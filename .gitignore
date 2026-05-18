@@ -1,11 +1,46 @@
+### Frontend (Next.js)
 .next/
 node_modules/
 out/
 dist/
 coverage/
+*.log
+*.tsbuildinfo
+
+### macOS
+# Finder metadata
+.DS_Store
+
+# Thumbnails
+._*
+
+# Custom folder icons
+Icon
+
+# Volume root files
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+### Python (Backend / AI)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+### MCP / Tooling
+# Local MCP server config (per-developer; tokens via env)
+.mcp.json
+
+### Environment (per-developer; tokens·secrets)
 .env
 .env.*
 !.env.example
-.DS_Store
-*.log
-*.tsbuildinfo
