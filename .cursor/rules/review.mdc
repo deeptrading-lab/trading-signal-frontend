@@ -1,0 +1,9 @@
+---
+description: 변경 리뷰 시 최소 확인 사항
+alwaysApply: true
+---
+
+# Review
+
+- 이 규칙의 공용 원본: `docs/rules/review.md`
+- Cursor 사용 시 이 파일이 적용되며, 상세 기준은 위 공용 문서를 따른다.
