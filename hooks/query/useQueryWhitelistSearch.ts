@@ -13,19 +13,19 @@
 "use client";
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { searchWhitelist } from "@/lib/api/whitelist";
-import { queryKeys } from "@/lib/query/keys";
+import { searchWhitelist } from "@/lib/api/workbench/whitelist";
+import { queryKeys } from "@/hooks/query/queryKeys";
 import type { ApiError } from "@/lib/api/errors";
-import type { WhitelistItem } from "@/lib/types/whitelist";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 
-export type UseWhitelistSearchOptions = {
+export type UseQueryWhitelistSearchOptions = {
   /** false 면 쿼리를 비활성화 (사용자가 입력 시작 전 등). 기본 true. */
   enabled?: boolean;
 };
 
-export function useWhitelistSearch(
+export function useQueryWhitelistSearch(
   q: string,
-  options?: UseWhitelistSearchOptions,
+  options?: UseQueryWhitelistSearchOptions,
 ): UseQueryResult<WhitelistItem[], ApiError> {
   return useQuery<WhitelistItem[], ApiError>({
     queryKey: queryKeys.whitelist(q),

@@ -12,9 +12,10 @@
 "use client";
 
 import { useId } from "react";
-import type { WhitelistItem } from "@/lib/types/whitelist";
-import type { AnalyzeValidationErrors } from "@/lib/validation/analyze";
-import type { AnalyzeFormState } from "@/hooks/use-analyze-form";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
+import type { AnalyzeValidationErrors } from "@/lib/validation/workbench/analyze";
+import type { AnalyzeFormState } from "@/hooks/workbench/useAnalyzeForm";
+import { cn } from "@/lib/utils/cn";
 
 type Props = {
   selectedTicker: WhitelistItem | null;
@@ -62,7 +63,7 @@ export function InputPanel({
           inputMode="decimal"
           min="0"
           step="any"
-          className={errors.capital_amount ? "input-error" : "input"}
+          className={cn(errors.capital_amount ? "input-error" : "input")}
           placeholder="예: 1000000"
           value={form.capital_amount}
           onChange={(e) => setField("capital_amount", e.target.value)}
@@ -90,7 +91,7 @@ export function InputPanel({
           inputMode="decimal"
           min="0"
           step="any"
-          className={errors.target_return_pct ? "input-error" : "input"}
+          className={cn(errors.target_return_pct ? "input-error" : "input")}
           placeholder="예: 5"
           value={form.target_return_pct}
           onChange={(e) => setField("target_return_pct", e.target.value)}
@@ -117,7 +118,7 @@ export function InputPanel({
           inputMode="numeric"
           min="1"
           step="1"
-          className={errors.target_period_days ? "input-error" : "input"}
+          className={cn(errors.target_period_days ? "input-error" : "input")}
           placeholder="예: 30"
           value={form.target_period_days}
           onChange={(e) => setField("target_period_days", e.target.value)}
@@ -146,7 +147,7 @@ export function InputPanel({
           min="0"
           max="5"
           step="any"
-          className={errors.max_loss_pct ? "input-error" : "input"}
+          className={cn(errors.max_loss_pct ? "input-error" : "input")}
           placeholder="예: 2"
           value={form.max_loss_pct}
           onChange={(e) => setField("max_loss_pct", e.target.value)}

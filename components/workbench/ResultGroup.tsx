@@ -11,7 +11,7 @@
  */
 
 import type { ApiError } from "@/lib/api/errors";
-import type { AnalyzeResponse } from "@/lib/types/workbench";
+import type { AnalyzeResponse } from "@/lib/types/workbench/analyze";
 import { ActionCard } from "@/components/workbench/ActionCard";
 import { BriefCard } from "@/components/workbench/BriefCard";
 import { EmptyState } from "@/components/workbench/EmptyState";

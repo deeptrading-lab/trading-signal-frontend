@@ -5,8 +5,8 @@
  * 라벨은 BE 가 `label` 로 한글/영문을 줄 수 있어 그대로 노출하고, 보조 통계는 캡션.
  */
 
-import type { Horizons } from "@/lib/types/workbench";
-import { formatPct } from "@/lib/formatters/pct";
+import type { Horizons } from "@/lib/types/workbench/analyze";
+import { formatPct } from "@/lib/utils/formatPct";
 
 type Props = {
   horizons: Horizons;

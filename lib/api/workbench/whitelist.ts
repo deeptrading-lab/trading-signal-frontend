@@ -8,7 +8,7 @@ import { httpClient } from "@/lib/api/client";
 import type {
   WhitelistItem,
   WhitelistSearchResponse,
-} from "@/lib/types/whitelist";
+} from "@/lib/types/workbench/whitelist";
 
 /**
  * 키워드(`q`) 로 화이트리스트를 검색해 종목 목록을 돌려준다.

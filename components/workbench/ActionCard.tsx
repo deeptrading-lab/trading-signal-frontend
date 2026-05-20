@@ -4,7 +4,7 @@
  * DESIGN.md `card-elevated` 한 장으로 화면당 1회. 한글 라벨은 `lib/copy/action-labels.ts`.
  */
 
-import { getActionMeta } from "@/lib/copy/action-labels";
+import { getActionMeta } from "@/lib/copy/workbench/actionLabels";
 
 type Props = {
   action: string;

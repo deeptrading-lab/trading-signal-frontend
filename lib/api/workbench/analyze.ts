@@ -8,7 +8,7 @@ import { httpClient } from "@/lib/api/client";
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
-} from "@/lib/types/workbench";
+} from "@/lib/types/workbench/analyze";
 
 /**
  * 분석 요청을 전송하고 BE 응답을 그대로 돌려준다.

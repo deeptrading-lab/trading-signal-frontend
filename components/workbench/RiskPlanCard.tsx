@@ -8,8 +8,8 @@
  *   - 차트 라이브러리 미도입 (PRD §4)
  */
 
-import type { RiskPlan } from "@/lib/types/workbench";
-import { formatMoney, formatNumber } from "@/lib/formatters/money";
+import type { RiskPlan } from "@/lib/types/workbench/analyze";
+import { formatMoney, formatNumber } from "@/lib/utils/formatMoney";
 
 type Props = {
   riskPlan: RiskPlan;

@@ -8,7 +8,7 @@
  * BE 가 새 필드를 추가해도 화면이 깨지지 않도록 핵심 외 필드는 옵셔널로 둔다.
  */
 
-import type { WhitelistItem } from "@/lib/types/whitelist";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 
 /* -------------------------------------------------------------------------- */
 /* 요청                                                                       */
