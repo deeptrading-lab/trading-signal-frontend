@@ -889,3 +889,45 @@
   - `app/page.tsx` 의 `http://127.0.0.1:8765` 직접 호출 → Next.js route handler 프록시(`app/api/workbench/analyze/route.ts`) 경유로 정정 (AGENTS.md "브라우저는 FastAPI를 직접 호출하지 않는다" 원칙) — PR #6 에서 이월
   - `README.md` / `AGENTS.md` 잔여 BE 표현 점검 — PR #6 에서 이월
   - `.mcp.json` 향후 처리 결정 (계속 로컬 유지 vs 제거) — PR #6 에서 이월
+
+### 2026-05-20 — docs(prd): 프론트엔드 재편 PRD 2개 (architecture + workbench-analyze) (#8)
+
+- **slug**: `docs/prd-frontend-rebuild` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/8
+- **요약**: docs(prd): 프론트엔드 재편 PRD 2개 (architecture + workbench-analyze)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6/#7 후속 — BE 분리 후 `app/page.tsx` 가 가정한 BE 인터페이스(`127.0.0.1:8765/api/bitcoin/brief` + BTC 단일 sizing 응답)가 실제 BE (`127.0.0.1:8000/api/workbench/analyze` + 6블록 응답)와 완전히 다름. PM 에이전트가 큰 재편을 두 PRD 로 분할 작성.
+  > 
+  > ## 변경 내용
+  > 
+  > ### 추가
+  > - [`docs/prd/frontend-architecture-restructure.md`](docs/prd/frontend-architecture-restructure.md) (UI: no) — 선행 PRD
+  >   - axios + TanStack Query v5 도입, 폴더 재구성, 타입 모듈, 클라이언트 함수·훅, route handler 보강, 입력 검증 함수
+  >   - AC 11개. 직접 호출 금지·env 단일 진입·axios 인스턴스·TanStack Query 적용·타입 일치(`any` 0건)·route handler 4xx/5xx 통과·placeholder 안전 포함
+  > - [`docs/prd/workbench-analyze-rebuild.md`](docs/prd/workbench-analyze-rebuild.md) (UI: yes) — 후속 PRD
+  >   - BE 응답 6블록(`brief / feasibility / horizons / risk_plan / action / warnings`) 매핑 화면, ticker 검색 UX, 입력 사전 차단 UI
+  >   - AC 15개. 수동 QA 시나리오 5개(AC-14) + 기본 접근성(AC-15) 포함
+  >   - 디자이너 산출물 `docs/design/workbench-analyze-rebuild.md` 의존
+  > 
+  > ### 수정
+  > - [`.claude/agents/api-integration-dev.md`](.claude/agents/api-integration-dev.md): `model: gpt-4` → `model: inherit` (engine 레포 잔재 — 다른 7개 에이전트와 통일)
+  > 
+  > ## PRD 분할 사유 (양 PRD §8 동일)
+  > 1. 한 PR 묶으면 +1000 라인급, reviewer 부담 ↑
+  > 2. 선행 PRD 만 머지된 시점에도 typecheck/build/라운드트립으로 회귀 가능 (UI 는 placeholder)
+  > 3. 후속 PRD 가 디자이너 산출물 의존 → 묶으면 디자이너 단계가 아키텍처 진행 블로킹
+  > 
+  > ## 사용자 결정사항 (PRD 본문에 가정으로 못 박힘)
+  > - 데이터 페칭: TanStack Query v5
+  > - HTTP 클라이언트: axios
+  > - BE 스펙 우선: 입력·응답·UX 모두 BE 제공 그대로
+  > - 폴더 트리: page / component / query / lib / types 등 역할별 분리 (구체 트리는 FE Dev 재량)
+  > 
+  > ## OPEN QUESTION 11건
+  > 선행 4건 + 후속 7건. 모두 PRD 본문 §9 에 PM 권고 동봉. 진입 차단 0건 — 디자이너 단계나 PM 권고로 자연스럽게 결정 예정.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 선행 PRD `frontend-architecture-restructure` 를 frontend-dev 에이전트가 `feature/frontend-architecture-restructure` 브랜치에서 구현
+  - 선행 PR 머지 후 후속 PRD `workbench-analyze-rebuild` 에 대해 ux-designer 에이전트 호출 → `docs/design/workbench-analyze-rebuild.md` 작성
+  - 디자이너 산출물 후 frontend-dev 구현 진입
