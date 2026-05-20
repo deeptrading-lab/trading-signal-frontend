@@ -1176,3 +1176,45 @@
   - 영향 파일: 약 23개 (import 경로 갱신) + 13개 파일 이동·rename + `lib/utils/cn.ts` 신규 + `app/page.tsx` 도메인 훅 흡수 + `docs/rules/frontend.md` 확장.
   - AC-10 (시각·동작 0 회귀) 의 QA 검증 = PR #11 라운드트립 5건 재현으로 갈음.
   - 본 PRD 머지 후 별도 PRD 큐잉: **반응형 (PC 대응 + useBreakpoint)** — PM 위임 예정.
+
+### 2026-05-20 — fe-conventions — hooks/lib 도메인 분리 + camelCase + cn 헬퍼 + 도메인 훅 흡수 (#15)
+
+- **slug**: `fe-conventions` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/15
+- **요약**: fe-conventions — hooks/lib 도메인 분리 + camelCase + cn 헬퍼 + 도메인 훅 흡수
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6~#14 후속 — PRD `fe-conventions` 구현. 시각·동작 0 회귀가 핵심.
+  > 
+  > ## 변경 요약 (커밋 6단위)
+  > 1. `chore(deps): clsx + tailwind-merge 도입` — cn 헬퍼의 런타임 의존
+  > 2. `feat(utils): cn 헬퍼 추가` — `lib/utils/cn.ts` (clsx + twMerge, 기본 설정)
+  > 3. `refactor(structure): hooks/lib 도메인 분리 + camelCase rename` — 13 파일 git mv + 함수명 갱신 + 23 파일 import 경로 갱신
+  > 4. `refactor(workbench): TanStack Query 인터페이스 누출 제거` — `useAnalyzeRun` 신설, `app/page.tsx` 가 도메인 훅만 경유
+  > 5. `refactor(workbench): cn 헬퍼 도입 — 조건부 className 합성 일원화` — BriefCard / FeasibilityCard / InputPanel / SearchPanel
+  > 6. `docs(rules): FE 컨벤션 7개 절 추가` — `docs/rules/frontend.md` 확장
+  > 
+  > ## AC 자가검증
+  > 
+  > - **AC-1 (카멜케이스 일원화)** — `find hooks lib -name '*-*.ts' -o -name '*-*.tsx' | wc -l` = **0**. `hooks/query/` 페칭 훅은 `useQuery~` / `useMutation~` 프리픽스로 종류 식별 가능.
+  > - **AC-2 (커스텀훅 의무화)** — `git grep -nE "from \"@/lib/query|from \"@/hooks/query" -- 'app/' 'components/'` **0 hits**. `git grep -nE "mutation\.(mutate|reset|isPending|isError|data)" -- 'app/page.tsx'` **0 hits**.
+  > - **AC-3 (cn 헬퍼 도입)** — `lib/utils/cn.ts` 존재, `package.json` dependencies 에 `clsx ^2.1.1` + `tailwind-merge ^3.6.0`.
+  > - **AC-4 (hooks 일원화)** — `test -d lib/query` → `gone`. `hooks/query/` 에 queryKeys + 페칭 훅 2개.
+  > - **AC-5 (한 뎁스 도메인 분리)** — `hooks/`, `lib/copy/`, `lib/types/`, `lib/validation/` 직속 파일 **0건**. `lib/api/` 직속은 `client.ts`, `errors.ts` 둘만.
+  > - **AC-6 (layout.tsx 컨벤션 문서화, 코드 변경 없음)** — `find app -name layout.tsx | wc -l` = **1**. 룰 추가.
+  > - **AC-7 (formatters → utils 흡수)** — `test -d lib/formatters` → `gone`. `lib/utils/{cn,formatMoney,formatPct}.ts` 존재. `lib/copy/workbench/{actionLabels,errorMessages}.ts` 존재.
+  > - **AC-8 (컨벤션 문서 확장)** — `docs/rules/frontend.md` 에 §3.6 의 7개 절 모두 추가. 기존 Tailwind 절 유지.
+  > - **AC-9 (build / typecheck / lint)** — 3개 모두 0 에러.
+  > - **AC-10 (시각·동작 0 회귀)** — 아래 라운드트립 5건 정상 응답.
+  > - **AC-11 (AGENTS.md 원칙 무회귀)** — 한글 카피 무회귀, `127.0.0.1` 직접 호출 0건 (route handler 만 경유), 환경변수 단일 진입 유지.
+  > - **AC-12 (수동 QA)** — `npm install`/`build` 0 에러, kebab-case 0건, `@/lib/query` 잔재 0건.
+  > 
+  > ## 최종 hooks/lib 트리
+  > 
+  > ```
+  > hooks/query/queryKeys.ts
+  > hooks/query/useMutationAnalyzeWorkbench.ts
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **반응형 (PC 대응 + useBreakpoint) PRD** — 별도 큐잉됨. `cn` 헬퍼 위에서 variant 분기로 자연스럽게 얹힘.
+  - **두 번째 화면 추가 시 라우트 그룹 `(group)/layout.tsx` + `components/layout/` 추출 검토** — 본 PRD 의 §3.6 layout 절을 1차 근거.
+  - **tailwind-merge 와 커스텀 토큰 충돌 모니터링** — `cn` 호출이 늘면서 `card`/`badge-warn`/`rounded-card` 같은 합성 토큰이 잘못 머지되는지 관찰. 발생 시 `extendTailwindMerge` 어댑터 1개를 `lib/utils/cn.ts` 안에 추가.
