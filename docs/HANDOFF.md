@@ -1252,3 +1252,43 @@
   - **ux-designer** 가 \`docs/design/workbench-analyze-rebuild.md\` 에 \`breakpoints\` 토큰 + 데스크탑 레이아웃 가이드 추가. \`npx @google/design.md lint\` 0 에러.
   - **frontend-dev** 가 \`feature/responsive-pc-support\` 브랜치에서 구현. \`useBreakpoint\` 훅 + 컴포넌트 반응형 적용 + \`docs/rules/frontend.md\` 8번째 절 추가.
   - 본 PRD 머지 후 **마지막**: \`chore/sync-agent-conventions\` — 누적 컨벤션을 \`.claude/agents/*\` + \`AGENTS.md\` 에 흡수.
+
+### 2026-05-20 — feat(responsive): PC 지원 — breakpoints 토큰 + useBreakpoint + 데스크탑 grid (#17)
+
+- **slug**: `responsive-pc-support` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/17
+- **요약**: feat(responsive): PC 지원 — breakpoints 토큰 + useBreakpoint + 데스크탑 grid
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6~#16 후속 — PRD `responsive-pc-support` 구현. 모바일 무회귀 + 데스크탑 (`>= lg`) 신규 레이아웃.
+  > 
+  > ## 변경 요약 (커밋 5단위)
+  > 1. **docs(design)**: `docs/design/workbench-analyze-rebuild.md` v2 — breakpoints 토큰 + 데스크탑 가이드 (디자이너 산출물, 본 PR 의 input).
+  > 2. **feat(tailwind)**: `npm run design:sync` 가 screens 토큰 흡수. `@google/design.md export` 가 breakpoints 를 흘려보내지 않으므로 후처리 스크립트 `scripts/inject-breakpoints.mjs` 가 DESIGN.md `breakpoints:` 절을 파싱해 `tailwind.theme.json.theme.extend.screens` 로 주입. `tailwind.config.ts` 의 어댑터가 `screens` 를 흡수 → 묵시적 채택을 명시적 채택으로 전환.
+  > 3. **feat(hooks)**: `hooks/utils/useBreakpoint.ts` 신설. `{ isMobile, isTablet, isDesktop }` boolean 셋 반환. matchMedia 두 미디어쿼리(md/lg) 로 셋 도출. SSR-safe — 초기값 모바일 퍼스트로 hydration mismatch 0건. StrictMode 더블 마운트 대응 (`useEffect` cleanup 에서 listener 제거).
+  > 4. **feat(components)**: 데스크탑 레이아웃 적용. Tailwind prefix 우선.
+  >    - `app/page.tsx`: `md:max-w-2xl lg:max-w-6xl`, 데스크탑에서 `lg:grid lg:grid-cols-[360px_1fr] lg:gap-2xl`. 좌측 sidebar 는 `lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto`.
+  >    - `components/workbench/ResultGroup.tsx`: 데스크탑(`>= lg`)에서 결과 6블록 비대칭 2 컬럼 grid. `action` 전폭 → `feasibility + warnings` (없으면 feasibility 풀폭) → `brief + risk_plan` → `horizons` 전폭. 모바일·데스크탑 DOM 순서가 달라(warnings 위치) `useBreakpoint` 로 JS 분기 — 본 PRD 의 sanity check 활용 1건 (PRD §3.4 / §9 RESOLVED 후보 (c)).
+  > 5. **docs(rules)**: `docs/rules/frontend.md` 8번째 절 "반응형" 추가.
+  > 
+  > ## 디자이너 v2 결정 (DESIGN.md OPEN QUESTION R1~R5)
+  > - R1 breakpoints: Tailwind 기본 정합 (sm 640 / md 768 / lg 1024 / xl 1280) — PM 권고 수용.
+  > - R2 컨테이너 최대폭: `lg:max-w-6xl` (1152px) — PM 권고(1024~1280) 안에서 카드 폭 정보 밀도 우선 1152px 채택.
+  > - R3 결과 grid: 우측 2 컬럼 비대칭.
+  > - R4 입력 패널 위치: 좌측 sticky sidebar.
+  > - R5 태블릿: 모바일과 동일 한 컬럼 + `md:max-w-2xl` 확장.
+  > 
+  > ## AC 자가검증
+  > 
+  > - **AC-1 (DESIGN.md breakpoints)**: front matter `breakpoints` 4 키 추가 (sm/md/lg/xl). 데스크탑 가이드 본문에 추가. `npx @google/design.md lint` errors=0 warnings=0.
+  > - **AC-2 (Tailwind theme 정합)**: `npm run design:sync` 0 에러 종료. `tailwind.theme.json.theme.extend.screens` 4 키 존재. `tailwind.config.ts` 의 `adaptDesignTokens` 가 `screens` 흡수.
+  > - **AC-3 (useBreakpoint 존재 + SSR-safe + 실사용)**: `hooks/utils/useBreakpoint.ts` 파일 존재. 반환 시그니처 `{ isMobile, isTablet, isDesktop }`. SSR 초기값 모바일 퍼스트로 hydration mismatch 0건 (dev 서버 + 콘솔 무경고 확인). `git grep useBreakpoint` 사용처: `components/workbench/ResultGroup.tsx` 1건.
+  > - **AC-4 (모바일 무회귀)**: 모바일(`< lg`)에서 ResultGroup 의 DOM 순서·className 모두 기존 동일 (action → warnings → feasibility → brief → risk_plan → horizons). 메인 컨테이너 `max-w-[480px] px-lg pt-[18px] pb-[28px]` 유지. 라운드트립 5건 무회귀.
+  > - **AC-5 (데스크탑 신규 레이아웃)**: `>= 1024px` 에서 결과 6블록 비대칭 2 컬럼. 메인 컨테이너 최대폭 1152px. 입력 패널 좌측 sticky sidebar.
+  > - **AC-6 (Tailwind 반응형 prefix 우선)**: max-w·grid-cols·sticky·gap 등 레이아웃 변경은 모두 Tailwind prefix (`md:`/`lg:`). `useBreakpoint` 사용처는 DOM 트리 분기(=조건부 렌더) 1건만 — Tailwind prefix 로 표현 불가능한 케이스.
+  > - **AC-7 (build / typecheck / lint)**: 0 에러 (실행 결과 첨부). `tailwind.theme.json` 변경분이 `npm run design:sync` 로 재현 가능.
+  > - **AC-8 (AGENTS.md 무회귀)**: 한글 카피 유지. 직접 호출 0건 (route handler fallback 만). env 변경 없음. 키보드 탭 순서 = 시각 순서.
+  > - **AC-9 (컨벤션 문서 확장)**: `docs/rules/frontend.md` 에 "반응형" 절 9 줄 추가 (CSS 측 / JS 측 / window.innerWidth 금지 / hooks/utils 위치 / SSR-safe / breakpoint 단일 진실 원천). 기존 7개 절 무회귀.
+  > - **AC-10 (수동 QA)**: 아래 수동 라운드트립 절.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `chore/sync-agent-conventions` — 누적 컨벤션(camelCase 네이밍, 커스텀훅 의무화, `cn`, `hooks` 일원화, 도메인 한 뎁스, Tailwind 토큰, BFF, 반응형 prefix · `useBreakpoint`) 을 `.claude/agents/*.md` + `AGENTS.md` + `docs/agents/*.md` 에 흡수. 본 PR 머지 후 마지막 단계.
