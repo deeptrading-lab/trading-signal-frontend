@@ -8,7 +8,11 @@
 
 export function EmptyState() {
   return (
-    <div className="emptyState" role="status" aria-live="polite">
+    <div
+      className="px-[16px] py-[20px] bg-panel border border-line rounded-sm text-secondary text-body-sm text-center"
+      role="status"
+      aria-live="polite"
+    >
       종목과 조건을 입력하면 분석 결과가 표시돼요.
     </div>
   );

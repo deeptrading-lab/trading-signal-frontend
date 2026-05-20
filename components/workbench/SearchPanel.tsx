@@ -79,8 +79,13 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
   }
 
   return (
-    <div className="searchPanel">
-      <label htmlFor={inputId}>종목 검색</label>
+    <div className="relative mb-md p-lg bg-panel border border-line rounded-sm">
+      <label
+        htmlFor={inputId}
+        className="block mb-sm text-caption text-secondary"
+      >
+        종목 검색
+      </label>
       <input
         id={inputId}
         ref={inputRef}
@@ -109,13 +114,19 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
             : undefined
         }
       />
-      {helper ? <p className="searchPanelHelper">{helper}</p> : null}
+      {helper ? (
+        <p className="mt-sm text-caption text-secondary">{helper}</p>
+      ) : null}
       {open ? (
-        <div className="searchPanelResults" role="listbox" id={listId}>
+        <div
+          className="absolute top-full left-lg right-lg z-[5] mt-xs p-xs bg-panel border border-line rounded-sm max-h-[280px] overflow-y-auto shadow-[0_10px_28px_rgba(23,32,42,0.08)]"
+          role="listbox"
+          id={listId}
+        >
           {isPending && results.length === 0 ? (
-            <div className="searchPanelEmpty">검색 중…</div>
+            <div className="p-[12px] text-body-sm text-secondary">검색 중…</div>
           ) : results.length === 0 ? (
-            <div className="searchPanelEmpty">
+            <div className="p-[12px] text-body-sm text-secondary">
               일치하는 종목이 없어요. AAPL · BTC-USD 를 검색해 보세요.
             </div>
           ) : (
@@ -135,10 +146,22 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
                     handleSelect(item);
                   }}
                 >
-                  <strong>
+                  <strong
+                    className={
+                      focused
+                        ? "text-body-md font-bold"
+                        : "text-body-md font-bold text-primary"
+                    }
+                  >
                     {item.ticker} · {item.name}
                   </strong>
-                  <span>
+                  <span
+                    className={
+                      focused
+                        ? "text-body-sm text-tertiary"
+                        : "text-body-sm text-secondary"
+                    }
+                  >
                     {item.asset_type} · {item.currency}
                     {item.aliases && item.aliases.length > 0
                       ? ` · ${item.aliases.slice(0, 3).join(", ")}`

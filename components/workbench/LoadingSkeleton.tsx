@@ -7,26 +7,31 @@
 
 export function LoadingSkeleton() {
   return (
-    <div className="resultGroup" aria-busy="true" aria-live="polite" aria-label="분석 중">
-      <div className="skeleton" style={{ minHeight: "120px" }}>
-        <div className="skeletonLine is-narrow" />
-        <div className="skeletonLine is-medium" />
-        <div className="skeletonLine" />
+    <div
+      className="grid gap-md mt-lg"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="분석 중"
+    >
+      <div className="skeleton min-h-[120px]">
+        <div className="skeleton-line skeleton-line-narrow" />
+        <div className="skeleton-line skeleton-line-medium" />
+        <div className="skeleton-line" />
       </div>
-      <div className="skeleton" style={{ minHeight: "84px" }}>
-        <div className="skeletonLine is-medium" />
-        <div className="skeletonLine" />
+      <div className="skeleton min-h-[84px]">
+        <div className="skeleton-line skeleton-line-medium" />
+        <div className="skeleton-line" />
       </div>
-      <div className="skeleton" style={{ minHeight: "160px" }}>
-        <div className="skeletonLine is-narrow" />
-        <div className="skeletonLine" />
-        <div className="skeletonLine is-medium" />
-        <div className="skeletonLine" />
+      <div className="skeleton min-h-[160px]">
+        <div className="skeleton-line skeleton-line-narrow" />
+        <div className="skeleton-line" />
+        <div className="skeleton-line skeleton-line-medium" />
+        <div className="skeleton-line" />
       </div>
-      <div className="skeleton" style={{ minHeight: "100px" }}>
-        <div className="skeletonLine is-narrow" />
-        <div className="skeletonLine" />
-        <div className="skeletonLine is-medium" />
+      <div className="skeleton min-h-[100px]">
+        <div className="skeleton-line skeleton-line-narrow" />
+        <div className="skeleton-line" />
+        <div className="skeleton-line skeleton-line-medium" />
       </div>
     </div>
   );

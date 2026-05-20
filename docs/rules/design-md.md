@@ -154,6 +154,8 @@ npx @google/design.md export --format tailwind docs/design/<slug>.md > frontend/
 npx @google/design.md export --format dtcg docs/design/<slug>.md > frontend/tokens.json
 ```
 
+본 저장소(`trading-signal-frontend`)에서는 위 명령을 `npm run design:sync` 한 줄로 실행한다. 결과 `tailwind.theme.json` 은 git 에 커밋해 빌드 재현성을 보장한다.
+
 ## 에이전트별 책임
 
 - **ux-designer**: `docs/design/<slug>.md`를 위 포맷으로 작성. 산출 직전 `lint` 통과 필수. 토큰 이름은 `primary`/`secondary`/`tertiary`/`neutral` 컨벤션 우선.

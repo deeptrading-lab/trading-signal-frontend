@@ -21,16 +21,22 @@ const DIRECTION_LABEL: Record<string, string> = {
 export function HorizonsCard({ horizons }: Props) {
   if (!horizons || horizons.length === 0) return null;
   return (
-    <article className="card horizonsCard" aria-label="구간별 추세">
-      <p className="resultBlockTitle">구간별 추세</p>
+    <article className="card" aria-label="구간별 추세">
+      <p className="mb-sm text-h2 text-primary">구간별 추세</p>
       {horizons.map((h, idx) => (
-        <div key={`${h.label}-${idx}`} className="horizonRow">
-          <span className="horizonLabel">{h.label}</span>
-          <span className="horizonBody">
+        <div
+          key={`${h.label}-${idx}`}
+          className="grid grid-cols-[64px_1fr] gap-md py-sm border-b border-line last:border-b-0"
+        >
+          <span className="text-caption text-secondary">{h.label}</span>
+          <span className="text-body-sm text-body-strong">
             {(DIRECTION_LABEL[h.direction] ?? h.direction) + " · "}
-            수익률 <strong>{formatPct(h.return_pct, { sign: true })}</strong>
+            수익률{" "}
+            <strong className="tabular">
+              {formatPct(h.return_pct, { sign: true })}
+            </strong>
             {" · 최대 낙폭 "}
-            <strong>{formatPct(h.max_drawdown_pct)}</strong>
+            <strong className="tabular">{formatPct(h.max_drawdown_pct)}</strong>
           </span>
         </div>
       ))}

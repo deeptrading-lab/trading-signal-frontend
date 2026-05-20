@@ -1,0 +1,130 @@
+{
+  "theme": {
+    "extend": {
+      "colors": {
+        "primary": "#17202a",
+        "secondary": "#657385",
+        "tertiary": "#0f766e",
+        "tertiary-soft": "#e5f4f1",
+        "neutral": "#f5f7fa",
+        "panel": "#ffffff",
+        "line": "#dbe2ea",
+        "field-bg": "#f8fafc",
+        "warn": "#b45309",
+        "warn-soft": "#fff4df",
+        "info": "#2563eb",
+        "info-soft": "#eaf1ff",
+        "critical": "#991b1b",
+        "critical-soft": "#fee2e2",
+        "body-strong": "#344253",
+        "white": "#ffffff"
+      },
+      "fontFamily": {
+        "display": [
+          "Arial"
+        ],
+        "h1": [
+          "Arial"
+        ],
+        "h2": [
+          "Arial"
+        ],
+        "body-md": [
+          "Arial"
+        ],
+        "body-sm": [
+          "Arial"
+        ],
+        "body-strong": [
+          "Arial"
+        ],
+        "caption": [
+          "Arial"
+        ],
+        "button": [
+          "Arial"
+        ],
+        "badge": [
+          "Arial"
+        ],
+        "mono-numeric": [
+          "Arial"
+        ]
+      },
+      "fontSize": {
+        "display": [
+          "30px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "h1": [
+          "22px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "h2": [
+          "17px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "body-md": [
+          "16px",
+          {
+            "fontWeight": "400"
+          }
+        ],
+        "body-sm": [
+          "14px",
+          {
+            "fontWeight": "400"
+          }
+        ],
+        "body-strong": [
+          "16px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "caption": [
+          "12px",
+          {
+            "fontWeight": "400"
+          }
+        ],
+        "button": [
+          "15px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "badge": [
+          "13px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "mono-numeric": [
+          "15px",
+          {
+            "fontWeight": "700"
+          }
+        ]
+      },
+      "borderRadius": {
+        "sm": "8px",
+        "pill": "999px"
+      },
+      "spacing": {
+        "xs": "4px",
+        "sm": "6px",
+        "md": "10px",
+        "lg": "14px",
+        "xl": "18px",
+        "2xl": "24px"
+      }
+    }
+  }
+}

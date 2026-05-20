@@ -1090,3 +1090,46 @@
   - frontend-dev 에이전트가 `feature/tailwind-migration` 브랜치에서 본 PRD 를 구현. AC-7 (합성 토큰 처리) §9 PM 권고 (b) 따라 `@layer components` + `@apply` 우선. AC-8 시각 0 회귀를 PR #11 라운드트립 5건으로 자가검증.
   - 구현 PR QA 시 본 PRD AC-12 (수동 QA 시나리오 a~c) 와 PR #11 AC-14 라운드트립 5건 동시 검증.
   - 본 PR 범위 외 follow-up (reviewer nit 5건 · `.mcp.json` · placeholder 동적화 · `offline` 토글 · `ai_summary` 카피) 은 자연 흡수 케이스만 구현 PR 본문에 명시.
+
+### 2026-05-20 — tailwind-migration: Tailwind v3 도입 + globals.css 844→46라인 + var(--) 0건 (#13)
+
+- **slug**: `tailwind-migration` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/13
+- **요약**: tailwind-migration: Tailwind v3 도입 + globals.css 844→46라인 + var(--) 0건
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6/#7/#8/#9/#10/#11/#12 후속 — PRD `tailwind-migration` 구현. 시각·동작 0 회귀가 핵심.
+  > 
+  > ## 변경 요약 (커밋 단위 분리)
+  > 
+  > - `chore(tailwind)`: tailwindcss@3 + postcss + autoprefixer 추가, `tailwind.config.ts` + adapter, `tailwind.theme.json` 커밋, `design:sync` script, `globals.css` 844→46 (94% 감축), 합성 토큰은 `app/components.css` 분리
+  > - `refactor(workbench)`: `app/page.tsx` + `components/workbench/*` 12개 className 재작성, `var(--)` 0건
+  > - `docs(rules)`: `frontend.md` 에 Tailwind 컨벤션 한 줄, `design-md.md` 에 동기화 명령 한 줄
+  > 
+  > ## AC 자가검증
+  > 
+  > - AC-1 (Tailwind 도입): `npm ls tailwindcss` OK, `tailwind.config.ts` 존재, `globals.css` 최상단에 `@tailwind base/components/utilities` 3줄
+  > - AC-2 (globals.css 축소): `wc -l app/globals.css` = **46** (목표 100 미만)
+  > - AC-3 (var(--) 0건): `git grep -nE "var\(--" -- app/ components/` → exit 1 (no match)
+  > - AC-4 (design:sync 동작): `npm run design:sync` → `tailwind.theme.json` 생성 확인, `tailwind.config.ts` 가 JSON import 후 어댑터 통과해 `theme.extend` 주입
+  > - AC-5 (토큰 매핑): colors / spacing / borderRadius / fontSize / fontFamily 모두 Tailwind theme key 로 1:1 매핑 (어댑터에서 lineHeight·tnum 보완, body-strong fontSize 키만 제외 — colors `body-strong` 와 이름 충돌 회피)
+  > - AC-6 (className 재작성): 12 컴포넌트 + `page.tsx` 모두 재작성, `style={{ }}` 안 hex/px 직타 0건 (동적 `left: ${pct}%` 만 허용 범위로 잔류)
+  > - AC-7 (합성 토큰 일관성): PM 권고 (b) 채택 — `@layer components` + `@apply` 로 `card`, `card-elevated`, `card-warn`, `card-critical`, `badge-*`, `input(-error)`, `button-*`, `search-result-item(-focus)`, `price-bar-*`, `skeleton(-line)` 유지
+  > - AC-8 (시각·동작 0 회귀): build 결과 CSS 의 토큰 색·간격·radius 가 main 과 1:1 동일 (선언만 Tailwind 로 이전). PR #11 의 수동 라운드트립 5건 (a~e) 은 BE LIVE 환경 필요 → QA 단계에서 dev 서버 + 실 BE 로 최종 확인 권장
+  > - AC-9 (build/typecheck/lint): 세 명령 모두 0 에러 확인
+  > - AC-10 (AGENTS.md 무회귀): 한글 톤 유지, `127.0.0.1` 직접 호출 0건, env 단일 진입, label·aria 그대로
+  > - AC-11 (컨벤션 갱신): `docs/rules/frontend.md` + `docs/rules/design-md.md` 한 절씩 추가
+  > - AC-12 (수동 QA 시나리오):
+  >   - (a) `npm install` 직후 `npm run build` 통과 — 확인
+  >   - (b) `tailwind.theme.json` 의 `tertiary` 를 `#ff00ff` 로 임시 변경 → `npm run build` → `.next/static/css/*.css` 에 `rgb(255 0 255)` 반영 확인, 복원 후 `rgb(15 118 110)` 재반영 확인
+  >   - (c) PR #11 라운드트립 5건은 BE LIVE QA 단계로 위임
+  > 
+  > ## 시각 0 회귀
+  > 
+  > - CSS 빌드 결과의 토큰값 직접 비교: main 의 `:root --tertiary: #0f766e` ↔ 본 PR 의 Tailwind 생성 `.bg-tertiary { background-color: rgb(15 118 110) }` — 동일
+  > - 모든 합성 토큰 클래스의 padding/radius/border 값이 DESIGN.md spec 과 동일 (build 출력 cross-check)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR #11 reviewer nit 5건 + `.mcp.json` 처리 + 화이트리스트 placeholder 동적화 + `offline` 토글 UI + `ai_summary` 카피 재검토 — 본 PR 범위 외이며 자연 흡수도 미발생, 별도 chore PRD 로 분리
+  - 다크모드 PRD (DESIGN.md 토큰 prefix 유지하면서 `dark:` variant + alternate theme 로 도입) — 본 PR 의 토큰 구조가 그 도입을 단순화
+  - shadcn/ui 도입 검토 PRD — Tailwind 가 전제됐으니 옵션 열림
+  - Tailwind v4 마이그레이션 chore PRD — alpha 안정화 시점에 검토
