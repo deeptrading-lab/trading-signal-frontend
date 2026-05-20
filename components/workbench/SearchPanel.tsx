@@ -80,10 +80,10 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
   }
 
   return (
-    <div className="relative mb-md p-lg bg-panel border border-line rounded-sm">
+    <div className="relative mb-md p-lg bg-surface border border-border-line rounded-sm">
       <label
         htmlFor={inputId}
-        className="block mb-sm text-caption text-secondary"
+        className="block mb-sm text-caption text-text-muted"
       >
         종목 검색
       </label>
@@ -116,18 +116,18 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
         }
       />
       {helper ? (
-        <p className="mt-sm text-caption text-secondary">{helper}</p>
+        <p className="mt-sm text-caption text-text-muted">{helper}</p>
       ) : null}
       {open ? (
         <div
-          className="absolute top-full left-lg right-lg z-[5] mt-xs p-xs bg-panel border border-line rounded-sm max-h-[280px] overflow-y-auto shadow-[0_10px_28px_rgba(23,32,42,0.08)]"
+          className="absolute top-full left-lg right-lg z-[5] mt-xs p-xs bg-surface border border-border-line rounded-sm max-h-[280px] overflow-y-auto shadow-[0_10px_28px_rgba(23,32,42,0.08)]"
           role="listbox"
           id={listId}
         >
           {isPending && results.length === 0 ? (
-            <div className="p-[12px] text-body-sm text-secondary">검색 중…</div>
+            <div className="p-[12px] text-body-sm text-text-muted">검색 중…</div>
           ) : results.length === 0 ? (
-            <div className="p-[12px] text-body-sm text-secondary">
+            <div className="p-[12px] text-body-sm text-text-muted">
               일치하는 종목이 없어요. AAPL · BTC-USD 를 검색해 보세요.
             </div>
           ) : (
@@ -148,14 +148,14 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
                   }}
                 >
                   <strong
-                    className={cn("text-body-md font-bold", !focused && "text-primary")}
+                    className={cn("text-body-md font-bold", !focused && "text-text-strong")}
                   >
                     {item.ticker} · {item.name}
                   </strong>
                   <span
                     className={cn(
                       "text-body-sm",
-                      focused ? "text-tertiary" : "text-secondary",
+                      focused ? "text-primary" : "text-text-muted",
                     )}
                   >
                     {item.asset_type} · {item.currency}

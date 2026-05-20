@@ -29,9 +29,9 @@ type Props = {
 
 const FIELD_WRAP = "grid gap-sm";
 const FIELD_FULL = "grid gap-sm col-span-2";
-const LABEL = "text-caption text-secondary";
-const UNIT = "flex items-end pb-md text-body-sm text-secondary";
-const HELPER = "mt-xs text-caption text-secondary";
+const LABEL = "text-caption text-text-muted";
+const UNIT = "flex items-end pb-md text-body-sm text-text-muted";
+const HELPER = "mt-xs text-caption text-text-muted";
 const HELPER_CRITICAL = "mt-xs text-caption text-critical";
 
 export function InputPanel({
@@ -51,7 +51,7 @@ export function InputPanel({
   const currencyLabel = selectedTicker?.currency ?? "-";
 
   return (
-    <div className="grid grid-cols-[1fr_92px] gap-md mb-md p-lg bg-panel border border-line rounded-sm">
+    <div className="grid grid-cols-[1fr_92px] gap-md mb-md p-lg bg-surface border border-border-line rounded-sm">
       {/* capital_amount */}
       <div className={FIELD_WRAP}>
         <label htmlFor={capitalId} className={LABEL}>

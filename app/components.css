@@ -10,6 +10,11 @@
  *   - 비-합성·일회성 레이아웃 (예: `.mobileShell`, `.topBar`, `.inputPanel`, `.searchPanel`,
  *     `.resultGroup`) 은 컴포넌트 코드의 Tailwind 유틸리티 조합으로 처리하므로 본 파일에 없다.
  *   - 본 파일은 PRD AC-2 의 100 라인 제약 대상이 아니다 (globals.css 한정).
+ *   - v3 (palette-modernization) 적용: 토큰명 v2 → v3 semantic rename
+ *     (`panel` → `surface`, `neutral` → `surface-muted`, `field-bg` → `surface-muted`,
+ *     `tertiary` → `primary`, `tertiary-soft` → `accent-soft`, `line` → `border-line`,
+ *     `secondary` → `text-muted`, `body-strong` → `text-strong`, `primary`(text) → `text-strong`,
+ *     `white` → `surface`).
  */
 
 /* Next.js 의 PostCSS 는 각 CSS 파일을 별도 입력으로 처리하므로, 본 파일에서
@@ -20,10 +25,10 @@
 @layer components {
   /* ---------- 카드 베이스 ---------- */
   .card {
-    @apply bg-panel text-primary border border-line rounded-sm p-[16px];
+    @apply bg-surface text-text-strong border border-border-line rounded-sm p-[16px];
   }
   .card-elevated {
-    @apply bg-panel text-primary border border-line rounded-sm p-[20px];
+    @apply bg-surface text-text-strong border border-border-line rounded-sm p-[20px];
     box-shadow: 0 10px 28px rgba(23, 32, 42, 0.08);
   }
   .card-warn {
@@ -38,7 +43,7 @@
     @apply inline-flex items-center h-[28px] px-[10px] rounded-pill text-badge whitespace-nowrap;
   }
   .badge-accent {
-    @apply badge-base bg-tertiary-soft text-tertiary;
+    @apply badge-base bg-accent-soft text-primary;
   }
   .badge-warn {
     @apply badge-base bg-warn-soft text-warn;
@@ -53,12 +58,12 @@
   /* ---------- 입력 / 버튼 ---------- */
   .input,
   .input-error {
-    @apply w-full h-[42px] px-[11px] bg-field-bg text-primary border border-line rounded-sm text-body-md;
+    @apply w-full h-[42px] px-[11px] bg-surface-muted text-text-strong border border-border-line rounded-sm text-body-md;
     font-family: inherit;
   }
   .input:focus {
-    @apply outline-none border-tertiary;
-    box-shadow: 0 0 0 3px theme("colors.tertiary-soft");
+    @apply outline-none border-primary;
+    box-shadow: 0 0 0 3px theme("colors.accent-soft");
   }
   .input-error {
     @apply bg-critical-soft text-critical border-critical;
@@ -69,7 +74,7 @@
   }
 
   .button-primary {
-    @apply h-[44px] px-[12px] bg-tertiary text-white border-0 rounded-sm text-button cursor-pointer;
+    @apply h-[44px] px-[12px] bg-primary text-surface border-0 rounded-sm text-button cursor-pointer;
     font-family: inherit;
   }
   .button-primary[aria-disabled="true"],
@@ -77,21 +82,21 @@
     @apply opacity-[0.65] cursor-not-allowed;
   }
   .button-secondary {
-    @apply h-[38px] px-[14px] bg-white text-critical border border-critical rounded-sm text-button cursor-pointer;
+    @apply h-[38px] px-[14px] bg-surface text-critical border border-critical rounded-sm text-button cursor-pointer;
     font-family: inherit;
   }
 
   /* ---------- 검색 결과 아이템 ---------- */
   .search-result-item {
-    @apply grid gap-xs p-[12px] rounded-sm cursor-pointer bg-panel text-primary;
+    @apply grid gap-xs p-[12px] rounded-sm cursor-pointer bg-surface text-text-strong;
   }
   .search-result-item-focus {
-    @apply grid gap-xs p-[12px] rounded-sm cursor-pointer bg-tertiary-soft text-tertiary;
+    @apply grid gap-xs p-[12px] rounded-sm cursor-pointer bg-accent-soft text-primary;
   }
 
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
   .price-bar-track {
-    @apply absolute top-[6px] left-0 right-0 h-[6px] bg-line rounded-pill;
+    @apply absolute top-[6px] left-0 right-0 h-[6px] bg-border-line rounded-pill;
   }
   .price-bar-stop,
   .price-bar-entry,
@@ -101,15 +106,15 @@
   }
   .price-bar-stop { @apply bg-critical; }
   .price-bar-entry { @apply bg-info; }
-  .price-bar-target { @apply bg-tertiary; }
+  .price-bar-target { @apply bg-primary; }
 
   /* ---------- 스켈레톤 ---------- */
   .skeleton {
-    @apply bg-field-bg border border-line rounded-sm p-[20px] relative overflow-hidden;
+    @apply bg-surface-muted border border-border-line rounded-sm p-[20px] relative overflow-hidden;
     animation: skeletonShimmer 1.4s ease-in-out infinite;
   }
   .skeleton-line {
-    @apply h-[14px] bg-line rounded-pill mb-sm;
+    @apply h-[14px] bg-border-line rounded-pill mb-sm;
   }
   .skeleton-line:last-child { @apply mb-0; }
   .skeleton-line-narrow { @apply w-[40%]; }

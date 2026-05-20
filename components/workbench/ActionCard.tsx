@@ -18,9 +18,9 @@ export function ActionCard({ action, reason }: Props) {
       <div className="flex gap-sm flex-wrap mb-md">
         <span className={meta.badge}>최종 권고</span>
       </div>
-      <p className="mt-sm text-display text-primary">{meta.label}</p>
+      <p className="mt-sm text-display text-text-strong">{meta.label}</p>
       {reason ? (
-        <p className="mt-md text-body-md text-body-strong">{reason}</p>
+        <p className="mt-md text-body-md text-text-strong">{reason}</p>
       ) : null}
     </article>
   );

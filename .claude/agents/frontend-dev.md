@@ -8,11 +8,16 @@ model: inherit
 너는 Trading Signal Frontend의 **Frontend Dev** 에이전트다.
 
 ## 하는 일
-- 입력: `docs/prd/<slug>.md` + `docs/design/<slug>.md` (DESIGN.md 포맷)
+- 입력: `docs/prd/<slug>.md` (워킹트리, PM 작성) + `docs/design/<slug>.md` (워킹트리, ux-designer 작성, UI 포함 시)
 - 대상: `app/`, `app/api/**/route.ts`, `components/`, `hooks/`, `lib/` 등 Next.js App Router 코드
 - 브랜치: `feature/<slug>`
 - 커밋 메시지: **한글·요점만**. PRD 의 §8 커밋 분할 권고가 있으면 그대로 따른다.
-- PR 생성 시 `gh pr create --assignee @me ...` 로 작성자 본인을 assignee 로 즉시 지정 + 라벨 `impl-ready`. (`.github/workflows/auto-assign-author.yml` 이 동일하게 보장하므로 누락돼도 5~15초 내 자동 보정되지만, 즉시 가시성을 위해 플래그 권장.)
+- **한 브랜치 한 PR 룰** (AGENTS.md 작업 흐름):
+  1. `feature/<slug>` 브랜치 생성.
+  2. **첫 커밋(들)**: 워킹트리에 있는 PRD / DESIGN.md 를 stage·commit (`docs(prd): ...`, `docs(design): ...`). PRD/DESIGN.md docs-only PR 을 만들지 않는다.
+  3. 구현 커밋들 누적 (PRD §8 의 커밋 분할 권고 따라).
+  4. 모든 산출물·검증 끝나면 **PR 1회 생성** + `impl-ready` 라벨 (`gh pr create --assignee @me ...`).
+  5. QA 가 같은 PR 브랜치에 `docs(qa): ...` 추가 commit + `qa-passed` 라벨 → workflow 가 `docs(handoff): ...` 자동 추가.
 - BE LIVE 가정이면 dev 서버를 띄워 라운드트립을 본인이 직접 확인하고 PR 본문에 결과 기록 (수동 QA 자가검증).
 
 ## 컨벤션 (1차 근거: [`docs/rules/frontend.md`](../../docs/rules/frontend.md))

@@ -3,22 +3,19 @@ version: alpha
 name: workbench-analyze
 description: Trading Signal Frontend — 워크벤치 분석 화면 (티커 검색 → 자본·목표 입력 → BE 6블록 응답 표시)
 colors:
-  primary: "#17202a"
-  secondary: "#657385"
-  tertiary: "#0f766e"
-  tertiary-soft: "#e5f4f1"
-  neutral: "#f5f7fa"
-  panel: "#ffffff"
-  line: "#dbe2ea"
-  field-bg: "#f8fafc"
-  warn: "#b45309"
+  primary: "#1f3b4d"
+  surface: "#ffffff"
+  surface-muted: "#f5f7fa"
+  border-line: "#dbe2ea"
+  text-strong: "#17202a"
+  text-muted: "#5b6878"
+  accent-soft: "#e6ecf2"
+  warn: "#a04a09"
   warn-soft: "#fff4df"
-  info: "#2563eb"
-  info-soft: "#eaf1ff"
-  critical: "#991b1b"
-  critical-soft: "#fee2e2"
-  body-strong: "#344253"
-  white: "#ffffff"
+  info: "#1f4fc0"
+  info-soft: "#e8efff"
+  critical: "#8a1818"
+  critical-soft: "#fde2e2"
 typography:
   display:
     fontFamily: Arial
@@ -88,27 +85,27 @@ breakpoints:
   xl: 1280px
 components:
   shell:
-    backgroundColor: "{colors.neutral}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.surface-muted}"
+    textColor: "{colors.text-strong}"
     padding: 18px
   caption:
-    backgroundColor: "{colors.panel}"
-    textColor: "{colors.secondary}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-muted}"
     typography: "{typography.caption}"
     padding: 0px
   body-strong:
-    backgroundColor: "{colors.panel}"
-    textColor: "{colors.body-strong}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-strong}"
     typography: "{typography.body-strong}"
     padding: 0px
   card:
-    backgroundColor: "{colors.panel}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-strong}"
     rounded: "{rounded.sm}"
     padding: 16px
   card-elevated:
-    backgroundColor: "{colors.panel}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-strong}"
     rounded: "{rounded.sm}"
     padding: 20px
   card-warn:
@@ -122,8 +119,8 @@ components:
     rounded: "{rounded.sm}"
     padding: 12px
   input:
-    backgroundColor: "{colors.field-bg}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.surface-muted}"
+    textColor: "{colors.text-strong}"
     rounded: "{rounded.sm}"
     padding: 11px
     height: 42px
@@ -134,32 +131,32 @@ components:
     padding: 11px
     height: 42px
   button-primary:
-    backgroundColor: "{colors.tertiary}"
-    textColor: "{colors.white}"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.surface}"
     rounded: "{rounded.sm}"
     padding: 12px
     typography: "{typography.button}"
     height: 44px
   button-primary-disabled:
-    backgroundColor: "{colors.tertiary}"
-    textColor: "{colors.white}"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.surface}"
     rounded: "{rounded.sm}"
     padding: 12px
     typography: "{typography.button}"
     height: 44px
   search-result-item:
-    backgroundColor: "{colors.panel}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-strong}"
     rounded: "{rounded.sm}"
     padding: 12px
   search-result-item-focus:
-    backgroundColor: "{colors.tertiary-soft}"
-    textColor: "{colors.tertiary}"
+    backgroundColor: "{colors.accent-soft}"
+    textColor: "{colors.primary}"
     rounded: "{rounded.sm}"
     padding: 12px
   badge-accent:
-    backgroundColor: "{colors.tertiary-soft}"
-    textColor: "{colors.tertiary}"
+    backgroundColor: "{colors.accent-soft}"
+    textColor: "{colors.primary}"
     rounded: "{rounded.pill}"
     padding: 10px
     typography: "{typography.badge}"
@@ -186,7 +183,7 @@ components:
     typography: "{typography.badge}"
     height: 28px
   price-bar-track:
-    backgroundColor: "{colors.line}"
+    backgroundColor: "{colors.border-line}"
     rounded: "{rounded.pill}"
     height: 6px
   price-bar-stop:
@@ -200,7 +197,7 @@ components:
     height: 12px
     width: 4px
   price-bar-target:
-    backgroundColor: "{colors.tertiary}"
+    backgroundColor: "{colors.primary}"
     rounded: "{rounded.pill}"
     height: 12px
     width: 4px
@@ -218,26 +215,89 @@ Trading Signal Frontend 의 워크벤치 분석 화면은 사용자가 화이트
 
 ## Colors
 
-- **Primary (`#17202a`)** — 본문 텍스트·헤드라인의 기본 색. 거의 검정에 가깝지만 푸른 기를 살짝 줘서 패널의 백색과 어우러진다.
-- **Secondary (`#657385`)** — 라벨·캡션·보조 정보 텍스트. WCAG AA 4.5:1 기준 `{colors.panel}` 위에서 통과.
-- **Tertiary (`#0f766e`, teal)** — 액션·확정·매수 권고에 한정해서 쓴다. 한 화면에 두 곳 이상 등장하지 않는 원칙.
-- **Tertiary-soft (`#e5f4f1`)** — 활성 상태(badge, toggle pressed) 배경. 흰 배경과 자연스럽게 이어지는 옅은 teal.
-- **Neutral (`#f5f7fa`)** — 페이지 배경. 패널과의 미세한 대비로 카드 윤곽을 살린다.
-- **Panel (`#ffffff`)** — 카드·입력 영역의 표면.
-- **Line (`#dbe2ea`)** — 카드 테두리, 구분선.
-- **Field-bg (`#f8fafc`)** — 입력 칸 내부 배경. 패널보다 살짝 내려앉아 있어 "여기는 입력하는 자리" 라는 신호.
-- **Warn (`#b45309`)** + **Warn-soft (`#fff4df`)** — feasibility 비현실 판정, warnings 블록, 리스크 강조에 쓴다. 빨강이 아니라 따뜻한 주황 — 사용자에게 차단 신호가 아니라 "한 번 다시 보세요" 신호.
-- **Info (`#2563eb`)** + **Info-soft (`#eaf1ff`)** — risk_plan 의 진입가 강조. 매수/매도 색과 섞이지 않게 푸른 계열로 분리.
-- **Critical (`#991b1b`)** + **Critical-soft (`#fee2e2`)** — 폼 사전 차단 메시지·BE 5xx 폴백·SELL/AVOID 권고. warn 보다 한 단계 더 강한 신호 (사용자가 그대로 두면 손해).
-- **Body-strong (`#344253`)** — `body-md` 보다 한 톤 진한 본문 보조 텍스트. 결과 블록 내부 설명 문장.
+### v3 의 톤 — 모던·차분·전문
 
-대비비 검증(주요 쌍):
-- `{colors.primary}` × `{colors.panel}` ≈ 15:1 — AA ✅
-- `{colors.secondary}` × `{colors.panel}` ≈ 4.7:1 — AA ✅
-- `{colors.tertiary}` × `{colors.tertiary-soft}` ≈ 5.5:1 — AA ✅
-- `{colors.warn}` × `{colors.warn-soft}` ≈ 5.0:1 — AA ✅
-- `{colors.critical}` × `{colors.critical-soft}` ≈ 6.1:1 — AA ✅
-- `{colors.info}` × `{colors.info-soft}` ≈ 5.6:1 — AA ✅
+본 디자인 v3 는 토스풍의 밝은 배경 톤은 그대로 두면서, 강조 색을 **틸 그린(teal)에서 다크 슬레이트 블루로 전환**한다. 사유는 세 가지다. 첫째, 트레이딩 도메인은 정보 밀도가 높고 사용자가 수치를 천천히 읽는 도구다. 비비드한 형광색(라임·핫핑크·전기 블루) 이나 따뜻한 베이지·앰버 계열은 시선을 빨아당겨 본문 가독성을 떨어뜨린다. 차분한 차콜·슬레이트 톤이 본문에 묻혀 있다가 시그니처 색과 상태 색에만 시선이 집중되게 한다. 둘째, 금융·트레이딩 도구의 클래식한 신뢰감은 차가운 중립 색(차콜·네이비·슬레이트)에서 온다 — 따뜻한 색은 컨슈머 톤이고, 본 도구는 컨슈머가 아니라 의사결정 도구다. 셋째, 본 PRD 의 다음 단계는 다크 모드 도입이므로, 시그니처 색은 라이트/다크 양쪽에서 모두 명확히 보여야 한다. 슬레이트 블루 (`#1f3b4d`) 는 라이트에서는 잉크처럼 묵직하게, 다크에서는 약간 채도를 올려 그대로 살아남는 톤이다. 모던·차분·전문 세 키워드를 한 줄로 요약하면 — "수치를 방해하지 않는 색, 시그니처만 또렷한 색" 이다.
+
+비비드 형광 / 과채도 / 따뜻한 색조는 모두 회피한다. HSL 의 S 값이 한 자리수~30% 수준으로만 유지되며, 색조 자체도 회색·푸른 회색·슬레이트 블루 계열에 머문다.
+
+### 시그니처 색 — Signature Slate (1 개)
+
+본 디자인은 시그니처 색 **1 개** 만 둔다 (`primary`, hex `#1f3b4d`, "Signature Slate"). 미니멀 톤의 강조 단일성 — 한 화면에서 "최종 권고와 CTA" 라는 한 시점에만 시선이 모이게 하는 것이 목적이다. 두 시그니처 색 (예: 액션 색 + 정보 색) 운영도 후보였지만, `info` 토큰이 risk_plan 진입가 표식에 이미 존재하므로 시그니처는 한 색으로 좁히고 info 는 별개 도메인 색으로 두는 분리가 더 또렷하다.
+
+DESIGN.md alpha 의 권장 키 `primary` 를 시그니처 슬레이트에 직접 매핑한 의도 — `primary` 가 "디자인 시스템의 1순위 강조 색" 으로 정의되는 키이므로 시그니처 색에 그 의미를 그대로 박는다. 본문 텍스트 색은 별도 `text-strong` 키로 분리해 의미 충돌을 피한다.
+
+| 토큰 | hex | 별명 | 역할 |
+|---|---|---|---|
+| `primary` | `#1f3b4d` | Signature Slate | 분석 CTA 버튼(`button-primary`), `action` 카드 권고 강조 배지(`badge-accent`), 검색 결과 포커스 상태(`search-result-item-focus`), risk_plan 익절가 표식(`price-bar-target`). **한 화면에 1회 원칙** — `action` 카드 1 장 + CTA 1 개가 정상 상태, 둘 다 등장하면 화면 안에서 단 두 지점에만 슬레이트 톤이 박힌다. |
+
+### 신·구 팔레트 비교
+
+v2 의 16 개 토큰을 v3 의 13 개로 정제했다. `body-strong`, `white`, `field-bg` 흡수로 -3, `primary` 의 의미 재배치 (텍스트 색 → 시그니처 색) 가 핵심 변경.
+
+| v2 토큰 | v3 토큰 | 비고 |
+|---|---|---|
+| `primary` (#17202a, 차콜) | **의미 재배치**: `primary` (#1f3b4d, 슬레이트) + 텍스트는 `text-strong` (#17202a) 으로 분리 | `primary` 의 hex 자체가 바뀜. v2 의 차콜 본문 색은 `text-strong` 으로 옮기고, `primary` 키에는 시그니처 슬레이트를 매핑. |
+| `body-strong` (#344253) | `text-strong` (#17202a) 로 흡수 | `body-md` 와 `body-strong` 의 색 분리는 가독성 기여가 미미. 한 색으로 통합. |
+| `secondary` (#657385) | `text-muted` (#5b6878) | semantic 명명. 명도 살짝 낮춰 surface 위 대비를 5.68:1 로 확보. |
+| `neutral` (#f5f7fa) | `surface-muted` (#f5f7fa) | 페이지 배경. 이름만 semantic. |
+| `panel` (#ffffff) | `surface` (#ffffff) | 카드·입력 영역의 표면. 이름만 semantic. |
+| `white` (#ffffff) | `surface` (#ffffff) 로 흡수 | 중복 제거. 흰색이 필요한 곳은 `surface` 로 일원화. |
+| `field-bg` (#f8fafc) | `surface-muted` (#f5f7fa) 로 흡수 | 입력 칸 전용 톤은 모던 디자인에서 불필요. 입력 시각 구분은 `border-line` 과 focus ring 으로. |
+| `line` (#dbe2ea) | `border-line` (#dbe2ea) | semantic 명명. 카드·입력 보더. |
+| `tertiary` (#0f766e, teal) | `primary` (#1f3b4d, slate blue) | **시그니처 색 톤 전환**. 틸 → 슬레이트 블루. 키 이름도 `tertiary` → `primary` 로 일원화. |
+| `tertiary-soft` (#e5f4f1) | `accent-soft` (#e6ecf2) | 시그니처 색의 옅은 배경. 별명은 `accent-soft` 로 짧게. |
+| `warn` (#b45309) | `warn` (#a04a09) | 미세 톤 다운. 채도를 살짝 낮춰 차분한 모던 톤에 맞춤. WCAG AA 무회귀. |
+| `warn-soft` (#fff4df) | `warn-soft` (#fff4df) | 유지. |
+| `critical` (#991b1b) | `critical` (#8a1818) | 미세 톤 다운. 채도 낮춤. WCAG AA 무회귀. |
+| `critical-soft` (#fee2e2) | `critical-soft` (#fde2e2) | 거의 동일. 미세 조정. |
+| `info` (#2563eb) | `info` (#1f4fc0) | 미세 톤 다운. 비비드한 푸른빛을 한 단계 죽인다. |
+| `info-soft` (#eaf1ff) | `info-soft` (#e8efff) | 거의 동일. 미세 조정. |
+
+토큰 수: **16 → 13**. `body-strong`, `white`, `field-bg` 제거. semantic 명명 전환은 frontend-dev 의 mechanical rename 1 사이클로 흡수 — 매핑 표:
+
+| v2 키 | v3 키 |
+|---|---|
+| `panel` | `surface` |
+| `neutral` | `surface-muted` |
+| `field-bg` | `surface-muted` |
+| `tertiary` | `primary` |
+| `tertiary-soft` | `accent-soft` |
+| `line` | `border-line` |
+| `secondary` | `text-muted` |
+| `body-strong` | `text-strong` |
+| `white` | `surface` |
+| `primary` (text 의미) | `text-strong` |
+
+### 색별 역할 (v3)
+
+- **`primary` (`#1f3b4d`)** — **Signature Slate**, 시그니처 색. CTA 와 권고 강조에 한정. 한 화면에 두 지점(`action` 카드 1 장 + 분석 CTA 1 개) 원칙.
+- **`text-strong` (`#17202a`)** — 본문 텍스트·헤드라인의 기본 색. 결과 블록 내부 설명 문장도 같은 색 (v2 의 `body-strong` 별도 톤은 흡수).
+- **`text-muted` (`#5b6878`)** — 라벨·캡션·보조 정보 텍스트. WCAG AA 4.5:1 기준 `{colors.surface}` 위 5.68:1, `{colors.surface-muted}` 위 5.29:1.
+- **`accent-soft` (`#e6ecf2`)** — 시그니처 색의 옅은 배경. 활성 상태(badge, focus) 배경. 흰 배경과 자연스럽게 이어지는 옅은 슬레이트.
+- **`surface` (`#ffffff`)** — 카드·입력 영역의 표면.
+- **`surface-muted` (`#f5f7fa`)** — 페이지 배경. 카드와의 미세한 대비로 카드 윤곽 살림. 입력 칸 내부 배경에도 사용 (v2 `field-bg` 흡수).
+- **`border-line` (`#dbe2ea`)** — 카드 테두리·구분선·가격 막대 트랙.
+- **`warn` (`#a04a09`)** + **`warn-soft` (`#fff4df`)** — feasibility 비현실 판정, warnings 블록, 리스크 강조. 빨강이 아닌 따뜻한 갈색·앰버 — 차단 신호가 아니라 "한 번 다시 보세요" 신호. v2 보다 미세하게 톤 다운.
+- **`info` (`#1f4fc0`)** + **`info-soft` (`#e8efff`)** — risk_plan 의 진입가 표식. 매수/매도 색과 섞이지 않게 푸른 계열로 분리. 시그니처 슬레이트와도 충돌하지 않는 명도 위치.
+- **`critical` (`#8a1818`)** + **`critical-soft` (`#fde2e2`)** — 폼 사전 차단·BE 5xx 폴백·SELL/AVOID 권고. warn 보다 한 단계 더 강한 신호.
+
+### WCAG AA 4.5:1 대비비 검증 (주요 쌍)
+
+| 쌍 | 비율 | AA (4.5:1) |
+|---|---|---|
+| `{colors.text-strong}` × `{colors.surface}` | 16.45:1 | ✅ |
+| `{colors.text-strong}` × `{colors.surface-muted}` | 15.33:1 | ✅ |
+| `{colors.text-muted}` × `{colors.surface}` | 5.68:1 | ✅ |
+| `{colors.text-muted}` × `{colors.surface-muted}` | 5.29:1 | ✅ |
+| `{colors.primary}` × `{colors.surface}` | 11.73:1 | ✅ |
+| `{colors.primary}` × `{colors.accent-soft}` | 9.85:1 | ✅ |
+| `{colors.surface}` × `{colors.primary}` (CTA: 흰 텍스트 × 슬레이트 버튼) | 11.73:1 | ✅ |
+| `{colors.warn}` × `{colors.warn-soft}` | 5.54:1 | ✅ |
+| `{colors.critical}` × `{colors.critical-soft}` | 7.71:1 | ✅ |
+| `{colors.info}` × `{colors.info-soft}` | 6.20:1 | ✅ |
+
+모든 쌍이 4.5:1 이상으로 통과. 큰 텍스트 전용 영역은 본 디자인에서 사용하지 않으며, 모든 텍스트 색 쌍은 본문 기준 4.5:1 을 만족한다.
 
 ## Typography
 
@@ -338,7 +398,7 @@ front matter `breakpoints` 토큰은 **Tailwind 기본 정합** 값을 채택한
 평면 디자인 기조. 그림자는 결과 그룹 첫 카드(`action`, `card-elevated`)에만 미세하게 적용해 시선 끌기:
 `box-shadow: 0 10px 28px rgba(23, 32, 42, 0.08)` — 토큰화하지 않음(한 군데만 사용, 토큰 도입은 두 곳 이상 쓸 때).
 
-나머지 카드는 `1px solid {colors.line}` 만으로 분리. 입력 칸은 패널보다 한 톤 어두운 `field-bg` 배경으로 깊이를 표현.
+나머지 카드는 `1px solid {colors.border-line}` 만으로 분리. 입력 칸은 `{colors.surface-muted}` 배경으로 페이지 배경과 시각 연속성을 유지하면서 보더(`{colors.border-line}`) 와 focus ring 으로 "여기는 입력하는 자리" 라는 신호를 준다.
 
 ## Shapes
 
@@ -350,8 +410,8 @@ front matter `breakpoints` 토큰은 **Tailwind 기본 정합** 값을 채택한
 
 ### 검색 영역
 
-- `input` — ticker 검색 필드. `placeholder="종목명·티커 입력 (예: AAPL, BTC-USD)"`. 포커스 시 보더 색은 `{colors.tertiary}` 톤(globals.css 의 보더 변수를 그대로 사용).
-- `search-result-item` / `search-result-item-focus` — 자동완성 결과 카드. 키보드 ↑↓ 또는 마우스 hover 시 `search-result-item-focus` (옅은 teal 배경). 결과 카드 안에는 ticker(굵게) · name · `currency` 칩 · `aliases` 일부 노출.
+- `input` — ticker 검색 필드. `placeholder="종목명·티커 입력 (예: AAPL, BTC-USD)"`. 포커스 시 보더 색은 `{colors.primary}` 톤(globals.css 의 보더 변수를 그대로 사용).
+- `search-result-item` / `search-result-item-focus` — 자동완성 결과 카드. 키보드 ↑↓ 또는 마우스 hover 시 `search-result-item-focus` (옅은 슬레이트 배경, `{colors.accent-soft}`). 결과 카드 안에는 ticker(굵게) · name · `currency` 칩 · `aliases` 일부 노출.
 - 미선택 상태에서는 제출 버튼이 `button-primary-disabled` (opacity 0.65, cursor not-allowed).
 
 ### 입력 영역
@@ -369,8 +429,8 @@ front matter `breakpoints` 토큰은 **Tailwind 기본 정합** 값을 채택한
 - `card` × `badge-warn` — `feasibility` 가 비현실 판정(`UNREALISTIC`)일 때. 카드 상단에 "⚠ 비현실적인 목표예요" 배지(텍스트 + 이모지 — 라이브러리 미도입 정합), 본문에 BE 가 돌려주는 연환산 목표 수익률·기간·근거.
 - `card-warn` — `warnings` 블록. 비어 있으면 렌더 안 함. 각 warning 은 불릿 한 줄.
 - `card` — `brief` (기술 신호). 헤더에 `badge-accent`/`badge-warn`(BUY/HOLD/SELL) + 본문에 근거. `action` 과 다른 결론이면 카드 좌측에 두께 3px 의 `line` 컬러 보더 한 줄을 추가해 "이건 별개 신호" 임을 시각적으로 분리.
-- `card` — `risk_plan`. 위쪽에 4행 표(진입가 / 손절가 / 익절가 / 제안 수량·금액), 아래쪽에 `price-bar-track` 위로 `price-bar-stop`(critical) · `price-bar-entry`(info) · `price-bar-target`(tertiary) 3개 표식이 가격 비율로 배치. RR 비율은 표 하단 한 줄.
-- `card` — `horizons`. 단·중·장기 3개 줄 — `typography.body-sm` × `{colors.body-strong}`.
+- `card` — `risk_plan`. 위쪽에 4행 표(진입가 / 손절가 / 익절가 / 제안 수량·금액), 아래쪽에 `price-bar-track` 위로 `price-bar-stop`(critical) · `price-bar-entry`(info) · `price-bar-target`(accent) 3개 표식이 가격 비율로 배치. RR 비율은 표 하단 한 줄.
+- `card` — `horizons`. 단·중·장기 3개 줄 — `typography.body-sm` × `{colors.text-strong}`.
 
 ### 에러·실패 영역
 
@@ -380,6 +440,7 @@ front matter `breakpoints` 토큰은 **Tailwind 기본 정합** 값을 채택한
 ## Do's and Don'ts
 
 - ✅ 색은 `{colors.<name>}` 토큰 참조로만 사용한다. 컴포넌트 영역에 hex 직타 금지.
+- ✅ 시그니처 색 (`{colors.primary}`, Signature Slate) 은 한 화면에 두 지점에만 사용한다 — `action` 카드 1 장 + 분석 CTA 1 개. 헤더·로고·아이콘 등에 추가 노출하지 않는다.
 - ✅ `action` 의 한글 라벨은 한 화면에 하나만 `display` 크기로 노출한다. 나머지 카드 제목은 `h2` 이하.
 - ✅ feasibility 비현실 강조는 색 + 텍스트 + 이모지 세 트랙 모두로 전달한다 (AC-15: 색만으로 의미를 전달하지 않는다).
 - ✅ 숫자는 `typography.mono-numeric` 으로 자릿수를 맞춘다. `1,000,000` 의 콤마는 표시한다.
@@ -423,13 +484,13 @@ front matter `breakpoints` 토큰은 **Tailwind 기본 정합** 값을 채택한
 
 | 상태 | 진입 조건 | 노출 컴포넌트 | 핵심 텍스트 | 사용 토큰 |
 |---|---|---|---|---|
-| **분석 전 (Empty)** | mutation 미실행, ticker 미선택 또는 입력 미완 | searchPanel, inputPanel, **placeholder card**(`card` × `body-sm` × `{colors.secondary}`) | "종목과 조건을 입력하면 분석 결과가 표시돼요." | `card`, `typography.body-sm`, `{colors.secondary}` |
+| **분석 전 (Empty)** | mutation 미실행, ticker 미선택 또는 입력 미완 | searchPanel, inputPanel, **placeholder card**(`card` × `body-sm` × `{colors.text-muted}`) | "종목과 조건을 입력하면 분석 결과가 표시돼요." | `card`, `typography.body-sm`, `{colors.text-muted}` |
 | **ticker 미선택 → 분석 시도** | 입력은 다 됐지만 ticker 선택 X | 분석 버튼 클릭 시 `aria-disabled` 유지, 검색 영역에 helper | "분석할 종목을 먼저 선택해 주세요." | `button-primary-disabled`, `{colors.warn}` × `typography.caption` |
 | **사전 차단 (Validation)** | `validateAnalyzePayload` 가 어느 필드든 거절 | 해당 필드 → `input-error`, helper 메시지 한 줄 | `validateAnalyzePayload` 반환 한글 메시지 그대로 | `input-error`, `typography.caption`, `{colors.critical}` |
-| **로딩 (Loading)** | mutation `isPending = true` | 분석 버튼 라벨 "분석 중" + `aria-busy="true"`, 결과 영역에 스켈레톤 4장 (`action`/`feasibility`/`risk_plan`/`horizons`) | 버튼: "분석 중" | `button-primary` (라벨만 교체), 스켈레톤은 `{colors.field-bg}` 배경 카드 |
+| **로딩 (Loading)** | mutation `isPending = true` | 분석 버튼 라벨 "분석 중" + `aria-busy="true"`, 결과 영역에 스켈레톤 4장 (`action`/`feasibility`/`risk_plan`/`horizons`) | 버튼: "분석 중" | `button-primary` (라벨만 교체), 스켈레톤은 `{colors.surface-muted}` 배경 카드 |
 | **정상 (Success)** | mutation 성공, `warnings` 빈 배열 가능 | `card-elevated`(action) → `feasibility` → `warnings`(있을 때) → `brief` → `risk_plan` → `horizons` | 각 블록 BE 응답 + 토큰 한글 라벨 | 위 Components 절 매핑 |
 | **feasibility 비현실** | `feasibility.label === "UNREALISTIC"` 또는 동등 | feasibility 카드 `card-warn` + `badge-warn` "⚠ 비현실적인 목표예요" | "이 목표는 연 환산 약 X% 에 해당해요. 기간을 늘리거나 목표를 낮춰 보세요." | `card-warn`, `badge-warn`, `{colors.warn}` |
-| **action vs brief 불일치** | `action.kind !== brief.action` (의미 매핑 기준) | `brief` 카드 좌측 3px 보더 + `caption` 한 줄 "최종 권고와는 별개의 기술 신호예요." | "최종 권고와는 별개의 기술 신호예요." | `{colors.line}` (3px), `typography.caption`, `{colors.secondary}` |
+| **action vs brief 불일치** | `action.kind !== brief.action` (의미 매핑 기준) | `brief` 카드 좌측 3px 보더 + `caption` 한 줄 "최종 권고와는 별개의 기술 신호예요." | "최종 권고와는 별개의 기술 신호예요." | `{colors.border-line}` (3px), `typography.caption`, `{colors.text-muted}` |
 | **whitelist miss** | 사용자가 검색 결과 선택 없이 직접 입력 후 분석 | `card` 한 장 + `body-md` | "지원 종목이 아니에요. 현재는 AAPL 또는 BTC-USD 만 분석할 수 있어요." | `card`, `typography.body-md` |
 | **BE 4xx 매핑 가능** | `ApiError.kind === 'validation'` 또는 `'whitelist_miss'` | 결과 영역에 `card-critical` 한 장 + `aria-live="polite"` | BE `detail` 본문이 한글이면 그대로, 영문이면 `errors.ts` 매핑 한글 카피 | `card-critical`, `typography.body-sm`, `{colors.critical}` |
 | **BE 5xx · 네트워크 실패** | `ApiError.kind === 'network'` 또는 `'server'` | `card-critical` + "다시 시도" 버튼(보조) | "엔진에 일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요." | `card-critical`, `button-primary` (보조 액션) |
@@ -461,6 +522,39 @@ PRD `responsive-pc-support` §9 의 11건 중 디자이너가 답하는 5건. �
 | R3 | 결과 6블록 grid 배치 (2 / 3 컬럼 / 비대칭) | **비대칭 2 컬럼**: `action` 전폭 → `feasibility + warnings` 2 컬럼 → `brief + risk_plan` 2 컬럼 → `horizons` 전폭. `warnings` 가 빈 배열이면 `feasibility` 가 그 줄을 풀폭으로 차지. | PM 권고(비대칭 2 컬럼 또는 3 컬럼 균등) 중 비대칭 2 컬럼 채택. 사유: 6블록의 의미적 묶음(상태 강조 / 의사결정 보조 / 시간축 요약) 이 2 컬럼 페어로 자연스럽게 짝지어진다. |
 | R4 | 입력 패널 데스크탑 위치 (좌측 sidebar / 상단 가로 / 그대로) | **좌측 sticky sidebar (360px, `lg:sticky lg:top-0`)**. 데스크탑에서 결과를 보며 입력값을 즉시 조정 가능. 시선 흐름이 좌상단 시작점에서 자연스럽다. | (디자이너 결정 영역) |
 | R5 | 태블릿 (`md ~ lg - 1`, 768~1023px) 정책 | **모바일과 동일한 한 컬럼 스택 유지 + 컨테이너 최대폭만 `md:max-w-2xl` (≈ 672px) 로 살짝 확장**. 결과 6블록 grid 는 도입하지 않음. 사유: 768~1023px 에서 2 컬럼은 카드 폭이 320~440px 로 좁아져 `risk_plan` 표 + 가격 막대가 답답해진다. | (디자이너 결정 영역) |
+
+## OPEN QUESTION 결정 (디자이너 영역) — v3 팔레트 모더나이제이션
+
+PRD `palette-modernization` §9 의 10건 중 디자이너가 답하는 6건. 본 v3 의 결정.
+
+| # | 질문 | v3 결정 | PM 권고 대비 |
+|---|---|---|---|
+| P1 | 시그니처 색 개수 (1 vs 2) | **1 개** (토큰 키 `primary`, 별명 Signature Slate, hex `#1f3b4d`). 한 화면에 두 지점(`action` 카드 + 분석 CTA) 에만 등장. | PM 권고 수용 (PM: 1 개) |
+| P2 | 시그니처 색 톤 방향 | **다크 슬레이트 블루 (`#1f3b4d`)**. PM 권고 후보 (a) 다크 블루·네이비 계열의 변형. 차콜 그레이보다 푸른 기를 살려 트레이딩 도메인의 클래식 톤을 살리되, 비비드 블루는 피한다. HSL 의 S 값이 약 43% 로 v2 의 teal `#0f766e` (S≈77%) 보다 채도 절제. | PM 권고 (b)/(c) 중간 — 거의 그레이스케일은 아니지만 채도 절제. 차콜 그레이 단독 (c) 보다 도메인 신뢰감을 살리기 위해 슬레이트 블루 채택. |
+| P3 | 토큰명 — semantic 전환 vs v2 명명 유지 | **semantic 전환**. `primary` 의 의미를 재배치 — 차콜 본문 색이 아니라 시그니처 슬레이트로. 본문은 `text-strong` 으로 분리. `secondary`/`tertiary` → `text-muted`/`primary` 흡수. `panel`/`neutral`/`field-bg` → `surface`/`surface-muted`. `line` → `border-line`. `body-strong` → `text-strong` 흡수. `white` → `surface` 흡수. `tertiary-soft` → `accent-soft`. | PM 권고 수용 (PM: semantic 전환). PM 권고의 `accent` 키 대신 `primary` 키를 시그니처에 직접 매핑 — DESIGN.md alpha 의 "primary = 1순위 강조" 시맨틱을 그대로 활용. |
+| P4 | 상태 색 (warn / critical / info) 톤 | **차분 유지 + 미세 톤 다운**. v2 의 명도 위치 유지, 채도를 한 단계 낮춤. warn `#b45309` → `#a04a09`, critical `#991b1b` → `#8a1818`, info `#2563eb` → `#1f4fc0`. WCAG AA 무회귀. | PM 권고 수용 (PM: 차분 톤 유지) |
+| P5 | 최종 토큰 수 | **13 개** (v2 16 → v3 13). `body-strong`, `white`, `field-bg` 제거. semantic 명명 전환 7건 + 신규 시그니처 명명 1건. PM 권고 "10개 안팎" 의 상한 근처. | PM 권고 ±3 (10±3). info / info-soft 가 risk_plan 진입가 도메인 색으로 보존되어야 하므로 10개 까지 줄이지 않음. |
+| P6 | `white` / `field-bg` / `body-strong` 흡수 처리 | **모두 흡수**. `white` → `surface`, `field-bg` → `surface-muted`, `body-strong` → `text-strong`. PM 권고 §9-6,7,8 모두 수용. | PM 권고 수용 |
+| P7 | 시그니처 색 사용처 범위 | **`action` 카드 1 장 + 분석 CTA 버튼 1 개** 두 지점에 한정. 검색 결과 포커스 (`search-result-item-focus`) 와 익절가 표식 (`price-bar-target`) 은 시그니처 색의 옅은 변종(`accent-soft`) 또는 표식 점이라 "시각적 시그니처 노출 지점" 으로 카운트하지 않음. 헤더·로고·아이콘 시그니처 노출은 본 PRD 비범위 (로고 작업은 PRD §4). | PM 권고 §9-9 수용 |
+
+## lint 메모 (v3)
+
+본 v3 (`palette-modernization`) 의 변경 범위는 `colors` front matter 절과 `Colors` prose 절, 그리고 옛 토큰명을 참조하던 일부 prose 라인에 한정된다. 구체적으로:
+
+- **front matter `colors` 절**: v2 의 16 개 → v3 의 13 개. semantic 명명 전환. `body-strong`, `white`, `field-bg` 제거.
+- **front matter `components` 절**: 합성 토큰 키 (`card`, `badge-warn`, `card-elevated`, `button-primary` 등) 는 **무회귀** — 키 이름·구조 변경 없음. 내부의 `{colors.<key>}` 참조만 새 토큰명으로 자동 재매핑.
+- **`Colors` 절 prose**: 전면 갱신 — v3 톤 근거 1단락, 시그니처 색 표, 신·구 비교 표, WCAG AA 대비비 표.
+- **`Elevation & Depth` / `Components` 절 prose**: 옛 토큰명을 참조하던 라인만 갱신 (`{colors.line}` → `{colors.border-line}`, `{colors.tertiary}` → `{colors.primary}`, `{colors.secondary}` → `{colors.text-muted}`, `{colors.body-strong}` → `{colors.text-strong}`, `field-bg` 문구 → `surface-muted`).
+- **`Do's and Don'ts` 절**: 시그니처 색 1 회 원칙 1 줄 추가.
+- **핸드오프 명세 표**: 옛 토큰명 참조 라인만 갱신 (`{colors.secondary}` → `{colors.text-muted}`, `{colors.line}` → `{colors.border-line}`, `{colors.field-bg}` → `{colors.surface-muted}`).
+- **OPEN QUESTION**: v3 표 (P1~P7) 추가.
+
+**무회귀**: `Typography`, `Layout`, `Shapes`, `Spacing`, `Breakpoints`, `components` 키 구조, v2 OPEN QUESTION 표 (1~7, R1~R5) 그대로 유지.
+
+산출 직전 `npx @google/design.md lint docs/design/workbench-analyze-rebuild.md` 실행 결과:
+- errors: 0
+- warnings: 0
+- info: 1 (token summary)
 
 ## lint 메모 (v2)
 

@@ -70,13 +70,13 @@ export default function Home() {
       <div className="lg:sticky lg:top-0 lg:self-start lg:max-h-screen lg:overflow-y-auto lg:pt-[18px] lg:pb-lg lg:pr-xs">
         <header className="flex justify-between items-start gap-md mb-lg">
           <div>
-            <p className="text-caption text-secondary">TradingSignalEngine</p>
+            <p className="text-caption text-text-muted">TradingSignalEngine</p>
             <h1 className="mt-xs text-h1">워크벤치</h1>
           </div>
-          <div className="text-right text-caption text-secondary">
+          <div className="text-right text-caption text-text-muted">
             {selectedTicker ? (
               <>
-                <strong className="block mb-xs text-body-sm font-bold text-primary">
+                <strong className="block mb-xs text-body-sm font-bold text-text-strong">
                   {selectedTicker.ticker}
                 </strong>
                 <span>
@@ -113,7 +113,7 @@ export default function Home() {
           onRetry={handleRetry}
         />
 
-        <footer className="grid gap-xs mt-lg px-[2px] text-caption text-secondary">
+        <footer className="grid gap-xs mt-lg px-[2px] text-caption text-text-muted">
           <span>투자 판단 보조 자료입니다. 자동 주문이나 수익 보장을 의미하지 않습니다.</span>
         </footer>
       </div>

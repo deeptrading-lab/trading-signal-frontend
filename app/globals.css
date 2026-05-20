@@ -23,7 +23,7 @@
 
   /* body 의 배경·텍스트는 Tailwind theme 토큰을 그대로 참조 (preflight 가 색까지 흡수하지는 않음). */
   body {
-    @apply bg-neutral text-primary font-sans;
+    @apply bg-surface-muted text-text-strong font-sans;
   }
 
   /* 폰트 패밀리 alias — DESIGN.md 가 시스템 sans 만 쓰지만 Arial 우선 정렬 유지. */

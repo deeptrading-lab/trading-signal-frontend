@@ -49,8 +49,8 @@ export function FeasibilityCard({
         </>
       ) : (
         <>
-          <p className="text-h2 text-primary">목표 현실성</p>
-          <p className="mt-sm text-body-sm text-body-strong">
+          <p className="text-h2 text-text-strong">목표 현실성</p>
+          <p className="mt-sm text-body-sm text-text-strong">
             {REALISTIC_COPY[feasibility?.toUpperCase() ?? ""] ??
               "BE 가 제공한 현실성 라벨을 그대로 표시해요."}
           </p>

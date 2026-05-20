@@ -1371,3 +1371,44 @@
   - **frontend-dev** 가 \`feature/palette-modernization\` 브랜치에서 구현. \`npm run design:sync\` + tailwind theme 자동 흡수. 토큰명 변경 있으면 mechanical rename 한 번.
   - **QA** 가 PR #11 라운드트립 5건 + PR #17 두 뷰포트 + DESIGN.md 토큰 라이브 동기화 검증.
   - 본 PRD 머지 후 후속: (선택) 다크 모드 PRD, 또는 추가 도메인 (portfolio/alerts) — 사용자 결정 시점에 큐잉.
+
+### 2026-05-20 — feat: palette v3 적용 — Signature Slate(#1f3b4d) + 토큰 13개 + semantic 명명 (#20)
+
+- **slug**: `palette-modernization` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/20
+- **요약**: feat: palette v3 적용 — Signature Slate(#1f3b4d) + 토큰 13개 + semantic 명명
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PRD `palette-modernization` 구현. PR #19 (PRD docs) 머지 후 — 새 룰 (한 브랜치 한 PR) 의 첫 적용 사례.
+  > 
+  > ## 변경 요약 (커밋 분할)
+  > 1. `docs(design): palette v3 — Signature Slate(#1f3b4d) + 토큰 16→13 + semantic 명명` (b4a623a, ux-designer 산출물)
+  > 2. `chore(workflow): 한 브랜치 한 PR 룰 — PRD/DESIGN.md/QA 별도 docs PR 폐기` (9c77083)
+  > 3. `chore(tailwind): design:sync — v3 토큰 흡수` (0fca370)
+  > 4. `refactor(css): app/components.css·globals.css 합성 토큰 mechanical rename (v2 → v3)` (0c35918)
+  > 5. `refactor(workbench): 컴포넌트 className v3 토큰 적용` (3a4ee6a)
+  > 
+  > ## 시그니처 색
+  > - **Signature Slate** `#1f3b4d` (토큰 키 `primary`)
+  > - v2 의 teal `#0f766e` (`tertiary`) → 다크 슬레이트 블루 전환. HSL S 값 ≈ 43% 로 채도 절제.
+  > - 한 화면에 두 지점 원칙: `action` 카드(`badge-accent` = accent-soft 배경 위 primary 텍스트) + 분석 CTA(`button-primary` = primary 배경 + surface 텍스트).
+  > 
+  > ## 토큰 매핑 (v2 16 → v3 13)
+  > | v2 | v3 | 변경 |
+  > |---|---|---|
+  > | `primary` (#17202a 차콜) | `text-strong` (#17202a) | 의미 재배치: text 의미는 `text-strong` 으로 분리 |
+  > | `primary` (시그니처 색) | `primary` (#1f3b4d 슬레이트) | 시그니처 색 톤 전환 |
+  > | `secondary` | `text-muted` (#5b6878) | semantic 명명 |
+  > | `tertiary` | `primary` | 시그니처 흡수 |
+  > | `tertiary-soft` | `accent-soft` (#e6ecf2) | semantic 명명 |
+  > | `panel` | `surface` (#ffffff) | semantic 명명 |
+  > | `neutral` | `surface-muted` (#f5f7fa) | semantic 명명 |
+  > | `line` | `border-line` (#dbe2ea) | semantic 명명 |
+  > | `field-bg` | `surface-muted` (흡수) | 입력 톤 단일화 |
+  > | `white` | `surface` (흡수) | 중복 제거 |
+  > | `body-strong` | `text-strong` (흡수) | 본문 색 단일화 |
+  > | `warn` #b45309 | `warn` #a04a09 | 미세 톤 다운 |
+  > | `critical` #991b1b | `critical` #8a1818 | 미세 톤 다운 |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) **다크 모드 PRD** — v3 의 semantic 명명(`surface` / `surface-muted` / `text-strong` / `text-muted` / `primary` / `accent-soft` / `border-line`) 이 그대로 다크 친화. 별도 PRD 진입 시점 결정.
+  - (선택) 로고·아이콘 작업 PRD — 본 PRD 의 시그니처 슬레이트 `#1f3b4d` 가 로고 메인 컬러로 자연스럽게 확장. 본 PRD §4 비범위였으므로 별도 PRD.

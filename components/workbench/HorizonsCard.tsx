@@ -22,14 +22,14 @@ export function HorizonsCard({ horizons }: Props) {
   if (!horizons || horizons.length === 0) return null;
   return (
     <article className="card" aria-label="구간별 추세">
-      <p className="mb-sm text-h2 text-primary">구간별 추세</p>
+      <p className="mb-sm text-h2 text-text-strong">구간별 추세</p>
       {horizons.map((h, idx) => (
         <div
           key={`${h.label}-${idx}`}
-          className="grid grid-cols-[64px_1fr] gap-md py-sm border-b border-line last:border-b-0"
+          className="grid grid-cols-[64px_1fr] gap-md py-sm border-b border-border-line last:border-b-0"
         >
-          <span className="text-caption text-secondary">{h.label}</span>
-          <span className="text-body-sm text-body-strong">
+          <span className="text-caption text-text-muted">{h.label}</span>
+          <span className="text-body-sm text-text-strong">
             {(DIRECTION_LABEL[h.direction] ?? h.direction) + " · "}
             수익률{" "}
             <strong className="tabular">
