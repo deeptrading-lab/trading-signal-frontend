@@ -76,6 +76,11 @@ function adaptDesignTokens(json: typeof themeJson) {
     fontSize: adaptFontSize(
       t.fontSize as unknown as Record<string, RawFontSizeEntry>,
     ),
+    // breakpoints — DESIGN.md `breakpoints` 토큰을 `screens` 로 흡수. `npm run design:sync`
+    // 후처리(`scripts/inject-breakpoints.mjs`)가 `tailwind.theme.json.theme.extend.screens` 로 주입한다.
+    // Tailwind 의 `theme.extend.screens` 는 기본 sm/md/lg/xl 위에 덮어쓰는 의미라서, 기본값과 동일하더라도
+    // 명시적으로 흡수해 DESIGN.md 단일 진실 원천 규칙(PR #13)을 breakpoint 차원에도 일관 적용한다.
+    screens: t.screens,
     // 컴포넌트 metric (input/button/badge height, shell padding) 은 spacing 토큰으로 합성 불가능한
     // 절대값이라 그대로 width/height 유틸리티에서 임의 값(`h-[42px]`)으로 쓰거나 컴포넌트 클래스에 흡수한다.
     // 차후 디자이너가 metric 토큰을 정식화하면 본 어댑터에서 흡수.
