@@ -1292,3 +1292,45 @@
   > - **AC-10 (수동 QA)**: 아래 수동 라운드트립 절.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - `chore/sync-agent-conventions` — 누적 컨벤션(camelCase 네이밍, 커스텀훅 의무화, `cn`, `hooks` 일원화, 도메인 한 뎁스, Tailwind 토큰, BFF, 반응형 prefix · `useBreakpoint`) 을 `.claude/agents/*.md` + `AGENTS.md` + `docs/agents/*.md` 에 흡수. 본 PR 머지 후 마지막 단계.
+
+### 2026-05-20 — chore(agents): 누적 컨벤션을 에이전트 정의에 흡수 + docs/agents 정리 (#18)
+
+- **slug**: `chore/sync-agent-conventions` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/18
+- **요약**: chore(agents): 누적 컨벤션을 에이전트 정의에 흡수 + docs/agents 정리
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6~#17 흐름으로 정착된 누적 컨벤션을 에이전트 정의에 흡수해 다음 PRD/구현 사이클에서 자동 적용되게 한다. 사용자 명시 의도 — "앞으로 작업에서도 기억해야할 내용들은 agent쪽에서 안까먹게".
+  > 
+  > ## 변경 요약 (20 파일, +594/-102)
+  > 
+  > ### \`AGENTS.md\` 갱신
+  > - **제품 구조**: Tailwind v3 / TanStack Query v5 / axios / BFF / DESIGN.md 파이프라인 명시
+  > - **작업 원칙**: BFF 패턴, 스타일링 (Tailwind + components.css), 디자인 토큰 동기화, 반응형 (CSS = Tailwind prefix / JS = useBreakpoint), `docs/rules/frontend.md` 1차 근거 참조
+  > - **에이전트 역할 표**: 각 역할의 컨벤션 책임 명시
+  > - **작업 흐름 절 신설**: 라벨 게이트 (impl-ready → qa-passed → review-approved → 머지) + handoff-append workflow + 자가 PR 처리
+  > - **도메인·폴더 표준 절 신설**: app/, components/, hooks/<domain>/, hooks/query/, hooks/utils/, lib/api/, lib/copy/<domain>/, lib/utils/
+  > 
+  > ### \`.claude/agents/\` 8개 갱신
+  > - **frontend-dev**: 컨벤션 8개 절 요지 + 반응형 + BFF + 디자인 토큰 의무
+  > - **pm**: PRD 양식 1~7 + §8 영향 분석 + §9 OPEN QUESTION ([RESOLVED] 패턴) + 컨벤션 컨텍스트
+  > - **ux-designer**: \`breakpoints\` 토큰 + \`design:sync\` 파이프라인 절 추가
+  > - **api-integration-dev**: BFF 안정성 6가지 (try/catch, AbortSignal.timeout(30s), 4xx 통과, Content-Type 폴백, 빈 본문 폴백, cache: no-store) + 환경변수 단일 진입 + 시크릿 정책
+  > - **qa**: AC 표 + 라운드트립 (BE LIVE 5건) + DESIGN.md 라이브 동기화 + 두 뷰포트 반응형 검증
+  > - **reviewer**: 점검 11 영역 + 자가 PR 처리 (\`--comment\` + 라벨 fallback) + HANDOFF 점검 + nit 은 후속 메모로
+  > - **devops**: 라벨 흐름 명시 + \`gh pr merge --merge --delete-branch\` 패턴
+  > - **manager**: 필수 read 에 AGENTS.md + docs/rules/frontend.md 추가
+  > 
+  > ### \`docs/agents/\` 정리
+  > - **삭제 2건**: \`deployer.md\` (구 DevOps 명), \`dev-frontend.md\` (구 frontend-dev 명) — \`.claude/agents/\` 와 충돌하는 구버전 잔재
+  > - **8개 model 필드**: \`gpt-4\` / \`gpt-5.3\` → \`inherit\` 통일 (engine 레포 잔재 정정, PR #14 의 부분 정정 완결)
+  > 
+  > ### 동반 정리
+  > - \`docs/qa/responsive-pc-support.md\` (PR #17 QA 에이전트 산출물, untracked 백필 — PR #10/#12/#14/#16 와 동일 패턴)
+  > 
+  > ## 검증
+  > - \`npm run typecheck\` / \`npm run lint\` 0 에러 (docs/agents 변경은 코드 영향 0).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 컨벤션 누적 정착이 본 PR 로 마무리. 다음 PRD 진입 시 PM 에이전트가 자동으로 \`docs/rules/frontend.md\` + 본 \`AGENTS.md\` 를 컨벤션 컨텍스트로 사용.
+  - 향후 도메인 (\`portfolio\`, \`alerts\` 등) 또는 컴포넌트 (\`components/layout/\`, \`components/ui/\`) 추가 PRD 가 들어올 때 본 컨벤션이 1차 근거로 작동.
+  - (선택) \`docs/agents/\` 파일들을 \`.claude/agents/\` 와 완전 동기화할지 — 본 PR 에서는 model 정합·잔재 제거까지만 처리. 깊은 본문 동기화는 별도 chore PRD.
