@@ -12,9 +12,9 @@
 "use client";
 
 import { useId } from "react";
-import type { WhitelistItem } from "@/lib/types/whitelist";
-import type { AnalyzeValidationErrors } from "@/lib/validation/analyze";
-import type { AnalyzeFormState } from "@/hooks/use-analyze-form";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
+import type { AnalyzeValidationErrors } from "@/lib/validation/workbench/analyze";
+import type { AnalyzeFormState } from "@/hooks/workbench/useAnalyzeForm";
 
 type Props = {
   selectedTicker: WhitelistItem | null;

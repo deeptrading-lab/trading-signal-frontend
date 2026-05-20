@@ -8,14 +8,14 @@
 "use client";
 
 import { useMutation, type UseMutationResult } from "@tanstack/react-query";
-import { analyzeWorkbench } from "@/lib/api/workbench";
+import { analyzeWorkbench } from "@/lib/api/workbench/analyze";
 import type { ApiError } from "@/lib/api/errors";
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
-} from "@/lib/types/workbench";
+} from "@/lib/types/workbench/analyze";
 
-export function useAnalyzeWorkbench(): UseMutationResult<
+export function useMutationAnalyzeWorkbench(): UseMutationResult<
   AnalyzeResponse,
   ApiError,
   AnalyzeRequest

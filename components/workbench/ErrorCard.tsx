@@ -8,7 +8,7 @@
  */
 
 import type { ApiError } from "@/lib/api/errors";
-import { getErrorMessage, isRetryable } from "@/lib/copy/error-messages";
+import { getErrorMessage, isRetryable } from "@/lib/copy/workbench/errorMessages";
 
 type Props = {
   error: ApiError;

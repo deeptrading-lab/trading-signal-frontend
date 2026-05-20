@@ -20,9 +20,9 @@ import { useState } from "react";
 import { SearchPanel } from "@/components/workbench/SearchPanel";
 import { InputPanel } from "@/components/workbench/InputPanel";
 import { ResultGroup } from "@/components/workbench/ResultGroup";
-import { useAnalyzeForm } from "@/hooks/use-analyze-form";
-import { useAnalyzeWorkbench } from "@/lib/query/use-analyze-workbench";
-import type { AnalyzeResponse } from "@/lib/types/workbench";
+import { useAnalyzeForm } from "@/hooks/workbench/useAnalyzeForm";
+import { useMutationAnalyzeWorkbench } from "@/hooks/query/useMutationAnalyzeWorkbench";
+import type { AnalyzeResponse } from "@/lib/types/workbench/analyze";
 
 export default function Home() {
   const {
@@ -35,7 +35,7 @@ export default function Home() {
     attemptSubmit,
   } = useAnalyzeForm();
 
-  const mutation = useAnalyzeWorkbench();
+  const mutation = useMutationAnalyzeWorkbench();
   const [lastResult, setLastResult] = useState<AnalyzeResponse | null>(null);
 
   function handleSubmit() {

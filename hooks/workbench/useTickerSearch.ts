@@ -1,5 +1,5 @@
 /**
- * ticker 검색 입력을 250ms debounce 한 뒤 `useWhitelistSearch` 를 호출하는 래퍼.
+ * ticker 검색 입력을 250ms debounce 한 뒤 `useQueryWhitelistSearch` 를 호출하는 래퍼.
  *
  * DESIGN.md OPEN QUESTION #1 결정 그대로:
  *   - debounce 250ms
@@ -9,14 +9,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useWhitelistSearch } from "@/lib/query/use-whitelist-search";
-import type { WhitelistItem } from "@/lib/types/whitelist";
+import { useQueryWhitelistSearch } from "@/hooks/query/useQueryWhitelistSearch";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 import type { ApiError } from "@/lib/api/errors";
 
 const DEBOUNCE_MS = 250;
 
 export type UseTickerSearchResult = {
-  /** debounced 쿼리(`useWhitelistSearch` 에 흘러간 값). */
+  /** debounced 쿼리(`useQueryWhitelistSearch` 에 흘러간 값). */
   debouncedQuery: string;
   results: WhitelistItem[];
   isPending: boolean;
@@ -37,7 +37,7 @@ export function useTickerSearch(
   }, [query]);
 
   const enabled = options?.enabled ?? true;
-  const { data, isFetching, error } = useWhitelistSearch(debouncedQuery, {
+  const { data, isFetching, error } = useQueryWhitelistSearch(debouncedQuery, {
     enabled,
   });
 

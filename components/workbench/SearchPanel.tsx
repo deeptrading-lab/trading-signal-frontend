@@ -12,8 +12,8 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { WhitelistItem } from "@/lib/types/whitelist";
-import { useTickerSearch } from "@/hooks/use-ticker-search";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
+import { useTickerSearch } from "@/hooks/workbench/useTickerSearch";
 
 type Props = {
   selectedTicker: WhitelistItem | null;

@@ -8,7 +8,7 @@
  *   - REALISTIC/STRETCH 등 다른 라벨은 정상 카드 + body 한 줄
  */
 
-import { formatPct } from "@/lib/formatters/pct";
+import { formatPct } from "@/lib/utils/formatPct";
 
 type Props = {
   feasibility: string;

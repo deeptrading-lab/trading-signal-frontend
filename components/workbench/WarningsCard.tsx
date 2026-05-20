@@ -4,7 +4,7 @@
  * DESIGN.md OPEN QUESTION #6 결정 그대로: action 카드 바로 아래 (feasibility 위) 노출.
  */
 
-import type { Warnings } from "@/lib/types/workbench";
+import type { Warnings } from "@/lib/types/workbench/analyze";
 
 type Props = {
   warnings: Warnings;

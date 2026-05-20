@@ -9,13 +9,13 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { WhitelistItem } from "@/lib/types/whitelist";
-import type { AnalyzeRequest } from "@/lib/types/workbench";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
+import type { AnalyzeRequest } from "@/lib/types/workbench/analyze";
 import {
   validateAnalyzePayload,
   type AnalyzeFieldKey,
   type AnalyzeValidationErrors,
-} from "@/lib/validation/analyze";
+} from "@/lib/validation/workbench/analyze";
 
 export type AnalyzeFormState = {
   capital_amount: string;

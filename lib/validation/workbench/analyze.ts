@@ -12,8 +12,8 @@
  * 화이트리스트 멤버십 체크는 BE 호출 없이 동기 검사가 가능하도록 인자로 받는다.
  */
 
-import type { AnalyzeRequest } from "@/lib/types/workbench";
-import type { WhitelistItem } from "@/lib/types/whitelist";
+import type { AnalyzeRequest } from "@/lib/types/workbench/analyze";
+import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 
 export type AnalyzeFieldKey =
   | "ticker"

@@ -7,9 +7,9 @@
  *   - 본문: reasons 목록, reference_price·confidence 보조 메타
  */
 
-import type { Brief } from "@/lib/types/workbench";
-import { getActionMeta, getBriefActionMeta, isDivergent } from "@/lib/copy/action-labels";
-import { formatNumber } from "@/lib/formatters/money";
+import type { Brief } from "@/lib/types/workbench/analyze";
+import { getActionMeta, getBriefActionMeta, isDivergent } from "@/lib/copy/workbench/actionLabels";
+import { formatNumber } from "@/lib/utils/formatMoney";
 
 type Props = {
   brief: Brief;
