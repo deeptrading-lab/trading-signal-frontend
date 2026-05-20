@@ -8,21 +8,19 @@
  *   - 분석 버튼 활성: ticker 선택 + 4필드 validateAnalyzePayload OK
  *   - 비활성 시 aria-disabled + helper text
  *
- * 호출 경로:
- *   - 화이트리스트: useTickerSearch → useWhitelistSearch → searchWhitelist → /api/whitelist/search → FastAPI
- *   - 분석: useAnalyzeWorkbench → analyzeWorkbench → /api/workbench/analyze → FastAPI
+ * 호출 경로 (모두 도메인 훅 경유 — TanStack Query 인터페이스 누출 0건):
+ *   - 화이트리스트: useTickerSearch → useQueryWhitelistSearch → searchWhitelist → /api/whitelist/search → FastAPI
+ *   - 분석:        useAnalyzeRun  → useMutationAnalyzeWorkbench → analyzeWorkbench → /api/workbench/analyze → FastAPI
  *   직접 fetch · 127.0.0.1 호출 0건 (AC-11).
  */
 
 "use client";
 
-import { useState } from "react";
 import { SearchPanel } from "@/components/workbench/SearchPanel";
 import { InputPanel } from "@/components/workbench/InputPanel";
 import { ResultGroup } from "@/components/workbench/ResultGroup";
 import { useAnalyzeForm } from "@/hooks/workbench/useAnalyzeForm";
-import { useMutationAnalyzeWorkbench } from "@/hooks/query/useMutationAnalyzeWorkbench";
-import type { AnalyzeResponse } from "@/lib/types/workbench/analyze";
+import { useAnalyzeRun } from "@/hooks/workbench/useAnalyzeRun";
 
 export default function Home() {
   const {
@@ -35,27 +33,30 @@ export default function Home() {
     attemptSubmit,
   } = useAnalyzeForm();
 
-  const mutation = useMutationAnalyzeWorkbench();
-  const [lastResult, setLastResult] = useState<AnalyzeResponse | null>(null);
+  const {
+    submit,
+    isPending,
+    isError,
+    error,
+    data,
+    reset,
+  } = useAnalyzeRun();
 
   function handleSubmit() {
     const payload = attemptSubmit();
     if (!payload) return;
-    mutation.mutate(payload, {
-      onSuccess: (response) => setLastResult(response),
-    });
+    submit(payload);
   }
 
   function handleRetry() {
-    mutation.reset();
-    setLastResult(null);
+    reset();
   }
 
-  const resultState: "empty" | "loading" | "success" | "error" = mutation.isPending
+  const resultState: "empty" | "loading" | "success" | "error" = isPending
     ? "loading"
-    : mutation.isError
+    : isError
       ? "error"
-      : lastResult
+      : data
         ? "success"
         : "empty";
 
@@ -93,14 +94,14 @@ export default function Home() {
         setField={setField}
         errors={errors}
         isValid={isValid}
-        isPending={mutation.isPending}
+        isPending={isPending}
         onSubmit={handleSubmit}
       />
 
       <ResultGroup
         state={resultState}
-        data={lastResult}
-        error={mutation.error ?? null}
+        data={data}
+        error={error}
         onRetry={handleRetry}
       />
 
