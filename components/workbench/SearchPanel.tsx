@@ -14,6 +14,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 import { useTickerSearch } from "@/hooks/workbench/useTickerSearch";
+import { cn } from "@/lib/utils/cn";
 
 type Props = {
   selectedTicker: WhitelistItem | null;
@@ -138,7 +139,7 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
                   id={`${listId}-option-${item.ticker}`}
                   role="option"
                   aria-selected={focused}
-                  className={focused ? "search-result-item-focus" : "search-result-item"}
+                  className={cn(focused ? "search-result-item-focus" : "search-result-item")}
                   onMouseEnter={() => setFocusIndex(index)}
                   onMouseDown={(e) => {
                     // input blur 직전에 클릭이 동작하도록 mousedown 사용.
@@ -147,20 +148,15 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
                   }}
                 >
                   <strong
-                    className={
-                      focused
-                        ? "text-body-md font-bold"
-                        : "text-body-md font-bold text-primary"
-                    }
+                    className={cn("text-body-md font-bold", !focused && "text-primary")}
                   >
                     {item.ticker} · {item.name}
                   </strong>
                   <span
-                    className={
-                      focused
-                        ? "text-body-sm text-tertiary"
-                        : "text-body-sm text-secondary"
-                    }
+                    className={cn(
+                      "text-body-sm",
+                      focused ? "text-tertiary" : "text-secondary",
+                    )}
                   >
                     {item.asset_type} · {item.currency}
                     {item.aliases && item.aliases.length > 0

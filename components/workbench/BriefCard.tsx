@@ -10,6 +10,7 @@
 import type { Brief } from "@/lib/types/workbench/analyze";
 import { getActionMeta, getBriefActionMeta, isDivergent } from "@/lib/copy/workbench/actionLabels";
 import { formatNumber } from "@/lib/utils/formatMoney";
+import { cn } from "@/lib/utils/cn";
 
 type Props = {
   brief: Brief;
@@ -24,11 +25,7 @@ export function BriefCard({ brief, action, currency }: Props) {
 
   return (
     <article
-      className={
-        divergent
-          ? "card border-l-[3px] border-l-line"
-          : "card"
-      }
+      className={cn("card", divergent && "border-l-[3px] border-l-line")}
       aria-label="기술 신호"
     >
       <p className="mb-sm text-h2 text-primary">기술 신호</p>

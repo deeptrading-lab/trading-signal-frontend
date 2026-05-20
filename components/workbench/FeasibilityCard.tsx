@@ -9,6 +9,7 @@
  */
 
 import { formatPct } from "@/lib/utils/formatPct";
+import { cn } from "@/lib/utils/cn";
 
 type Props = {
   feasibility: string;
@@ -32,7 +33,7 @@ export function FeasibilityCard({
 
   return (
     <article
-      className={isUnrealistic ? "card card-warn" : "card"}
+      className={cn("card", isUnrealistic && "card-warn")}
       aria-label="목표 현실성"
     >
       {isUnrealistic ? (
