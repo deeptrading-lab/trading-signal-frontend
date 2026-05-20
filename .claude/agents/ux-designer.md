@@ -42,6 +42,8 @@ model: inherit
 
 ## 산출물 규약
 - 경로: `docs/design/<slug>.md`
+- **별도 docs PR 을 만들지 않는다.** 워킹트리에 modified 로 두면 `feature/<slug>` 브랜치의 commit (`docs(design): ...`) 으로 다음 단계가 stage·push 한다 (한 브랜치 한 PR 룰).
+- 메인 에이전트 또는 frontend-dev 가 commit 책임. 디자이너는 파일 작성·lint 통과까지만.
 - 최종 응답에 다음을 한 줄씩 명시한다.
   - `산출물: docs/design/<slug>.md`
   - `lint: errors=0 warnings=N info=M`

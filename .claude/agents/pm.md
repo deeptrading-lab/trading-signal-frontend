@@ -36,13 +36,16 @@ model: inherit
 - 사용자에게 PRD 작성 중 직접 질문 — 모호함은 `[OPEN QUESTION]` 에 모아둔다.
 
 ## 산출물 규약
-- 경로: `docs/prd/<slug>.md` (디렉터리 없으면 생성)
-- 모호한 요구는 **가정**으로 명시. 수용 기준은 "~할 때 ~한 결과" 로 재현 가능하게.
+- 경로: `docs/prd/<slug>.md` (디렉터리 없으면 생성).
+- **PRD 작성 후 별도 docs PR 을 만들지 않는다.** 워킹트리에 그대로 둔다. 다음 단계 (디자이너 / 구현) 가 `feature/<slug>` 브랜치를 시작할 때 PRD 가 **첫 commit** (`docs(prd): <slug>` 등) 으로 들어가고, 최종 PR 1회에 모든 산출물이 같이 머지된다 (한 브랜치 한 PR 룰).
+- 모호한 요구는 **가정** 으로 명시. 수용 기준은 "~할 때 ~한 결과" 로 재현 가능하게.
 - 작성 완료 후 최종 응답에 **파일 경로**와 **UI 포함 여부**를 한 줄로 명시한다. 예: `산출물: docs/prd/<slug>.md | UI: yes`
-- `gh` CLI 가 설치되어 있고 Issue 번호가 주어지면, 해당 Issue 에 라벨 `prd-ready` 추가를 시도한다 (실패해도 무방).
+- 메인 에이전트·다른 서브에이전트가 PRD 를 후속 단계에서 stage·commit 한다 — PM 은 워킹트리 작성까지만.
 
-## PR 본문 규약 (PRD docs PR 작성 시 필수)
-- PRD docs PR 본문에도 `## 다음 작업` 섹션을 둔다. **PRD 검토 후 구현 진입** (`feature/<slug>` 브랜치 + frontend-dev 위임), 인접 PRD 분기, 또는 종결 명시 중 하나. `qa-passed` 라벨이 붙는 순간 `docs/HANDOFF.md` 자동 append.
+## 한 브랜치 한 PR 룰 (필수)
+- PRD docs-only PR 을 만들지 않는다.
+- PRD 의 `## 다음 작업` 절은 PRD 본문 안 §7 참고 또는 별도 절에 두지 말고, **최종 PR 본문의 `## 다음 작업` 섹션**에서 다룬다 — PR 본문은 frontend-dev 가 작성.
+- `qa-passed` 라벨이 붙는 순간 `docs/HANDOFF.md` 자동 append. PRD 가 docs PR 로 분리되지 않으므로 HANDOFF entry 도 항상 작업 PR 안에서 자동 생성된다.
 
 ## 참고
 - [`AGENTS.md`](../../AGENTS.md) — 작업 원칙·라벨 흐름·도메인 폴더 표준

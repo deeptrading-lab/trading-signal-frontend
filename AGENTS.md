@@ -36,22 +36,36 @@
 | Reviewer | 접근성, 타입 안정성, 보안, Tailwind 토큰 정합, BFF 패턴, HANDOFF 점검, Vercel 배포 리스크 |
 | DevOps | Vercel 환경변수, 배포(preview/production), 도메인, 라벨 흐름 + 머지 |
 
-## 작업 흐름 — 라벨 게이트
+## 작업 흐름 — 한 브랜치 한 PR
+
+한 작업 단위 = 한 `feature/<slug>` 브랜치 = 한 PR. PRD·디자인·구현·QA·HANDOFF 모두 같은 브랜치에 누적 commit 하고 **최종 PR 한 번** 으로 머지한다.
 
 ```text
-PM (PRD) → docs PR 머지
-         ↓
-Frontend Dev 구현 → impl-ready 라벨 (gh pr create --assignee @me 즉시 지정)
-         ↓
-QA 검증 → qa-passed 라벨 (handoff-append workflow 자동 트리거 — docs/HANDOFF.md 자동 entry commit)
-         ↓ (실패 시 qa-failed → impl-wip 회귀)
-Reviewer 검토 → review-approved 라벨 (자가 PR 차단 시 --comment + 라벨 fallback)
-         ↓ (실패 시 review-changes-requested → impl-wip 회귀)
-DevOps 머지 → main 반영 + 브랜치 정리 (gh pr merge --merge --delete-branch)
+사용자 의도
+  ↓
+PM (PRD 워킹트리 작성, 별도 PR 안 만듦)
+  ↓
+[ feature/<slug> 브랜치 생성 ]
+  ↓ commit: docs(prd): <slug> PRD 추가
+UX/UI Designer (UI 포함 시) — DESIGN.md 같은 브랜치 commit
+  ↓ commit: docs(design): DESIGN.md ...
+Frontend Dev — 구현 commit 누적
+  ↓ commit: feat/refactor/chore/...
+  ↓ PR 생성 (impl-ready 라벨, gh pr create --assignee @me 즉시 지정)
+QA — 같은 브랜치에 QA 리포트 push
+  ↓ commit: docs(qa): <slug> QA 리포트
+  ↓ qa-passed 라벨 → handoff-append workflow 자동 → commit: docs(handoff): #N
+Reviewer
+  ↓ review-approved 라벨 (자가 PR 차단 시 --comment + 라벨 fallback)
+DevOps
+  ↓ gh pr merge --merge --delete-branch
+main 반영 + 브랜치 정리
 ```
 
+- **PRD/DESIGN.md/QA 리포트를 위해 docs-only PR 을 별도로 만들지 않는다**. 모두 작업 PR 브랜치에 누적.
 - PR 본문에 **`## 다음 작업` 섹션 필수**. `handoff-append.yml` workflow 가 이 섹션을 `docs/HANDOFF.md` 에 자동 채워준다.
 - 자가 PR (작성자 = reviewer 본인) 의 경우 GitHub native `--approve` 가 막힌다 — `--comment` 로 승인 본문 + `review-approved` 라벨로 승인 상태 표시.
+- 라벨이 한 단계라도 빠진 PR 은 머지 불가 (impl-ready → qa-passed → review-approved).
 
 ## 산출물 위치
 

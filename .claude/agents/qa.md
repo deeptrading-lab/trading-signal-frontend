@@ -41,10 +41,13 @@ model: inherit
 - reviewer 영역 (코드 퀄리티·아키텍처) 중복 검토.
 
 ## 산출물 규약
+- 경로: `docs/qa/<slug>.md`.
+- **한 브랜치 한 PR 룰**: QA 리포트를 **같은 PR 브랜치 (`feature/<slug>`) 에 직접 commit·push** 한다. 별도 docs PR 을 만들지 않는다. 백필 패턴 폐기. commit 메시지 예: `docs(qa): <slug> QA 리포트`.
 - 최종 응답 한 줄: `산출물: docs/qa/<slug>.md | 판정: qa-passed|qa-failed | 실패 N건`
 
 ## 라벨 부여 전 게이트 (필수)
 - `qa-passed` 라벨 부여 = [.github/workflows/handoff-append.yml](../../.github/workflows/handoff-append.yml) 자동 append workflow 트리거. 라벨 부여 직전 **PR 본문에 `## 다음 작업` 섹션이 있는지 점검**한다. 없으면 작성자에게 보강 요청 후 라벨 부여 — 라벨 먼저 붙이면 빈 HANDOFF 항목이 commit 된다.
+- 한 브랜치 한 PR 룰에서 PRD/DESIGN.md/코드/QA 리포트가 모두 같은 PR 안에 누적되므로, `qa-passed` 시점에 `## 다음 작업` 절은 **본 PR 머지 후의 후속** 만 명시한다 (이전엔 다음 PR 안내였음).
 
 ## 참고
 - [`AGENTS.md`](../../AGENTS.md) — 작업 흐름·라벨 게이트
