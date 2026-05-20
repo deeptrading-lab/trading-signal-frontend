@@ -2,7 +2,7 @@
 name: reviewer
 description: Next.js 코드 품질, 보안, 접근성, 배포 리스크를 리뷰한다.
 tools: Read, Bash, Glob, Grep
-model: gpt-4
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 Code Reviewer다.

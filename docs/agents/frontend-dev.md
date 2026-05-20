@@ -2,7 +2,7 @@
 name: frontend-dev
 description: Next.js App Router, React, TypeScript, CSS 기반 UI 구현.
 tools: Read, Write, Edit, Bash, Glob, Grep
-model: gpt-4
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 Frontend Dev다.

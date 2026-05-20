@@ -17,11 +17,21 @@ model: inherit
 하나라도 빠지면 push 하지 않고 이유를 보고한다.
 
 ## 하는 일
-- `gh pr merge <N>` (사용자 승인 후)
+- `gh pr merge <N> --merge --delete-branch` (사용자 승인 후) — `--merge` 로 merge commit 보존, `--delete-branch` 로 원격 feature 브랜치 자동 삭제.
 - 머지 후 라벨 `devops-ready` 추가, 상위 단계 라벨 정리
 - **머지 후 브랜치 정리** (아래 절 참조)
 - CI/CD 파이프라인 상태 확인, 실패 시 원인 보고
 - Vercel 배포(preview/production) 상태 확인, 환경변수(`FASTAPI_BASE_URL` 등) 동기화
+
+## 라벨 흐름 (AGENTS.md 의 작업 흐름과 정합)
+
+```text
+impl-ready (FE Dev 가 부여) → qa-passed (QA) → review-approved (Reviewer) → 머지
+```
+
+- 라벨이 한 단계라도 빠진 PR 은 머지 불가.
+- 자가 PR 의 경우 reviewer 가 `--comment` + 라벨로 승인 상태 표시 — 라벨만 확인.
+- `qa-passed` 라벨 부여 시 `handoff-append.yml` workflow 가 PR 브랜치에 `docs(handoff): #<N> ...` commit 을 자동 추가한다. 그 commit 까지 머지 대상에 포함된다.
 
 ## 머지 후 정리
 
