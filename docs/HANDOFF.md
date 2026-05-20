@@ -931,3 +931,44 @@
   - 선행 PRD `frontend-architecture-restructure` 를 frontend-dev 에이전트가 `feature/frontend-architecture-restructure` 브랜치에서 구현
   - 선행 PR 머지 후 후속 PRD `workbench-analyze-rebuild` 에 대해 ux-designer 에이전트 호출 → `docs/design/workbench-analyze-rebuild.md` 작성
   - 디자이너 산출물 후 frontend-dev 구현 진입
+
+### 2026-05-20 — feat: 프론트엔드 아키텍처 재편 (axios + TanStack Query + lib 분리) (#9)
+
+- **slug**: `frontend-architecture-restructure` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/9
+- **요약**: feat: 프론트엔드 아키텍처 재편 (axios + TanStack Query + lib 분리)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6 / #7 / #8 후속 — 선행 PRD [`frontend-architecture-restructure`](docs/prd/frontend-architecture-restructure.md) 구현. UI 변경 없음. 후속 PRD `workbench-analyze-rebuild` 가 본 PR 의 클라이언트·훅·타입·검증 함수를 그대로 import 한다.
+  > 
+  > ## 변경 요약
+  > - **의존성**: `axios`, `@tanstack/react-query` v5 추가. 그 외 라이브러리 추가 없음.
+  > - **폴더 신설**: `lib/api/` (axios 인스턴스 + 클라이언트 함수 + 통합 ApiError 매핑), `lib/query/` (queryKeys + 훅), `lib/types/` (WhitelistItem + AnalyzeRequest/Response · Brief · Feasibility · Horizons · RiskPlan · Action · Warnings), `lib/validation/` (`validateAnalyzePayload` 순수 함수).
+  > - **App shell**: `app/providers.tsx` 신설 ('use client' QueryClientProvider, `useState` 로 QueryClient 1회 생성). `app/layout.tsx` 가 Providers 로 children 감쌈.
+  > - **page placeholder**: 기존 `app/page.tsx` 의 BTC 단일 sizing UI 전면 제거. "재구성 중" 안내 placeholder 로 교체 (직접 호출 0건, 기존 디자인 토큰만 사용).
+  > - **route handler 보강**: 두 핸들러에 `AbortSignal.timeout(30s)`, 통신 실패 시 502 + 한글 폴백, JSON 이외 Content-Type text 안전 폴백, 4xx/5xx body 그대로 통과.
+  > - **tsconfig**: `@/*` path alias 추가 (App Router 컨벤션 정합).
+  > - **.env.example**: `FASTAPI_BASE_URL` 주석에 engine 레포 LIVE 방법 명시.
+  > - **OPEN QUESTION 대응** (PRD §9 PM 권고 그대로 채택):
+  >   - Q2 QueryClient 기본값: `staleTime 30s`, `retry 1`, `refetchOnWindowFocus false` 채택. 후속 PRD 디자이너 단계에서 재검토 가능.
+  >   - Q3 axios 에러 표준: `{ kind: 'validation' | 'whitelist_miss' | 'network' | 'server', message, status, detail }` 골격만 정의. 메시지 카피는 후속 PRD.
+  >   - Q4 `offline` 토글: 타입·클라이언트 함수에 `offline?: boolean` 만 흘려두고 UI 노출 미결정.
+  > 
+  > ## AC 자가검증
+  > - **AC-1 (직접 호출 금지)**: `git grep -nE "http://127\.0\.0\.1:(8000|8765)" -- app/` → 2건 (둘 다 `app/api/**/route.ts` 안의 `FASTAPI_BASE_URL` fallback, PRD 명시 예외). 클라이언트 코드 0건.
+  > - **AC-2 (env 단일 진입)**: `FASTAPI_BASE_URL` 만 변경하면 dev/prod 전환. 코드 수정 불필요.
+  > - **AC-3 (axios 단일 인스턴스)**: 클라이언트 측 `fetch(` 사용 0건. `lib/api/client.ts` 의 `httpClient` 인스턴스 하나만 사용. `app/api/**/route.ts` 안 server-side `fetch(` 만 허용.
+  > - **AC-4 (TanStack Query 적용)**: `useWhitelistSearch` (useQuery) + `useAnalyzeWorkbench` (useMutation) 제공. `useState` + `useEffect` fetch 패턴 0건 (placeholder 페이지는 fetch 자체가 없음).
+  > - **AC-5 (타입 일치)**: 6블록 + WhitelistItem 모두 `lib/types/*` 에 정의. 클라이언트 함수 반환 타입 일치. `lib/` 내 `any` 사용 0건.
+  > - **AC-6 (입력 사전 차단)**: `validateAnalyzePayload(input, whitelist)` 가 5개 규칙 (capital_amount · target_return_pct · target_period_days · max_loss_pct · ticker 화이트리스트 멤버십) 모두 거절 + 한글 메시지 반환.
+  > - **AC-7 (route handler 정합)**: 4xx/5xx body 그대로 통과 검증 — 화이트리스트 외 ticker → `{detail: "NVDA는 분석 가능한 화이트리스트에 없습니다"}` + 400 통과, 음수 capital → 422 + Pydantic detail 그대로 통과. 빈 본문·JSON 파싱 실패 시 한글 폴백 메시지 + 500.
+  > - **AC-8 (build/typecheck/lint)**: `npm run typecheck` / `npm run lint` / `npm run build` 모두 0 에러.
+  > - **AC-9 (폴더 분리)**: 타입(`lib/types/`) · HTTP 클라이언트(`lib/api/`) · 쿼리 훅(`lib/query/`) · 검증(`lib/validation/`) 모두 별도 모듈로 분리.
+  > - **AC-10 (placeholder 안전)**: 새 `app/page.tsx` 가 빌드 통과, 직접 호출 0건, 화면에 "재구성 중" + 후속 PRD 명시.
+  > - **AC-11 (whitelist 라운드트립)**: dev 서버에서 수동 확인 — `GET /api/whitelist/search?q=APPLE` 호출 시 BE 가 alias 매칭으로 `AAPL` 단일 결과를 그대로 반환. 본문은 `results: [{ ticker: "AAPL", aliases: ["APPLE"], ... }]`.
+  > 
+  > ## 검증
+  > - `npm run typecheck` / `npm run lint` / `npm run build` 모두 0 에러
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 후속 PRD `workbench-analyze-rebuild` 도입 — `ux-designer` 에이전트로 `docs/design/workbench-analyze-rebuild.md` 작성 트리거 후 frontend-dev 가 본 PR 의 `useWhitelistSearch` · `useAnalyzeWorkbench` · `validateAnalyzePayload` · `WhitelistItem` · `AnalyzeRequest` · `AnalyzeResponse` 를 import 하여 화면 재구성.
+  - `.mcp.json` 향후 처리 결정 — 이전 HANDOFF 에서 이월된 후보 (본 PR 범위 외).
