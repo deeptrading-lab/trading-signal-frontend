@@ -25,12 +25,12 @@ export function BriefCard({ brief, action, currency }: Props) {
 
   return (
     <article
-      className={cn("card", divergent && "border-l-[3px] border-l-line")}
+      className={cn("card", divergent && "border-l-[3px] border-l-border-line")}
       aria-label="기술 신호"
     >
-      <p className="mb-sm text-h2 text-primary">기술 신호</p>
+      <p className="mb-sm text-h2 text-text-strong">기술 신호</p>
       {divergent ? (
-        <p className="mb-sm text-caption text-secondary">
+        <p className="mb-sm text-caption text-text-muted">
           최종 권고와는 별개의 기술 신호예요.
         </p>
       ) : null}
@@ -43,16 +43,16 @@ export function BriefCard({ brief, action, currency }: Props) {
       {brief.reasons && brief.reasons.length > 0 ? (
         <ul className="mt-sm pl-[18px] list-disc">
           {brief.reasons.map((reason, idx) => (
-            <li key={idx} className="my-sm text-body-sm text-body-strong">
+            <li key={idx} className="my-sm text-body-sm text-text-strong">
               {reason}
             </li>
           ))}
         </ul>
       ) : null}
-      <div className="flex gap-md flex-wrap mt-sm text-caption text-secondary">
+      <div className="flex gap-md flex-wrap mt-sm text-caption text-text-muted">
         <span>
           참고 가격{" "}
-          <strong className="text-primary tabular">
+          <strong className="text-text-strong tabular">
             {formatNumber(brief.reference_price)} {currency ?? ""}
           </strong>
         </span>

@@ -39,7 +39,7 @@ export function RiskPlanCard({ riskPlan, currency, isUnrealistic }: Props) {
 
   return (
     <article className="card" aria-label="리스크 플랜">
-      <p className="mb-sm text-h2 text-primary">리스크 플랜</p>
+      <p className="mb-sm text-h2 text-text-strong">리스크 플랜</p>
       {isUnrealistic ? (
         <p className="mb-sm text-body-sm text-warn">
           비현실 목표 기준 계산값 — 참고로만 보세요.
@@ -58,14 +58,14 @@ export function RiskPlanCard({ riskPlan, currency, isUnrealistic }: Props) {
         <div className="price-bar-entry" style={{ left: `${entryPct}%` }} />
         <div className="price-bar-target" style={{ left: `${targetPct}%` }} />
       </div>
-      <div className="flex gap-md flex-wrap mt-sm text-caption text-secondary">
+      <div className="flex gap-md flex-wrap mt-sm text-caption text-text-muted">
         <span className="inline-flex items-center gap-xs before:content-[''] before:inline-block before:w-[8px] before:h-[8px] before:rounded-pill before:bg-critical">
           손절
         </span>
         <span className="inline-flex items-center gap-xs before:content-[''] before:inline-block before:w-[8px] before:h-[8px] before:rounded-pill before:bg-info">
           진입
         </span>
-        <span className="inline-flex items-center gap-xs before:content-[''] before:inline-block before:w-[8px] before:h-[8px] before:rounded-pill before:bg-tertiary">
+        <span className="inline-flex items-center gap-xs before:content-[''] before:inline-block before:w-[8px] before:h-[8px] before:rounded-pill before:bg-primary">
           익절
         </span>
       </div>
@@ -75,83 +75,83 @@ export function RiskPlanCard({ riskPlan, currency, isUnrealistic }: Props) {
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary border-b border-line"
+              className="py-sm text-left text-body-sm text-text-muted border-b border-border-line"
             >
               진입가
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary border-b border-line">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong border-b border-border-line">
               {formatMoney(entry_price, currency)}
             </td>
           </tr>
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary border-b border-line"
+              className="py-sm text-left text-body-sm text-text-muted border-b border-border-line"
             >
               손절가
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary border-b border-line">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong border-b border-border-line">
               {formatMoney(stop_loss_price_for_day, currency)}
             </td>
           </tr>
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary border-b border-line"
+              className="py-sm text-left text-body-sm text-text-muted border-b border-border-line"
             >
               익절가
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary border-b border-line">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong border-b border-border-line">
               {formatMoney(take_profit_price_for_day, currency)}
             </td>
           </tr>
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary border-b border-line"
+              className="py-sm text-left text-body-sm text-text-muted border-b border-border-line"
             >
               제안 매수 금액
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary border-b border-line">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong border-b border-border-line">
               {formatMoney(suggested_buy_amount, currency)}
             </td>
           </tr>
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary border-b border-line"
+              className="py-sm text-left text-body-sm text-text-muted border-b border-border-line"
             >
               제안 수량
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary border-b border-line">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong border-b border-border-line">
               {formatNumber(suggested_share_qty, { digits: 4 })}
             </td>
           </tr>
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary border-b border-line"
+              className="py-sm text-left text-body-sm text-text-muted border-b border-border-line"
             >
               손절 시 예상 손실
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary border-b border-line">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong border-b border-border-line">
               {formatMoney(expected_loss_if_stopped, currency)}
             </td>
           </tr>
           <tr>
             <th
               scope="row"
-              className="py-sm text-left text-body-sm text-secondary"
+              className="py-sm text-left text-body-sm text-text-muted"
             >
               익절 시 예상 이익
             </th>
-            <td className="py-sm text-right text-mono-numeric tabular text-primary">
+            <td className="py-sm text-right text-mono-numeric tabular text-text-strong">
               {formatMoney(expected_gain_if_take_profit, currency)}
             </td>
           </tr>
         </tbody>
       </table>
-      <p className="mt-sm text-body-sm text-body-strong">
+      <p className="mt-sm text-body-sm text-text-strong">
         손익비{" "}
         <strong className="tabular">
           {formatNumber(risk_reward_ratio, { digits: 2 })} : 1

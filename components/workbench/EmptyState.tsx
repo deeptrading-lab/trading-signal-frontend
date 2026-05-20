@@ -9,7 +9,7 @@
 export function EmptyState() {
   return (
     <div
-      className="px-[16px] py-[20px] bg-panel border border-line rounded-sm text-secondary text-body-sm text-center"
+      className="px-[16px] py-[20px] bg-surface border border-border-line rounded-sm text-text-muted text-body-sm text-center"
       role="status"
       aria-live="polite"
     >
