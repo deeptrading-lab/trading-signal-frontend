@@ -1,34 +1,108 @@
 /**
- * 본 화면은 선행 PRD `frontend-architecture-restructure` 의 placeholder 다.
+ * 메인 = 워크벤치 (DESIGN.md OPEN QUESTION #7 결정).
  *
- * 이전 BTC 단일 sizing UI 는 BE 인터페이스 정정으로 폐기되었고,
- * 후속 PRD `workbench-analyze-rebuild` 가 새 BE 6블록 응답 기반 화면을 구현한다.
+ * 구조 (위→아래):
+ *   topBar → SearchPanel → InputPanel → ResultGroup (empty | loading | success | error)
  *
- * 본 PR 시점에서는 직접 호출이 없으며, 빌드/타입체크/lint 통과가 유일한 목적이다.
+ * 사전 차단:
+ *   - 분석 버튼 활성: ticker 선택 + 4필드 validateAnalyzePayload OK
+ *   - 비활성 시 aria-disabled + helper text
+ *
+ * 호출 경로:
+ *   - 화이트리스트: useTickerSearch → useWhitelistSearch → searchWhitelist → /api/whitelist/search → FastAPI
+ *   - 분석: useAnalyzeWorkbench → analyzeWorkbench → /api/workbench/analyze → FastAPI
+ *   직접 fetch · 127.0.0.1 호출 0건 (AC-11).
  */
 
+"use client";
+
+import { useState } from "react";
+import { SearchPanel } from "@/components/workbench/SearchPanel";
+import { InputPanel } from "@/components/workbench/InputPanel";
+import { ResultGroup } from "@/components/workbench/ResultGroup";
+import { useAnalyzeForm } from "@/hooks/use-analyze-form";
+import { useAnalyzeWorkbench } from "@/lib/query/use-analyze-workbench";
+import type { AnalyzeResponse } from "@/lib/types/workbench";
+
 export default function Home() {
+  const {
+    selectedTicker,
+    setSelectedTicker,
+    form,
+    setField,
+    errors,
+    isValid,
+    attemptSubmit,
+  } = useAnalyzeForm();
+
+  const mutation = useAnalyzeWorkbench();
+  const [lastResult, setLastResult] = useState<AnalyzeResponse | null>(null);
+
+  function handleSubmit() {
+    const payload = attemptSubmit();
+    if (!payload) return;
+    mutation.mutate(payload, {
+      onSuccess: (response) => setLastResult(response),
+    });
+  }
+
+  function handleRetry() {
+    mutation.reset();
+    setLastResult(null);
+  }
+
+  const resultState: "empty" | "loading" | "success" | "error" = mutation.isPending
+    ? "loading"
+    : mutation.isError
+      ? "error"
+      : lastResult
+        ? "success"
+        : "empty";
+
   return (
     <main className="mobileShell">
       <header className="topBar">
-        <div>
+        <div className="topBarLeft">
           <p>TradingSignalEngine</p>
-          <h1>화면 재구성 중</h1>
+          <h1>워크벤치</h1>
+        </div>
+        <div className="topBarRight">
+          {selectedTicker ? (
+            <>
+              <strong>{selectedTicker.ticker}</strong>
+              <span>
+                {selectedTicker.name} ({selectedTicker.currency})
+              </span>
+            </>
+          ) : (
+            <span>종목 선택 필요</span>
+          )}
         </div>
       </header>
 
-      <section className="heroDecision" aria-live="polite">
-        <div className="decisionLabel">준비 중</div>
-        <h2>새 분석 화면 도입 예정</h2>
-        <p>
-          엔진 인터페이스 정정에 맞춰 분석 화면을 새로 만들고 있어요. 후속 PRD
-          <code> workbench-analyze-rebuild </code>가 머지되면 ticker · 자본 · 목표 수익률 · 기간 ·
-          최대 손실률을 입력해 분석 결과를 확인할 수 있어요.
-        </p>
-      </section>
+      <SearchPanel
+        selectedTicker={selectedTicker}
+        onSelect={setSelectedTicker}
+      />
+
+      <InputPanel
+        selectedTicker={selectedTicker}
+        form={form}
+        setField={setField}
+        errors={errors}
+        isValid={isValid}
+        isPending={mutation.isPending}
+        onSubmit={handleSubmit}
+      />
+
+      <ResultGroup
+        state={resultState}
+        data={lastResult}
+        error={mutation.error ?? null}
+        onRetry={handleRetry}
+      />
 
       <footer className="mobileFooter">
-        <span>본 페이지는 데이터 흐름·폴더 구조 재정비 단계의 placeholder 입니다.</span>
         <span>투자 판단 보조 자료입니다. 자동 주문이나 수익 보장을 의미하지 않습니다.</span>
       </footer>
     </main>
