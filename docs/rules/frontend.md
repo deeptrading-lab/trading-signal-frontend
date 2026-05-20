@@ -48,3 +48,12 @@
 ## TanStack Query key 명명
 
 - query key 는 `hooks/query/queryKeys.ts` 한 곳에 모은다. 컴포넌트·도메인 훅에서 인라인 배열 리터럴로 key 를 만들지 않는다. invalidate / refetch 시 동일 상수를 참조해 키가 어긋나지 않게 한다.
+
+## 반응형 — CSS 측 vs JS 측 1차 도구
+
+- **CSS 측 1차 도구 = Tailwind 반응형 prefix** (`sm:`, `md:`, `lg:`, `xl:`). 레이아웃·간격·폰트 크기·padding·margin·grid·max-width 등 시각·레이아웃 변경은 prefix 로 처리한다. prefix 로 표현 가능한 변경을 JS 분기로 처리하는 것은 금지 (리렌더 비용 + hydration 일관성 측면에서 prefix 우선).
+- **JS 측 1차 도구 = `useBreakpoint` 훅** (`@/hooks/utils/useBreakpoint`). 반환은 `{ isMobile, isTablet, isDesktop }` boolean 셋. 조건부 렌더(예: 데스크탑에서만 보이는 hint), 이벤트 바인딩 분기(예: 데스크탑에서만 `keydown` 단축키 리스너), DOM 트리·동적 동작 분기 등 **JS 분기가 필요한 경우에만** 사용한다.
+- **`window.innerWidth` 직접 검사 금지** — SSR-unsafe + listener 누락 위험. `matchMedia` 직접 호출도 금지 (컴포넌트는 `useBreakpoint` 만 import). 본 훅이 listener 등록·정리·SSR 폴백을 일관 처리한다.
+- **`useBreakpoint` 위치 = `hooks/utils/`** — 도메인 무관 React 훅의 단일 위치. 도메인 훅은 `hooks/<domain>/`, 도메인 무관 헬퍼(`cn`, `formatMoney` 등 React 훅 외) 는 `lib/utils/` 그대로 유지.
+- **SSR-safe 가정 = 모바일 퍼스트** — 서버·첫 클라이언트 렌더는 항상 `{ isMobile: true, isTablet: false, isDesktop: false }`. 클라이언트 마운트 후 `useEffect` 에서 실제 viewport 로 swap. hydration mismatch 0건이 의무.
+- **breakpoint 값의 단일 진실 원천 = DESIGN.md** (`docs/design/<slug>.md` 의 `breakpoints` 절). `npm run design:sync` 가 `tailwind.theme.json.theme.extend.screens` 로 주입 → `tailwind.config.ts` 의 어댑터가 흡수 → Tailwind prefix 와 `useBreakpoint` 의 경계값이 동일 값을 참조. 현재 채택값: Tailwind 기본 정합 (`sm` 640 / `md` 768 / `lg` 1024 / `xl` 1280).
