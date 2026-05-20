@@ -81,6 +81,11 @@ spacing:
 rounded:
   sm: 8px
   pill: 999px
+breakpoints:
+  sm: 640px
+  md: 768px
+  lg: 1024px
+  xl: 1280px
 components:
   shell:
     backgroundColor: "{colors.neutral}"
@@ -271,6 +276,63 @@ Trading Signal Frontend 의 워크벤치 분석 화면은 사용자가 화이트
 - `inputPanel` 은 2칼럼(`1fr 92px`) 기본. 통화 보조 라벨이 두 번째 칼럼에 들어가며 `capital_amount` 행은 두 칼럼 모두 사용, `target_period_days` 와 `max_loss_pct` 는 단위(`일`, `%`) 라벨이 두 번째 칼럼.
 - `risk_plan` 가격 막대는 가로 풀폭, 손절-진입-익절을 라인 위에 표식으로.
 
+### Breakpoints (반응형 분기점)
+
+front matter `breakpoints` 토큰은 **Tailwind 기본 정합** 값을 채택한다 (`sm` 640 / `md` 768 / `lg` 1024 / `xl` 1280). PM 권고 수용 사유:
+- 학습 비용·외부 자료 정합·`tailwind-merge` 기본 그룹 인식 모두 유리.
+- `npm run design:sync` 가 흘려보낸 `screens` 키가 `tailwind.config.ts` 에 무손실 흡수.
+- 후속 디자이너·FE Dev 가 추가로 학습할 도메인 명명(`mobile`/`tablet`/`desktop`)을 도입할 필요가 없다.
+
+본 디자인의 분기점 정책 (세 구간):
+- **모바일 (`< md`, 즉 `< 768px`)** — 본 가이드의 기준 캔버스. `shell` 좌우 14px 패딩, 한 컬럼 세로 스택. PR #11 의 라운드트립 5건이 통과하는 시각 상태 그대로 유지 (무회귀 의무).
+- **태블릿 (`md ~ lg - 1`, 즉 `768 ~ 1023px`)** — **본 PRD 범위에서는 모바일과 동일한 한 컬럼 스택을 유지**한다. 컨테이너 최대폭만 `md:max-w-2xl` (≈ 672px) 로 살짝 늘어나 가운데 정렬되어 좌우 여백이 자연스럽게 차오른다. 결과 6블록 grid 는 도입하지 않음. 사유: 768~1023px 구간에서 2 컬럼 grid 를 도입하면 카드 폭이 320~440px 안팎으로 좁아져 `risk_plan` 의 표 + 가격 막대가 답답해진다. 후속 PRD 에서 도메인 친화 grid 가 필요해지면 그때 도입.
+- **데스크탑 (`>= lg`, 즉 `>= 1024px`)** — 결과 6블록을 2 컬럼 grid 로 재배치. 입력 패널은 좌측 sticky sidebar.
+
+### Desktop (`>= lg`) 레이아웃 가이드
+
+**메인 컨테이너 최대폭**: `lg:max-w-6xl` (= 1152px) 까지 허용하고 좌우는 가운데 정렬 + 자연 여백. PM 권고 1024~1280px 범위 중 **1152px 채택** 사유:
+- 1024px(= lg 기점) 은 너무 좁아 좌측 sidebar(입력 패널 360px) + 우측 결과 2 컬럼(각 카드 ≈ 330px) 의 최소 폭이 빠듯하다.
+- 1280px(= xl 기점) 은 카드 폭이 너무 넓어져 `risk_plan` 표나 `horizons` 한 줄 텍스트가 좌우로 흩어진다. 정보 밀도가 높은 금융 도구 톤(`AGENTS.md` §작업 원칙)과 어긋남.
+- 1152px 는 sidebar 360px + gap 24px + 결과 grid 768px(2 컬럼 × 372px) 가 깔끔히 들어오는 폭이다.
+
+**가로 레이아웃 (2-Column Shell)**: 데스크탑에서 `shell` 은 **좌측 입력 sidebar + 우측 결과 grid** 의 2 컬럼으로 분할된다.
+
+```
+┌──── lg:max-w-6xl (1152px) ──────────────────────────────────┐
+│ ┌─ sidebar 360px ─┐ gap 24px ┌─ result grid (1fr) ────────┐ │
+│ │ topBar          │          │ ┌──────── action ───────┐  │ │
+│ │ searchPanel     │          │ └───────────────────────┘  │ │
+│ │ inputPanel      │          │ ┌─ feasibility ─┬─ warn ─┐ │ │
+│ │ (sticky top-0)  │          │ └───────────────┴────────┘ │ │
+│ │                 │          │ ┌─ brief ───────┬─ risk ─┐ │ │
+│ │                 │          │ └───────────────┴────────┘ │ │
+│ │                 │          │ ┌──────── horizons ─────┐  │ │
+│ │                 │          │ └───────────────────────┘  │ │
+│ └─────────────────┘          └─────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**입력 패널 데스크탑 위치 — 좌측 sticky sidebar 채택** 사유:
+- 데스크탑에서는 결과를 보며 입력값을 바로 조정하는 케이스가 잦다. 모바일처럼 위→아래 흐름이면 결과를 보려고 스크롤한 후 입력값을 바꾸려 위로 다시 올라가야 한다.
+- 좌측 sticky 는 시선 흐름의 시작점(좌상단)에 입력을 두어 자연스럽다. 우측은 결과의 시각 무게가 크므로 균형이 맞는다.
+- `useBreakpoint` 활용 후보: 데스크탑일 때만 입력 패널 상단에 키보드 단축키 hint("⌘ Enter 로 분석") 노출 등.
+
+**결과 6블록 데스크탑 grid 배치 — 비대칭 2 컬럼** 사유:
+- `action` 은 화면의 첫 인상이므로 전폭으로 시각 무게를 가장 크게 차지한다.
+- `feasibility` 와 `warnings` 는 둘 다 상태 강조 카드 (`badge-warn`/`card-warn`) 라 한 줄에 나란히 두어 비교 가능하게 한다. `warnings` 가 빈 배열이면 `feasibility` 가 그 줄을 풀폭으로 차지한다.
+- `brief`(기술 신호) 와 `risk_plan`(진입/손절/익절) 은 의사결정 보조 정보. 한 줄에 묶어 "신호 → 액션" 의 흐름을 시각화한다.
+- `horizons` 는 단/중/장기 텍스트 요약이라 전폭에서 한 줄로 길게 펼치는 게 가독성이 좋다.
+
+데스크탑 grid 배치 시퀀스 (세로 흐름, 우측 컬럼 안에서 위→아래):
+1. **`action`** — 전폭 (`lg:col-span-2`). `card-elevated`.
+2. **`feasibility` + `warnings`** — 2 컬럼 (`lg:grid-cols-2`). `warnings` 빈 배열이면 `feasibility` 가 풀폭.
+3. **`brief` + `risk_plan`** — 2 컬럼.
+4. **`horizons`** — 전폭.
+
+세로 간격은 모바일과 동일하게 `{spacing.md}` (10px), 가로 gap 은 `{spacing.lg}` (14px). 데스크탑에서도 결과 그룹 시작 전 `{spacing.lg}` 의 상단 여백.
+
+**키보드 탭 순서 (데스크탑 grid 배치 후 무회귀 확인)**: 좌측 sidebar (검색 → 자본 → 수익률 → 기간 → 손실률 → 분석 버튼) → 우측 결과 grid (action → feasibility → warnings → brief → risk_plan → horizons). DOM 순서를 시각 순서와 일치시켜 `tabIndex` 명시 없이 자연스럽게 흐른다.
+
 ## Elevation & Depth
 
 평면 디자인 기조. 그림자는 결과 그룹 첫 카드(`action`, `card-elevated`)에만 미세하게 적용해 시선 끌기:
@@ -327,6 +389,10 @@ Trading Signal Frontend 의 워크벤치 분석 화면은 사용자가 화이트
 - ❌ `warnings` 가 비어 있을 때 빈 카드를 보여주지 않는다. 섹션 자체를 렌더하지 않는다.
 - ❌ ticker 가 선택되지 않은 상태에서 분석 버튼이 활성화되지 않는다. 활성/비활성을 색만으로 구분하지 않고 `aria-disabled` 와 라벨(예: "종목을 먼저 선택해 주세요") 로도 전달.
 - ❌ 가격 막대에 라이브러리(차트·d3)를 도입하지 않는다. CSS 만으로 충분.
+- ✅ 반응형 CSS 변경은 Tailwind 반응형 prefix(`md:`, `lg:`) 로만 표현한다. 레이아웃·간격·폰트 크기·padding·margin 의 분기점별 값은 모두 prefix 로.
+- ✅ 반응형 JS 분기는 `useBreakpoint` 의 boolean 셋(`{ isMobile, isTablet, isDesktop }`) 을 사용한다. 조건부 렌더·이벤트 바인딩 분기·동적 동작에 한정.
+- ❌ JS 측에서 `window.innerWidth` 를 직접 검사하지 않는다 (SSR-unsafe + listener 누락). `matchMedia` 도 컴포넌트에서 직접 호출하지 않고 `useBreakpoint` 훅을 경유한다.
+- ❌ Tailwind prefix 로 표현 가능한 레이아웃 변경을 `useBreakpoint` + JS 분기로 처리하지 않는다 (리렌더 비용·hydration 일관성 측면에서 prefix 우선).
 
 ---
 
@@ -383,6 +449,30 @@ PRD §9 의 7개 질문에 대한 디자이너 결정. PM 권고와 다른 경�
 | 5 | `risk_plan` 시각화 정도 | **표(진입가 / 손절가 / 익절가 / 제안 수량 · 금액 / RR 비율) + 가로 가격 막대** (`price-bar-track` 위에 `stop`(critical) · `entry`(info) · `target`(tertiary) 3개 표식). CSS 만 사용, 차트 라이브러리 미도입. | (디자이너 결정 영역) |
 | 6 | `warnings` 노출 위치 | **`action` 카드 바로 아래** (feasibility 보다 위). 데이터 신뢰성 메시지는 사용자가 결과를 해석하기 전에 보는 게 안전. 빈 배열이면 섹션 자체 숨김. | PM 권고 수용 (action 블록 하단 — 본 디자인에서 "action 카드 직후 + feasibility 위" 로 좀 더 구체화) |
 | 7 | 라우트 위치 | **메인 페이지(`app/page.tsx`) = 워크벤치**. MVP 단계에서는 별도 랜딩 화면을 만들지 않는다. 차후 PRD 로 분리. | PM 권고 수용 |
+
+## OPEN QUESTION 결정 (디자이너 영역) — v2 반응형 추가분
+
+PRD `responsive-pc-support` §9 의 11건 중 디자이너가 답하는 5건. 본 v2 의 추가 결정.
+
+| # | 질문 | 결정 | PM 권고 대비 |
+|---|---|---|---|
+| R1 | breakpoint 값 (Tailwind 기본 vs 도메인 친화 커스텀) | **Tailwind 기본 채택**: `sm` 640 / `md` 768 / `lg` 1024 / `xl` 1280. front matter `breakpoints` 토큰에 그대로 정의. `npm run design:sync` 가 흘려보내는 `screens` 키도 동일. | PM 권고 수용 |
+| R2 | 데스크탑 컨테이너 최대폭 (1024 / 1280 / 풀폭) | **`lg:max-w-6xl` (1152px) 채택**. 1024 는 좁고 1280 은 카드 폭이 흩어진다. 좌측 sidebar 360px + gap 24px + 결과 grid 2 컬럼 768px 가 깔끔히 들어오는 폭. | PM 권고(1280px 까지 허용) 와 다름 — 1152px 로 좁힘. 사유: 결과 6블록의 카드 폭 정보 밀도 우선. |
+| R3 | 결과 6블록 grid 배치 (2 / 3 컬럼 / 비대칭) | **비대칭 2 컬럼**: `action` 전폭 → `feasibility + warnings` 2 컬럼 → `brief + risk_plan` 2 컬럼 → `horizons` 전폭. `warnings` 가 빈 배열이면 `feasibility` 가 그 줄을 풀폭으로 차지. | PM 권고(비대칭 2 컬럼 또는 3 컬럼 균등) 중 비대칭 2 컬럼 채택. 사유: 6블록의 의미적 묶음(상태 강조 / 의사결정 보조 / 시간축 요약) 이 2 컬럼 페어로 자연스럽게 짝지어진다. |
+| R4 | 입력 패널 데스크탑 위치 (좌측 sidebar / 상단 가로 / 그대로) | **좌측 sticky sidebar (360px, `lg:sticky lg:top-0`)**. 데스크탑에서 결과를 보며 입력값을 즉시 조정 가능. 시선 흐름이 좌상단 시작점에서 자연스럽다. | (디자이너 결정 영역) |
+| R5 | 태블릿 (`md ~ lg - 1`, 768~1023px) 정책 | **모바일과 동일한 한 컬럼 스택 유지 + 컨테이너 최대폭만 `md:max-w-2xl` (≈ 672px) 로 살짝 확장**. 결과 6블록 grid 는 도입하지 않음. 사유: 768~1023px 에서 2 컬럼은 카드 폭이 320~440px 로 좁아져 `risk_plan` 표 + 가격 막대가 답답해진다. | (디자이너 결정 영역) |
+
+## lint 메모 (v2)
+
+본 v2 (반응형 PC 추가) 는 기존 v1 의 토큰·prose 를 그대로 보존하고 다음만 추가했다:
+- front matter: `breakpoints` 토큰 (4 키, Tailwind 기본 정합).
+- 본문 `Layout` 절 끝에 "Breakpoints (반응형 분기점)" + "Desktop (`>= lg`) 레이아웃 가이드" 하위 절.
+- 본문 `Do's and Don'ts` 절에 반응형 4 줄 (Tailwind prefix 우선 / `useBreakpoint` 사용 / `window.innerWidth` 금지 / prefix 가능한 케이스에서 JS 분기 금지).
+- OPEN QUESTION 결정 표 v2 (R1~R5 5건).
+
+기존 컴포넌트 토큰(`shell`/`card`/`card-elevated`/`button-primary` 등) 은 변경하지 않았다. 데스크탑에서 컴포넌트 자체의 시각이 달라지는 경우는 없고, 배치(grid 위치·sidebar sticky) 만 달라지므로 컴포넌트 토큰 추가 없이 prose 와 Tailwind prefix 만으로 표현 가능.
+
+산출 직전 `npx @google/design.md lint docs/design/workbench-analyze-rebuild.md` 실행 결과는 PR 본문에 첨부한다.
 
 ## lint 메모
 
