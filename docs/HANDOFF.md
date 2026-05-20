@@ -972,3 +972,45 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 후속 PRD `workbench-analyze-rebuild` 도입 — `ux-designer` 에이전트로 `docs/design/workbench-analyze-rebuild.md` 작성 트리거 후 frontend-dev 가 본 PR 의 `useWhitelistSearch` · `useAnalyzeWorkbench` · `validateAnalyzePayload` · `WhitelistItem` · `AnalyzeRequest` · `AnalyzeResponse` 를 import 하여 화면 재구성.
   - `.mcp.json` 향후 처리 결정 — 이전 HANDOFF 에서 이월된 후보 (본 PR 범위 외).
+
+### 2026-05-20 — docs(design+qa): workbench-analyze-rebuild DESIGN.md + PR #9 누락 QA 리포트 백필 (#10)
+
+- **slug**: `design/workbench-analyze-rebuild` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/10
+- **요약**: docs(design+qa): workbench-analyze-rebuild DESIGN.md + PR #9 누락 QA 리포트 백필
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #8 (PRD 2개 머지) · PR #9 (선행 PRD 구현) 후속 — 후속 PRD `workbench-analyze-rebuild` 의 디자인 산출물과 PR #9 의 QA 리포트가 main 에 누락된 것을 함께 정리.
+  > 
+  > ## 변경 요약
+  > 
+  > ### 추가 1: `docs/design/workbench-analyze-rebuild.md` (389 라인)
+  > - Google Labs DESIGN.md 포맷 — YAML front matter 토큰 + Markdown 본문 (`docs/rules/design-md.md` 기준)
+  > - 토큰: **16 colors / 10 typography / 6 spacing / 2 rounded / 21 components**
+  > - 본문 섹션 순서 준수: Overview → Colors → Typography → Layout → Elevation & Depth → Shapes → Components → Do's and Don'ts
+  > - 본문 외 추가 섹션:
+  >   - **유저 시나리오 2건**: 해피 패스 (`AAPL`, 5%/30일) + 비현실 목표 강조 (`BTC-USD`, 50%/7일)
+  >   - **핸드오프 명세 9개 상태별 컴포넌트·텍스트·토큰 표**: Empty, ticker 미선택, Validation, Loading, Success, feasibility 비현실, action vs brief 불일치, whitelist miss, BE 4xx/5xx·네트워크 실패
+  >   - **OPEN QUESTION 7건 결정**: PM 권고 수용 5건(feasibility 강조 방식 · `capital_amount` 통화 · warnings 위치 · 라우트 위치 · 라이브러리 미도입 risk_plan 시각화) + 디자이너 결정 영역 2건(검색 UX 디테일 · `action` 6 라벨 한글 톤)
+  > - ux-designer 에이전트 spawn 이 3회 연속 API 529 Overloaded 로 실패해 메인 에이전트가 ux-designer 정의·`docs/rules/design-md.md`·PRD §9 PM 권고를 그대로 따라 작성. 산출물 양식·품질 동일, 본문 끝 lint 메모 절에 작성 경위 명시.
+  > 
+  > ### 추가 2: `docs/qa/frontend-architecture-restructure.md` (238 라인) — PR #9 백필
+  > - QA 에이전트가 PR #9 검증 시 작성한 리포트가 untracked 로 남아있던 것을 정리
+  > - AC-1 ~ AC-11 모두 PASS · 에지 케이스 E1 ~ E11 모두 PASS · 결함 0건
+  > - LIVE BE 라운드트립 5건 (whitelist alias / 6블록 응답 / whitelist miss / Pydantic 422 / placeholder) 검증
+  > - 본 PR 머지 후 `docs/qa/` 가 진실의 단일 출처로 일관됨
+  > 
+  > ## DESIGN.md lint
+  > ```
+  > {
+  >   "findings": [
+  >     { "severity": "info", "message": "Design system defines 16 colors, 10 typography scales, 2 rounding levels, 6 spacing tokens, 21 components." }
+  >   ],
+  >   "summary": { "errors": 0, "warnings": 0, "infos": 1 }
+  > }
+  > ```
+  > `npx @google/design.md lint docs/design/workbench-analyze-rebuild.md` → **errors=0 warnings=0** (PRD `signal-workbench-frontend-mvp` 의 산출 직전 검증 기준 충족).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 후속 PRD `workbench-analyze-rebuild` 를 frontend-dev 에이전트가 `feature/workbench-analyze-rebuild` 브랜치에서 구현. PR #9 의 `useWhitelistSearch` · `useAnalyzeWorkbench` · `validateAnalyzePayload` · 타입 모듈을 import 하여 본 디자인 가이드의 컴포넌트·상태·OPEN QUESTION 결정을 그대로 화면화.
+  - 구현 PR 의 QA 시 본 DESIGN.md 의 토큰·핸드오프 명세 9 상태가 실제로 코드와 매핑되는지 검증.
+  - `.mcp.json` 향후 처리 결정 — 이전 HANDOFF 에서 이월된 후보 (본 PR 범위 외).
