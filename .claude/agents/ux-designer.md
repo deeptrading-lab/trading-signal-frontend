@@ -19,6 +19,16 @@ model: inherit
 - **YAML front matter**에 토큰을 정의하고, 본문은 `Overview → Colors → Typography → Layout → Elevation & Depth → Shapes → Components → Do's and Don'ts` 순서를 지킨다 (생략 가능, 순서는 고정).
 - 색·간격은 토큰으로만 표현한다. 컴포넌트 속성은 `{colors.primary}` 같은 **토큰 참조**로 연결한다.
 - 동일 slug 내에서는 기존 토큰 키(`primary`, `body-md`, `button-primary` 등)를 재사용한다. 새 키는 prose에서 도입 근거를 명시한다.
+- **반응형 breakpoint** 가 PRD 에 들어오면 front matter 에 `breakpoints` 절을 추가한다. 권고 값 Tailwind 기본 정합 (`sm` 640 / `md` 768 / `lg` 1024 / `xl` 1280) — 디자이너 재량으로 변경 시 사유 prose.
+- **`Layout` 절** 에 모바일·태블릿·데스크탑 가이드를 명시. 컨테이너 최대폭·grid 배치·sidebar 정책 포함.
+- **OPEN QUESTION 결정 (디자이너 영역)** 표 — PRD §9 의 디자이너 결정 영역을 본문 끝에 R1/R2/... 로 명시.
+
+## design:sync 파이프라인
+
+- 디자이너가 DESIGN.md 토큰을 갱신하면 `npm run design:sync` 가 `tailwind.theme.json` 재생성 → `tailwind.config.ts` 가 import → Tailwind theme 에 주입.
+- frontend-dev 가 그 토큰을 `bg-tertiary`, `rounded-card` 같은 Tailwind utility 로 호출한다. hex/px 직타 0건이 목표.
+- breakpoint 는 후처리 스크립트 (`scripts/inject-breakpoints.mjs`) 가 `screens` 로 흡수한다 (export 도구 한계 우회).
+- 디자이너는 토큰만 갱신, 파이프라인 변경은 frontend-dev 영역.
 
 ## 산출 직전 검증 (필수)
 - `npx @google/design.md lint docs/design/<slug>.md`를 실행해 **error 0건**인지 확인한다.

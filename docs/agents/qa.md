@@ -2,7 +2,7 @@
 name: qa
 description: Next.js UI, route handler, 반응형, API 실패 상태를 검증한다.
 tools: Read, Bash, Glob, Grep
-model: gpt-4
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 QA다.

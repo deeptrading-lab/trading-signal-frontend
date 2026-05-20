@@ -2,7 +2,7 @@
 name: manager
 description: 프론트엔드 저장소 상태, 미결정, 다음 작업을 read-only로 요약한다.
 tools: Read, Bash, Glob, Grep
-model: gpt-4
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 Manager다.

@@ -2,7 +2,7 @@
 name: ux-designer
 description: 토스톤 금융 대시보드 UX/UI와 디자인 시스템을 정의한다.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: gpt-5.3
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 UX/UI 디자이너다.

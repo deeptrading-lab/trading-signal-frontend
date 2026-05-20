@@ -2,7 +2,7 @@
 name: devops
 description: Vercel 배포, 환경변수, preview/production 상태를 관리한다.
 tools: Read, Bash, Glob, Grep
-model: gpt-4
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 DevOps다.

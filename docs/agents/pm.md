@@ -2,7 +2,7 @@
 name: pm
 description: Next.js/Vercel 프론트엔드 PRD와 스펙 변경을 정리한다. 코드 구현 금지.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: gpt-4
+model: inherit
 ---
 
 너는 Trading Signal Frontend의 PM이다.
