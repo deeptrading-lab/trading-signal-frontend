@@ -1014,3 +1014,43 @@
   - 후속 PRD `workbench-analyze-rebuild` 를 frontend-dev 에이전트가 `feature/workbench-analyze-rebuild` 브랜치에서 구현. PR #9 의 `useWhitelistSearch` · `useAnalyzeWorkbench` · `validateAnalyzePayload` · 타입 모듈을 import 하여 본 디자인 가이드의 컴포넌트·상태·OPEN QUESTION 결정을 그대로 화면화.
   - 구현 PR 의 QA 시 본 DESIGN.md 의 토큰·핸드오프 명세 9 상태가 실제로 코드와 매핑되는지 검증.
   - `.mcp.json` 향후 처리 결정 — 이전 HANDOFF 에서 이월된 후보 (본 PR 범위 외).
+
+### 2026-05-20 — feat: workbench-analyze-rebuild 화면 구현 — BE 6블록 + 종목 검색·자본 입력 폼 (#11)
+
+- **slug**: `workbench-analyze-rebuild` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/11
+- **요약**: feat: workbench-analyze-rebuild 화면 구현 — BE 6블록 + 종목 검색·자본 입력 폼
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6/#7/#8/#9/#10 후속 — 후속 PRD `workbench-analyze-rebuild` 화면 구현. 선행 PRD (PR #9) 의 클라이언트·훅·타입·검증 함수를 그대로 import.
+  > 
+  > ## 변경 요약
+  > - 의존성 변경 없음 (axios·@tanstack/react-query 만 사용).
+  > - `app/globals.css` 를 DESIGN.md front matter 토큰 그대로 CSS custom property 로 이식 (colors / spacing / rounded / typography). 기존 `--accent`·`--blue` 등 alias 는 선행 PRD placeholder 호환을 위해 보존.
+  > - 신설: `components/workbench/*` (12개), `hooks/use-analyze-form.ts`, `hooks/use-ticker-search.ts`, `lib/copy/action-labels.ts`, `lib/copy/error-messages.ts`, `lib/formatters/money.ts`, `lib/formatters/pct.ts`.
+  > - `app/page.tsx` 의 BTC 단일 placeholder 폐기 → 워크벤치 메인 (DESIGN.md OPEN QUESTION #7 결정: 메인 = 워크벤치).
+  > - DESIGN.md OPEN QUESTION 7건 결정 그대로 채택 (자동완성 250ms / feasibility 비현실 강조 3트랙 / capital_amount 통화 보조 라벨 / action 한글 6라벨 / risk_plan 표+CSS 막대 / warnings = action 직후·feasibility 위 / 메인=워크벤치).
+  > 
+  > ## AC 자가검증
+  > - AC-1 (BTC 단일 UI 제거) — `git grep -nE "btc_holding|news_snapshot|market_flow_snapshot" -- app/ lib/ components/ hooks/` 결과 0건.
+  > - AC-2 (BE 6블록 매핑) — `ResultGroup` 이 action / warnings / feasibility / brief / risk_plan / horizons 카드 6개 매핑. `warnings` 빈 배열일 때는 섹션 자체 숨김.
+  > - AC-3 (feasibility 강조) — `FeasibilityCard` 가 `UNREALISTIC` 일 때 `card-warn` 배경 + `badge-warn` "⚠ 비현실적인 목표예요" + 본문에 연환산 수치. 색·텍스트·이모지 세 트랙 모두로 전달.
+  > - AC-4 (action vs brief 구분) — `BriefCard` 가 의미 그룹 비교 후 다르면 좌측 3px `--line` 보더 + caption "최종 권고와는 별개의 기술 신호예요." 매뉴얼 QA (a) 결과 `action=HOLD` vs `brief.action=ACTIONABLE_LONG` 에서 divergent 분기 동작 확인.
+  > - AC-5 (whitelist 검색 UX) — `SearchPanel` 가 `useTickerSearch` 의 250ms debounce 결과를 드롭다운(role=listbox)에 표시, 키보드 ↑↓ + Enter / ESC / 마우스 클릭, 결과 1건도 자동 선택 X, alias 검색은 BE 가 `q=APPLE → AAPL` 처리.
+  > - AC-6 (whitelist miss 메시지) — `validateAnalyzePayload` 에 직접 입력된 ticker 가 화이트리스트 멤버가 아니면 분석 버튼 비활성 + helper. BE 가 400 + 한글 detail 을 보내면 axios 인터셉터가 `kind=whitelist_miss` 매핑 → `ErrorCard` 가 그대로 노출 (NVDA 매뉴얼 QA 확인).
+  > - AC-7 (입력 사전 차단) — `useAnalyzeForm.attemptSubmit` 이 `validateAnalyzePayload` 호출. 4필드 모두 한글 helper 가 placeholder/error 위치에 정합.
+  > - AC-8 (로딩 상태) — `mutation.isPending` 시 분석 버튼 라벨 "분석 중" + `aria-busy=true` + `disabled`. 결과 영역은 `LoadingSkeleton` 4장.
+  > - AC-9 (BE 에러 메시지) — `getErrorMessage` 가 한글 detail 이면 그대로 사용, 영문이면 kind 별 한글 fallback. 500/network 는 "엔진에 일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요." + "다시 시도" 버튼.
+  > - AC-10 (한글 톤) — ticker / BE enum / 단위(USD, KRW, %, 일) 외 모든 텍스트 한글.
+  > - AC-11 (직접 호출 금지) — `git grep -nE "http://127\.0\.0\.1" -- app/page.tsx components/ hooks/ lib/copy/ lib/formatters/` 결과 0건. `git grep -nE "fetch\(" -- app/page.tsx components/ hooks/ lib/copy/ lib/formatters/` 결과 0건. 화면 코드는 `lib/api/*` 클라이언트 함수 + `lib/query/*` 훅만 사용.
+  > - AC-12 (디자인 토큰 사용) — `git grep -nE "#[0-9a-fA-F]{3,6}" -- app/page.tsx components/ hooks/ lib/copy/ lib/formatters/` 결과 0건. 모든 색·간격·라운드·폰트 metric 은 `var(--<token>)` 만 사용.
+  > - AC-13 (build/typecheck/lint) — `npm run typecheck` / `npm run lint` / `npm run build` 모두 0 에러.
+  > - AC-14 (수동 QA 시나리오) — dev 환경 (`http://127.0.0.1:3000` + BE `127.0.0.1:8000`) 에서 5건 모두 동작 확인. 아래 "검증" 절 참조.
+  > - AC-15 (기본 접근성) — 모든 폼 필드 `<label>` 연결, 검색 드롭다운 `role=listbox`/`role=option`/`aria-selected`, 분석 버튼 `aria-disabled`/`aria-busy`, 에러 카드 `role=alert aria-live=polite`, feasibility UNREALISTIC 강조는 색 + 텍스트 ("⚠ 비현실적인 목표예요") + 이모지 세 트랙. Tab 순서 검색 → capital → return → period → loss → 분석 → 결과.
+  > 
+  > ## DESIGN.md 정합
+  > - 토큰 매핑: front matter 의 `colors`/`typography`/`spacing`/`rounded`/`components` 가 `app/globals.css` 의 `--<token>` 그룹으로 그대로 이식 (예: `colors.primary` → `--primary`, `colors.tertiary-soft` → `--tertiary-soft`, `rounded.pill` → `--rounded-pill`, `typography.mono-numeric` 의 fontFeature `tnum` → CSS `font-variant-numeric: tabular-nums`). 화면 코드는 hex/px 직타 0건.
+  > - 핸드오프 명세 9 상태가 모두 매핑됨: 분석 전 (`EmptyState`) / ticker 미선택 (helper "분석할 종목을 먼저 선택해 주세요.") / 사전 차단 (`input-error` + `helper.is-critical`) / 로딩 (`LoadingSkeleton`) / 정상 (`ResultGroup` 6블록) / feasibility 비현실 (`FeasibilityCard.is-unrealistic`) / action vs brief 불일치 (`BriefCard.is-divergent`) / whitelist miss (`ErrorCard` + 한글 카피) / BE 4xx·5xx·network (`ErrorCard` + 다시 시도 버튼).
+  > - OPEN QUESTION 7건 결정 그대로 채택: 자동완성 250ms / UNREALISTIC = card-warn + badge-warn + 본문 / 통화 보조 라벨 두 번째 칼럼 / action 6 한글 라벨 + 배지 색 / risk_plan 표 + CSS 막대 + RR 한 줄 / warnings = action 직후·feasibility 위 / 메인 = 워크벤치.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 본 PR 종결 후 후속 PRD 후보: (1) 화이트리스트 확장 (BE 작업) 시 placeholder 카피 "AAPL 또는 BTC-USD" 동적화. (2) `offline` 토글 UI 도입 PRD. (3) ai_summary 가 BE 에서 채워졌을 때 ActionCard reason 영역 카피 톤 재검토 (현재는 BE null 이라 미노출). (4) `.mcp.json` 정리 등 historical follow-up. 위 4건 모두 본 PR 범위 밖.
