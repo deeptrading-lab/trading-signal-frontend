@@ -32,15 +32,15 @@ export function FeasibilityCard({
 
   return (
     <article
-      className={`card feasibilityCard${isUnrealistic ? " is-unrealistic" : ""}`}
+      className={isUnrealistic ? "card card-warn" : "card"}
       aria-label="목표 현실성"
     >
       {isUnrealistic ? (
         <>
-          <div className="actionBadgeRow">
+          <div className="flex gap-sm flex-wrap mb-md">
             <span className="badge-warn">⚠ 비현실적인 목표예요</span>
           </div>
-          <p className="feasibilityBody">
+          <p className="mt-sm text-body-sm text-warn">
             {`${targetPeriodDays}일 동안 ${formatPct(targetReturnPct)} 수익을 노리는 건 연 환산 약 `}
             <strong>{formatPct(annualizedTargetReturnPct)}</strong>
             {` 에 해당해요. 기간을 늘리거나 목표를 낮춰 보세요.`}
@@ -48,12 +48,12 @@ export function FeasibilityCard({
         </>
       ) : (
         <>
-          <p className="feasibilityTitle">목표 현실성</p>
-          <p className="feasibilityBody">
+          <p className="text-h2 text-primary">목표 현실성</p>
+          <p className="mt-sm text-body-sm text-body-strong">
             {REALISTIC_COPY[feasibility?.toUpperCase() ?? ""] ??
               "BE 가 제공한 현실성 라벨을 그대로 표시해요."}
           </p>
-          <p className="feasibilityAnnualized">
+          <p className="mt-sm text-mono-numeric tabular">
             {`연 환산 약 ${formatPct(annualizedTargetReturnPct)}`}
           </p>
         </>

@@ -60,16 +60,18 @@ export default function Home() {
         : "empty";
 
   return (
-    <main className="mobileShell">
-      <header className="topBar">
-        <div className="topBarLeft">
-          <p>TradingSignalEngine</p>
-          <h1>워크벤치</h1>
+    <main className="w-[min(480px,100%)] mx-auto px-lg pt-[18px] pb-[28px]">
+      <header className="flex justify-between items-start gap-md mb-lg">
+        <div>
+          <p className="text-caption text-secondary">TradingSignalEngine</p>
+          <h1 className="mt-xs text-h1">워크벤치</h1>
         </div>
-        <div className="topBarRight">
+        <div className="text-right text-caption text-secondary">
           {selectedTicker ? (
             <>
-              <strong>{selectedTicker.ticker}</strong>
+              <strong className="block mb-xs text-body-sm font-bold text-primary">
+                {selectedTicker.ticker}
+              </strong>
               <span>
                 {selectedTicker.name} ({selectedTicker.currency})
               </span>
@@ -102,7 +104,7 @@ export default function Home() {
         onRetry={handleRetry}
       />
 
-      <footer className="mobileFooter">
+      <footer className="grid gap-xs mt-lg px-[2px] text-caption text-secondary">
         <span>투자 판단 보조 자료입니다. 자동 주문이나 수익 보장을 의미하지 않습니다.</span>
       </footer>
     </main>

@@ -19,11 +19,15 @@ export function ErrorCard({ error, onRetry }: Props) {
   const message = getErrorMessage(error);
   const retryable = isRetryable(error);
   return (
-    <div className="card-critical errorCard" role="alert" aria-live="polite">
-      <p>{message}</p>
+    <div className="card-critical" role="alert" aria-live="polite">
+      <p className="text-body-sm text-critical">{message}</p>
       {retryable ? (
-        <div className="errorActions">
-          <button type="button" className="button-secondary" onClick={onRetry}>
+        <div className="mt-md">
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={onRetry}
+          >
             다시 시도
           </button>
         </div>

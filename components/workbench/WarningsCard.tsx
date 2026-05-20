@@ -13,11 +13,13 @@ type Props = {
 export function WarningsCard({ warnings }: Props) {
   if (!warnings || warnings.length === 0) return null;
   return (
-    <article className="card warningsCard" aria-label="주의 사항">
-      <p className="feasibilityTitle">주의 사항</p>
-      <ul>
+    <article className="card card-warn" aria-label="주의 사항">
+      <p className="text-h2 text-warn">주의 사항</p>
+      <ul className="mt-sm pl-[18px] list-disc">
         {warnings.map((w, idx) => (
-          <li key={idx}>{typeof w === "string" ? w : w.message}</li>
+          <li key={idx} className="my-sm text-body-sm text-warn">
+            {typeof w === "string" ? w : w.message}
+          </li>
         ))}
       </ul>
     </article>

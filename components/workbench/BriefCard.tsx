@@ -24,31 +24,40 @@ export function BriefCard({ brief, action, currency }: Props) {
 
   return (
     <article
-      className={`card briefCard${divergent ? " is-divergent" : ""}`}
+      className={
+        divergent
+          ? "card border-l-[3px] border-l-line"
+          : "card"
+      }
       aria-label="기술 신호"
     >
-      <p className="resultBlockTitle">기술 신호</p>
+      <p className="mb-sm text-h2 text-primary">기술 신호</p>
       {divergent ? (
-        <p className="briefDivergentNote">최종 권고와는 별개의 기술 신호예요.</p>
+        <p className="mb-sm text-caption text-secondary">
+          최종 권고와는 별개의 기술 신호예요.
+        </p>
       ) : null}
-      <div className="briefHeader">
+      <div className="flex items-center gap-sm mb-sm">
         <span className={briefMeta.badge}>{briefMeta.label}</span>
         <span className="badge-info" aria-label="신뢰도">
           신뢰도 {brief.confidence}
         </span>
       </div>
       {brief.reasons && brief.reasons.length > 0 ? (
-        <ul className="briefReasons">
+        <ul className="mt-sm pl-[18px] list-disc">
           {brief.reasons.map((reason, idx) => (
-            <li key={idx} className="briefBody">
+            <li key={idx} className="my-sm text-body-sm text-body-strong">
               {reason}
             </li>
           ))}
         </ul>
       ) : null}
-      <div className="briefMetaRow">
+      <div className="flex gap-md flex-wrap mt-sm text-caption text-secondary">
         <span>
-          참고 가격 <strong>{formatNumber(brief.reference_price)} {currency ?? ""}</strong>
+          참고 가격{" "}
+          <strong className="text-primary tabular">
+            {formatNumber(brief.reference_price)} {currency ?? ""}
+          </strong>
         </span>
         {brief.entry_condition ? <span>{brief.entry_condition}</span> : null}
       </div>

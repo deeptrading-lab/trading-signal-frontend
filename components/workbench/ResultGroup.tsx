@@ -46,7 +46,7 @@ export function ResultGroup({ state, data, error, onRetry }: Props) {
       analysis.feasibility.toUpperCase() === "UNREALISTIC";
     const currency = analysis.whitelist_entry?.currency;
     return (
-      <div className="resultGroup">
+      <div className="grid gap-md mt-lg">
         <ActionCard
           action={analysis.action}
           reason={analysis.ai_summary ?? null}
