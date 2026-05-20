@@ -811,3 +811,39 @@
   > | AC-WTN-11 (audit 완전성) | `TestNLWriteHappyPath` — 4 종 신규 kind + Phase 2 chain | PASS |
   > | AC-WTN-12 (PRD 산문 스캔) | `test_compliance.py::test_prd_write_tools_nl_body_outside_code_is_clean` | PASS |
 - **다음 작업 후보**: _PR 본문에 별도 섹션 없음. 본문 참고하여 판단._
+
+### 2026-05-20 — chore: BE/AI 잔재 제거 및 .claude agents FE 컨텍스트 정리 (#6)
+
+- **slug**: `chore/strip-backend-residue` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/6
+- **요약**: chore: BE/AI 잔재 제거 및 .claude agents FE 컨텍스트 정리
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경 요약
+  > - `ai/` Python 트리(coordinator·llm·stock_signal·tests)와 BE 인프라(`Dockerfile` / `apprunner.yaml` / `Makefile` / `.dockerignore` / `skills/`) 제거 — engine 레포로 분리
+  > - `docs/` BE 자산 제거: PRD 11건, QA 12건, references 2건(`slack-coordinator-bot-setup`, `slack-mcp-setup`), rules 2건(`ai.md` / `backend.md`), agents 2건(`.claude/agents/backend-dev.md`, `docs/agents/dev-backend.md`)
+  > - `.env.example`: BE 섹션(Slack / Anthropic / OpenAI / WORKBENCH / HOST / PORT) 제거, FE 키(`FASTAPI_BASE_URL` / Supabase / `LOG_LEVEL`)만 유지
+  > - `.claude/agents/*.md`: `Trading Signal Engine` → `Trading Signal Frontend` 일괄 교체, `devops` / `ux-designer` / `manager` 의 BE 흔적(Slack 알림·`ai/services` 경로·BE slug 예시)을 FE 맥락(Vercel·`app/page.tsx`·`signal-workbench-frontend-mvp`)으로 정리
+  > 
+  > ## 통계
+  > - 85 files changed, +271 / -11,966
+  > - 잔여 BE 흔적 grep 결과 0건 (`.claude/agents/` 전수 점검)
+  > 
+  > ## 의도적 보존 (이번 PR 범위 외)
+  > - `.mcp.json` — 사용자 결정으로 로컬 유지. `.gitignore` 처리되어 레포 영향 없음
+  > - `docs/qa/` 안 session-notes·handoff 류 4건 — 인수인계 historical 기록으로 보존
+  > - `package-lock.json` 메타 변경 — 이번 정리와 무관한 lock 재정렬(84줄 삭제, `libc` optional 필드)이라 별도 처리
+  > 
+  > ## 검증
+  > - npm 종속성·런타임 영향 없음 (Python 트리만 제거)
+  > - TypeScript/ESLint 영향 없음 (FE 코드 미변경)
+  > - 모든 변경은 워킹트리·커밋 단위 reversible
+  > 
+  > ## 다음 작업
+  > - `app/page.tsx` 의 `http://127.0.0.1:8765` 직접 호출 → Next.js route handler 프록시(`app/api/workbench/analyze/route.ts`) 경유로 정정 (AGENTS.md "브라우저는 FastAPI를 직접 호출하지 않는다" 원칙)
+  > - `README.md` / `AGENTS.md` 잔여 BE 표현 점검 (구조도·작업 원칙 절)
+  > - `.mcp.json` 향후 처리 결정 (계속 로컬 유지 vs 제거)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `app/page.tsx` 의 `http://127.0.0.1:8765` 직접 호출 → Next.js route handler 프록시(`app/api/workbench/analyze/route.ts`) 경유로 정정 (AGENTS.md "브라우저는 FastAPI를 직접 호출하지 않는다" 원칙)
+  - `README.md` / `AGENTS.md` 잔여 BE 표현 점검 (구조도·작업 원칙 절)
+  - `.mcp.json` 향후 처리 결정 (계속 로컬 유지 vs 제거)
