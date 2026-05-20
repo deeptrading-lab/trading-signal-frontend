@@ -847,3 +847,45 @@
   - `app/page.tsx` 의 `http://127.0.0.1:8765` 직접 호출 → Next.js route handler 프록시(`app/api/workbench/analyze/route.ts`) 경유로 정정 (AGENTS.md "브라우저는 FastAPI를 직접 호출하지 않는다" 원칙)
   - `README.md` / `AGENTS.md` 잔여 BE 표현 점검 (구조도·작업 원칙 절)
   - `.mcp.json` 향후 처리 결정 (계속 로컬 유지 vs 제거)
+
+### 2026-05-20 — chore(cursor): .cursor BE 잔재 정리 (engine 레포로 분리 후속) (#7)
+
+- **slug**: `chore/strip-cursor-be-residue` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/7
+- **요약**: chore(cursor): .cursor BE 잔재 정리 (engine 레포로 분리 후속)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6 후속 — 처음 인벤토리에서 `.cursor/` 디렉토리를 표면만 봐 누락했던 BE 규칙·스킬을 마저 정리합니다.
+  > 
+  > ## 변경 요약
+  > 
+  > ### 삭제 (3건)
+  > - `.cursor/skills/spring-api/` — Spring Boot REST API 관례 스킬(BE 전용)
+  > - `.cursor/rules/backend.mdc` — Kotlin/Spring Trading Core 규칙, `globs: backend/**`
+  > - `.cursor/rules/ai.mdc` — Python AI 서비스 규칙, `globs: ai/**`
+  > 
+  > ### 수정 (2건)
+  > - `.cursor/rules/agents-workflow.mdc`
+  >   - 역할 4: `Backend Dev (ai/·backend/ 구현)` → `API Integration Dev (app/api/**/route.ts·FASTAPI_BASE_URL 프록시·Supabase 연동 준비)`
+  >   - 역할 7 DevOps: `Slack 알림·비용 모니터링` → `Vercel 배포(preview/production) 모니터링`
+  >   - 경로 규칙: `backend/** → backend.mdc`, `ai/** → ai.mdc` 제거. `frontend/** → frontend.mdc` 를 `app/** → frontend.mdc` 로 정정
+  > - `.cursor/rules/frontend.mdc`
+  >   - `globs: frontend/**` → `globs: app/**` (이 레포는 Next.js App Router 단일 구조라 `frontend/` 디렉토리가 없음)
+  > 
+  > ## 통계
+  > - 5 files changed, +6 / -41
+  > - 잔여 BE 흔적 grep 결과 0건 (`.cursor/` 전수 점검)
+  > 
+  > ## 검증
+  > - `npm run typecheck` — 0 에러
+  > - `npm run lint` — 0 에러
+  > - 영향 범위: Cursor IDE 사용자만(레포 빌드/런타임 영향 없음)
+  > 
+  > ## 다음 작업
+  > - `app/page.tsx` 의 `http://127.0.0.1:8765` 직접 호출 → Next.js route handler 프록시(`app/api/workbench/analyze/route.ts`) 경유로 정정 (AGENTS.md "브라우저는 FastAPI를 직접 호출하지 않는다" 원칙) — PR #6 에서 이월
+  > - `README.md` / `AGENTS.md` 잔여 BE 표현 점검 — PR #6 에서 이월
+  > - `.mcp.json` 향후 처리 결정 (계속 로컬 유지 vs 제거) — PR #6 에서 이월
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `app/page.tsx` 의 `http://127.0.0.1:8765` 직접 호출 → Next.js route handler 프록시(`app/api/workbench/analyze/route.ts`) 경유로 정정 (AGENTS.md "브라우저는 FastAPI를 직접 호출하지 않는다" 원칙) — PR #6 에서 이월
+  - `README.md` / `AGENTS.md` 잔여 BE 표현 점검 — PR #6 에서 이월
+  - `.mcp.json` 향후 처리 결정 (계속 로컬 유지 vs 제거) — PR #6 에서 이월
