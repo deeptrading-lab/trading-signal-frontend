@@ -1054,3 +1054,39 @@
   > - OPEN QUESTION 7건 결정 그대로 채택: 자동완성 250ms / UNREALISTIC = card-warn + badge-warn + 본문 / 통화 보조 라벨 두 번째 칼럼 / action 6 한글 라벨 + 배지 색 / risk_plan 표 + CSS 막대 + RR 한 줄 / warnings = action 직후·feasibility 위 / 메인 = 워크벤치.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 본 PR 종결 후 후속 PRD 후보: (1) 화이트리스트 확장 (BE 작업) 시 placeholder 카피 "AAPL 또는 BTC-USD" 동적화. (2) `offline` 토글 UI 도입 PRD. (3) ai_summary 가 BE 에서 채워졌을 때 ActionCard reason 영역 카피 톤 재검토 (현재는 BE null 이라 미노출). (4) `.mcp.json` 정리 등 historical follow-up. 위 4건 모두 본 PR 범위 밖.
+
+### 2026-05-20 — docs(prd+qa): tailwind-migration PRD + PR #11 누락 QA 리포트 백필 (#12)
+
+- **slug**: `docs/prd-tailwind-migration` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/12
+- **요약**: docs(prd+qa): tailwind-migration PRD + PR #11 누락 QA 리포트 백필
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #11 (workbench-analyze-rebuild) 머지 후 스타일링 전략 전환 — 사용자가 "css는 tailwind로 할려고해. global.css는 지양해야해. 디자인 토큰을 tailwind랑 같이 쓸수있게" 의사 표명. PM 에이전트가 단독 PRD 로 정리.
+  > 
+  > ## 변경 요약
+  > 
+  > ### 추가 1: `docs/prd/tailwind-migration.md` (174 라인, UI: yes)
+  > - **목표**: globals.css 책임 축소 (Tailwind preflight + 잔여물만) / `var(--<token>)` 직접 참조 제거 / DESIGN.md → Tailwind theme 자동 동기화 / 시각 0 회귀
+  > - **AC 12개**: Tailwind 도입·globals.css **100라인 미만**·`var(--)` 0건·DESIGN.md export 파이프라인·DESIGN.md 토큰 매핑·className 재작성·합성 토큰 일관 처리·시각 0 회귀·build/typecheck/lint·AGENTS.md 원칙 무회귀·컨벤션 문서 갱신·수동 QA 시나리오 3건
+  > - **§8 영향 분석**: 순 -500 라인 추정 (globals.css 844 → 100 미만, tailwind config·theme import·className 재작성)
+  > - **§9 OPEN QUESTION 8건**: Tailwind v3 채택·`tailwind.theme.json` 커밋·합성 토큰 (b) `@layer components` 우선·다크 모드 prefix 룰·export 어댑터 함수·preflight 잔여물 코멘트 의무화·PR 분할 — 모두 PM 권고 동봉
+  > - **선후행**: PR #11 머지 후 진입. 디자이너 산출물 `docs/design/workbench-analyze-rebuild.md` 는 그대로 source-of-truth 로 활용 (재작성 X). `npm run design:sync` script 한 줄로 동기화.
+  > 
+  > ### 추가 2: `docs/qa/workbench-analyze-rebuild.md` (364 라인) — PR #11 백필
+  > - QA 에이전트가 PR #11 검증 시 작성한 리포트가 untracked 로 남아있던 것을 정리 (PR #10 의 PR #9 QA 백필과 동일 패턴)
+  > - AC-1 ~ AC-15 모두 PASS · 에지 케이스 모두 PASS · ad-hoc 검증 43/43 · 결함 0건
+  > - LIVE BE 라운드트립 5건 (PR #11 AC-14 a~e) 검증
+  > - 본 PR 머지 후 `docs/qa/` 가 진실의 단일 출처로 일관됨
+  > 
+  > ## 검증
+  > - docs-only PR. 코드 변경 없음 — typecheck/lint/build 영향 0.
+  > 
+  > ## 다음 작업
+  > - frontend-dev 에이전트가 `feature/tailwind-migration` 브랜치에서 본 PRD 를 구현. AC-7 (합성 토큰 처리) §9 PM 권고 (b) 따라 `@layer components` + `@apply` 우선. AC-8 시각 0 회귀를 PR #11 라운드트립 5건으로 자가검증.
+  > - 구현 PR QA 시 본 PRD AC-12 (수동 QA 시나리오 a~c) 와 PR #11 AC-14 라운드트립 5건 동시 검증.
+  > - 본 PR 범위 외 follow-up (reviewer nit 5건 · `.mcp.json` · placeholder 동적화 · `offline` 토글 · `ai_summary` 카피) 은 자연 흡수 케이스만 구현 PR 본문에 명시.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - frontend-dev 에이전트가 `feature/tailwind-migration` 브랜치에서 본 PRD 를 구현. AC-7 (합성 토큰 처리) §9 PM 권고 (b) 따라 `@layer components` + `@apply` 우선. AC-8 시각 0 회귀를 PR #11 라운드트립 5건으로 자가검증.
+  - 구현 PR QA 시 본 PRD AC-12 (수동 QA 시나리오 a~c) 와 PR #11 AC-14 라운드트립 5건 동시 검증.
+  - 본 PR 범위 외 follow-up (reviewer nit 5건 · `.mcp.json` · placeholder 동적화 · `offline` 토글 · `ai_summary` 카피) 은 자연 흡수 케이스만 구현 PR 본문에 명시.
