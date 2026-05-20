@@ -1334,3 +1334,40 @@
   - 컨벤션 누적 정착이 본 PR 로 마무리. 다음 PRD 진입 시 PM 에이전트가 자동으로 \`docs/rules/frontend.md\` + 본 \`AGENTS.md\` 를 컨벤션 컨텍스트로 사용.
   - 향후 도메인 (\`portfolio\`, \`alerts\` 등) 또는 컴포넌트 (\`components/layout/\`, \`components/ui/\`) 추가 PRD 가 들어올 때 본 컨벤션이 1차 근거로 작동.
   - (선택) \`docs/agents/\` 파일들을 \`.claude/agents/\` 와 완전 동기화할지 — 본 PR 에서는 model 정합·잔재 제거까지만 처리. 깊은 본문 동기화는 별도 chore PRD.
+
+### 2026-05-20 — docs(prd): palette-modernization — DESIGN.md 색 팔레트 모던·시그니처 정제 (#19)
+
+- **slug**: `docs/prd-palette-modernization` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/19
+- **요약**: docs(prd): palette-modernization — DESIGN.md 색 팔레트 모던·시그니처 정제
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #18 머지 직후 — 사용자 결정 "모던 + 색상 적게 + 시그니처 정도만 + 디자이너 일임" 단독 PRD 로 정리.
+  > 
+  > ## 변경 요약
+  > 
+  > ### 추가: \`docs/prd/palette-modernization.md\` (256 라인, UI: yes)
+  > - **§3.2 디자이너 가이드** — 모던 톤의 조작적 정의:
+  >   - 채도 낮은 그레이스케일 + 포인트 1~2
+  >   - 트레이딩 도메인 신뢰감 — 중립 그레이 / 차콜 / 다크 블루 계열
+  >   - 상태 색 (warn/critical/info) 시각적 명확성 무회귀
+  >   - 다크 모드 친화 semantic 명명 권장 (primary/surface/accent/text-strong/text-muted)
+  > - **§3.3 코드 자동 흡수** — Tailwind theme key 동일 시 컴포넌트 0 변경. 키 변경 시 mechanical rename 1회.
+  > - **AC 10개** — DESIGN.md v3 (errors=0 warnings=0) / design:sync 파이프라인 / 시그니처 색 prose 명시 / 모던 톤 근거 단락 + 신·구 비교 표 / WCAG AA 대비비 / 합성 토큰 정합 / build·typecheck·lint / 시각 라운드트립 5건 / 반응형 무회귀 / 코드 변경 최소
+  > - **§4 비범위** — 다크 모드 (별도 PRD), 레이아웃·간격 변경, 새 토큰 카테고리(typography/spacing 등), shadcn-ui, 차트
+  > - **§8 영향 분석** — 신·구 팔레트 비교 위치, mechanical rename 비용 추정, 회귀 위험
+  > - **§9 OPEN QUESTION**: 0건 — PM 이 사용자 결정 4가지를 §3 가정·AC 에 모두 분배. 디자이너 결정 영역은 §3.2 의 가이드 안에서 ux-designer 가 R1~Rn 으로 명시 예정.
+  > 
+  > ## 검증
+  > - docs-only PR. 코드 변경 없음 — typecheck/lint/build 영향 0.
+  > 
+  > ## 다음 작업
+  > - **ux-designer** 가 \`docs/design/workbench-analyze-rebuild.md\` v3 작성. 시그니처 색 1~2 결정 + 토큰 수 정제 + semantic 명명 + 신·구 비교 표 + WCAG AA 대비비 표 + lint 0/0.
+  > - **frontend-dev** 가 \`feature/palette-modernization\` 브랜치에서 구현. \`npm run design:sync\` + tailwind theme 자동 흡수. 토큰명 변경 있으면 mechanical rename 한 번.
+  > - **QA** 가 PR #11 라운드트립 5건 + PR #17 두 뷰포트 + DESIGN.md 토큰 라이브 동기화 검증.
+  > - 본 PRD 머지 후 후속: (선택) 다크 모드 PRD, 또는 추가 도메인 (portfolio/alerts) — 사용자 결정 시점에 큐잉.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **ux-designer** 가 \`docs/design/workbench-analyze-rebuild.md\` v3 작성. 시그니처 색 1~2 결정 + 토큰 수 정제 + semantic 명명 + 신·구 비교 표 + WCAG AA 대비비 표 + lint 0/0.
+  - **frontend-dev** 가 \`feature/palette-modernization\` 브랜치에서 구현. \`npm run design:sync\` + tailwind theme 자동 흡수. 토큰명 변경 있으면 mechanical rename 한 번.
+  - **QA** 가 PR #11 라운드트립 5건 + PR #17 두 뷰포트 + DESIGN.md 토큰 라이브 동기화 검증.
+  - 본 PRD 머지 후 후속: (선택) 다크 모드 PRD, 또는 추가 도메인 (portfolio/alerts) — 사용자 결정 시점에 큐잉.
