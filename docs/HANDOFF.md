@@ -1218,3 +1218,37 @@
   - **반응형 (PC 대응 + useBreakpoint) PRD** — 별도 큐잉됨. `cn` 헬퍼 위에서 variant 분기로 자연스럽게 얹힘.
   - **두 번째 화면 추가 시 라우트 그룹 `(group)/layout.tsx` + `components/layout/` 추출 검토** — 본 PRD 의 §3.6 layout 절을 1차 근거.
   - **tailwind-merge 와 커스텀 토큰 충돌 모니터링** — `cn` 호출이 늘면서 `card`/`badge-warn`/`rounded-card` 같은 합성 토큰이 잘못 머지되는지 관찰. 발생 시 `extendTailwindMerge` 어댑터 1개를 `lib/utils/cn.ts` 안에 추가.
+
+### 2026-05-20 — docs(prd+qa): responsive-pc-support PRD + PR #15 누락 QA 리포트 백필 (#16)
+
+- **slug**: `docs/prd-responsive-pc-support` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/16
+- **요약**: docs(prd+qa): responsive-pc-support PRD + PR #15 누락 QA 리포트 백필
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #15 (fe-conventions) 머지 직후 — 사용자 결정 "모바일·PC 둘 다 대응 + useBreakpoint 훅" 단독 PRD 로 정리.
+  > 
+  > ## 변경 요약
+  > 
+  > ### 추가 1: \`docs/prd/responsive-pc-support.md\` (266 라인, UI: yes)
+  > - **§3**: 모바일 (`< md`) 무회귀 + 데스크탑 (`>= lg`) grid 레이아웃 + `useBreakpoint` 훅
+  > - **AC 10개** + **§8 영향 분석** + **§9 OPEN QUESTION 11건** (사용자 결정 1건 RESOLVED: 반환형 `{isMobile, isTablet, isDesktop}`)
+  > - **DESIGN.md → tailwind.theme.json → tailwind.config.ts** breakpoint 파이프라인 (PR #13 의 `design:sync` 그대로 활용)
+  > - **CSS 1차 도구 = Tailwind prefix / JS 1차 도구 = useBreakpoint** 가 \`docs/rules/frontend.md\` 8번째 절로 추가됨
+  > - **선후행**: PR #15 머지 후 진입. 후속으로 `chore/sync-agent-conventions` 큐잉됨 (반응형까지 머지 후 마지막 단계)
+  > 
+  > ### 추가 2: \`docs/qa/fe-conventions.md\` (PR #15 백필)
+  > - QA 에이전트가 PR #15 검증 시 작성한 리포트가 untracked 로 남아있던 것 정리 (PR #10/#12/#14 와 동일 패턴)
+  > - AC-1~12 모두 PASS, 구조 재편 13행 + import 14건 + 시각 0 회귀 5건 + 에지 케이스 모두 PASS, 결함 0건
+  > 
+  > ## 검증
+  > - docs-only PR. 코드 변경 없음 — typecheck/lint/build 영향 0.
+  > 
+  > ## 다음 작업
+  > - **ux-designer** 가 \`docs/design/workbench-analyze-rebuild.md\` 에 \`breakpoints\` 토큰 + 데스크탑 레이아웃 가이드 추가. \`npx @google/design.md lint\` 0 에러.
+  > - **frontend-dev** 가 \`feature/responsive-pc-support\` 브랜치에서 구현. \`useBreakpoint\` 훅 + 컴포넌트 반응형 적용 + \`docs/rules/frontend.md\` 8번째 절 추가.
+  > - 본 PRD 머지 후 **마지막**: \`chore/sync-agent-conventions\` — 누적 컨벤션을 \`.claude/agents/*\` + \`AGENTS.md\` 에 흡수.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **ux-designer** 가 \`docs/design/workbench-analyze-rebuild.md\` 에 \`breakpoints\` 토큰 + 데스크탑 레이아웃 가이드 추가. \`npx @google/design.md lint\` 0 에러.
+  - **frontend-dev** 가 \`feature/responsive-pc-support\` 브랜치에서 구현. \`useBreakpoint\` 훅 + 컴포넌트 반응형 적용 + \`docs/rules/frontend.md\` 8번째 절 추가.
+  - 본 PRD 머지 후 **마지막**: \`chore/sync-agent-conventions\` — 누적 컨벤션을 \`.claude/agents/*\` + \`AGENTS.md\` 에 흡수.
