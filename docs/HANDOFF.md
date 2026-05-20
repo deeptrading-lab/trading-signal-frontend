@@ -1133,3 +1133,46 @@
   - 다크모드 PRD (DESIGN.md 토큰 prefix 유지하면서 `dark:` variant + alternate theme 로 도입) — 본 PR 의 토큰 구조가 그 도입을 단순화
   - shadcn/ui 도입 검토 PRD — Tailwind 가 전제됐으니 옵션 열림
   - Tailwind v4 마이그레이션 chore PRD — alpha 안정화 시점에 검토
+
+### 2026-05-20 — docs(prd+qa): fe-conventions PRD + PR #13 누락 QA 리포트 백필 (#14)
+
+- **slug**: `docs/prd-fe-conventions` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/14
+- **요약**: docs(prd+qa): fe-conventions PRD + PR #13 누락 QA 리포트 백필
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > PR #6~#13 흐름 (BE 분리 → 아키텍처 → 화면 → Tailwind) 머지 직후 — 사용자가 세션 중 누적 결정한 FE 코드 구조·네이밍 컨벤션 8가지를 단독 PRD 로 정리.
+  > 
+  > ## 변경 요약
+  > 
+  > ### 추가 1: `docs/prd/fe-conventions.md` (338 라인, UI: no)
+  > - **8개 컨벤션 영역** (§3.1~§3.8):
+  >   - 카멜케이스 일원화 (kebab → camelCase / PascalCase)
+  >   - 커스텀훅 의무화 (컴포넌트가 `useQuery~/useMutation~` 직접 import 금지)
+  >   - `cn` 헬퍼 도입 (`clsx + tailwind-merge`)
+  >   - `lib/query/*` → `hooks/query/*` 이동
+  >   - 한 뎁스 더 도메인 분리 (`hooks/workbench/`, `lib/api/workbench/`, `lib/copy/workbench/` 등)
+  >   - App Router `layout.tsx` 중첩 컨벤션 (문서화만, 실제 도입은 2번째 화면 시점)
+  >   - `lib/formatters/` → `lib/utils/` 흡수, `lib/copy/` 는 i18n 여지로 유지
+  >   - `docs/rules/frontend.md` 7개 절 추가
+  > - **AC 12개** + **§8 영향 분석** (+100~200 라인 추정) + **§9 OPEN QUESTION 10건** (PM 권고 동봉)
+  > - **사용자 결정 반영**: 파일명 `useQuery~~` / `useMutation~~` 프리픽스 채택 (§9 #5 가 `[RESOLVED]` 로 변경됨 — PM 의 "기존 명 유지" 권고는 사용자가 명시 결정으로 뒤집음)
+  > - **커밋 분할 6단위 권고** (qa 백필 → 의존성 → 구조 재편 → 도메인 훅 흡수 → cn 도입 → 컨벤션 문서)
+  > 
+  > ### 추가 2: `docs/qa/tailwind-migration.md` (352 라인) — PR #13 백필
+  > - QA 에이전트가 PR #13 검증 시 작성한 리포트가 untracked 로 남아있던 것 정리 (PR #10/#12 와 동일 패턴)
+  > - AC-1 ~ AC-12 모두 PASS, 에지 12건 PASS, DESIGN.md → Tailwind theme 라이브 동기화 검증, 라운드트립 5건 BE LIVE 재현 PASS, 결함 0건
+  > 
+  > ## 검증
+  > - docs-only PR. 코드 변경 없음 — typecheck/lint/build 영향 0.
+  > 
+  > ## 다음 작업
+  > - frontend-dev 에이전트가 `feature/fe-conventions` 브랜치에서 본 PRD 구현. 커밋 분할 §8 권고 따라 6단위로.
+  > - 영향 파일: 약 23개 (import 경로 갱신) + 13개 파일 이동·rename + `lib/utils/cn.ts` 신규 + `app/page.tsx` 도메인 훅 흡수 + `docs/rules/frontend.md` 확장.
+  > - AC-10 (시각·동작 0 회귀) 의 QA 검증 = PR #11 라운드트립 5건 재현으로 갈음.
+  > - 본 PRD 머지 후 별도 PRD 큐잉: **반응형 (PC 대응 + useBreakpoint)** — PM 위임 예정.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - frontend-dev 에이전트가 `feature/fe-conventions` 브랜치에서 본 PRD 구현. 커밋 분할 §8 권고 따라 6단위로.
+  - 영향 파일: 약 23개 (import 경로 갱신) + 13개 파일 이동·rename + `lib/utils/cn.ts` 신규 + `app/page.tsx` 도메인 훅 흡수 + `docs/rules/frontend.md` 확장.
+  - AC-10 (시각·동작 0 회귀) 의 QA 검증 = PR #11 라운드트립 5건 재현으로 갈음.
+  - 본 PRD 머지 후 별도 PRD 큐잉: **반응형 (PC 대응 + useBreakpoint)** — PM 위임 예정.
