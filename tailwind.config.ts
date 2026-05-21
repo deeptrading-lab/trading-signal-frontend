@@ -1,6 +1,7 @@
 /**
- * Tailwind theme — DESIGN.md (`docs/design/component-compactness.md`, v5) 의 토큰을
+ * Tailwind theme — DESIGN.md (`docs/design/polish-followups.md`, v6) 의 토큰을
  * `tailwind.theme.json` 으로 export 한 결과를 그대로 흡수한다.
+ * v6 는 v5 무수정 계승 + spacing 신규 3 키 (`input-pr-suffix-sm/md/lg`) 만 추가.
  *
  * 파이프라인:
  *   1) 디자이너가 DESIGN.md 의 토큰을 수정.
@@ -19,6 +20,8 @@
  *   - v5 spacing 9 키 (`input-h`, `input-px`, `input-py`, `input-pr-suffix`,
  *     `dropdown-item-h`, `dropdown-item-py`, `button-primary-h`, `button-sm-h`, `hit-area-min`)
  *     도 spacing 으로 흡수되어 `h-input-h`, `pr-input-pr-suffix` 등으로 호출.
+ *   - v6 spacing 3 키 (`input-pr-suffix-sm` 36px / `-md` 44px / `-lg` 56px) 추가 흡수 —
+ *     `pr-input-pr-suffix-sm/md/lg` 클래스가 자동 생성되어 InputPanel 의 단위별 분기에서 호출.
  *   - v4 rounded 1 키 (`md`) 도 borderRadius spread 로 흡수.
  */
 

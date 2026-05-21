@@ -14,6 +14,14 @@
  *   - 분석 버튼 (`button-primary`) 은 합성 토큰 갱신으로 h 40px.
  *   - prop 시그니처 무수정 (PRD AC-18).
  *
+ * v6 (polish-followups) 변경 — DESIGN.md v6 R1 (PRD §3.2 A2):
+ *   - input 우측 padding 을 단위 글자 수에 따라 분기:
+ *     - 1자 (`%`, `일`) → `pr-input-pr-suffix-sm` (36px)
+ *     - 2~3자 (`USD`, `KRW`) → `pr-input-pr-suffix-md` (44px)
+ *     - 4자+ → `pr-input-pr-suffix-lg` (56px)
+ *   - 단위 없음 → `pr-input-px` (12px, v5 무회귀).
+ *   - v5 의 `pr-input-pr-suffix` (44px) 호환 보존 — `-md` 와 의미적 동치, 신규 분기 클래스로 마이그레이션.
+ *
  * 사전 차단(`validateAnalyzePayload`) 실패 시 각 필드는 `input-error` + helper text(`input-helper-error`).
  * 분석 버튼은 ticker + 4필드 모두 통과일 때만 활성. 비활성 시 aria-disabled.
  */
@@ -185,11 +193,25 @@ export function InputPanel({
  * input + 우측 absolute suffix DOM 묶음.
  *
  * - wrapper: position: relative.
- * - input: 우측 padding 만 `pr-input-pr-suffix` (44px) 로 확장. 좌우 padding 동일하지 않음.
+ * - input: 우측 padding 을 v6 단위별 토큰으로 분기 (sm 36px / md 44px / lg 56px).
+ *   분기 기준은 단위 문자열 길이 — 1자 sm, 2~3자 md, 4자+ lg. 단위 없음은 좌우 동일 12px.
  * - suffix: position: absolute right: var(--spacing-input-px), 수직 가운데, pointer-events: none.
  *   aria-hidden="true" — 단위는 라벨 텍스트 또는 helper 에 포함되는 게 정상이며
  *   스크린리더가 suffix 를 중복 읽지 않게 hidden.
  */
+
+/**
+ * v6: 단위 문자열 길이로 우측 padding 클래스 분기.
+ *
+ * DESIGN.md v6 Components > input-suffix > Width 매핑 표 — `%`/`일` (1자) → sm,
+ * `USD`/`KRW` (3자) → md, 4자+ → lg. 디자이너 핸드오프와 1:1 정합.
+ */
+function suffixPaddingClass(suffix: string): string {
+  const len = suffix.length;
+  if (len <= 1) return "pr-input-pr-suffix-sm"; // %, 일
+  if (len <= 3) return "pr-input-pr-suffix-md"; // USD, KRW
+  return "pr-input-pr-suffix-lg"; // 향후 4자+ 단위
+}
 type InputWithSuffixProps = {
   id: string;
   type: string;
@@ -230,7 +252,8 @@ function InputWithSuffix({
         step={step}
         // 합성 토큰 `input` / `input-error` 가 좌우 `px-input-px` 를 갖고 있으므로
         // 우측만 suffix 폭으로 오버라이드. (Tailwind 의 `pr-*` 는 단일 방향이라 안전 오버라이드.)
-        className={cn(hasError ? "input-error" : "input", "pr-input-pr-suffix")}
+        // v6: 단위 문자열 길이 기반 분기 — sm 36px / md 44px / lg 56px.
+        className={cn(hasError ? "input-error" : "input", suffixPaddingClass(suffix))}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
