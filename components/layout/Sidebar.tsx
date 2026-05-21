@@ -24,10 +24,13 @@ export function Sidebar({
   onSelectHistory,
   onSelectFavorite,
 }: Props) {
+  // v5 (component-compactness) nit #1 흡수 — 인라인 60px 직타 제거.
+  // navbar 높이 토큰 `{spacing.navbar-h}` 를 Tailwind theme 의 `navbar-h` 키로 호출.
+  // `top-navbar-h` / `max-h-[calc(100vh-theme(spacing.navbar-h))]` 둘 다 토큰 참조이며
+  // 페이지 어디에도 `60px` 직타는 없다.
   return (
     <aside
-      className="sidebar sticky self-start"
-      style={{ top: "var(--navbar-sticky-top, 60px)", maxHeight: "calc(100vh - 60px)" }}
+      className="sidebar sticky self-start top-navbar-h max-h-[calc(100vh-theme(spacing.navbar-h))]"
     >
       <SidebarContent
         selectedTicker={selectedTicker}

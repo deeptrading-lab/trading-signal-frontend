@@ -28,7 +28,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SearchPanel } from "@/components/workbench/SearchPanel";
 import { InputPanel } from "@/components/workbench/InputPanel";
 import { ResultGroup } from "@/components/workbench/ResultGroup";
@@ -65,8 +65,16 @@ export default function WorkbenchPage() {
   const { pushHistory } = useAnalyzeHistory();
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  // 선택 ticker 변경을 layout 으로 알린다 — 사이드바 active 표시용.
+  // v5 (component-compactness) PRD §3.5.3 / AC-8 — ticker-change effect 첫 발화 가드.
+  // 첫 마운트 시 selectedTicker 가 null 이라도 CustomEvent 가 발화되어, 사이드바가
+  // 마운트되기 전 무의미한 dispatch 로그가 남는다. ref 가드로 첫 effect 발화를 skip.
+  // null → 실제 ticker 선택 시점부터만 dispatch.
+  const isFirstTickerEffect = useRef(true);
   useEffect(() => {
+    if (isFirstTickerEffect.current) {
+      isFirstTickerEffect.current = false;
+      return;
+    }
     window.dispatchEvent(
       new CustomEvent<WorkbenchTickerChangeDetail>(WORKBENCH_TICKER_CHANGE_EVENT, {
         detail: { ticker: selectedTicker?.ticker ?? null },
@@ -116,19 +124,25 @@ export default function WorkbenchPage() {
   function handleSubmit() {
     const payload = attemptSubmit();
     if (!payload) return;
-    submit(payload);
-    // mutation 성공 시 자동 push — pushHistory 호출은 onSuccess 콜백을 직접 받지 못하므로
-    // selectedTicker + payload 시점 그대로 push. submit 은 async 비동기이지만
-    // payload·selectedTicker 는 사용자가 다음 입력을 시작하기 전까지 안정적.
-    if (selectedTicker) {
-      pushHistory({
-        ticker: selectedTicker.ticker,
-        name: selectedTicker.name,
-        currency: selectedTicker.currency,
-        lastInput: payload,
-        pushedAt: Date.now(),
-      });
-    }
+    // v5 (component-compactness) PRD §3.5.2 / AC-7 — pushHistory 시점 정밀화.
+    //   - mutation 성공이 확정된 onSuccess 콜백 안에서만 push (실패 시 push 안 함).
+    //   - 한 분석 결과 당 정확히 1회 발화 (mutation onSuccess 가 1회만 발화).
+    //   - 동일 ticker 중복 push 는 `useWorkbenchSession.pushHistory` 가 LRU promote 처리.
+    //   - selectedTicker 는 클로저 캡처 — submit 직후 사용자가 다른 ticker 로 바꾸는 동안
+    //     성공 콜백이 들어와도 "분석 시점의 ticker" 로 push 되어야 일관.
+    const tickerAtSubmit = selectedTicker;
+    submit(payload, {
+      onSuccess: (committedPayload) => {
+        if (!tickerAtSubmit) return;
+        pushHistory({
+          ticker: tickerAtSubmit.ticker,
+          name: tickerAtSubmit.name,
+          currency: tickerAtSubmit.currency,
+          lastInput: committedPayload,
+          pushedAt: Date.now(),
+        });
+      },
+    });
   }
 
   function handleRetry() {
@@ -196,7 +210,7 @@ export default function WorkbenchPage() {
         onRetry={handleRetry}
       />
 
-      <footer className="grid gap-xs mt-lg px-[2px] text-caption text-text-muted">
+      <footer className="grid gap-xs mt-lg px-xs text-caption text-text-muted">
         <span>{FOOTER_DISCLAIMER}</span>
       </footer>
     </div>

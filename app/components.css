@@ -15,6 +15,9 @@
  *     `tertiary` → `primary`, `tertiary-soft` → `accent-soft`, `line` → `border-line`,
  *     `secondary` → `text-muted`, `body-strong` → `text-strong`, `primary`(text) → `text-strong`,
  *     `white` → `surface`).
+ *   - v5 (component-compactness): input/search-result-item/button-primary/sidebar-item size 다운,
+ *     input-label / input-helper / input-helper-error / input-suffix / dropdown-panel /
+ *     button-secondary / button-icon 합성 토큰 신설.
  */
 
 /* Next.js 의 PostCSS 는 각 CSS 파일을 별도 입력으로 처리하므로, 본 파일에서
@@ -55,10 +58,16 @@
     @apply badge-base bg-critical-soft text-critical;
   }
 
-  /* ---------- 입력 / 버튼 ---------- */
+  /* ---------- 입력 (v5 컴팩트화) ---------- */
+  /* DESIGN.md v5 §Components — input/input-error:
+   *   height {spacing.input-h} = 36px
+   *   horizontal padding {spacing.input-px} = 12px (suffix 없을 때 좌우 동일)
+   *   vertical padding {spacing.input-py} = 8px
+   *   typography {typography.body-sm} = 14px / 1.5
+   * 우측 suffix 가 있는 경우 호출 측에서 `pr-input-pr-suffix` 클래스 추가 (= 44px). */
   .input,
   .input-error {
-    @apply w-full h-[42px] px-[11px] bg-surface-muted text-text-strong border border-border-line rounded-sm text-body-md;
+    @apply w-full h-input-h px-input-px py-input-py bg-surface-muted text-text-strong border border-border-line rounded-sm text-body-sm;
     font-family: inherit;
   }
   .input:focus {
@@ -73,25 +82,70 @@
     box-shadow: 0 0 0 3px theme("colors.critical-soft");
   }
 
+  /* ---------- 입력 보조 (v5 신설) ---------- */
+  .input-label {
+    @apply block text-label-sm text-text-strong;
+  }
+  .input-helper {
+    @apply text-caption text-text-muted;
+  }
+  .input-helper-error {
+    @apply text-caption text-critical;
+  }
+  /* input 내부 우측 absolute suffix.
+   * - pointer-events-none → input click/focus 방해 X
+   * - aria-hidden="true" (호출 측에서 부여) → 스크린리더 라벨에서 단위 읽음 */
+  .input-suffix {
+    @apply pointer-events-none text-input-suffix text-text-muted;
+  }
+
+  /* ---------- 버튼 (v5 컴팩트화) ---------- */
+  /* button-primary: height 40px (input 36px 보다 한 단계 위). v4 의 44px → v5 의 40px. */
   .button-primary {
-    @apply h-[44px] px-[12px] bg-primary text-surface border-0 rounded-sm text-button cursor-pointer;
+    @apply h-button-primary-h px-md bg-primary text-surface border-0 rounded-sm text-button cursor-pointer;
     font-family: inherit;
   }
   .button-primary[aria-disabled="true"],
   .button-primary:disabled {
     @apply opacity-[0.65] cursor-not-allowed;
   }
+  /* button-secondary: height 32px (CTA 40px 보다 약함). 보조 액션. */
   .button-secondary {
-    @apply h-[38px] px-[14px] bg-surface text-critical border border-critical rounded-sm text-button cursor-pointer;
+    @apply h-button-sm-h px-md bg-surface text-primary border border-border-line rounded-sm text-button-sm cursor-pointer;
     font-family: inherit;
   }
+  .button-secondary:hover,
+  .button-secondary:focus-visible {
+    @apply bg-accent-soft text-primary outline-none;
+  }
+  /* button-icon: 32×32px 시각 size, hit area 는 호출 측에서 before:absolute -inset-1 로 40×40 확장. */
+  .button-icon {
+    @apply relative inline-flex items-center justify-center h-button-sm-h w-button-sm-h p-sm bg-surface text-text-strong rounded-sm cursor-pointer border-0;
+  }
+  .button-icon::before {
+    content: "";
+    @apply absolute -inset-1;
+  }
+  .button-icon:hover,
+  .button-icon:focus-visible {
+    @apply bg-surface-muted text-text-strong outline-none;
+  }
 
-  /* ---------- 검색 결과 아이템 ---------- */
+  /* ---------- 검색 결과 아이템 (v5 컴팩트화) ---------- */
+  /* search-result-item: height 34px (input 36px 보다 한 단계 작음 — dropdown 보조 패널 위계). */
+  .search-result-item,
+  .search-result-item-focus {
+    @apply grid gap-xs h-dropdown-item-h px-md py-dropdown-item-py rounded-sm cursor-pointer text-body-sm;
+  }
   .search-result-item {
-    @apply grid gap-xs p-[12px] rounded-sm cursor-pointer bg-surface text-text-strong;
+    @apply bg-surface text-text-strong;
   }
   .search-result-item-focus {
-    @apply grid gap-xs p-[12px] rounded-sm cursor-pointer bg-accent-soft text-primary;
+    @apply bg-accent-soft text-primary;
+  }
+  /* dropdown-panel: input 바로 아래 absolute floating. 그림자 없음 (border 로 분리). */
+  .dropdown-panel {
+    @apply bg-surface text-text-strong border border-border-line rounded-sm p-xs;
   }
 
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
@@ -127,10 +181,11 @@
     @apply flex items-center justify-between h-navbar-h bg-surface text-text-strong border-b border-border-line px-lg lg:px-2xl;
   }
   .navbar-brand {
-    @apply inline-flex items-center px-[6px] py-[2px] bg-surface text-primary text-nav-brand;
+    @apply inline-flex items-center px-sm py-[2px] bg-surface text-primary text-nav-brand;
   }
+  /* navbar-icon-button: hit-area-min(40px) 정사각형. v4 무회귀. */
   .navbar-icon-button {
-    @apply inline-flex items-center justify-center h-[40px] w-[40px] p-[8px] bg-surface text-text-strong rounded-sm cursor-pointer border-0;
+    @apply inline-flex items-center justify-center h-hit-area-min w-hit-area-min p-sm bg-surface text-text-strong rounded-sm cursor-pointer border-0;
   }
   .navbar-icon-button:hover,
   .navbar-icon-button:focus-visible {
@@ -146,10 +201,11 @@
     @apply hidden lg:flex flex-col w-sidebar-w bg-surface text-text-strong border-r border-border-line p-lg overflow-y-auto;
   }
   .sidebar-section-header {
-    @apply px-[6px] py-xs text-sidebar-section text-text-muted uppercase;
+    @apply px-sm py-xs text-sidebar-section text-text-muted uppercase;
   }
+  /* sidebar-item: v5 height 40px → 36px (input 과 동등 — 시각 정합). */
   .sidebar-item {
-    @apply flex items-center justify-between gap-sm h-[40px] px-md py-[8px] bg-surface text-text-strong rounded-sm cursor-pointer;
+    @apply flex items-center justify-between gap-sm h-input-h px-md py-input-py bg-surface text-text-strong rounded-sm cursor-pointer;
   }
   .sidebar-item:hover,
   .sidebar-item:focus-visible {
@@ -179,9 +235,14 @@
     @apply flex items-center justify-between gap-md bg-surface text-text-strong rounded-sm p-[14px];
   }
 
-  /* ---------- 즐겨찾기 토글 ---------- */
+  /* ---------- 즐겨찾기 토글 (v5 토큰 키 연결, 시각 동일) ---------- */
+  /* 시각 size 32×32, hit area 는 호출 측에서 before:absolute -inset-1 로 40×40 확장. */
   .favorite-toggle {
-    @apply inline-flex items-center justify-center h-[32px] w-[32px] p-[6px] bg-surface text-text-muted rounded-pill cursor-pointer border-0;
+    @apply relative inline-flex items-center justify-center h-button-sm-h w-button-sm-h p-sm bg-surface text-text-muted rounded-pill cursor-pointer border-0;
+  }
+  .favorite-toggle::before {
+    content: "";
+    @apply absolute -inset-1;
   }
   .favorite-toggle:hover,
   .favorite-toggle:focus-visible {

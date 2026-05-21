@@ -41,6 +41,9 @@
         "button": [
           "Arial"
         ],
+        "button-sm": [
+          "Arial"
+        ],
         "badge": [
           "Arial"
         ],
@@ -51,6 +54,12 @@
           "Arial"
         ],
         "sidebar-section": [
+          "Arial"
+        ],
+        "label-sm": [
+          "Arial"
+        ],
+        "input-suffix": [
           "Arial"
         ]
       },
@@ -103,6 +112,12 @@
             "fontWeight": "700"
           }
         ],
+        "button-sm": [
+          "13px",
+          {
+            "fontWeight": "700"
+          }
+        ],
         "badge": [
           "13px",
           {
@@ -128,6 +143,18 @@
             "letterSpacing": "0.04em",
             "fontWeight": "700"
           }
+        ],
+        "label-sm": [
+          "13px",
+          {
+            "fontWeight": "700"
+          }
+        ],
+        "input-suffix": [
+          "13px",
+          {
+            "fontWeight": "400"
+          }
         ]
       },
       "borderRadius": {
@@ -145,7 +172,16 @@
         "navbar-h": "60px",
         "sidebar-w": "264px",
         "drawer-w": "304px",
-        "main-max-w": "1152px"
+        "main-max-w": "1152px",
+        "input-h": "36px",
+        "input-px": "12px",
+        "input-py": "8px",
+        "input-pr-suffix": "44px",
+        "dropdown-item-h": "34px",
+        "dropdown-item-py": "6px",
+        "button-primary-h": "40px",
+        "button-sm-h": "32px",
+        "hit-area-min": "40px"
       },
       "screens": {
         "sm": "640px",

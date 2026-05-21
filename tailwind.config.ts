@@ -1,5 +1,5 @@
 /**
- * Tailwind theme — DESIGN.md (`docs/design/layout-redesign.md`, v4) 의 토큰을
+ * Tailwind theme — DESIGN.md (`docs/design/component-compactness.md`, v5) 의 토큰을
  * `tailwind.theme.json` 으로 export 한 결과를 그대로 흡수한다.
  *
  * 파이프라인:
@@ -11,11 +11,15 @@
  *   - DESIGN.md 의 `typography.<name>.lineHeight` / `fontFeature` / `letterSpacing` 는
  *     export 도구가 fontSize 튜플에 포함시키지 않거나 가공이 필요하므로 본 어댑터에서 흡수.
  *   - v4 신규 typography 2 키 (`nav-brand`, `sidebar-section`) 의 letterSpacing 도 본 어댑터에서 흡수.
+ *   - v5 신규 typography 3 키 (`button-sm`, `label-sm`, `input-suffix`) 의 lineHeight + fontFeature 흡수.
  *   - 그 외 colors / spacing / borderRadius / fontFamily / fontSize / fontWeight 는
  *     theme.json 의 키 구조가 Tailwind 와 1:1 정합하므로 spread 만으로 충분.
- *   - v4 신규 spacing 4 키 (`navbar-h`, `sidebar-w`, `drawer-w`, `main-max-w`) 는
+ *   - v4 spacing 4 키 (`navbar-h`, `sidebar-w`, `drawer-w`, `main-max-w`) 는
  *     spacing 그대로 흡수되어 `w-navbar-h`, `w-sidebar-w` 등으로 호출.
- *   - v4 신규 rounded 1 키 (`md`) 도 borderRadius spread 로 흡수.
+ *   - v5 spacing 9 키 (`input-h`, `input-px`, `input-py`, `input-pr-suffix`,
+ *     `dropdown-item-h`, `dropdown-item-py`, `button-primary-h`, `button-sm-h`, `hit-area-min`)
+ *     도 spacing 으로 흡수되어 `h-input-h`, `pr-input-pr-suffix` 등으로 호출.
+ *   - v4 rounded 1 키 (`md`) 도 borderRadius spread 로 흡수.
  */
 
 import type { Config } from "tailwindcss";
@@ -23,6 +27,7 @@ import themeJson from "./tailwind.theme.json";
 
 // DESIGN.md 의 typography 토큰을 직접 옮겨둔다 (export 도구가 lineHeight / fontFeature 를 누락하므로 보완).
 // v4 신규 키 `nav-brand`, `sidebar-section` 도 함께 등록.
+// v5 신규 키 `button-sm`, `label-sm`, `input-suffix` 도 함께 등록.
 const TYPOGRAPHY_EXTRAS: Record<
   string,
   { lineHeight: string; fontFeature?: string; letterSpacing?: string }
@@ -35,10 +40,13 @@ const TYPOGRAPHY_EXTRAS: Record<
   "body-strong": { lineHeight: "1.5" },
   caption: { lineHeight: "1.4" },
   button: { lineHeight: "1.2" },
+  "button-sm": { lineHeight: "1.2" },
   badge: { lineHeight: "1.2" },
   "mono-numeric": { lineHeight: "1.2", fontFeature: '"tnum"' },
   "nav-brand": { lineHeight: "1.2", letterSpacing: "-0.01em" },
   "sidebar-section": { lineHeight: "1.2", letterSpacing: "0.04em" },
+  "label-sm": { lineHeight: "1.25" },
+  "input-suffix": { lineHeight: "1.2", fontFeature: '"tnum"' },
 };
 
 type RawFontSizeEntry = [
