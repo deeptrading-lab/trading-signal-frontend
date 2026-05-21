@@ -1,8 +1,9 @@
 /**
- * Tailwind theme — DESIGN.md (`docs/design/design-tone-refinement.md`, v7) 의 토큰을
+ * Tailwind theme — DESIGN.md (`docs/design/design-tone-refinement.md`, v7-rev2) 의 토큰을
  * `tailwind.theme.json` 으로 export 한 결과를 그대로 흡수한다.
- * v7 는 v6 (polish-followups) 의 토큰 키 셋 완전 무수정 계승 + colors 11 키의 hex 값만 재조정.
- * 합성 토큰 46 키·typography 15·spacing 22·rounded 3·breakpoints 4 키 셋 전체 무회귀.
+ * v7-rev2 는 v6 (polish-followups) 의 토큰 키 셋 무수정 계승 + 1차 v7 의 colors 11 키 hex 재조정 +
+ * 후속 v7-rev2 의 신규 토큰 (colors 2 / typography 1 / spacing 1 / components 2) 추가.
+ * 합성 토큰 48 키·typography 16·spacing 23·rounded 3·breakpoints 4 키 셋 전체.
  *
  * 파이프라인:
  *   1) 디자이너가 DESIGN.md 의 토큰을 수정.
@@ -41,6 +42,7 @@ const TYPOGRAPHY_EXTRAS: Record<
   h2: { lineHeight: "1.35" },
   "body-md": { lineHeight: "1.55" },
   "body-sm": { lineHeight: "1.5" },
+  "body-sm-strong": { lineHeight: "1.35" },
   "body-strong": { lineHeight: "1.5" },
   caption: { lineHeight: "1.4" },
   button: { lineHeight: "1.2" },

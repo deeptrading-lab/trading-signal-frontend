@@ -9,6 +9,8 @@
         "text-strong": "#0f1419",
         "text-muted": "#5b6470",
         "accent-soft": "#eaf0f6",
+        "accent-vivid": "#1d4ed8",
+        "accent-vivid-soft": "#dbeafe",
         "warn": "#a14a06",
         "warn-soft": "#fff3df",
         "info": "#1c4fd1",
@@ -30,6 +32,9 @@
           "Arial"
         ],
         "body-sm": [
+          "Arial"
+        ],
+        "body-sm-strong": [
           "Arial"
         ],
         "body-strong": [
@@ -92,6 +97,12 @@
           "14px",
           {
             "fontWeight": "400"
+          }
+        ],
+        "body-sm-strong": [
+          "14px",
+          {
+            "fontWeight": "700"
           }
         ],
         "body-strong": [
@@ -180,8 +191,9 @@
         "input-pr-suffix-sm": "36px",
         "input-pr-suffix-md": "44px",
         "input-pr-suffix-lg": "56px",
-        "dropdown-item-h": "34px",
-        "dropdown-item-py": "6px",
+        "dropdown-item-h": "52px",
+        "dropdown-item-py": "10px",
+        "dropdown-item-gap": "2px",
         "button-primary-h": "40px",
         "button-sm-h": "32px",
         "hit-area-min": "40px"
