@@ -21,6 +21,14 @@
  *   - 초기 focusIndex -1 (옵션 focus 없음) → ↓ 첫 옵션, ↑ 마지막 옵션.
  *   - Enter 가드 — focusIndex < 0 시 동작 없음 (의도하지 않은 선택 방지).
  *   - aria-activedescendant 는 dropdown 열림 + focusIndex >= 0 일 때만 옵션 id 가리킴.
+ *
+ * v7 (design-tone-refinement) 추가 — PRD §3.1 결함 1 fix:
+ *   - dropdown anchor 재정합 — 기존 outer wrapper(`relative p-lg`) 의 `top-full` 은
+ *     wrapper 의 bottom (label + input + helper + padding) 아래에 떨어져 input 과 시각 분리.
+ *     본 v7 는 **input 만 감싸는 inner `position: relative` wrapper** 를 도입하고 dropdown 을
+ *     그 자식으로 두어 input 의 `top: 100%` 바로 아래 (mt-xs = 4px 간격) anchor.
+ *   - `z-50` 으로 격상 — navbar / sidebar / 결과 카드 위로 떠야 함.
+ *   - portal 미사용 (PRD §9.1 PM 권고 옵션 A).
  */
 
 "use client";
@@ -130,7 +138,7 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     <div
       ref={wrapperRef}
       onBlur={handleWrapperBlur}
-      className="relative mb-md p-lg bg-surface border border-border-line rounded-sm"
+      className="mb-md p-lg bg-surface border border-border-line rounded-sm"
     >
       <label
         htmlFor={inputId}
@@ -138,43 +146,43 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
       >
         종목 검색
       </label>
-      <input
-        id={inputId}
-        ref={inputRef}
-        type="text"
-        className="input"
-        autoComplete="off"
-        placeholder="종목명·티커 입력 (예: AAPL, BTC-USD)"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-          // v6: 타이핑 시 옵션 focus 없음 상태로 리셋 — Enter 의도하지 않은 선택 방지.
-          setFocusIndex(-1);
-          if (selectedTicker && e.target.value.trim() !== selectedTicker.ticker) {
-            onSelect(null);
+      {/* v7: dropdown anchor 정합 — input 만 감싸는 inner `position: relative` wrapper.
+       *   dropdown 은 이 wrapper 의 자식으로 `top-full left-0 right-0` 사용 → input 의 바로 아래에 anchor. */}
+      <div className="relative">
+        <input
+          id={inputId}
+          ref={inputRef}
+          type="text"
+          className="input"
+          autoComplete="off"
+          placeholder="종목명·티커 입력 (예: AAPL, BTC-USD)"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            // v6: 타이핑 시 옵션 focus 없음 상태로 리셋 — Enter 의도하지 않은 선택 방지.
+            setFocusIndex(-1);
+            if (selectedTicker && e.target.value.trim() !== selectedTicker.ticker) {
+              onSelect(null);
+            }
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            // v6: dropdown 열림 + focusIndex >= 0 + 해당 옵션 존재 시에만 옵션 id 가리킴.
+            // 조건 외에는 attribute 자체 제거 (잘못된 id 참조로 screen reader silence 회피).
+            open && focusIndex >= 0 && results[focusIndex]
+              ? `${listId}-option-${results[focusIndex].ticker}`
+              : undefined
           }
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={handleKeyDown}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={
-          // v6: dropdown 열림 + focusIndex >= 0 + 해당 옵션 존재 시에만 옵션 id 가리킴.
-          // 조건 외에는 attribute 자체 제거 (잘못된 id 참조로 screen reader silence 회피).
-          open && focusIndex >= 0 && results[focusIndex]
-            ? `${listId}-option-${results[focusIndex].ticker}`
-            : undefined
-        }
-      />
-      {helper ? (
-        <p className="mt-sm input-helper">{helper}</p>
-      ) : null}
-      {open ? (
+        />
+        {open ? (
         <div
-          className="dropdown-panel absolute top-full left-lg right-lg z-[5] mt-xs max-h-[280px] overflow-y-auto"
+          className="dropdown-panel absolute top-full left-0 right-0 z-50 mt-xs max-h-[280px] overflow-y-auto"
           role="listbox"
           id={listId}
         >
@@ -223,6 +231,10 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
             })
           )}
         </div>
+        ) : null}
+      </div>
+      {helper ? (
+        <p className="mt-sm input-helper">{helper}</p>
       ) : null}
     </div>
   );
