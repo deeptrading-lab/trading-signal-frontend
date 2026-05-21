@@ -1,5 +1,5 @@
 /**
- * Tailwind theme — DESIGN.md (`docs/design/workbench-analyze-rebuild.md`) 의 토큰을
+ * Tailwind theme — DESIGN.md (`docs/design/layout-redesign.md`, v4) 의 토큰을
  * `tailwind.theme.json` 으로 export 한 결과를 그대로 흡수한다.
  *
  * 파이프라인:
@@ -8,19 +8,24 @@
  *   3) `npm run build` → 본 config 가 JSON 을 import → Tailwind theme.extend 에 주입.
  *
  * 어댑터(`adaptDesignTokens`) 의 책임:
- *   - DESIGN.md 의 `typography.<name>.lineHeight` / `fontFeature` 는 export 도구가
- *     fontSize 튜플에 포함시키지 않으므로 본 어댑터에서 직접 흡수 (PRD §9 #5).
+ *   - DESIGN.md 의 `typography.<name>.lineHeight` / `fontFeature` / `letterSpacing` 는
+ *     export 도구가 fontSize 튜플에 포함시키지 않거나 가공이 필요하므로 본 어댑터에서 흡수.
+ *   - v4 신규 typography 2 키 (`nav-brand`, `sidebar-section`) 의 letterSpacing 도 본 어댑터에서 흡수.
  *   - 그 외 colors / spacing / borderRadius / fontFamily / fontSize / fontWeight 는
  *     theme.json 의 키 구조가 Tailwind 와 1:1 정합하므로 spread 만으로 충분.
+ *   - v4 신규 spacing 4 키 (`navbar-h`, `sidebar-w`, `drawer-w`, `main-max-w`) 는
+ *     spacing 그대로 흡수되어 `w-navbar-h`, `w-sidebar-w` 등으로 호출.
+ *   - v4 신규 rounded 1 키 (`md`) 도 borderRadius spread 로 흡수.
  */
 
 import type { Config } from "tailwindcss";
 import themeJson from "./tailwind.theme.json";
 
 // DESIGN.md 의 typography 토큰을 직접 옮겨둔다 (export 도구가 lineHeight / fontFeature 를 누락하므로 보완).
+// v4 신규 키 `nav-brand`, `sidebar-section` 도 함께 등록.
 const TYPOGRAPHY_EXTRAS: Record<
   string,
-  { lineHeight: string; fontFeature?: string }
+  { lineHeight: string; fontFeature?: string; letterSpacing?: string }
 > = {
   display: { lineHeight: "1.18" },
   h1: { lineHeight: "1.2" },
@@ -32,12 +37,22 @@ const TYPOGRAPHY_EXTRAS: Record<
   button: { lineHeight: "1.2" },
   badge: { lineHeight: "1.2" },
   "mono-numeric": { lineHeight: "1.2", fontFeature: '"tnum"' },
+  "nav-brand": { lineHeight: "1.2", letterSpacing: "-0.01em" },
+  "sidebar-section": { lineHeight: "1.2", letterSpacing: "0.04em" },
 };
 
-type RawFontSizeEntry = [string, { fontWeight?: string }];
+type RawFontSizeEntry = [
+  string,
+  { fontWeight?: string; letterSpacing?: string },
+];
 type AdaptedFontSizeEntry = [
   string,
-  { lineHeight: string; fontWeight?: string; fontFeatureSettings?: string },
+  {
+    lineHeight: string;
+    fontWeight?: string;
+    fontFeatureSettings?: string;
+    letterSpacing?: string;
+  },
 ];
 
 function adaptFontSize(
@@ -52,6 +67,9 @@ function adaptFontSize(
     if (name === "body-strong") continue;
     const [size, meta] = entry;
     const extras = TYPOGRAPHY_EXTRAS[name] ?? { lineHeight: "1.5" };
+    // letterSpacing 은 design.md export 도구가 meta 에 넣어주기도 하고, 누락되기도 한다.
+    // 양쪽 모두에서 안전하게 흡수 — export 우선, fallback 으로 TYPOGRAPHY_EXTRAS.
+    const letterSpacing = meta?.letterSpacing ?? extras.letterSpacing;
     out[name] = [
       size,
       {
@@ -60,6 +78,7 @@ function adaptFontSize(
         ...(extras.fontFeature
           ? { fontFeatureSettings: extras.fontFeature }
           : {}),
+        ...(letterSpacing ? { letterSpacing } : {}),
       },
     ];
   }

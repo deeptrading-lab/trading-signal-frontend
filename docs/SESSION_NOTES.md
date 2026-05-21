@@ -347,3 +347,66 @@ A·F·B 모든 즉시 가능 트랙 종결. 다음 세션은 P2 누적 follow-up
 ### 미결·블록
 
 - 본 chore PR 후 즉시 가능 트랙 (A/F) 모두 정리됨. 다음 세션은 B-1 PRD (사용자 진입 필요) 또는 C-1 데이터 점검 (~2026-05-21) 자연 진입.
+
+---
+
+## 2026-05-21 — Trading Signal Frontend 본격 구축 세션 (PR #6~#20, 15개 PR)
+
+**요약**: `trading-signal-engine` 에서 분리된 직후의 FE 잔재 정리부터 시작해 axios+TanStack Query 아키텍처 → 화면 구현 → Tailwind 도입 → fe-conventions 정착 → 반응형(PC 대응) → palette v3 (Signature Slate) 까지 한 세션에 15개 PR 머지. 후반에 사용자가 "한 브랜치 한 PR" 새 워크플로 룰을 결정해 PR #20 에서 첫 적용.
+
+### 처리한 일 (PR #6 ~ #20)
+
+| PR | 영역 | 핵심 |
+|---|---|---|
+| #6 | BE 잔재 제거 | `ai/` Python 트리 + Dockerfile + apprunner.yaml + Makefile + skills + BE PRD/QA/agents 제거. engine 레포로 분리 후 잔재 87 파일 정리 |
+| #7 | .cursor BE 잔재 | spring-api 스킬·backend.mdc·ai.mdc 삭제 |
+| #8 | PRD 2개 (docs) | `frontend-architecture-restructure` + `workbench-analyze-rebuild` (PRD 분할) |
+| #9 | 아키텍처 구현 | axios 단일 인스턴스 + TanStack Query v5 + `lib/api/` + `lib/query/` + `lib/types/` + `lib/validation/` + ApiError 인터셉터 + route handler 보강(timeout/4xx 통과/한글 폴백) |
+| #10 | DESIGN.md + PR #9 QA 백필 | docs(design): workbench-analyze-rebuild (v1, 16 colors / 21 components / mobile shell) + DESIGN.md → tailwind theme 파이프라인의 시초 |
+| #11 | 워크벤치 화면 구현 | BE 6블록 응답 매핑 — `app/page.tsx` + `components/workbench/*` 12개. AC-14 라운드트립 5건 (a~e) 의 출처. 7 commit 분할 (deps/utils/hooks/api/components/copy/formatters) |
+| #12 | tailwind-migration PRD + PR #11 QA 백필 | Tailwind v3 도입 + globals.css 축소 + `design:sync` 파이프라인 PRD |
+| #13 | Tailwind 도입 구현 | globals.css 844 → 46 라인, `tailwind.config.ts` + `tailwind.theme.json` + `scripts/inject-breakpoints.mjs` (PR #17 에서 추가됨) 까지 가는 단일 진실 원천 파이프라인. PR #13 시점은 components.css(`@apply`) 까지 |
+| #14 | fe-conventions PRD + PR #13 QA 백필 | 8항목 컨벤션 PRD (카멜케이스 / 커스텀훅 의무화 / cn / hooks 일원화 / 도메인 한 뎁스 / layout.tsx / formatters→utils / 문서화) |
+| #15 | fe-conventions 구현 | 13 파일 git mv, `hooks/workbench/*` + `hooks/query/useQueryWhitelistSearch.ts` + `useMutationAnalyzeWorkbench.ts` + `lib/utils/cn.ts` + `useAnalyzeRun` 신설. mutation 인터페이스 누출 0 |
+| #16 | responsive-pc-support PRD + PR #15 QA 백필 | 모바일 무회귀 + 데스크탑 grid + `useBreakpoint` 훅 PRD |
+| #17 | 반응형 구현 | `hooks/utils/useBreakpoint.ts` (SSR-safe `{isMobile,isTablet,isDesktop}` 모바일 퍼스트 초기값) + `scripts/inject-breakpoints.mjs` (screens 후처리) + 데스크탑 grid (좌측 sticky sidebar + 우측 2 컬럼 비대칭) |
+| #18 | agent 정의에 누적 컨벤션 흡수 | AGENTS.md + .claude/agents/* 8개 갱신. docs/agents/ 의 model 잔재(gpt-4/gpt-5.3) 정리 + deployer.md/dev-frontend.md 잔재 삭제 |
+| #19 | palette-modernization PRD (docs-only, 이전 룰 마지막 적용) | 색 팔레트 정제 PRD — 사용자 결정 모던·적은 수·시그니처 1~2·디자이너 일임 |
+| #20 | palette v3 구현 + 새 룰 첫 적용 | **Signature Slate `#1f3b4d`** (v2 teal #0f766e 대체) + 토큰 16→13 semantic 명명 + 한 PR 7 commit 누적 (design + 새 룰 + tailwind + css + workbench + qa + handoff) |
+
+### 결정·합의 사항
+
+- **새 워크플로 룰 = 한 브랜치 한 PR**: PRD/DESIGN.md/QA 리포트를 위해 docs-only PR 을 별도로 만들지 않는다. `feature/<slug>` 한 브랜치에 PRD → DESIGN.md → 코드 → QA → HANDOFF 모두 누적 commit 후 PR 1회 머지. 이전 패턴(PR #14/#16/#19 처럼 docs PR + 별도 구현 PR + QA 백필) 폐기. **PR #20 이 첫 적용 사례**. AGENTS.md "작업 흐름" 절 + `.claude/agents/{pm,ux-designer,frontend-dev,qa,reviewer}.md` 5개에 룰 박힘.
+- **시그니처 색 = Signature Slate `#1f3b4d`** (1개): 한 화면 두 지점 원칙 (action 카드 + 분석 CTA). 디자이너 일임 결정.
+- **토큰 13개 semantic 명명**: `surface` / `surface-muted` / `border-line` / `text-strong` / `text-muted` / `accent-soft` / `primary` / `warn` / `warn-soft` / `info` / `info-soft` / `critical` / `critical-soft`. 다크 모드 친화.
+- **BFF 패턴**: 브라우저 → `app/api/**/route.ts` (route handler) → `FASTAPI_BASE_URL` 프록시. 직접 호출 0건. `lib/api/client.ts` axios baseURL `/api` same-origin.
+- **컨벤션 8개 절** (`docs/rules/frontend.md`): 카멜케이스 / 커스텀훅 의무화 / 도메인 한 뎁스 (`hooks/<domain>/`, `lib/<...>/<domain>/`) / cn / layout.tsx / copy 유지 / queryKeys / 반응형 (CSS = Tailwind prefix / JS = `useBreakpoint`).
+- **현재 화면 = 워크벤치 단일** (`app/page.tsx`): ticker 검색 → 자본·목표 입력 → BE 6블록(brief/feasibility/horizons/risk_plan/action/warnings) 응답.
+- **PRD 분할 정착 패턴**: 한 변경이 크고 디자이너 의존이 있으면 분할 (예: `architecture` + `analyze-rebuild`). 작은 단일 PRD 가능한 경우는 단일.
+
+### 다음 세션 시작 포인트 — 사용자 결정 (2026-05-21 세션 끝)
+
+사용자가 다음 작업 의도를 한 번에 정리:
+
+> "전체적인 레이아웃을 다시 잡아보자. 기존꺼랑 무관하게. 상단 navbar 부터 왼쪽 사이드 메뉴 / 메인 영역… 컴포넌트 크기 너무 크지 않게, 글씨도 작게. selectbox 외부 클릭 자동 닫힘, input 단위는 필드 안 우측. 디자인 전문가 톤. claude api 우선은 로컬 CLI 로 켜놓고 종목 분석 시키고 데이터 받아와서 그려주는 것도 하고 싶어. 잘 되면 API 연결."
+
+**PRD 3분할 합의** (사용자):
+
+1. **PRD `layout-redesign`** (또는 유사명) — 기존 단일 메인 → navbar + 좌측 사이드 메뉴 + 메인 3구획. 디자이너 합류 필수 (DESIGN.md v4: layout 절 + 새 컴포넌트 토큰).
+2. **PRD `component-compactness`** — input/dropdown 크기 한 단계 다운, 글씨 크기 정제, selectbox 외부 클릭 자동 닫힘, input 안 우측 단위 표시. 디자이너 산출물 + cn·tailwind prefix 활용.
+3. **PRD `claude-cli-analysis`** — BFF (`app/api/...`) 에서 subprocess 로 로컬 `claude` CLI spawn → 종목 분석 명령·프롬프트 전달 → 결과 JSON 파싱 → 클라이언트 반환. 사용자 머신에 `claude` 명령이 PATH 에 있어야 함. 추후 Claude API 직결로 전환 가능하게 인터페이스 분리.
+
+**Claude CLI 통합 방식 = BFF subprocess 호출** (사용자 결정). 파일 watcher 또는 별도 프로세스 모니터링 패턴 채택 X.
+
+**진행 순서**: PRD 1 (layout) → 머지 → PRD 2 (compactness) → 머지 → PRD 3 (claude-cli). 의존성 명확.
+
+**컨텍스트 컴팩팅**: 사용자가 본 세션 종료 후 `/compact` 입력 → 새 컨텍스트로 PRD 1 진입 예정. 본 SESSION_NOTES 항목이 다음 세션의 1차 컨텍스트 (manager·PM 의 필수 read).
+
+### 미결·블록
+
+- 본 세션 정리 후 큐잉된 PRD 3건 모두 사용자 의도 명확 (디자이너 일임 권한·BFF subprocess 결정·컴팩트 톤). 다음 세션은 PM 위임으로 PRD `layout-redesign` 자연 진입.
+- PR #20 reviewer 가 메모한 nit 1건 — `EmptyState.tsx` 주석의 `{colors.secondary}` → `{colors.text-muted}` 정정. PRD 1 (`layout-redesign`) 진행 중 자연 흡수 가능.
+
+### 참고: 미머지된 워킹트리 (본 SESSION_NOTES update)
+
+본 SESSION_NOTES 갱신은 새 룰 (한 브랜치 한 PR) 따라 별도 PR 만들지 않음. 다음 작업 PR (PRD `layout-redesign` 의 `feature/layout-redesign` 브랜치) 첫 commit (`docs(session): 2026-05-21 세션 정리`) 으로 묻어 들어간다.

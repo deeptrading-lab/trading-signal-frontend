@@ -1412,3 +1412,46 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) **다크 모드 PRD** — v3 의 semantic 명명(`surface` / `surface-muted` / `text-strong` / `text-muted` / `primary` / `accent-soft` / `border-line`) 이 그대로 다크 친화. 별도 PRD 진입 시점 결정.
   - (선택) 로고·아이콘 작업 PRD — 본 PRD 의 시그니처 슬레이트 `#1f3b4d` 가 로고 메인 컬러로 자연스럽게 확장. 본 PRD §4 비범위였으므로 별도 PRD.
+
+### 2026-05-21 — feat(layout): 3-section shell + 6블록 위계 + in-session 히스토리/즐겨찾기 (#21)
+
+- **slug**: `layout-redesign` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/21
+- **요약**: feat(layout): 3-section shell + 6블록 위계 + in-session 히스토리/즐겨찾기
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PRD `layout-redesign` (3분할 PRD 중 #1) 의 PRD / DESIGN.md v4 / 구현을 한 브랜치 안에 누적한 PR.
+  > 
+  > - **3-section shell 도입** — 상단 navbar + 좌측 사이드바 + 메인 영역. PRD #11 의 단일 페이지 `lg:grid-cols-[360px_1fr]` sticky sidebar 구조 폐기.
+  > - **App Router 컨벤션 적용** — RootLayout 은 html/body/Providers 만 책임, 새 route group `(workbench)/layout.tsx` 가 글로벌 shell 호스팅. URL 무변경 ("/" 그대로).
+  > - **메인 영역 6블록 위계 갱신** — Action → Brief → (Feasibility + Horizons 2-col) → RiskPlan → Warnings (R3 인지 흐름 우선).
+  > - **모바일 drawer 도입** — hamburger 클릭 → slide-in. ESC + scrim + close 세 진입점. focus trap + body scroll lock 자체 구현 (라이브러리 0건). 리사이즈 시 자동 닫기.
+  > - **in-session 히스토리·즐겨찾기** — React Context 기반 (Zustand 미도입). 분석 mutation 성공 시 자동 push (LRU 5건), ticker-header + 사이드바 항목 두 진입점에서 별표 토글.
+  > - **디자인 토큰 흡수** — `design:sync` source 를 v3 → v4 로 갱신. spacing 4 키 / typography 2 키 / rounded 1 키 / components 16 합성 토큰 추가. 기존 v3 토큰 무회귀.
+  > 
+  > ## 변경 사항
+  > 
+  > ### 사전 산출물 (이미 commit 된 것)
+  > - `docs/prd/layout-redesign.md` (545 lines) — PRD 본문.
+  > - `docs/SESSION_NOTES.md` — 2026-05-21 세션 정리.
+  > - `docs/design/layout-redesign.md` (832 lines) — DESIGN.md v4 신설.
+  > 
+  > ### 본 구현 commit
+  > 
+  > #### `chore(tokens): design:sync source v4 갱신 + 신규 토큰 흡수`
+  > - `package.json` `scripts.design:sync` source → `docs/design/layout-redesign.md`.
+  > - `scripts/inject-breakpoints.mjs` 의 `DESIGN_PATH` 도 v4 경로로.
+  > - `tailwind.theme.json` 재생성 (결정적) — spacing `navbar-h/sidebar-w/drawer-w/main-max-w`, typography `nav-brand/sidebar-section`, borderRadius `md` 추가.
+  > - `tailwind.config.ts` `adaptDesignTokens` — 신규 typography 2 키 + `letterSpacing` 흡수.
+  > 
+  > #### `feat(layout): 3-section shell + 6블록 위계 + in-session 히스토리/즐겨찾기`
+  > - `app/components.css` — v4 신규 합성 토큰 16 추가 (`@layer components`). 기존 21 토큰 무회귀.
+  > - `app/layout.tsx` — 무변경 (RootLayout 책임 유지).
+  > - `app/(workbench)/layout.tsx` (신규) — Navbar + Sidebar + MobileDrawer 호스팅 + `WorkbenchSessionProvider`.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PRD #2 component-compactness 신설** — input · dropdown · selectbox · checkbox · toggle 등 **개별 컴포넌트의 내부 디자인** (크기 · 폰트 · outside-click · input 내 단위 표기) 리디자인. 본 PRD 가 자리만 잡은 ticker-header / SearchPanel / InputPanel 의 내부 디테일은 #2 가 다룬다.
+  - **PRD #3 claude-cli-analysis 신설** — BFF route handler 가 FastAPI 대신 로컬 claude CLI subprocess 호출하도록 데이터 소스 교체. 본 PRD 의 6블록 정보 구조는 응답 shape 에만 의존하므로 BFF 만 갈아끼우면 무회귀.
+  - 사용자 결정: #2 → #3 권장 (시각 디테일 먼저, 데이터 소스 교체는 BE/FE 추상화 흡수 후).
+  QA 게이트 통과 후 `qa-passed` 라벨 부착 시점에 본 섹션이 `docs/HANDOFF.md` 로 자동 append (handoff-append workflow).

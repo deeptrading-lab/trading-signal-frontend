@@ -119,4 +119,75 @@
   .skeleton-line:last-child { @apply mb-0; }
   .skeleton-line-narrow { @apply w-[40%]; }
   .skeleton-line-medium { @apply w-[70%]; }
+
+  /* ===== v4 layout-redesign 신규 합성 토큰 16개 ===== */
+
+  /* ---------- 상단 navbar ---------- */
+  .navbar {
+    @apply flex items-center justify-between h-navbar-h bg-surface text-text-strong border-b border-border-line px-lg lg:px-2xl;
+  }
+  .navbar-brand {
+    @apply inline-flex items-center px-[6px] py-[2px] bg-surface text-primary text-nav-brand;
+  }
+  .navbar-icon-button {
+    @apply inline-flex items-center justify-center h-[40px] w-[40px] p-[8px] bg-surface text-text-strong rounded-sm cursor-pointer border-0;
+  }
+  .navbar-icon-button:hover,
+  .navbar-icon-button:focus-visible {
+    @apply bg-surface-muted text-text-strong outline-none;
+  }
+  .navbar-icon-button[aria-disabled="true"],
+  .navbar-icon-button:disabled {
+    @apply opacity-[0.65] cursor-not-allowed;
+  }
+
+  /* ---------- 좌측 sidebar (데스크탑) ---------- */
+  .sidebar {
+    @apply hidden lg:flex flex-col w-sidebar-w bg-surface text-text-strong border-r border-border-line p-lg overflow-y-auto;
+  }
+  .sidebar-section-header {
+    @apply px-[6px] py-xs text-sidebar-section text-text-muted uppercase;
+  }
+  .sidebar-item {
+    @apply flex items-center justify-between gap-sm h-[40px] px-md py-[8px] bg-surface text-text-strong rounded-sm cursor-pointer;
+  }
+  .sidebar-item:hover,
+  .sidebar-item:focus-visible {
+    @apply bg-surface-muted text-text-strong outline-none;
+  }
+  .sidebar-item-active {
+    @apply bg-accent-soft text-primary;
+  }
+  .sidebar-empty {
+    @apply bg-surface-muted text-text-muted text-caption rounded-sm p-[12px];
+  }
+
+  /* ---------- 모바일 drawer ---------- */
+  .drawer {
+    @apply fixed top-0 left-0 z-[60] h-screen w-drawer-w bg-surface text-text-strong rounded-r-md p-lg overflow-y-auto;
+    box-shadow: 0 16px 48px rgba(23, 32, 42, 0.16);
+  }
+  .drawer-scrim {
+    @apply fixed inset-0 z-[55] bg-text-strong/10;
+  }
+
+  /* ---------- 메인 영역 ---------- */
+  .main-area {
+    @apply bg-surface-muted text-text-strong p-lg lg:p-2xl;
+  }
+  .ticker-header {
+    @apply flex items-center justify-between gap-md bg-surface text-text-strong rounded-sm p-[14px];
+  }
+
+  /* ---------- 즐겨찾기 토글 ---------- */
+  .favorite-toggle {
+    @apply inline-flex items-center justify-center h-[32px] w-[32px] p-[6px] bg-surface text-text-muted rounded-pill cursor-pointer border-0;
+  }
+  .favorite-toggle:hover,
+  .favorite-toggle:focus-visible {
+    @apply bg-surface-muted outline-none;
+  }
+  .favorite-toggle-active {
+    @apply bg-accent-soft text-primary;
+  }
 }
