@@ -118,7 +118,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         onHamburgerClick={() => setDrawerOpen((v) => !v)}
         drawerId={drawerId}
       />
-      <div className="flex flex-1 min-h-0">
+      {/* v7 PRD §3.2 — `items-stretch` 명시 (flex 의 default 라 무회귀 보장 보조) +
+       *   `min-h-[calc(100vh-...)]` 로 내부 콘텐츠가 짧을 때도 sidebar/main 영역이 viewport 끝까지 stretched. */}
+      <div className="flex flex-1 min-h-0 items-stretch min-h-[calc(100vh-theme(spacing.navbar-h))]">
         <Sidebar
           selectedTicker={selectedTicker}
           onSelectHistory={dispatchSelectHistory}
