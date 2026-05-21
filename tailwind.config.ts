@@ -1,7 +1,8 @@
 /**
- * Tailwind theme — DESIGN.md (`docs/design/polish-followups.md`, v6) 의 토큰을
+ * Tailwind theme — DESIGN.md (`docs/design/design-tone-refinement.md`, v7) 의 토큰을
  * `tailwind.theme.json` 으로 export 한 결과를 그대로 흡수한다.
- * v6 는 v5 무수정 계승 + spacing 신규 3 키 (`input-pr-suffix-sm/md/lg`) 만 추가.
+ * v7 는 v6 (polish-followups) 의 토큰 키 셋 완전 무수정 계승 + colors 11 키의 hex 값만 재조정.
+ * 합성 토큰 46 키·typography 15·spacing 22·rounded 3·breakpoints 4 키 셋 전체 무회귀.
  *
  * 파이프라인:
  *   1) 디자이너가 DESIGN.md 의 토큰을 수정.

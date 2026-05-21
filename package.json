@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/polish-followups.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs"
+    "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/design-tone-refinement.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.11",

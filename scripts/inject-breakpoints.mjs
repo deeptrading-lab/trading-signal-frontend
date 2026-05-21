@@ -4,13 +4,13 @@
  * front matter 의 `breakpoints` 토큰을 흘려보내지 않으므로 (export 도구의 spec 한계),
  * DESIGN.md 의 YAML front matter 를 직접 파싱해 `tailwind.theme.json.theme.extend.screens` 로 주입한다.
  *
- * 단일 진실 원천: `docs/design/polish-followups.md` 의 `breakpoints:` 절 (v6).
+ * 단일 진실 원천: `docs/design/design-tone-refinement.md` 의 `breakpoints:` 절 (v7).
  * 본 스크립트는 hex/px 직타 없이 DESIGN.md 토큰 값만 그대로 옮긴다.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DESIGN_PATH = resolve("docs/design/polish-followups.md");
+const DESIGN_PATH = resolve("docs/design/design-tone-refinement.md");
 const THEME_PATH = resolve("tailwind.theme.json");
 
 function parseBreakpoints(md) {
