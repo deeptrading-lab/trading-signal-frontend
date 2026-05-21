@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DESIGN_PATH = resolve("docs/design/workbench-analyze-rebuild.md");
+const DESIGN_PATH = resolve("docs/design/layout-redesign.md");
 const THEME_PATH = resolve("tailwind.theme.json");
 
 function parseBreakpoints(md) {
