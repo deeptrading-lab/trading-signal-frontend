@@ -1497,3 +1497,44 @@
   - 본 PR 머지 후 **PRD #3 `claude-cli-analysis`** 신설 — 분석 결과의 데이터 소스 교체 (FastAPI BE → BFF route handler 가 로컬 claude CLI subprocess 호출). 본 PRD 의 6블록 shape · 합성 토큰 무회귀.
   - 운영 모니터링: 모바일 (375px) 에서 input 36px hit area 가 라벨·helper 합쳐 60px+ 묶음으로 충분한지 실 디바이스 점검 권장.
   - 후속 후보: button-icon 합성 토큰을 결과 카드 보조 아이콘 (예: tooltip / copy) 에 도입할 자리가 생기면 확장.
+
+### 2026-05-21 — feat(api): claude CLI subprocess 분석 백엔드 + adapter 추상화 (#23)
+
+- **slug**: `claude-cli-analysis` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/23
+- **요약**: feat(api): claude CLI subprocess 분석 백엔드 + adapter 추상화
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PRD `claude-cli-analysis` (#22 후속, 3분할 PRD 의 마지막) 구현. 분석 결과의 **데이터 소스 교체** 만 다루고 UI 는 무수정. 운영자가 `ANALYZE_BACKEND` 환경변수 하나로 FastAPI ↔ 로컬 claude CLI subprocess 사이를 toggle. 후속 PRD `claude-api-analysis` 가 같은 `AnalyzeAdapter` 인터페이스 위에 `claudeApiAdapter` 만 추가하면 되도록 어댑터 추상화를 미리 도입.
+  > 
+  > ## 변경 사항
+  > 
+  > - `app/api/workbench/_adapters/types.ts` (신규) — `AnalyzeAdapter` 인터페이스 + `AdapterResult` + `AnalyzeBackend` 정의.
+  > - `app/api/workbench/_adapters/fastapi.ts` (신규) — 기존 route handler 의 `fetch(fastapi)` 로직 1:1 이동. `FASTAPI_BASE_URL` 그대로 사용.
+  > - `app/api/workbench/_adapters/claudeCli.ts` (신규) — `execFile` + stdin pipe + `AbortController(30s)` subprocess 호출. `claude --print --output-format json --system-prompt ...` argv 분리 (shell 미경유로 injection 차단). envelope.result 안에서 JSON 추출 → 코드펜스 strip + 첫 `{`~마지막 `}` 슬라이스 fallback. 핵심 6블록 누락 시 malformed, 보조 필드 누락 시 기본값 fallback. Vercel 환경 (`VERCEL=1`, `VERCEL_ENV`, `NEXT_PUBLIC_VERCEL_ENV`) 감지 시 호출 거부. ENOENT / timeout / exit code ≠ 0 / parse 실패 모두 한글 폴백 메시지로 흡수.
+  > - `app/api/workbench/_adapters/prompt.ts` (신규) — 한글 system + user prompt. JSON 스키마는 `lib/types/workbench/analyze.ts` 와 정합. `CLAUDE_PROMPT_TEMPLATE` 로 user prompt override 가능.
+  > - `app/api/workbench/_adapters/index.ts` (신규) — `resolveBackend()` + `createAnalyzeAdapter()` factory.
+  > - `app/api/workbench/analyze/route.ts` — adapter dispatcher 로 교체. 진입부 Vercel 가드. `fetch()` 직접 호출 제거 (adapter 위임).
+  > - `.env.example` — `ANALYZE_BACKEND` / `CLAUDE_CLI_PATH` / `CLAUDE_CLI_MODEL` / `CLAUDE_PROMPT_TEMPLATE` 4종 한글 주석과 함께 명시.
+  > - `lib/copy/workbench/errorMessages.ts` — `CLAUDE_CLI_FALLBACKS` reference 카탈로그 추가 (실제 카피는 BFF adapter 가 직접 흘려보냄).
+  > 
+  > ## 검증
+  > 
+  > - `npm run typecheck` — 0 에러.
+  > - `npm run lint` — 0 에러.
+  > - `npm run build` — 0 에러. `/api/workbench/analyze` route 정상 생성 확인.
+  > - `git diff main -- components/ app/(workbench)/ app/components.css app/globals.css docs/design/ lib/types/workbench/analyze.ts lib/api/workbench/ hooks/` → 0 라인 (AC-11 / AC-12 / AC-13 / AC-20 UI 무회귀).
+  > - `git grep "fetch(" -- components/ hooks/ lib/api/workbench/` → 0건 (BFF 단일 진입점 유지).
+  > - `git grep "child_process\.exec(\|\\bexec('\\|\\bexec(\\\"" -- app/` → 0건 (shell 경유 `exec()` 미사용, `execFile` 만).
+  > - claude CLI envelope shape sanity check — `claude --print --output-format json` 출력이 `{ type: "result", subtype: "success", result: "<text>", ... }` 형태임을 확인. adapter 의 envelope.result path 정합.
+  > - 신규 의존성 0건 — `node:child_process` 표준 모듈만 사용. `package.json` 변경 없음.
+  > 
+  > ## 다음 작업
+  > 
+  > - **QA** 진입. 두 백엔드 모드 × 라운드트립 5건 + CLI 실패 케이스 (timeout / parse / ENOENT / Vercel) 검증. AC-1~AC-20 재현·기대·실측 표로 `docs/qa/claude-cli-analysis.md` 작성.
+  > - 머지 후보 후속 PRD: `claude-api-analysis` — Claude API 직접 호출. 본 PR 의 `AnalyzeAdapter` 인터페이스 위에 `claudeApiAdapter` 추가만으로 도입 가능. Vercel serverless 환경에서도 동작 가능 (subprocess 미사용).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **QA** 진입. 두 백엔드 모드 × 라운드트립 5건 + CLI 실패 케이스 (timeout / parse / ENOENT / Vercel) 검증. AC-1~AC-20 재현·기대·실측 표로 `docs/qa/claude-cli-analysis.md` 작성.
+  - 머지 후보 후속 PRD: `claude-api-analysis` — Claude API 직접 호출. 본 PR 의 `AnalyzeAdapter` 인터페이스 위에 `claudeApiAdapter` 추가만으로 도입 가능. Vercel serverless 환경에서도 동작 가능 (subprocess 미사용).
