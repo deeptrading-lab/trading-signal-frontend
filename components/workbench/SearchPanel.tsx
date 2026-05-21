@@ -29,6 +29,14 @@
  *     그 자식으로 두어 input 의 `top: 100%` 바로 아래 (mt-xs = 4px 간격) anchor.
  *   - `z-50` 으로 격상 — navbar / sidebar / 결과 카드 위로 떠야 함.
  *   - portal 미사용 (PRD §9.1 PM 권고 옵션 A).
+ *
+ * v7-rev2 (design-tone-refinement 후속 흡수) — PRD §3 결함 4·5 fix:
+ *   - 옵션 항목 마크업 2줄 분리 — `<span className="...">` 메인 라벨 (body-sm-strong)
+ *     + `<span className="search-result-item-meta">` 메타 (caption).
+ *     라벨·메타 글자 겹침 해소 (1차 v7 의 grid 34px 컨테이너 → v7-rev2 의 flex-col 52px 컨테이너).
+ *   - focus 상태 메타 색이 accent-vivid 톤 (search-result-item-focus-meta 합성 토큰) 으로 cascade.
+ *   - search-result-item 합성 토큰 자체에 `flex flex-col gap-dropdown-item-gap min-h-dropdown-item-h`
+ *     이 포함되었으므로 본 컴포넌트는 라벨·메타 span 만 자식으로 둠.
  */
 
 "use client";
@@ -210,15 +218,16 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
                     handleSelect(item);
                   }}
                 >
-                  <strong
-                    className={cn("text-body-sm font-bold", !focused && "text-text-strong")}
-                  >
+                  {/* v7-rev2: 2줄 분리. 라벨 = body-sm-strong (합성 토큰 기본 typography),
+                   * 메타 = search-result-item-meta / -focus-meta 합성 토큰 (caption 톤). */}
+                  <span>
                     {item.ticker} · {item.name}
-                  </strong>
+                  </span>
                   <span
                     className={cn(
-                      "text-caption",
-                      focused ? "text-primary" : "text-text-muted",
+                      focused
+                        ? "search-result-item-focus-meta"
+                        : "search-result-item-meta",
                     )}
                   >
                     {item.asset_type} · {item.currency}
