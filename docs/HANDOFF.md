@@ -1455,3 +1455,45 @@
   - **PRD #3 claude-cli-analysis 신설** — BFF route handler 가 FastAPI 대신 로컬 claude CLI subprocess 호출하도록 데이터 소스 교체. 본 PRD 의 6블록 정보 구조는 응답 shape 에만 의존하므로 BFF 만 갈아끼우면 무회귀.
   - 사용자 결정: #2 → #3 권장 (시각 디테일 먼저, 데이터 소스 교체는 BE/FE 추상화 흡수 후).
   QA 게이트 통과 후 `qa-passed` 라벨 부착 시점에 본 섹션이 `docs/HANDOFF.md` 로 자동 append (handoff-append workflow).
+
+### 2026-05-21 — feat: component-compactness — input·dropdown·button 컴팩트화 + outside-click + nit 흡수 (#22)
+
+- **slug**: `component-compactness` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/22
+- **요약**: feat: component-compactness — input·dropdown·button 컴팩트화 + outside-click + nit 흡수
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PRD #2 `component-compactness` 구현 PR. PR #21 (layout-redesign) 위에서 **컴포넌트 내부 톤** 만 재정의 — colors / spacing 기존 키 / typography 기존 키 / rounded / breakpoints 무수정 계승, components 만 컴팩트화. v5 DESIGN.md (`docs/design/component-compactness.md`) 의 토큰을 `design:sync` 로 결정적 흡수.
+  > 
+  > 사용자 의도 4 문장 흡수:
+  > 1. **컴팩트 톤** — input h 42→36, button-primary h 44→40, sidebar-item h 40→36, search-result-item h(신규) 34.
+  > 2. **outside-click** — `useOutsideClick` 자체 구현 (mousedown + touchstart) + Tab(onBlur relatedTarget) + ESC(기존). 신규 라이브러리 0건.
+  > 3. **input 내 우측 suffix** — USD / % / 일 모두 input 필드 내부 absolute, `pointer-events:none` + `aria-hidden`. 우측 padding 만 `pr-input-pr-suffix` (44px) 확장.
+  > 4. **전문가 톤** — input-label (13/700/1.25), input-suffix (13/400/1.2 tnum), button-secondary / button-icon 신설.
+  > 
+  > 추가로 PR #21 reviewer nit 3건 흡수.
+  > 
+  > ## 변경 사항
+  > 
+  > ### 디자인 파이프라인 (`chore(tokens)` 커밋)
+  > - `package.json` design:sync source v4 → v5.
+  > - `scripts/inject-breakpoints.mjs` DESIGN_PATH 동일 갱신.
+  > - `npm run design:sync` 결정적 재생성 — typography 3 (`button-sm`, `label-sm`, `input-suffix`) + spacing 9 (`input-h`, `input-px`, `input-py`, `input-pr-suffix`, `dropdown-item-h`, `dropdown-item-py`, `button-primary-h`, `button-sm-h`, `hit-area-min`) 흡수.
+  > - `tailwind.config.ts` `TYPOGRAPHY_EXTRAS` 에 v5 신규 3 키 lineHeight / fontFeature 흡수.
+  > - `app/components.css`:
+  >   - 갱신 (size 다운): `input` / `input-error` (h 36px, body-sm), `button-primary` (40px), `search-result-item(-focus)` (34px), `sidebar-item` (36px).
+  >   - 신설: `input-label` / `input-helper` / `input-helper-error` / `input-suffix` / `dropdown-panel` / `button-secondary` / `button-icon` (32×32 + before:absolute -inset-1 → hit area 40).
+  >   - `favorite-toggle` 도 동일 패턴 (시각 32, hit area 40) 으로 강화.
+  > 
+  > ### 컴포넌트 (`feat(workbench)` 커밋)
+  > - `hooks/utils/useOutsideClick.ts` (신규) — ref 외부 mousedown + touchstart 감지. SSR-safe.
+  > - `components/workbench/SearchPanel.tsx` — wrapperRef + useOutsideClick + onBlur(Tab) + dropdown-panel 토큰.
+  > - `components/workbench/InputPanel.tsx` — `InputWithSuffix` 내부 컴포넌트로 추출, 4 필드 모두 우측 suffix DOM (USD / % / 일). label-sm / input-helper(-error) 호출. **prop 시그니처 무수정** (AC-18).
+  > - `components/layout/Sidebar.tsx` — nit #1: 인라인 `60px` 제거, `top-navbar-h` + `max-h-[calc(100vh-theme(spacing.navbar-h))]`.
+  > - `components/layout/Navbar.tsx` — placeholder `h-[40px] w-[40px]` → `h-hit-area-min w-hit-area-min`.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 본 PR 머지 후 **PRD #3 `claude-cli-analysis`** 신설 — 분석 결과의 데이터 소스 교체 (FastAPI BE → BFF route handler 가 로컬 claude CLI subprocess 호출). 본 PRD 의 6블록 shape · 합성 토큰 무회귀.
+  - 운영 모니터링: 모바일 (375px) 에서 input 36px hit area 가 라벨·helper 합쳐 60px+ 묶음으로 충분한지 실 디바이스 점검 권장.
+  - 후속 후보: button-icon 합성 토큰을 결과 카드 보조 아이콘 (예: tooltip / copy) 에 도입할 자리가 생기면 확장.
