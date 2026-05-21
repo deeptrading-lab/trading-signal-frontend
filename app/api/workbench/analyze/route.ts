@@ -1,19 +1,27 @@
 /**
  * `/api/workbench/analyze` route handler.
  *
- * 브라우저 → 이 route handler → FastAPI 단방향 흐름의 server-side proxy.
- * PRD AC-2: `FASTAPI_BASE_URL` 환경변수만으로 dev/prod 전환.
- * PRD AC-7: 4xx/5xx 시 BE body 를 그대로 통과시키고, 빈 본문·JSON 파싱 실패 시 한글 폴백.
+ * 브라우저 → 이 route handler → adapter 단방향 흐름의 server-side proxy.
+ *
+ * PRD `claude-cli-analysis`:
+ *  - §3.1 옵션 A — 같은 endpoint 가 `ANALYZE_BACKEND` 환경변수로 백엔드 분기.
+ *    - `fastapi` (기본) → FastAPI BE 호출.
+ *    - `claude-cli` → 로컬 claude CLI subprocess 호출.
+ *  - §3.7 — `claude-cli` 모드 + Vercel 환경 감지 시 명시적 한글 에러 (런타임 가드).
+ *  - AC-1 — 환경변수 미설정/`fastapi` 시 기존 동작 무회귀.
+ *  - AC-13 — BFF 단일 진입점 유지: 클라이언트는 이 endpoint 만 호출한다.
+ *
+ * route handler 자체는 adapter 결과를 그대로 흘려보낸다 (응답 envelope·HTTP status·한글 메시지 모두 adapter 책임).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 
-const FASTAPI_BASE_URL = process.env.FASTAPI_BASE_URL ?? "http://127.0.0.1:8000";
-const TIMEOUT_MS = 30_000;
-const FALLBACK_NETWORK_MESSAGE =
-  "엔진 통신에 실패했어요. 잠시 후 다시 시도해 주세요.";
-const FALLBACK_PARSE_MESSAGE =
-  "엔진 응답 처리에 실패했어요. 잠시 후 다시 시도해 주세요.";
+import { createAnalyzeAdapter, resolveBackend } from "../_adapters";
+
+import type { AnalyzeRequest } from "@/lib/types/workbench/analyze";
+
+const MSG_VERCEL_UNSUPPORTED =
+  "Vercel 환경에서는 claude CLI 모드를 사용할 수 없습니다. 로컬 환경에서 실행해 주세요.";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -26,57 +34,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let response: Response;
-  try {
-    response = await fetch(`${FASTAPI_BASE_URL}/api/workbench/analyze`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch {
+  // adapter 가 1차 책임이지만, route handler 진입부에서도 한 번 더 가드 (조기 반환 + 명확성).
+  const backend = resolveBackend();
+  if (backend === "claude-cli" && isVercelEnv()) {
     return NextResponse.json(
-      { error: FALLBACK_NETWORK_MESSAGE },
-      { status: 502 },
+      { error: MSG_VERCEL_UNSUPPORTED },
+      { status: 503 },
     );
   }
 
-  return passthrough(response);
+  const adapter = createAnalyzeAdapter(backend);
+  const result = await adapter.analyze(body as AnalyzeRequest);
+
+  if (result.ok) {
+    return NextResponse.json(result.data, { status: 200 });
+  }
+  return NextResponse.json({ error: result.error }, { status: result.status });
 }
 
-async function passthrough(response: Response): Promise<NextResponse> {
-  const contentType = response.headers.get("content-type") ?? "";
-
-  if (!contentType.includes("application/json")) {
-    let text = "";
-    try {
-      text = await response.text();
-    } catch {
-      return NextResponse.json(
-        { error: FALLBACK_PARSE_MESSAGE },
-        { status: 500 },
-      );
-    }
-    if (text.trim() === "") {
-      return NextResponse.json(
-        { error: FALLBACK_PARSE_MESSAGE },
-        { status: response.status >= 400 ? response.status : 500 },
-      );
-    }
-    return new NextResponse(text, {
-      status: response.status,
-      headers: { "Content-Type": contentType || "text/plain; charset=utf-8" },
-    });
-  }
-
-  try {
-    const payload = await response.json();
-    return NextResponse.json(payload, { status: response.status });
-  } catch {
-    return NextResponse.json(
-      { error: FALLBACK_PARSE_MESSAGE },
-      { status: 500 },
-    );
-  }
+function isVercelEnv(): boolean {
+  return (
+    process.env.VERCEL === "1" ||
+    typeof process.env.VERCEL_ENV === "string" ||
+    typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string"
+  );
 }
