@@ -1538,3 +1538,45 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **QA** 진입. 두 백엔드 모드 × 라운드트립 5건 + CLI 실패 케이스 (timeout / parse / ENOENT / Vercel) 검증. AC-1~AC-20 재현·기대·실측 표로 `docs/qa/claude-cli-analysis.md` 작성.
   - 머지 후보 후속 PRD: `claude-api-analysis` — Claude API 직접 호출. 본 PR 의 `AnalyzeAdapter` 인터페이스 위에 `claudeApiAdapter` 추가만으로 도입 가능. Vercel serverless 환경에서도 동작 가능 (subprocess 미사용).
+
+### 2026-05-21 — polish-followups: PR #22/#23 reviewer nit 6건 일괄 흡수 (#24)
+
+- **slug**: `polish-followups` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/24
+- **요약**: polish-followups: PR #22/#23 reviewer nit 6건 일괄 흡수
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PR #22 (component-compactness) 와 PR #23 (claude-cli-analysis) reviewer 가 후속 권고로 남긴 6건의 polish nit (A1/A2/A3/B1/B2/B3) 을 한 PR 로 묶어 흡수. 신규 기능 0건, 라운드트립 0건 변경, 응답 shape 0건 변경, adapter 인터페이스 0건 변경.
+  > 
+  > ## 변경 사항
+  > 
+  > ### 디자인 토큰 파이프라인 (v6)
+  > - `package.json` design:sync source → `docs/design/polish-followups.md` (v6).
+  > - `scripts/inject-breakpoints.mjs` DESIGN_PATH → v6.
+  > - `tailwind.theme.json` 재생성 — 신규 spacing 3 (`input-pr-suffix-sm` 36px / `-md` 44px / `-lg` 56px) 흡수.
+  > 
+  > ### A1 — SearchPanel dropdown ARIA + 키보드 navigation
+  > - ARIA 5속성 풀 셋 — `role="combobox"` + `aria-expanded` + `aria-controls` + `aria-autocomplete="list"` + `aria-activedescendant` (옵션 id 가리킴).
+  > - listbox 컨테이너 + 옵션 li 의 `role` / `aria-selected` / 안정 id (`${listId}-option-${ticker}`).
+  > - 키보드 ↑/↓ wrap-around — 마지막에서 ↓ → 첫, 첫에서 ↑ → 마지막. 초기 -1 (옵션 focus 없음).
+  > - Enter 가드 — `focusIndex < 0` 시 동작 없음 (의도하지 않은 선택 방지).
+  > - ESC 시 dropdown 닫음 + focusIndex -1 + input focus 복귀.
+  > - 입력값 변경 시 focusIndex -1 로 리셋.
+  > 
+  > ### A2 — InputPanel suffix 단위별 너비 분기
+  > - `suffixPaddingClass(suffix)` 헬퍼 — 단위 문자열 길이로 sm/md/lg 분기.
+  > - 1자 (`%`, `일`) → `pr-input-pr-suffix-sm` (36px, v5 대비 8px 축소).
+  > - 2~3자 (`USD`, `KRW`) → `pr-input-pr-suffix-md` (44px, v5 무회귀).
+  > - 4자+ → `pr-input-pr-suffix-lg` (56px, 향후 단위 사전 대비).
+  > - `tailwind.config.ts` / `app/components.css` 주석 v6 갱신.
+  > 
+  > ### A3 — claudeCli 6블록 누락 한글화
+  > - `CLAUDE_CLI_FALLBACKS` 카탈로그에 `missing_action/brief/feasibility/horizons/risk_plan/warnings` 6키 + `malformed_position` 1키 추가.
+  > - normalize 반환 타입을 `NormalizeResult` discriminated union 으로 변경 (`{ok, data}` / `{ok:false, reason, error}`).
+  > - 누락 우선순위: `action → brief → feasibility → horizons → risk_plan → warnings` 순 early return.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - QA 에이전트 — 라운드트립 5건 양 뷰포트 (1280·1920) 시각 회귀 검증 (특히 A2 의 1자 단위 필드 우측 padding 36px), 키보드 + VoiceOver 시뮬레이션 1건, claude CLI mock 6블록 누락 케이스 6개 + position 잘못된 shape 1개 한글 메시지 매핑 검증.
+  - 사용자 검증 후 PRD `claude-api-analysis` 진입 (사용자 명시 의도 — PR #23 PRD 1.2 의 후속).
+  - 또는 PRD `analyze-streaming` (단일 → streaming UX 개선) — 사용자 결정.
