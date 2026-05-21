@@ -22,6 +22,10 @@ const FALLBACK: Record<ApiError["kind"], string> = {
  * 실제로는 BFF adapter (`app/api/workbench/_adapters/claudeCli.ts`) 가 한글 메시지를 직접
  * `{ error: "..." }` body 로 내려주므로 axios interceptor 의 `extractMessage` 가 본문을 그대로 사용한다.
  * 본 상수는 카피 일관성 검증용 reference. UI 컴포넌트는 수정하지 않는다.
+ *
+ * v6 (polish-followups §3.3 A3) 확장 — 6블록 누락 케이스 메시지 분리.
+ * 누락된 블록이 어디인지 사용자가 식별할 수 있도록 블록별 메시지를 별도 키로 둔다.
+ * normalize 단계에서 첫 누락 블록을 감지하면 해당 키 메시지를 그대로 `{ error }` body 로 흘려보낸다.
  */
 export const CLAUDE_CLI_FALLBACKS = {
   cli_missing: "claude CLI 가 설치되어 있지 않거나 경로가 올바르지 않아요.",
@@ -30,6 +34,22 @@ export const CLAUDE_CLI_FALLBACKS = {
   cli_malformed: "분석 결과 형식이 올바르지 않아요. 잠시 후 다시 시도해 주세요.",
   cli_unsupported:
     "Vercel 환경에서는 claude CLI 모드를 사용할 수 없습니다. 로컬 환경에서 실행해 주세요.",
+  // v6 — 6블록 누락 케이스. 한 PR 안에서 다시 분석 누름으로 회복 유도.
+  missing_action:
+    "분석 결과의 권고 액션 항목이 비어 있어요. 잠시 후 다시 시도해 주세요.",
+  missing_brief:
+    "분석 결과의 요약(근거) 항목이 비어 있어요. 잠시 후 다시 시도해 주세요.",
+  missing_feasibility:
+    "분석 결과의 실현 가능성 항목이 비어 있어요. 잠시 후 다시 시도해 주세요.",
+  missing_horizons:
+    "분석 결과의 기간별 시나리오 항목이 비어 있어요. 잠시 후 다시 시도해 주세요.",
+  missing_risk_plan:
+    "분석 결과의 리스크 계획 항목이 비어 있어요. 잠시 후 다시 시도해 주세요.",
+  missing_warnings:
+    "분석 결과의 경고 항목이 비어 있어요. 잠시 후 다시 시도해 주세요.",
+  // v6 — position nested shape narrowing 실패. 정상 nested shape 가 아닐 때.
+  malformed_position:
+    "분석 결과의 포지션 정보 형식이 올바르지 않아요. 잠시 후 다시 시도해 주세요.",
 } as const;
 
 export function getErrorMessage(error: ApiError): string {

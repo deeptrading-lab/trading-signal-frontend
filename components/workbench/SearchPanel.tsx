@@ -13,6 +13,14 @@
  *   - outside-click 자동 닫힘 — useOutsideClick 훅 (`hooks/utils/`).
  *   - ESC 키 닫힘 (기존 무회귀) + Tab 키 닫힘 (wrapper onBlur relatedTarget 검사).
  *   - search-result-item 컴팩트 (h 34px, body-sm).
+ *
+ * v6 (polish-followups) 추가 — DESIGN.md v6 R2 (PRD §3.1 A1):
+ *   - ARIA 5속성 풀 셋 — role="combobox" + aria-expanded + aria-controls + aria-autocomplete + aria-activedescendant.
+ *   - listbox · option role + 안정 id (useId() 기반, `${listId}-option-${i}`).
+ *   - 키보드 ↑/↓ wrap-around — 마지막에서 ↓ → 첫, 첫에서 ↑ → 마지막.
+ *   - 초기 focusIndex -1 (옵션 focus 없음) → ↓ 첫 옵션, ↑ 마지막 옵션.
+ *   - Enter 가드 — focusIndex < 0 시 동작 없음 (의도하지 않은 선택 방지).
+ *   - aria-activedescendant 는 dropdown 열림 + focusIndex >= 0 일 때만 옵션 id 가리킴.
  */
 
 "use client";
@@ -39,7 +47,8 @@ type Props = {
 export function SearchPanel({ selectedTicker, onSelect }: Props) {
   const [query, setQuery] = useState(selectedTicker?.ticker ?? "");
   const [open, setOpen] = useState(false);
-  const [focusIndex, setFocusIndex] = useState(0);
+  // v6: 초기 -1 (옵션 focus 없음). ↓ 누르면 0, ↑ 누르면 마지막. DESIGN.md v6 Keyboard 표.
+  const [focusIndex, setFocusIndex] = useState(-1);
   const inputId = useId();
   const listId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -53,8 +62,9 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
   });
 
   useEffect(() => {
+    // 결과가 줄어들면 focusIndex 가 범위 밖이 될 수 있다. -1 (focus 없음) 은 보존.
     if (focusIndex >= results.length) {
-      setFocusIndex(Math.max(0, results.length - 1));
+      setFocusIndex(results.length === 0 ? -1 : results.length - 1);
     }
   }, [results.length, focusIndex]);
 
@@ -70,23 +80,30 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     onSelect(item);
     setQuery(item.ticker);
     setOpen(false);
-    setFocusIndex(0);
+    setFocusIndex(-1);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    // v6 키보드 navigation — wrap-around (DESIGN.md v6 Keyboard 표).
     if (event.key === "ArrowDown") {
       event.preventDefault();
       if (!open) setOpen(true);
-      setFocusIndex((idx) => Math.min(idx + 1, Math.max(0, results.length - 1)));
+      const total = results.length;
+      if (total === 0) return;
+      setFocusIndex((idx) => (idx + 1) % total);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setFocusIndex((idx) => Math.max(0, idx - 1));
+      const total = results.length;
+      if (total === 0) return;
+      // 초기 -1 또는 0 에서 ↑ → 마지막. 그 외는 한 칸 위로.
+      setFocusIndex((idx) => (idx <= 0 ? total - 1 : idx - 1));
       return;
     }
     if (event.key === "Enter") {
-      if (open && results[focusIndex]) {
+      // v6 가드 — focusIndex < 0 (옵션 focus 없음) 시 동작 없음.
+      if (open && focusIndex >= 0 && results[focusIndex]) {
         event.preventDefault();
         handleSelect(results[focusIndex]);
       }
@@ -95,6 +112,9 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     if (event.key === "Escape") {
       event.preventDefault();
       setOpen(false);
+      setFocusIndex(-1);
+      // ESC 후에도 검색 input 에 focus 유지 — v6 Keyboard 표.
+      inputRef.current?.focus();
     }
   }
 
@@ -129,7 +149,8 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
-          setFocusIndex(0);
+          // v6: 타이핑 시 옵션 focus 없음 상태로 리셋 — Enter 의도하지 않은 선택 방지.
+          setFocusIndex(-1);
           if (selectedTicker && e.target.value.trim() !== selectedTicker.ticker) {
             onSelect(null);
           }
@@ -141,7 +162,9 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={
-          open && results[focusIndex]
+          // v6: dropdown 열림 + focusIndex >= 0 + 해당 옵션 존재 시에만 옵션 id 가리킴.
+          // 조건 외에는 attribute 자체 제거 (잘못된 id 참조로 screen reader silence 회피).
+          open && focusIndex >= 0 && results[focusIndex]
             ? `${listId}-option-${results[focusIndex].ticker}`
             : undefined
         }

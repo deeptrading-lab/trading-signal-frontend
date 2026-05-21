@@ -64,7 +64,11 @@
    *   horizontal padding {spacing.input-px} = 12px (suffix 없을 때 좌우 동일)
    *   vertical padding {spacing.input-py} = 8px
    *   typography {typography.body-sm} = 14px / 1.5
-   * 우측 suffix 가 있는 경우 호출 측에서 `pr-input-pr-suffix` 클래스 추가 (= 44px). */
+   * 우측 suffix 가 있는 경우 호출 측에서 단위별 분기 클래스 추가:
+   *   v5: `pr-input-pr-suffix` (44px, 호환 보존).
+   *   v6 (polish-followups): `pr-input-pr-suffix-sm` (36px, 1자 `%`/`일`)
+   *                        / `-md` (44px, 3자 `USD`/`KRW`, default)
+   *                        / `-lg` (56px, 4자+ 향후 단위). */
   .input,
   .input-error {
     @apply w-full h-input-h px-input-px py-input-py bg-surface-muted text-text-strong border border-border-line rounded-sm text-body-sm;

@@ -9,10 +9,17 @@
  *
  * - `CLAUDE_CLI_PATH` (기본 `claude`) 로 binary override 가능.
  * - `CLAUDE_CLI_MODEL` (옵션) 로 모델 지정.
- * - timeout 30초 (`AbortController`). 도달 시 `child.kill('SIGKILL')`.
+ * - timeout 30초 — `execFile` 의 `timeout` option 으로 위임. node 가 만료 시 child 에
+ *   SIGTERM 을 보낸 뒤 종료를 기다린다. (PR #23 머지 시점 헤더 주석에 `AbortController` 표현이
+ *   있었으나 실제로는 AbortController 를 쓰지 않는다 — polish-followups §3.5 B2 로 정합.)
+ *   타임아웃 분기 판정: callback err.killed === true 이고 signal 이 SIGTERM/SIGKILL 인 경우.
  * - stdout 의 JSON 을 parse → `AnalyzeResponse` 로 normalize.
  * - 코드펜스 (```json ... ```) 가 섞인 경우 strip 후 재시도.
  * - exit code ≠ 0, ENOENT, JSON parse 실패, 6블록 누락 → 한글 폴백 메시지 반환 (throw 안 함).
+ * - v6 (polish-followups §3.3 A3): 6블록 중 어느 블록이 누락됐는지 사용자에게 한글로 안내 —
+ *   `CLAUDE_CLI_FALLBACKS.missing_<block>` 카탈로그 사용. 누락된 첫 블록 감지 시점에 early return.
+ * - v6 (polish-followups §3.6 B3): `position` nested shape narrowing 추가 — type guard 통과 못하면
+ *   `malformed_position` 메시지로 502 반환. null 또는 미정의는 정상 (position 자체가 nullable).
  *
  * Vercel 안전 가드 (§3.7) — `process.env.VERCEL` 감지 시 호출 거부.
  */
@@ -24,6 +31,7 @@ import type {
   AnalyzeRequest,
   AnalyzeResponse,
 } from "@/lib/types/workbench/analyze";
+import { CLAUDE_CLI_FALLBACKS } from "@/lib/copy/workbench/errorMessages";
 
 import { buildUserPrompt, getSystemPrompt } from "./prompt";
 import type { AdapterResult, AnalyzeAdapter } from "./types";
@@ -31,16 +39,11 @@ import type { AdapterResult, AnalyzeAdapter } from "./types";
 const TIMEOUT_MS = 30_000;
 const MAX_STDOUT_BYTES = 4 * 1024 * 1024; // 4MB.
 
-const MSG_VERCEL_UNSUPPORTED =
-  "Vercel 환경에서는 claude CLI 모드를 사용할 수 없습니다. 로컬 환경에서 실행해 주세요.";
-const MSG_CLI_MISSING =
-  "claude CLI 가 설치되어 있지 않거나 경로가 올바르지 않아요.";
-const MSG_CLI_ERROR =
-  "분석 도구 호출에 실패했어요. 잠시 후 다시 시도해 주세요.";
-const MSG_TIMEOUT =
-  "분석이 너무 오래 걸려요. 잠시 후 다시 시도해 주세요.";
-const MSG_MALFORMED =
-  "분석 결과 형식이 올바르지 않아요. 잠시 후 다시 시도해 주세요.";
+const MSG_VERCEL_UNSUPPORTED = CLAUDE_CLI_FALLBACKS.cli_unsupported;
+const MSG_CLI_MISSING = CLAUDE_CLI_FALLBACKS.cli_missing;
+const MSG_CLI_ERROR = CLAUDE_CLI_FALLBACKS.cli_error;
+const MSG_TIMEOUT = CLAUDE_CLI_FALLBACKS.cli_timeout;
+const MSG_MALFORMED = CLAUDE_CLI_FALLBACKS.cli_malformed;
 
 export class ClaudeCliAdapter implements AnalyzeAdapter {
   private readonly binaryPath: string;
@@ -100,15 +103,16 @@ export class ClaudeCliAdapter implements AnalyzeAdapter {
       return { ok: false, status: 502, error: MSG_MALFORMED };
     }
 
-    const normalized = normalizeAnalyzeResponse(extracted, input);
-    if (!normalized) {
+    const result = normalizeAnalyzeResponse(extracted, input);
+    if (!result.ok) {
       logServer("[claude-cli] schema validation failed", {
+        reason: result.reason,
         sample: JSON.stringify(extracted).slice(0, 2000),
       });
-      return { ok: false, status: 502, error: MSG_MALFORMED };
+      return { ok: false, status: 502, error: result.error };
     }
 
-    return { ok: true, status: 200, data: normalized };
+    return { ok: true, status: 200, data: result.data };
   }
 }
 
@@ -254,34 +258,112 @@ function parseLooseJson(raw: string): unknown | null {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * normalize 결과 — 성공이면 6블록 완전한 AnalyzeResponse, 실패면 누락 블록을 식별한 한글 에러.
+ *
+ * v6 (polish-followups §3.3 A3) — `'malformed'` 일괄 메시지가 아닌 누락된 블록을 한글로 안내.
+ * 누락 블록 우선순위: action → brief → feasibility → horizons → risk_plan → warnings 순.
+ */
+type NormalizeResult =
+  | { ok: true; data: AnalyzeResponse }
+  | { ok: false; reason: NormalizeReason; error: string };
+
+type NormalizeReason =
+  | "not_object"
+  | "missing_action"
+  | "missing_brief"
+  | "missing_feasibility"
+  | "missing_horizons"
+  | "missing_risk_plan"
+  | "missing_warnings"
+  | "malformed_position";
+
+/**
  * 추출된 JSON 을 `AnalyzeResponse` shape 으로 narrowing.
  *
  * - 최상위에 `analysis` 가 없으면 전체가 `AnalyzeAnalysis` 인 케이스를 흡수 ({ analysis } 로 wrap).
- * - 핵심 필드 (`brief`, `feasibility`, `horizons`, `risk_plan`, `action`) 누락 시 null 반환 → malformed.
- * - 보조 필드 (`warnings`, `position`, `ai_summary`, `whitelist_entry`, `input` 등) 누락 시 기본값 fallback.
+ * - 핵심 6블록 (`action`, `brief`, `feasibility`, `horizons`, `risk_plan`, `warnings`) 누락 시
+ *   해당 블록을 식별한 한글 메시지로 reason + error 반환 (v6 A3).
+ * - `position` nested shape 가 있는데 narrowing 실패면 `malformed_position` (v6 B3).
+ * - 보조 필드 (`ai_summary`, `whitelist_entry`, `input` 등) 누락 시 기본값 fallback (PR #23 무회귀).
  */
 function normalizeAnalyzeResponse(
   payload: unknown,
   input: AnalyzeRequest,
-): AnalyzeResponse | null {
-  if (!isObject(payload)) return null;
+): NormalizeResult {
+  if (!isObject(payload)) {
+    return { ok: false, reason: "not_object", error: MSG_MALFORMED };
+  }
 
   const rawAnalysis = isObject(payload.analysis) ? payload.analysis : payload;
-  if (!isObject(rawAnalysis)) return null;
+  if (!isObject(rawAnalysis)) {
+    return { ok: false, reason: "not_object", error: MSG_MALFORMED };
+  }
 
+  const action = rawAnalysis.action;
   const brief = rawAnalysis.brief;
   const feasibility = rawAnalysis.feasibility;
   const horizons = rawAnalysis.horizons;
   const riskPlan = rawAnalysis.risk_plan;
-  const action = rawAnalysis.action;
+  const rawWarnings = rawAnalysis.warnings;
 
-  if (!isObject(brief)) return null;
-  if (typeof feasibility !== "string") return null;
-  if (!Array.isArray(horizons)) return null;
-  if (!isObject(riskPlan)) return null;
-  if (typeof action !== "string") return null;
+  // v6 A3: 6블록 누락 우선순위 검사. 첫 누락 블록에서 early return.
+  if (typeof action !== "string" || action.trim() === "") {
+    return {
+      ok: false,
+      reason: "missing_action",
+      error: CLAUDE_CLI_FALLBACKS.missing_action,
+    };
+  }
+  if (!isObject(brief)) {
+    return {
+      ok: false,
+      reason: "missing_brief",
+      error: CLAUDE_CLI_FALLBACKS.missing_brief,
+    };
+  }
+  if (typeof feasibility !== "string" || feasibility.trim() === "") {
+    return {
+      ok: false,
+      reason: "missing_feasibility",
+      error: CLAUDE_CLI_FALLBACKS.missing_feasibility,
+    };
+  }
+  if (!Array.isArray(horizons)) {
+    return {
+      ok: false,
+      reason: "missing_horizons",
+      error: CLAUDE_CLI_FALLBACKS.missing_horizons,
+    };
+  }
+  if (!isObject(riskPlan)) {
+    return {
+      ok: false,
+      reason: "missing_risk_plan",
+      error: CLAUDE_CLI_FALLBACKS.missing_risk_plan,
+    };
+  }
+  if (!Array.isArray(rawWarnings)) {
+    return {
+      ok: false,
+      reason: "missing_warnings",
+      error: CLAUDE_CLI_FALLBACKS.missing_warnings,
+    };
+  }
 
-  const warnings = Array.isArray(rawAnalysis.warnings) ? rawAnalysis.warnings : [];
+  // v6 B3: position nested shape narrowing — null/undefined 는 정상, 객체이면 type guard 통과 필수.
+  const rawPosition = rawAnalysis.position;
+  let position: AnalyzeAnalysis["position"];
+  if (rawPosition === null || rawPosition === undefined) {
+    position = null;
+  } else if (isPositionShape(rawPosition)) {
+    position = rawPosition;
+  } else {
+    return {
+      ok: false,
+      reason: "malformed_position",
+      error: CLAUDE_CLI_FALLBACKS.malformed_position,
+    };
+  }
 
   const whitelistEntry = isObject(rawAnalysis.whitelist_entry)
     ? rawAnalysis.whitelist_entry
@@ -315,13 +397,27 @@ function normalizeAnalyzeResponse(
     annualized_target_return_pct: annualized,
     horizons: horizons as AnalyzeAnalysis["horizons"],
     risk_plan: riskPlan as AnalyzeAnalysis["risk_plan"],
-    position: rawAnalysis.position ?? null,
+    position,
     action,
     ai_summary: aiSummary,
-    warnings: warnings as AnalyzeAnalysis["warnings"],
+    warnings: rawWarnings as AnalyzeAnalysis["warnings"],
   };
 
-  return { analysis: normalized };
+  return { ok: true, data: { analysis: normalized } };
+}
+
+/**
+ * v6 (polish-followups §3.6 B3) — `position` nested shape narrowing.
+ *
+ * `lib/types/workbench/analyze.ts` 의 `AnalyzeAnalysis.position` 은 `unknown | null` 로 열려 있어
+ * 실 상위 컴포넌트가 부분 정보로도 동작하지만, claude 가 잘못된 shape 을 흘려보내면
+ * 결과 패널에서 런타임 오류가 발생할 위험이 있다. 본 type guard 는 보수적으로
+ * "객체이고 entry / stop / target 셋 중 하나라도 존재" 를 통과 조건으로 둔다 (BE 마이그레이션 안정성).
+ * 셋 모두 부재한 객체 (예: `{ foo: 1 }`) 는 잘못된 shape 으로 간주.
+ */
+function isPositionShape(value: unknown): value is Record<string, unknown> {
+  if (!isObject(value)) return false;
+  return "entry" in value || "stop" in value || "target" in value;
 }
 
 /* -------------------------------------------------------------------------- */

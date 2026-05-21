@@ -7,17 +7,23 @@
  * - user prompt: 입력값을 한글 라벨로 명시 (ticker / 자본 / 목표 수익 / 기간 / 최대 손실).
  * - JSON 스키마는 `lib/types/workbench/analyze.ts` 의 `AnalyzeResponse` 와 동일 shape.
  *
+ * v6 (polish-followups §3.4 B1) — `ANALYZE_JSON_SCHEMA` 를 system prompt 안에 inline embed.
+ * claude CLI 가 별도 `--json-schema` 플래그를 지원하지 않으므로, 정의된 schema 객체를
+ * JSON 문자열로 직렬화해 system prompt 본문에 포함시켜 응답의 일관성을 끌어올린다.
+ *
  * `CLAUDE_PROMPT_TEMPLATE` 환경변수로 user prompt 템플릿 override 가능 (옵션).
  */
 
 import type { AnalyzeRequest } from "@/lib/types/workbench/analyze";
 
 /**
- * claude CLI 가 JSON Schema 옵션 (`--json-schema`) 으로 받아서
- * 구조화된 응답을 강제하도록 만든 스키마. `lib/types/workbench/analyze.ts` 의 shape 과 정합.
+ * claude CLI 응답 강제용 JSON 스키마. `lib/types/workbench/analyze.ts` 의 shape 과 정합.
  *
  * 보조 필드는 BE 마이그레이션 안정성 차원에서 옵셔널로 두고, 핵심 필드 (action / brief / feasibility /
  * horizons / risk_plan / warnings) 는 required 로 못박는다.
+ *
+ * v6 — `getSystemPrompt()` 안에서 JSON.stringify 된 형태로 system prompt 본문에 embed 된다.
+ * 미사용 export 0건 — `git grep -n "ANALYZE_JSON_SCHEMA" app/` 가 정의 + 사용처를 모두 잡는다.
  */
 export const ANALYZE_JSON_SCHEMA = {
   type: "object",
@@ -52,7 +58,7 @@ export const ANALYZE_JSON_SCHEMA = {
   },
 } as const;
 
-const SYSTEM_PROMPT_KO = `당신은 한국어로 답변하는 트레이딩 분석가입니다.
+const SYSTEM_PROMPT_KO_HEAD = `당신은 한국어로 답변하는 트레이딩 분석가입니다.
 주어진 종목과 투자 조건에 대해 분석한 결과를 **반드시 아래 JSON 스키마에 정확히 일치하는 단일 JSON 객체** 로만 응답하세요.
 
 규칙:
@@ -133,7 +139,14 @@ export function buildUserPrompt(input: AnalyzeRequest): string {
 }
 
 export function getSystemPrompt(): string {
-  return SYSTEM_PROMPT_KO;
+  // v6 (polish-followups §3.4 B1) — system prompt 본문에 JSON 스키마를 inline embed.
+  // claude 가 스키마의 required / properties 를 직접 보면서 응답을 생성하도록 유도.
+  // shape 예시 (SYSTEM_PROMPT_KO_HEAD 의 끝) 와 schema 가 함께 들어가 BE 마이그레이션 안정성 유지.
+  const schemaJson = JSON.stringify(ANALYZE_JSON_SCHEMA, null, 2);
+  return `${SYSTEM_PROMPT_KO_HEAD}
+
+엄격한 JSON 스키마 (이 스키마의 required 항목은 반드시 모두 채워서 응답):
+${schemaJson}`;
 }
 
 /**
