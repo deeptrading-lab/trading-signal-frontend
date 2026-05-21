@@ -7,13 +7,28 @@
  *   - 결과 1건일 때도 자동 선택 X — 사용자가 확정
  *   - 컨테이너 role="listbox", 항목 role="option" aria-selected
  *   - 입력칸 placeholder: "종목명·티커 입력 (예: AAPL, BTC-USD)"
+ *
+ * v5 (component-compactness) 추가:
+ *   - dropdown-panel 합성 토큰 호출 (이전 인라인 shadow + 보더 제거).
+ *   - outside-click 자동 닫힘 — useOutsideClick 훅 (`hooks/utils/`).
+ *   - ESC 키 닫힘 (기존 무회귀) + Tab 키 닫힘 (wrapper onBlur relatedTarget 검사).
+ *   - search-result-item 컴팩트 (h 34px, body-sm).
  */
 
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+} from "react";
 import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 import { useTickerSearch } from "@/hooks/workbench/useTickerSearch";
+import { useOutsideClick } from "@/hooks/utils/useOutsideClick";
 import { cn } from "@/lib/utils/cn";
 
 type Props = {
@@ -27,6 +42,7 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
   const [focusIndex, setFocusIndex] = useState(0);
   const inputId = useId();
   const listId = useId();
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 검색은 사용자가 입력칸을 비웠거나 선택 ticker 와 다른 텍스트를 치는 동안만 활성화.
@@ -41,6 +57,9 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
       setFocusIndex(Math.max(0, results.length - 1));
     }
   }, [results.length, focusIndex]);
+
+  // v5 R3 — dropdown 외부 mousedown / touchstart 자동 닫힘.
+  useOutsideClick(wrapperRef, () => setOpen(false), { enabled: open });
 
   const helper = useMemo(() => {
     if (selectedTicker) return null;
@@ -79,11 +98,23 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     }
   }
 
+  // v5 R3 — Tab 으로 wrapper 외부로 focus 이동 시 자동 닫힘.
+  // wrapper 내부 자식(input → option)으로 이동이면 relatedTarget 이 wrapper 안이라 유지.
+  function handleWrapperBlur(event: FocusEvent<HTMLDivElement>) {
+    const next = event.relatedTarget as Node | null;
+    if (next && wrapperRef.current?.contains(next)) return;
+    setOpen(false);
+  }
+
   return (
-    <div className="relative mb-md p-lg bg-surface border border-border-line rounded-sm">
+    <div
+      ref={wrapperRef}
+      onBlur={handleWrapperBlur}
+      className="relative mb-md p-lg bg-surface border border-border-line rounded-sm"
+    >
       <label
         htmlFor={inputId}
-        className="block mb-sm text-caption text-text-muted"
+        className="block mb-sm input-label"
       >
         종목 검색
       </label>
@@ -116,18 +147,18 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
         }
       />
       {helper ? (
-        <p className="mt-sm text-caption text-text-muted">{helper}</p>
+        <p className="mt-sm input-helper">{helper}</p>
       ) : null}
       {open ? (
         <div
-          className="absolute top-full left-lg right-lg z-[5] mt-xs p-xs bg-surface border border-border-line rounded-sm max-h-[280px] overflow-y-auto shadow-[0_10px_28px_rgba(23,32,42,0.08)]"
+          className="dropdown-panel absolute top-full left-lg right-lg z-[5] mt-xs max-h-[280px] overflow-y-auto"
           role="listbox"
           id={listId}
         >
           {isPending && results.length === 0 ? (
-            <div className="p-[12px] text-body-sm text-text-muted">검색 중…</div>
+            <div className="px-md py-dropdown-item-py text-body-sm text-text-muted">검색 중…</div>
           ) : results.length === 0 ? (
-            <div className="p-[12px] text-body-sm text-text-muted">
+            <div className="px-md py-dropdown-item-py text-body-sm text-text-muted">
               일치하는 종목이 없어요. AAPL · BTC-USD 를 검색해 보세요.
             </div>
           ) : (
@@ -142,19 +173,20 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
                   className={cn(focused ? "search-result-item-focus" : "search-result-item")}
                   onMouseEnter={() => setFocusIndex(index)}
                   onMouseDown={(e) => {
-                    // input blur 직전에 클릭이 동작하도록 mousedown 사용.
+                    // input blur 직전에 클릭이 동작하도록 mousedown 사용 +
+                    // useOutsideClick 의 mousedown 가드와 충돌 방지 (wrapper 내부이므로 통과).
                     e.preventDefault();
                     handleSelect(item);
                   }}
                 >
                   <strong
-                    className={cn("text-body-md font-bold", !focused && "text-text-strong")}
+                    className={cn("text-body-sm font-bold", !focused && "text-text-strong")}
                   >
                     {item.ticker} · {item.name}
                   </strong>
                   <span
                     className={cn(
-                      "text-body-sm",
+                      "text-caption",
                       focused ? "text-primary" : "text-text-muted",
                     )}
                   >

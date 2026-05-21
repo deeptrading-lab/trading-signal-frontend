@@ -53,10 +53,11 @@ export function Navbar({
         ) : null}
         <span className="navbar-brand">{NAV_BRAND_LABEL}</span>
       </div>
-      {/* 우측 placeholder — 후속 PRD 의 사용자 메뉴·다크모드 토글 자리. */}
+      {/* 우측 placeholder — 후속 PRD 의 사용자 메뉴·다크모드 토글 자리.
+       *  v5: 인라인 px 직타 제거, hit-area-min 토큰 (40px) 으로 흡수. */}
       <div
         aria-hidden="true"
-        className="h-[40px] w-[40px]"
+        className="h-hit-area-min w-hit-area-min"
       />
     </header>
   );
