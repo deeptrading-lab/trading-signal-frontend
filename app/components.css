@@ -103,11 +103,16 @@
     @apply pointer-events-none text-input-suffix text-text-muted;
   }
 
-  /* ---------- 버튼 (v5 컴팩트화) ---------- */
-  /* button-primary: height 40px (input 36px 보다 한 단계 위). v4 의 44px → v5 의 40px. */
+  /* ---------- 버튼 (v5 컴팩트화 + v7-rev2 accent-vivid cascade) ---------- */
+  /* button-primary: height 40px (input 36px 보다 한 단계 위). v4 의 44px → v5 의 40px.
+   * v7-rev2: backgroundColor 가 primary (Signature Slate) → accent-vivid (#1d4ed8) 로 교체.
+   * 사유 — PRD §3 결함 5 (사용자 후속 발화 "비비드하게") 흡수. accent-vivid × surface 6.70:1 (AA 통과). */
   .button-primary {
-    @apply h-button-primary-h px-md bg-primary text-surface border-0 rounded-sm text-button cursor-pointer;
+    @apply h-button-primary-h px-md bg-accent-vivid text-surface border-0 rounded-sm text-button cursor-pointer;
     font-family: inherit;
+  }
+  .button-primary:hover {
+    @apply bg-accent-vivid/90;
   }
   .button-primary[aria-disabled="true"],
   .button-primary:disabled {
@@ -135,17 +140,29 @@
     @apply bg-surface-muted text-text-strong outline-none;
   }
 
-  /* ---------- 검색 결과 아이템 (v5 컴팩트화) ---------- */
-  /* search-result-item: height 34px (input 36px 보다 한 단계 작음 — dropdown 보조 패널 위계). */
+  /* ---------- 검색 결과 아이템 (v5 컴팩트 → v7-rev2 2줄 콘텐츠 수용) ---------- */
+  /* v7-rev2 — DESIGN.md §Components search-result-item / -focus:
+   *   height {spacing.dropdown-item-h} = 52px (1차 v7 34px → v7-rev2 52px, 2줄 콘텐츠 수용)
+   *   vertical padding {spacing.dropdown-item-py} = 10px
+   *   typography {typography.body-sm-strong} = 14px/700/1.35 (라벨)
+   *   2줄 layout — flex-col + gap {spacing.dropdown-item-gap} = 2px
+   *   focus 배경 accent-vivid-soft + 텍스트 accent-vivid (옵션 B 비비드 cascade) */
   .search-result-item,
   .search-result-item-focus {
-    @apply grid gap-xs h-dropdown-item-h px-md py-dropdown-item-py rounded-sm cursor-pointer text-body-sm;
+    @apply flex flex-col justify-center gap-dropdown-item-gap min-h-dropdown-item-h px-md py-dropdown-item-py rounded-sm cursor-pointer text-body-sm-strong;
   }
   .search-result-item {
     @apply bg-surface text-text-strong;
   }
   .search-result-item-focus {
-    @apply bg-accent-soft text-primary;
+    @apply bg-accent-vivid-soft text-accent-vivid;
+  }
+  /* 메타 라인 합성 토큰 (v7-rev2 신규) — 옵션 항목 두 번째 줄. */
+  .search-result-item-meta {
+    @apply text-caption text-text-muted;
+  }
+  .search-result-item-focus-meta {
+    @apply text-caption text-accent-vivid;
   }
   /* dropdown-panel: input 바로 아래 absolute floating. 그림자 없음 (border 로 분리). */
   .dropdown-panel {
