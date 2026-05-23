@@ -1,51 +1,67 @@
 /**
- * Sidebar — 데스크탑(`>= lg`) 한정 펼쳐진 사이드바.
+ * Sidebar — finsight 글로벌 셸 데스크탑(`>= lg`) 좌측 사이드바.
  *
- * 위치: navbar 아래 좌측 sticky, 너비 spacing.sidebar-w (264px), 세로 100vh - navbar-h.
- * 모바일에서는 hidden (CSS `hidden lg:flex` 합성 토큰 `sidebar` 안에서 처리).
+ * PR3 (finsight-redesign) 갱신. PRD §3.3 / §5.3 AC-L-1.
  *
- * 내부 콘텐츠는 SidebarContent 컴포넌트로 분리 — drawer 와 재사용.
+ * 변경 사유 (legacy → v8 finsight shell):
+ *   - legacy (PR21~PR25): 워크벤치 한정 history / favorites 섹션 호스트 (SidebarContent 위임).
+ *   - v8 (PR3): 글로벌 셸 6 메뉴 항목 — 모든 라우트가 공유. 워크벤치 한정 history / favorites
+ *     는 PR5 의 워크벤치 재구성 시점에 별도 우측 패널 또는 페이지 내부로 흡수.
  *
- * v7 (design-tone-refinement) — PRD §3.2 결함 2 fix:
- *   - 기존 `self-start` 가 flex item 의 stretch 를 차단 → 사이드바가 내부 콘텐츠 높이만큼만
- *     차지하고 그 아래로 surface-muted 의 회색 빈 공간 노출 (사용자 지적).
- *   - `self-start` 제거 + `min-h-[calc(100vh-theme(spacing.navbar-h))]` 추가 →
- *     데스크탑에서 사이드바가 navbar 아래 viewport 끝까지 stretched.
- *   - sticky 동작은 그대로 — 상위 flex 의 stretch 가 적용된 후에도 sticky top 정합.
- *   - 모바일 drawer (`MobileDrawer`) 는 본 컴포넌트 무관 — `hidden lg:flex` 가 모바일 차단.
+ * 위치: Header 아래 좌측 sticky, 너비 `spacing.sidebar-w` (264px), 세로 `100vh - navbar-h`.
+ * 모바일에서는 hidden (CSS 합성 토큰 `sidebar` 안 `hidden lg:flex`).
+ *
+ * 내부 콘텐츠:
+ *   - 상단 FinSight wordmark (Activity 로고 + 텍스트, font-display + text-accent-vivid)
+ *   - 6 메뉴 항목 — NAV_ITEMS 단일 정의 (`./navItems.ts`).
+ *   - 활성 라우트 강조 — `sidebar-nav-item-active` 합성 토큰.
  */
 
 "use client";
 
-import { SidebarContent } from "@/components/layout/SidebarContent";
-import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
-import type { AnalyzeHistoryEntry } from "@/hooks/workbench/useWorkbenchSession";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Activity } from "lucide-react";
+import { NAV_ITEMS, isNavItemActive } from "@/components/layout/navItems";
+import { NAV_BRAND_LABEL } from "@/lib/copy/layout/navCopy";
+import { cn } from "@/lib/utils/cn";
 
-type Props = {
-  selectedTicker: string | null;
-  onSelectHistory: (entry: AnalyzeHistoryEntry) => void;
-  onSelectFavorite: (item: WhitelistItem) => void;
-};
+export function Sidebar() {
+  const pathname = usePathname();
 
-export function Sidebar({
-  selectedTicker,
-  onSelectHistory,
-  onSelectFavorite,
-}: Props) {
-  // v5 nit #1 흡수 — 인라인 60px 직타 제거. navbar 높이 토큰 `{spacing.navbar-h}` 를
-  // Tailwind theme 의 `navbar-h` 키로 호출.
-  // v7 PRD §3.2 — `self-start` 제거 + `min-h-[calc(100vh-...)]` 추가 → viewport 끝까지 stretched.
-  // 두 클래스 모두 토큰 참조이며 페이지 어디에도 `60px` 직타는 없다.
   return (
     <aside
       className="sidebar sticky top-navbar-h min-h-[calc(100vh-theme(spacing.navbar-h))] max-h-[calc(100vh-theme(spacing.navbar-h))]"
       data-component="sidebar"
+      aria-label="주 메뉴"
     >
-      <SidebarContent
-        selectedTicker={selectedTicker}
-        onSelectHistory={onSelectHistory}
-        onSelectFavorite={onSelectFavorite}
-      />
+      {/* 상단 브랜드 — Header 의 wordmark 와 시각 중복을 피하기 위해
+       *   데스크탑에서는 본 sidebar 가 brand 의 1차 호스트. */}
+      <Link href="/" className="sidebar-brand" aria-label={NAV_BRAND_LABEL}>
+        <Activity className="sidebar-brand-icon" aria-hidden="true" />
+        <span className="sidebar-brand-text">{NAV_BRAND_LABEL}</span>
+      </Link>
+
+      <nav className="sidebar-nav" aria-label="메뉴">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const active = isNavItemActive(item.path, pathname);
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={cn(
+                "sidebar-nav-item",
+                active && "sidebar-nav-item-active",
+              )}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon className="sidebar-nav-item-icon" aria-hidden="true" />
+              <span className="sidebar-nav-item-label">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </aside>
   );
 }

@@ -319,6 +319,99 @@
     @apply flex items-center justify-between gap-md bg-surface text-text-strong rounded-sm p-[14px];
   }
 
+  /* ===== v8 (finsight-redesign) PR3 신규 — 글로벌 셸 합성 토큰 ===== */
+
+  /* ---------- Header (글래스) ----------
+   * PRD §5.3 AC-L-2 — backdrop-blur + 반투명 surface + border-b.
+   * height = navbar-h (60px) v4 무회귀. */
+  .header-glass {
+    @apply flex items-center justify-between h-navbar-h bg-surface/80 backdrop-blur-md border-b border-border-line px-lg lg:px-2xl;
+  }
+  /* header-brand — 좌측 wordmark (Activity 아이콘 + 텍스트). text-decoration: none 강제 (Link). */
+  .header-brand {
+    @apply inline-flex items-center gap-sm text-accent-vivid no-underline;
+  }
+  .header-brand-icon {
+    @apply h-2xl w-2xl;
+  }
+  .header-brand-text {
+    @apply text-nav-brand;
+  }
+  /* header-profile-button — 우측 프로필 아이콘. hit-area 40×40. */
+  .header-profile-button {
+    @apply inline-flex items-center justify-center h-hit-area-min w-hit-area-min p-sm bg-surface text-text-strong rounded-pill cursor-pointer border-0 no-underline;
+  }
+  .header-profile-button:hover,
+  .header-profile-button:focus-visible {
+    @apply bg-surface-muted text-text-strong outline-none;
+  }
+
+  /* ---------- Sidebar 글로벌 6 메뉴 (PR3 신규 sub-class) ----------
+   * `.sidebar` shell 은 layout-redesign v4 무회귀 — 본 PR3 도 호출.
+   * sub-class 만 신규: sidebar-brand / sidebar-nav / sidebar-nav-item / -active.
+   * PR3 시점 — legacy sidebar-section-header / sidebar-item / sidebar-empty 는 컴파일에 남아 있으나
+   * 현 layout 에서 mount 0 (PR5 의 워크벤치 재구성 시 정리 예정). */
+  .sidebar-brand {
+    @apply inline-flex items-center gap-sm mb-lg px-sm text-accent-vivid no-underline;
+  }
+  .sidebar-brand-icon {
+    @apply h-2xl w-2xl;
+  }
+  .sidebar-brand-text {
+    @apply text-nav-brand;
+  }
+  .sidebar-nav {
+    @apply flex flex-col gap-xs w-full;
+  }
+  .sidebar-nav-item {
+    @apply flex items-center gap-sm h-button-primary-h px-md bg-surface text-text-strong rounded-sm cursor-pointer no-underline;
+  }
+  .sidebar-nav-item:hover,
+  .sidebar-nav-item:focus-visible {
+    @apply bg-surface-muted text-text-strong outline-none;
+  }
+  .sidebar-nav-item-active {
+    @apply bg-accent-vivid-soft text-accent-vivid;
+  }
+  .sidebar-nav-item-active:hover,
+  .sidebar-nav-item-active:focus-visible {
+    @apply bg-accent-vivid-soft text-accent-vivid;
+  }
+  .sidebar-nav-item-icon {
+    @apply h-xl w-xl shrink-0;
+  }
+  .sidebar-nav-item-label {
+    @apply text-body-sm-strong;
+  }
+
+  /* ---------- BottomNav (모바일 < md) ----------
+   * PRD §5.3 AC-L-3 + DESIGN.md v8 components.bottom-nav / bottom-nav-item-active.
+   * fixed bottom-0 inset-x-0 — useBreakpoint().isMobile 분기로 컴포넌트 측 unmount.
+   * glass 효과 — backdrop-blur + bg-surface/80 + border-t. */
+  .bottom-nav {
+    @apply flex items-stretch justify-around h-navbar-h bg-surface/80 backdrop-blur-md border-t border-border-line;
+  }
+  .bottom-nav-item {
+    @apply flex-1 inline-flex flex-col items-center justify-center gap-[2px] text-text-muted text-caption no-underline cursor-pointer;
+  }
+  .bottom-nav-item:hover,
+  .bottom-nav-item:focus-visible {
+    @apply text-text-strong outline-none;
+  }
+  .bottom-nav-item-active {
+    @apply text-accent-vivid;
+  }
+  .bottom-nav-item-active:hover,
+  .bottom-nav-item-active:focus-visible {
+    @apply text-accent-vivid;
+  }
+  .bottom-nav-item-icon {
+    @apply h-xl w-xl;
+  }
+  .bottom-nav-item-label {
+    @apply text-caption;
+  }
+
   /* ---------- 즐겨찾기 토글 (v5 토큰 키 연결, 시각 동일) ---------- */
   /* 시각 size 32×32, hit area 는 호출 측에서 before:absolute -inset-1 로 40×40 확장. */
   .favorite-toggle {
