@@ -194,3 +194,159 @@ PR #25 본문 확인:
 ```
 
 섹션 존재 + 3 후보 + PM 1순위 추천 명시. **handoff-append.yml workflow 게이트 통과**. `qa-passed` 라벨 부여 가능.
+
+---
+
+## 7. v7 rev2 재검증 (2026-05-23)
+
+### 0. 배경
+
+1차 QA 통과 후 사용자 시각 검토에서 결함 4·5 가 추가 보고됐다 (PR 라벨이 `qa-passed → impl-ready` 로 되돌려짐). v7-rev2 누적 fix 가 들어왔으며 본 절은 그 누적 변경을 재검증한다.
+
+- v7 rev2 변경 축:
+  - **결함 4 fix** — `dropdown-item-h: 34→52`, `dropdown-item-py: 6→10`, `dropdown-item-gap: 2` 신규, `body-sm-strong: 14/700/1.35` 신규, `search-result-item-meta` + `-focus-meta` 합성 토큰 2 신규, SearchPanel 옵션 항목 2줄 마크업.
+  - **결함 5 fix** — `accent-vivid: #1d4ed8` + `accent-vivid-soft: #dbeafe` 신규, `button-primary` 의 `bg-accent-vivid` cascade, `search-result-item-focus` 의 `bg-accent-vivid-soft / text-accent-vivid` cascade. Signature Slate `primary #1f3b4d` 무수정 (옵션 B — 정체성 보존 + 액션 신호 채도 한 단계 도입).
+
+이번 재검증은 토큰 흡수 정합 / 결함 4·5 DOM cascade / 1차 fix 무회귀 / WCAG AA / 공통 무회귀 / 라이브 동기화 6 영역.
+
+### 1. v7 rev2 토큰 흡수 정합
+
+| 항목 | 기대 | 실측 | 판정 |
+|---|---|---|---|
+| `tailwind.theme.json` colors 키 수 | 15 (13 + accent-vivid + accent-vivid-soft) | 15 — `python` 카운트: 15. 키: primary / surface / surface-muted / border-line / text-strong / text-muted / accent-soft / **accent-vivid** / **accent-vivid-soft** / warn / warn-soft / info / info-soft / critical / critical-soft. | OK |
+| `tailwind.theme.json` fontSize/typography 키 수 | 16 (15 + body-sm-strong) | 16 — `tailwind.theme.json:102 "body-sm-strong"` 1행 신규. | OK |
+| `tailwind.theme.json` spacing 키 수 | 23 (22 + dropdown-item-gap, dropdown-item-h 52, dropdown-item-py 10) | 23 — `tailwind.theme.json:194 "dropdown-item-h": "52px"`, `:195 "dropdown-item-py": "10px"`, `:196 "dropdown-item-gap": "2px"`. | OK |
+| DESIGN.md front matter `components` 키 수 | 48 (46 + search-result-item-meta + search-result-item-focus-meta) | 48 — awk 카운트 정상. | OK |
+| `app/components.css` 의 신규 토큰 `@apply` 호출 | bg/text-accent-vivid, bg/text-accent-vivid-soft, gap-dropdown-item-gap, min-h-dropdown-item-h, text-body-sm-strong | `components.css:111 bg-accent-vivid`, `:115 bg-accent-vivid/90`, `:152 gap-dropdown-item-gap min-h-dropdown-item-h ... text-body-sm-strong`, `:158 bg-accent-vivid-soft text-accent-vivid`, `:165 text-accent-vivid`. | OK |
+| `git grep -nE "accent-vivid" tailwind.theme.json app/components.css` 정합 | 토큰 정의 (theme.json) + cascade 호출 (components.css) 양쪽 보유 | theme.json 2건 (`accent-vivid` / `accent-vivid-soft`) + components.css 5건. | OK |
+
+### 2. 결함 4 DOM 검증 (dropdown 옵션 항목 2줄)
+
+| AC | 재현 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|
+| AC-4-1 옵션 항목 height ≥ 50px | components.css `.search-result-item` / `-focus` 의 `min-h-dropdown-item-h` cascade | 52px (theme.json `dropdown-item-h: 52px`) | `components.css:152` 양쪽 selector 가 `min-h-dropdown-item-h` 호출. theme.json 52px 흡수. | OK |
+| AC-4-2 옵션 항목 2줄 마크업 | `SearchPanel.tsx` 옵션 안 라벨 `<span>` + 메타 `<span className=search-result-item-meta>` 두 줄 | 2개 자식 span (라벨 + 메타) | `SearchPanel.tsx:223-237` — `<span>{item.ticker} · {item.name}</span>` (라벨) + `<span className={cn(focused ? "search-result-item-focus-meta" : "search-result-item-meta")}>{...meta...}</span>` (메타). | OK |
+| AC-4-3 옵션 항목 layout = flex-col + gap | `.search-result-item` 합성 토큰의 layout | `flex flex-col justify-center gap-dropdown-item-gap` | `components.css:152` — 정합. | OK |
+| AC-4-4 라벨 typography = body-sm-strong | 합성 토큰 기본 typography 가 14/700/1.35 | text-body-sm-strong | `components.css:152` 끝 `text-body-sm-strong`. theme.json `body-sm-strong: 14px/700` 흡수. | OK |
+| AC-4-5 메타 typography = caption / text-muted | `.search-result-item-meta` 합성 토큰 | text-caption text-text-muted | `components.css:161-163` — `.search-result-item-meta { @apply text-caption text-text-muted; }` 정합. | OK |
+| AC-4-6 focus 메타 cascade | `.search-result-item-focus-meta` 합성 토큰 | text-caption text-accent-vivid | `components.css:164-166` — 정합. SearchPanel 의 `focused` 분기 호출. | OK |
+| AC-4-7 키보드 ARIA / outside-click / focus-index 무회귀 | combobox + listbox + 5속성 ARIA 유지 | role="combobox" + aria-expanded/controls/autocomplete/activedescendant + role="listbox" + useOutsideClick + focusIndex wrap-around 유지 | `SearchPanel.tsx:179-194` 모두 무회귀. PR #22/#24 영역 보존. | OK |
+
+`git grep -nE "search-result-item-meta" components/workbench/SearchPanel.tsx` → 3건 (코멘트 + className 2회). 정합.
+
+### 3. 결함 5 cascade 검증 (accent-vivid)
+
+| AC | 기대 | 실측 | 판정 |
+|---|---|---|---|
+| AC-5-1 `button-primary` accent-vivid cascade | `.button-primary` 가 `bg-accent-vivid` (1차 v7 의 `bg-primary` 에서 교체) | `components.css:111 @apply h-button-primary-h px-md bg-accent-vivid text-surface ...` + `:114-115 hover:bg-accent-vivid/90`. | OK |
+| AC-5-2 `search-result-item-focus` cascade | `bg-accent-vivid-soft text-accent-vivid` | `components.css:157-159 .search-result-item-focus { @apply bg-accent-vivid-soft text-accent-vivid; }` + `:152` 공유 layout. | OK |
+| AC-5-3 Signature Slate 사용처 무회귀 | navbar-brand / sidebar-item-active / favorite-toggle-active / badge-accent / button-secondary / price-bar-target 의 `text-primary` / `bg-primary` 보존 | `components.css:184 .price-bar-target { @apply bg-primary; }`, `:205 navbar-brand text-primary`, `:236 sidebar-item-active text-primary`, `:273 favorite-toggle-active text-primary`, `:49 badge-accent text-primary`, `:123 button-secondary text-primary`. 6 사용처 모두 Slate 보존. | OK |
+| AC-5-4 hex 직타 0건 | `git grep -nE "#1d4ed8\|#dbeafe" -- components/ app/` 결과 본 PR 추가 0건 (tailwind.theme.json + DESIGN.md 안만 허용) | grep 1건 (`app/components.css:108`) — **주석 안 설명용 hex**. cascade 코드에는 hex 직타 0건. PRD `## 검증` 절의 "주석 안 hex 1건은 설명용" 정합. | OK |
+| AC-5-5 colors 외 hex 직타 무회귀 | `git grep -nE "#[0-9a-fA-F]{6}" -- 'app/' 'components/' | grep -v tailwind.theme.json | grep -v '\.md:'` | 결과 1건 (위 주석). 코드 hex 직타 0. | OK |
+
+### 4. 1차 fix 무회귀 검증 (결함 1·2·3)
+
+| 영역 | 기대 | 실측 | 판정 |
+|---|---|---|---|
+| 결함 1 dropdown anchor | SearchPanel 의 inner `relative` wrapper + dropdown `top-full` 보존 | `SearchPanel.tsx:159 <div className="relative">` (input 만 감싸는 inner wrapper) + `:193 className="dropdown-panel absolute top-full left-0 right-0 z-50 mt-xs ..."`. 무회귀. | OK |
+| 결함 2 sidebar 높이 | layout.tsx grid `items-stretch` + `min-h-[calc(100vh-navbar-h)]` + Sidebar.tsx aside 자체 `min-h-[calc(...)]` 보존 | `app/(workbench)/layout.tsx:123` 정합. `Sidebar.tsx:41` 정합. 무회귀. | OK |
+| 결함 3 colors v7 톤 보존 | surface `#ffffff`, surface-muted `#f6f8fa`, border-line `#eceff3`, text-strong `#0f1419`, text-muted `#5b6470` 등 v7 hex 유지 | `tailwind.theme.json:6-19` 13 키 모두 v7 hex 그대로. v7-rev2 가 colors 키 셋에 2건만 add (accent-vivid / accent-vivid-soft) 하고 기존 13 키 무수정. | OK |
+
+### 5. WCAG AA 4.5:1 spot-check
+
+DESIGN.md `### WCAG AA 대비비 표 (v7-rev2 갱신본)` (line 500~) 직접 검증:
+
+| 페어 | 측정값 | AA 마진 | 판정 |
+|---|---|---|---|
+| `text-strong #0f1419` × `surface #ffffff` (본문) | **18.51:1** | +311% | OK |
+| `text-muted #5b6470` × `surface #ffffff` (보조) | **6.00:1** | +33% | OK |
+| `accent-vivid #1d4ed8` × `surface #ffffff` (link / focus ring) | **6.70:1** | +49% | OK |
+| `surface #ffffff` × `accent-vivid #1d4ed8` (button-primary 흰 텍스트 × vivid 배경) | **6.70:1** | +49% | OK |
+| `accent-vivid #1d4ed8` × `accent-vivid-soft #dbeafe` (search-result-item-focus 페어) | **5.49:1** | +22% | OK |
+
+가장 좁은 마진 `accent-vivid × accent-vivid-soft` 5.49:1 — AA `4.5:1` 기준 +22% 안전. DESIGN.md L525 의 blue-700 선정 사유 ("blue-600 #2563eb 는 4.16:1 미달 → blue-700 #1d4ed8 결정") 합치. WCAG AA 무회귀.
+
+### 6. 공통 무회귀
+
+| AC | 명령 / 검증 | 결과 | 판정 |
+|---|---|---|---|
+| typecheck | `npm run typecheck` | 0 에러 | OK |
+| lint | `npm run lint` | 0 에러 | OK |
+| build | `npm run build` | Compiled successfully in 844ms. Static pages 6/6. Route 4건 (`/`, `/_not-found`, `/api/whitelist/search`, `/api/workbench/analyze`) bundle 무회귀 (35.1 kB / 152 kB First Load). | OK |
+| BFF 패턴 | `git grep -nE "fetch\(" app/ components/ hooks/ lib/` | 3건 모두 route handler 안 (`app/api/whitelist/search/route.ts:23`, `app/api/workbench/_adapters/fastapi.ts:4 문구`, `:38`). 컴포넌트/훅/lib 클라이언트 `fetch(` 0건. | OK |
+| 한글 톤 무회귀 | `lib/copy/workbench/*` diff | 본 PR 범위 무관 (PRD §4 카피 변경 0건). diff 0건. | OK |
+| 라운드트립 5건 양 뷰포트 | dev 서버 / BE 미가용 환경에서 정적 + 렌더 HTML 검증. UI 토큰 cascade 변경은 BE 응답 shape 와 무관. | 정적 cascade 검증 OK. BE 환경 한계 명시. | OK (제약 명시) |
+| 컴포넌트 prop 시그니처 무수정 | SearchPanel · Sidebar · layout `Props` 타입 무회귀 | git diff 영역에 Props 타입 변경 0건. | OK |
+| 신규 라이브러리 도입 0건 | `git diff main..feature/design-tone-refinement -- package.json` | `dependencies` / `devDependencies` 변경 0건. `scripts.design:sync` 의 source 1줄 (v6 → v7) 만 변경. | OK |
+| 모바일 drawer 동작 무회귀 | `components/layout/MobileDrawer.tsx` + `Sidebar.tsx` 의 `hidden lg:flex` + layout.tsx 의 `useBreakpoint` 분기 보존 | `MobileDrawer.tsx` 무수정. `Sidebar.tsx:5` 모바일 차단 docblock 유지. `layout.tsx:69-80` useBreakpoint + drawer 자동 닫힘 유지. | OK |
+| ARIA 5속성 풀 셋 | role=combobox / aria-expanded / aria-controls / aria-autocomplete / aria-activedescendant + role=listbox | `SearchPanel.tsx:179-194` 5속성 풀 셋 + listbox 모두 보존. | OK |
+| portal 미사용 | `git grep -nE "createPortal\|ReactDOM\.createPortal" components/workbench/SearchPanel.tsx` | 0건 — 옵션 A 정합. | OK |
+
+### 7. DESIGN.md v7 rev2 라이브 동기화 (결정적 무회귀)
+
+`accent-vivid` hex 임시 변경 → `design:sync` → 빌드 → 복원 라운드트립.
+
+```
+$ cp tailwind.theme.json /tmp/theme.before.json
+$ cp docs/design/design-tone-refinement.md /tmp/design.before.md
+$ sed -i.bak 's/accent-vivid: "#1d4ed8"/accent-vivid: "#ff0000"/' docs/design/design-tone-refinement.md
+$ grep 'accent-vivid:' docs/design/design-tone-refinement.md
+  accent-vivid: "#ff0000"                  ← 변경 반영 (front matter)
+$ npm run design:sync
+design:sync — screens 주입 완료 (sm=640px, md=768px, lg=1024px, xl=1280px).
+$ grep '"accent-vivid":' tailwind.theme.json
+        "accent-vivid": "#ff0000",         ← theme.json 흡수 OK
+$ npm run build
+✓ Compiled successfully in 844ms
+✓ Generating static pages (6/6)
+$ cp /tmp/design.before.md docs/design/design-tone-refinement.md
+$ rm -f docs/design/design-tone-refinement.md.bak
+$ npm run design:sync
+design:sync — screens 주입 완료 (sm=640px, md=768px, lg=1024px, xl=1280px).
+$ grep '"accent-vivid":' tailwind.theme.json
+        "accent-vivid": "#1d4ed8",         ← 복원 OK
+$ diff -q /tmp/theme.before.json tailwind.theme.json
+$ echo "THEME RESTORED"
+THEME RESTORED
+$ git status
+nothing to commit, working tree clean        ← 워킹트리 깨끗
+```
+
+**라이브 동기화 OK + 빌드 OK + 복원 OK + 멱등 OK + git status 깨끗**. DESIGN.md → tailwind.theme.json → cascade 가 결정적으로 동작.
+
+### 8. v7 rev2 AC 재검증 표
+
+| AC 절 | 항목 | 통과 | 비고 |
+|---|---|---|---|
+| 5.1 결함 1 dropdown anchor | 7/7 | OK | 1차 무회귀 |
+| 5.2 결함 2 sidebar 높이 | 5/5 | OK | 1차 무회귀 |
+| 5.3 결함 3 colors v7 톤 | 9/9 | OK | 1차 무회귀 |
+| **5.4 결함 4 dropdown 옵션 2줄** | 7/7 | OK | **v7 rev2 신규 — 통과** |
+| **5.5 결함 5 accent-vivid 비비드** | 9/9 | OK | **v7 rev2 신규 — 통과** |
+| 5.6 cascade | 4/4 | OK | hex 직타 0건 |
+| 5.7 공통 (typecheck/lint/build/BFF/카피/라이브러리/prop) | 9/9 | OK | 무회귀 |
+| 토큰 흡수 (colors 15 / typography 16 / spacing 23 / components 48) | 4/4 | OK | v7 rev2 신규 |
+| WCAG AA spot-check (5쌍) | 5/5 | OK | 최저 5.49:1 |
+| 라이브 동기화 라운드트립 | 1/1 | OK | 멱등 |
+
+**v7 rev2 누적 AC 60/60 통과. 실패 0건.**
+
+### 9. 에지 케이스 (v7 rev2 신규)
+
+| # | 에지 케이스 | 평가 | 판정 |
+|---|---|---|---|
+| E9 | `dropdown-item-h: 52` 가 키보드 ↑↓ 시각 점프 폭이 너무 커 사용자 혼란 | `search-result-item-focus` 가 `accent-vivid-soft + accent-vivid` 페어로 확실한 focus 강조. 점프 시각이 클수록 오히려 활성 옵션 위치 인지 쉬움. PRD §8.2 위험 평가 일치 — focus 시각 강조로 보완. | OK |
+| E10 | `accent-vivid` 가 navbar wordmark / sidebar-item-active 등 Signature 영역에 누수 | `components.css` 의 6 Signature 영역 (`navbar-brand` / `sidebar-item-active` / `favorite-toggle-active` / `badge-accent` / `button-secondary` / `price-bar-target`) 모두 `text-primary` / `bg-primary` 유지. accent-vivid 호출은 `button-primary` / `button-primary-disabled` (헤더 docblock에 명시) / `search-result-item-focus` / `search-result-item-focus-meta` 4건 한정. | OK |
+| E11 | `body-sm-strong` 토큰이 다른 컴포넌트로 누수 | `git grep -nE "text-body-sm-strong" -- app/ components/` 결과 `components.css:152` 1건 (.search-result-item / -focus 공유 정의). 호출처 한정. | OK |
+| E12 | dropdown 의 hover 가 focus 와 같은 인덱스로 묶여 옵션 클릭 시 잘못된 선택 | `SearchPanel.tsx:213 onMouseEnter={() => setFocusIndex(index)}` + `:214-219 onMouseDown` 가 `e.preventDefault()` 후 `handleSelect(item)` (item 자체 인자) — 인덱스 race 없음. | OK |
+| E13 | `accent-vivid-soft #dbeafe` 가 카드 surface 와 혼동 | surface `#ffffff` 대비 accent-vivid-soft `#dbeafe` 는 청색 채도 명확. dropdown focus 외 영역에 cascade 없음 (호출처 2건 한정). | OK |
+| E14 | 라이브 동기화 시 `accent-vivid` 키만 흡수되고 cascade 무참여 | sed test 결과 theme.json 즉시 반영 + 빌드 통과 + 복원 멱등. cascade 실 동작 확인. | OK |
+
+### 10. 최종 판정 — v7 rev2
+
+- **v7 rev2 누적 AC**: 60/60 통과
+- **실패**: 0건
+- **PR 본문 `## 다음 작업` 게이트**: PR #25 body 안 `## 다음 작업` 1행 매칭 — handoff-append.yml 게이트 통과.
+- **판정**: **qa-passed**
+
+라벨 액션: `gh pr edit 25 --add-label qa-passed --remove-label impl-ready`.
