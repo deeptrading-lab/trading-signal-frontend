@@ -71,8 +71,9 @@ export function PortfolioHero({ portfolio }: PortfolioHeroProps) {
 
       <div className="relative z-10">
         {/* 라벨 — Bright Blue hero 안 무채색 라벨 (white/60). Tailwind opacity utility — text-white 와
-         *  동일 cascade. 합성 토큰 신설 대신 inline 으로 — 본 hero 1개소만 사용. */}
-        <p className="mb-sm text-body-sm text-white/60">
+         *  동일 cascade. 합성 토큰 신설 대신 inline 으로 — 본 hero 1개소만 사용.
+         *  white/60 → white/80: Bright Blue hero 위 가독성 보강 (사용자 dev 실측 2026-05-24). */}
+        <p className="mb-sm text-body-sm text-white/80">
           {PORTFOLIO_TOTAL_VALUE}
         </p>
         <div className="mb-2xl flex items-end gap-md">
@@ -104,7 +105,7 @@ export function PortfolioHero({ portfolio }: PortfolioHeroProps) {
           <RatioStat
             label={PORTFOLIO_STOCK_RATIO}
             pct={portfolio.stockPct}
-            barClass="bg-white/40"
+            barClass="bg-white/70"
           />
           <RatioStat
             label={PORTFOLIO_CRYPTO_RATIO}
@@ -128,7 +129,7 @@ function Stat({
 }) {
   return (
     <div>
-      <p className="mb-xs text-caption text-white/60">{label}</p>
+      <p className="mb-xs text-caption text-white/80">{label}</p>
       <p
         className={cn(
           "text-body-strong tabular-nums",
@@ -154,9 +155,9 @@ function RatioStat({
   // 토큰 룰 정합. style 안 동적 계산은 컨벤션 §4 의 예외로 허용).
   return (
     <div>
-      <p className="mb-xs text-caption text-white/60">{label}</p>
+      <p className="mb-xs text-caption text-white/80">{label}</p>
       <div className="flex items-center gap-sm">
-        <div className="h-[8px] w-full overflow-hidden rounded-pill bg-white/10">
+        <div className="h-[8px] w-full overflow-hidden rounded-pill bg-white/20">
           <div
             className={cn("h-full", barClass)}
             style={{ width: `${pct}%` }}
