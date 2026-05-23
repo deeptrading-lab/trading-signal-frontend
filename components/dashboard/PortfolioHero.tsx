@@ -5,10 +5,12 @@
  *
  * 시안 `Stock and Coin Analysis App/src/app/components/Dashboard.tsx` L8~L52 정합.
  *   - **그라데이션** — 다크 네이비 (`from-slate-900 to-slate-800`) 는 다크모드 도입 시 재활용.
- *     라이트 모드 hero 는 **Bright Blue 단톤 (`from-blue-700 to-blue-400`)** 으로 FinSight 활기·
- *     금융 정체성 정합. 사용자 dev 실측 후 선택 2026-05-24. Tailwind 기본 palette 명명 (hex 직타 0).
+ *     라이트 모드 hero 는 **Purple/Indigo 단톤 (`from-indigo-700 to-purple-600`)** — 한국식
+ *     signal-up (red) 과의 보색 관계로 신호 색 가독성 보강 + 시안 blob purple 영감.
+ *     사용자 dev 실측 후 재선택 2026-05-24 (직전 Bright Blue 는 red 와 색 충돌).
+ *     Tailwind 기본 palette 명명 (hex 직타 0).
  *   - 데코 blob — 시안 `animate-blob` 미도입. 정적 blob (animation 없이 색 blur).
- *     Bright Blue hero 위에서 같은 blue blob 은 묻혀버리므로 **보색 (`bg-purple-400` + `bg-cyan-400`)**
+ *     Purple/Indigo hero 위에서 같은 보라 blob 은 묻혀버리므로 **보색 (`bg-pink-400` + `bg-cyan-400`)**
  *     로 시각 흥미 확보. Tailwind 기본 palette (hex 직타 0).
  *   - 시안의 `text-emerald-400` (변동률 상승) → **한국식 cascade 적용**: `text-signal-up` (red).
  *     `text-emerald-400` (평가손익 양수) → `text-signal-up`.
@@ -46,24 +48,24 @@ export interface PortfolioHeroProps {
 
 export function PortfolioHero({ portfolio }: PortfolioHeroProps) {
   const isUp = portfolio.profitPct >= 0;
-  // 한국식 — 상승 = 빨강, 하락 = 파랑. hero scope 한정으로 밝은 톤 적용:
-  // - signal-up (red-500 #ef4444) on blue-700~400 배경 = 대비비 1.4~2.5:1 (AA 미흡) → red-300 (#fca5a5) 으로 4.5+ 보강
-  // - signal-down (blue-500) on blue 그라데이션 = 자기 색과 묻힘 → blue-200 (#bfdbfe) 으로 분리
-  // Tailwind 기본 palette 활용 (hex 직타 0). 사용자 dev 실측 후 적용 2026-05-24.
-  const signalColor = isUp ? "text-red-300" : "text-blue-200";
+  // 한국식 — 상승 = 빨강 (signal-up), 하락 = 파랑 (signal-down).
+  // Purple/Indigo 배경 (보색 관계) 위에서 red-500 / blue-500 대비 자연 — v8 토큰 그대로.
+  const signalColor = isUp ? "text-signal-up" : "text-signal-down";
   const SignalIcon = isUp ? ArrowUpRight : ArrowDownRight;
 
   return (
     <section
-      // Bright Blue 단톤 그라데이션 (사용자 dev 실측 후 선택 2026-05-24).
-      // 다크 네이비 (slate-900/-800) 는 다크모드 도입 시 재활용. rounded-xl (24px) + hero padding 토큰.
-      className="relative overflow-hidden rounded-xl p-hero-px bg-gradient-to-br from-blue-700 to-blue-400 text-white"
+      // Purple/Indigo 단톤 그라데이션 (사용자 dev 실측 후 재선택 2026-05-24).
+      // 다크 네이비 (slate-900/-800) 는 다크모드 도입 시 재활용. 직전 Bright Blue (blue-700→blue-400) 는
+      // 한국식 signal-up (red) 과 색 충돌 (대비비 1.4~2.5) — 보색 관계인 indigo/purple 로 교체.
+      // rounded-xl (24px) + hero padding 토큰. Tailwind 기본 palette (hex 직타 0).
+      className="relative overflow-hidden rounded-xl p-hero-px bg-gradient-to-br from-indigo-700 to-purple-600 text-white"
       aria-label={PORTFOLIO_TOTAL_VALUE}
     >
-      {/* 정적 blob 데코 — Bright Blue hero 위에서 같은 blue 토큰은 묻혀버리므로 보색 (purple/cyan) 사용.
+      {/* 정적 blob 데코 — Purple/Indigo hero 위에서 같은 보라 토큰은 묻혀버리므로 보색 (pink/cyan) 사용.
        *  Tailwind 기본 palette 명명 (hex 직타 0). text-white 가독성 무영향 (mix-blend-multiply + blur-3xl). */}
       <div
-        className="absolute top-0 right-0 h-64 w-64 rounded-pill bg-purple-400 opacity-20 mix-blend-multiply blur-3xl"
+        className="absolute top-0 right-0 h-64 w-64 rounded-pill bg-pink-400 opacity-20 mix-blend-multiply blur-3xl"
         aria-hidden="true"
       />
       <div
