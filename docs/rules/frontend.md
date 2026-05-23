@@ -23,11 +23,12 @@
 
 ## 폴더 구조 — 도메인 한 뎁스
 
-- `hooks/`, `lib/copy/`, `lib/types/`, `lib/validation/` 의 직속 파일은 두지 않는다. 모든 모듈은 도메인 폴더 (`workbench/` 등) 안에 둔다.
+- `hooks/`, `lib/copy/`, `lib/types/`, `lib/mock/`, `lib/validation/` 의 직속 파일은 두지 않는다. 모든 모듈은 도메인 폴더 (`workbench/`, `layout/`, `dashboard/`, `home/`, `market/`, `watchlist/`, `profile/` 등) 안에 둔다.
 - `lib/api/` 는 인프라성 단일 파일 (`client.ts`, `errors.ts`) 만 직속 허용. 도메인 API 모듈은 `lib/api/<domain>/` 안에 둔다.
 - 도메인 무관 헬퍼는 `lib/utils/` 직속에 둔다 (`cn.ts`, `formatMoney.ts`, `formatPct.ts`). `lib/utils/` 안에 헬퍼가 10개 이상 누적되면 카테고리화 검토.
-- 도메인 폴더명은 **비즈니스 도메인 단위**로 통일한다 (예: `workbench/`, 후속 `portfolio/`, `alerts/`). 한 화면이 여러 도메인을 호출하더라도 폴더는 비즈니스 단위 그대로.
-- `lib/api/workbench/index.ts` 같은 barrel re-export 는 두지 않는다. 직접 경로 (`@/lib/api/workbench/analyze`) 로 import. 이유: import 경로의 명확성·tree-shaking·grep 신뢰도.
+- 도메인 폴더명은 **비즈니스 도메인 단위**로 통일한다 (예: `workbench/`, `dashboard/`, `home/`, `market/`, `watchlist/`, `profile/`). 한 화면이 여러 도메인을 호출하더라도 폴더는 비즈니스 단위 그대로. 글로벌 셸 카피처럼 모든 라우트가 공유하는 경우는 `layout/` 도메인 폴더에 둔다.
+- `lib/api/workbench/index.ts` 같은 barrel re-export 는 두지 않는다. 직접 경로 (`@/lib/api/workbench/analyze`, `@/lib/mock/dashboard/portfolio`) 로 import. 이유: import 경로의 명확성·tree-shaking·grep 신뢰도.
+- **mock 데이터 위치 = `lib/mock/<domain>/<file>.ts`** — 의미 단위 분할 (예: `lib/mock/dashboard/portfolio.ts`, `holdings.ts`, `fearGreed.ts`). barrel 미사용. mock 안 사용자 노출 한글 카피 0건 — 카피는 `lib/copy/<domain>/` 로 분리하고 mock 은 카피 키 (`labelKey`, `bodyKey` 등) 로 참조한다. 자산 이름·ticker·뉴스 본문 같은 식별자·데이터 단위는 mock 의 데이터로 보존.
 
 ## `cn` 헬퍼
 
@@ -44,6 +45,7 @@
 ## `lib/copy/` 유지 이유
 
 - `lib/copy/` 는 향후 i18n 도입 여지로 의도적으로 유지한다. 사용자 노출 한글 카피는 `lib/copy/<domain>/` 에 모은다. `lib/utils/` 와 합치지 않는다.
+- 도메인 폴더는 라우트 / 비즈니스 단위 — 워크벤치 (`lib/copy/workbench/`), 글로벌 셸 (`lib/copy/layout/`), 5 finsight 도메인 (`lib/copy/dashboard/`, `home/`, `market/`, `watchlist/`, `profile/`). mock 데이터 도메인 폴더 (`lib/mock/<domain>/`) 와 1:1 매칭. mock 의 카피 키 (`labelKey`, `bodyKey`, `summaryKey`, `displayKey` 등) 는 동일 도메인의 `lib/copy/<domain>/*.ts` 상수 이름과 1:1 매칭.
 
 ## TanStack Query key 명명
 
