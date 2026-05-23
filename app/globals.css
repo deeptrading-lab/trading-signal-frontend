@@ -1,16 +1,21 @@
 /**
- * 전역 스타일 — Tailwind 디렉티브 + preflight 가 흡수하지 못하는 잔여물에 한정.
+ * 전역 스타일 — Tailwind v4 import + preflight 가 흡수하지 못하는 잔여물에 한정.
  *
  * 합성 토큰 (`.card`, `.badge-*`, `.btn-*` 등) 은 `@layer components` 로 묶여
  * 별도 파일 `./components.css` 에 거주. (PRD AC-2 의 100 라인 제약은 본 파일에만 적용.)
+ *
+ * v4 마이그레이션 (PRD finsight-redesign §3.2):
+ *   - v3 의 `@tailwind base; @tailwind components; @tailwind utilities;` 3 디렉티브 → v4 의 단일 `@import "tailwindcss";`.
+ *   - `@config "../tailwind.config.ts";` 디렉티브로 JS 어댑터 다리 강제.
+ *     DESIGN.md → `tailwind.theme.json` → `tailwind.config.ts` 의 `adaptDesignTokens()` 어댑터가
+ *     v4 위에서도 단일 진실 원천 유지 (PRD §6.2 제약 + §9 q10 RESOLVED 옵션 A).
  *
  * 디자인 토큰은 `tailwind.config.ts` 가 `tailwind.theme.json` 을 import 하여
  * theme.extend 에 주입한다. 본 파일에 hex/px 직타·`:root --` 변수 정의는 두지 않는다.
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.ts";
 
 /* 합성 토큰 컴포넌트 클래스 (`@layer components` + `@apply`) 는 별도 파일에 거주.
  * layout.tsx 에서 본 파일 다음으로 import 한다. */

@@ -20,10 +20,13 @@
  *     button-secondary / button-icon 합성 토큰 신설.
  */
 
-/* Next.js 의 PostCSS 는 각 CSS 파일을 별도 입력으로 처리하므로, 본 파일에서
- * `@layer components` 를 쓰기 위해 `@tailwind components` directive 를 한 번 더 둔다.
- * Tailwind 가 중복 출력을 피하므로 빌드 결과에는 한 번만 들어간다. */
-@tailwind components;
+/* Tailwind v4 (PRD finsight-redesign §3.2):
+ * Next.js 의 CSS 로더는 각 CSS 파일을 별도 입력으로 처리하므로, 본 파일에서 `@apply`
+ * 호출이 globals.css 의 theme 을 참조하지 못한다. v4 의 `@reference` 디렉티브로
+ * tailwind core + JS config 어댑터를 import 하되 CSS 출력은 생성하지 않는다.
+ *   <https://tailwindcss.com/docs/functions-and-directives#reference-directive>
+ * v3 시절의 `@tailwind components;` 디렉티브는 v4 에서 폐기 — `@reference` 가 대체. */
+@reference "./globals.css";
 
 @layer components {
   /* ---------- 카드 베이스 ---------- */
@@ -41,21 +44,26 @@
     @apply bg-critical-soft text-critical border border-critical-soft rounded-sm p-[12px];
   }
 
-  /* ---------- 배지 ---------- */
-  .badge-base {
+  /* ---------- 배지 ----------
+   * v4: `@apply` 는 utilities 만 적용 가능. v3 의 `.badge-base` 합성 후 `@apply badge-base ...`
+   * 패턴은 v4 에서 비호환 → 각 variant 가 베이스 utility 셋을 직접 흡수. */
+  .badge-accent,
+  .badge-warn,
+  .badge-info,
+  .badge-critical {
     @apply inline-flex items-center h-[28px] px-[10px] rounded-pill text-badge whitespace-nowrap;
   }
   .badge-accent {
-    @apply badge-base bg-accent-soft text-primary;
+    @apply bg-accent-soft text-primary;
   }
   .badge-warn {
-    @apply badge-base bg-warn-soft text-warn;
+    @apply bg-warn-soft text-warn;
   }
   .badge-info {
-    @apply badge-base bg-info-soft text-info;
+    @apply bg-info-soft text-info;
   }
   .badge-critical {
-    @apply badge-base bg-critical-soft text-critical;
+    @apply bg-critical-soft text-critical;
   }
 
   /* ---------- 입력 (v5 컴팩트화) ---------- */
@@ -75,15 +83,13 @@
     font-family: inherit;
   }
   .input:focus {
-    @apply outline-none border-primary;
-    box-shadow: 0 0 0 3px theme("colors.accent-soft");
+    @apply outline-none border-primary shadow-[0_0_0_3px_theme(colors.accent-soft)];
   }
   .input-error {
     @apply bg-critical-soft text-critical border-critical;
   }
   .input-error:focus {
-    @apply outline-none border-critical;
-    box-shadow: 0 0 0 3px theme("colors.critical-soft");
+    @apply outline-none border-critical shadow-[0_0_0_3px_theme(colors.critical-soft)];
   }
 
   /* ---------- 입력 보조 (v5 신설) ---------- */
