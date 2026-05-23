@@ -15,7 +15,7 @@
     "axios": "^1.16.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
-    "next": "^15.5.18",
+    "next": "^16.2.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
@@ -28,7 +28,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.17.0",
-    "eslint-config-next": "^15.5.18",
+    "eslint-config-next": "^16.2.6",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.7.0"
