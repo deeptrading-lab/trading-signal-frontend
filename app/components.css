@@ -3,9 +3,10 @@
  *
  * 원칙
  *   - DESIGN.md `components` 절의 합성 토큰 이름 (`card`, `card-elevated`, `card-warn`,
- *     `card-critical`, `badge-accent`/`badge-warn`/`badge-info`/`badge-critical`,
+ *     `card-critical`, `card-info`, `card-hero`, `card-ai`,
+ *     `badge-accent`/`badge-warn`/`badge-info`/`badge-critical`/`badge-signal-up`/`badge-signal-down`/`badge-asset-stock`/`badge-asset-coin`,
  *     `button-primary`, `input`/`input-error`, `search-result-item(-focus)`,
- *     `price-bar-*`) 은 컴포넌트 코드에서 그대로 className 으로 참조한다.
+ *     `price-bar-*`, `signal-up-text`/`signal-down-text`, `ai-heading`) 은 컴포넌트 코드에서 그대로 className 으로 참조.
  *   - 토큰 갱신·다크 모드 도입 시 변경 면적을 최소화 (AC-7 PM 권고 (b)).
  *   - 비-합성·일회성 레이아웃 (예: `.mobileShell`, `.topBar`, `.inputPanel`, `.searchPanel`,
  *     `.resultGroup`) 은 컴포넌트 코드의 Tailwind 유틸리티 조합으로 처리하므로 본 파일에 없다.
@@ -18,6 +19,11 @@
  *   - v5 (component-compactness): input/search-result-item/button-primary/sidebar-item size 다운,
  *     input-label / input-helper / input-helper-error / input-suffix / dropdown-panel /
  *     button-secondary / button-icon 합성 토큰 신설.
+ *   - v8 (finsight-redesign): 한국식 등락 의미 토큰 (`signal-up` red / `signal-down` blue + soft 페어)
+ *     + 자산 식별 토큰 (`asset-stock` blue / `asset-coin` orange + soft 페어)
+ *     + AI 그라데이션 (`gradient-ai-from` → `gradient-ai-to`) + 카드 셸 lg/xl 라운드
+ *     + 카드 padding (`card-px`/`card-py`/`hero-px`/`hero-py`) + Pretendard 폰트 흡수.
+ *     hex/px 직타 0건 — 카드/배지 모두 spacing·rounded 토큰만 사용.
  */
 
 /* Tailwind v4 (PRD finsight-redesign §3.2):
@@ -29,19 +35,40 @@
 @reference "./globals.css";
 
 @layer components {
-  /* ---------- 카드 베이스 ---------- */
+  /* ---------- 카드 베이스 (v8 lg 라운드 + card padding 토큰) ----------
+   * v8 cascade — DESIGN.md `components.card*` 토큰 정합:
+   *   - card / card-elevated / card-warn / card-info: rounded-lg (16px) + card-px-mobile (16px) padding
+   *   - card-hero / card-ai: rounded-xl (24px) + hero-px (24px) padding
+   *   - card-critical: rounded-lg + card-px-mobile (16px) padding 유지
+   * 모바일 기본 = card-px-mobile, lg 이상 = card-px (20px) 로 옵션 cascade.
+   * hex/px 직타 0건 — Tailwind 토큰만. */
   .card {
-    @apply bg-surface text-text-strong border border-border-line rounded-sm p-[16px];
+    @apply bg-surface text-text-strong border border-border-line rounded-lg p-card-px-mobile lg:p-card-px;
   }
   .card-elevated {
-    @apply bg-surface text-text-strong border border-border-line rounded-sm p-[20px];
+    @apply bg-surface text-text-strong border border-border-line rounded-lg p-card-px-mobile lg:p-card-px;
     box-shadow: 0 10px 28px rgba(23, 32, 42, 0.08);
   }
   .card-warn {
-    @apply bg-warn-soft text-warn border border-warn-soft rounded-sm p-[16px];
+    @apply bg-warn-soft text-warn border border-warn-soft rounded-lg p-card-px-mobile lg:p-card-px;
   }
   .card-critical {
-    @apply bg-critical-soft text-critical border border-critical-soft rounded-sm p-[12px];
+    @apply bg-critical-soft text-critical border border-critical-soft rounded-lg p-card-px-mobile;
+  }
+  .card-info {
+    @apply bg-info-soft text-info border border-info-soft rounded-lg p-card-px-mobile;
+  }
+  /* v8 신규 — hero 카드 (xl 라운드 + hero padding) */
+  .card-hero {
+    @apply bg-surface text-text-strong border border-border-line rounded-xl p-hero-px;
+  }
+  /* v8 신규 — AI 영역 (그라데이션 cascade — bg 는 호출 측에서 추가 또는 본 클래스의 soft 흡수). */
+  .card-ai {
+    @apply bg-gradient-ai-soft text-gradient-ai-from border border-gradient-ai-soft rounded-xl p-hero-px;
+  }
+  /* v8 신규 — 풀 그라데이션 hero (gradient-ai-from → gradient-ai-to). */
+  .gradient-ai-bg {
+    @apply bg-gradient-to-br from-gradient-ai-from to-gradient-ai-to text-surface;
   }
 
   /* ---------- 배지 ----------
@@ -50,8 +77,12 @@
   .badge-accent,
   .badge-warn,
   .badge-info,
-  .badge-critical {
-    @apply inline-flex items-center h-[28px] px-[10px] rounded-pill text-badge whitespace-nowrap;
+  .badge-critical,
+  .badge-signal-up,
+  .badge-signal-down,
+  .badge-asset-stock,
+  .badge-asset-coin {
+    @apply inline-flex items-center h-[28px] px-md rounded-pill text-badge whitespace-nowrap;
   }
   .badge-accent {
     @apply bg-accent-soft text-primary;
@@ -64,6 +95,32 @@
   }
   .badge-critical {
     @apply bg-critical-soft text-critical;
+  }
+  /* v8 신규 — 한국식 등락 의미 (상승=빨강, 하락=파랑). */
+  .badge-signal-up {
+    @apply bg-signal-up-soft text-signal-up;
+  }
+  .badge-signal-down {
+    @apply bg-signal-down-soft text-signal-down;
+  }
+  /* v8 신규 — 자산 식별 (주식=blue, 코인=orange). */
+  .badge-asset-stock {
+    @apply bg-asset-stock-soft text-asset-stock;
+  }
+  .badge-asset-coin {
+    @apply bg-asset-coin-soft text-asset-coin;
+  }
+  /* v8 신규 — 등락 수치 텍스트 (mono-numeric 폰트로 자릿수 정렬).
+   * tabular-nums (font-variant-numeric) 는 Tailwind utility `tabular-nums` 로 적용. */
+  .signal-up-text {
+    @apply text-signal-up text-mono-numeric tabular-nums;
+  }
+  .signal-down-text {
+    @apply text-signal-down text-mono-numeric tabular-nums;
+  }
+  /* v8 신규 — AI 헤더 (gradient-ai-soft 배경 + gradient-ai-to 텍스트). */
+  .ai-heading {
+    @apply bg-gradient-ai-soft text-gradient-ai-to text-h1 rounded-lg p-md;
   }
 
   /* ---------- 입력 (v5 컴팩트화) ---------- */
