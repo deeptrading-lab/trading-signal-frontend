@@ -1580,3 +1580,44 @@
   - QA 에이전트 — 라운드트립 5건 양 뷰포트 (1280·1920) 시각 회귀 검증 (특히 A2 의 1자 단위 필드 우측 padding 36px), 키보드 + VoiceOver 시뮬레이션 1건, claude CLI mock 6블록 누락 케이스 6개 + position 잘못된 shape 1개 한글 메시지 매핑 검증.
   - 사용자 검증 후 PRD `claude-api-analysis` 진입 (사용자 명시 의도 — PR #23 PRD 1.2 의 후속).
   - 또는 PRD `analyze-streaming` (단일 → streaming UX 개선) — 사용자 결정.
+
+### 2026-05-23 — chore(tailwind): v4 migration (PR1/9 finsight-redesign) (#26)
+
+- **slug**: `finsight-redesign` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/26
+- **요약**: chore(tailwind): v4 migration (PR1/9 finsight-redesign)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > PRD `finsight-redesign` 시리즈 **PR1/9** — Phase 1 Tailwind v4 마이그레이션.
+  > 
+  > - `tailwindcss` `^3.4.19` → `^4.3.0` (v4 stable).
+  > - `@tailwindcss/postcss` ^4.3.0 신규 (devDependency). `autoprefixer` 제거 (v4 의 LightningCSS 가 vendor prefix 흡수).
+  > - `postcss.config.mjs` 가 `@tailwindcss/postcss` 단일 플러그인 호출.
+  > - `app/globals.css` — v3 `@tailwind base; @tailwind components; @tailwind utilities;` 3 디렉티브 → v4 `@import "tailwindcss";` 단일 + `@config "../tailwind.config.ts";` 디렉티브 (JS 어댑터 다리 강제, PRD §6.2 + §9 q10 옵션 A).
+  > - `app/components.css` — `@tailwind components;` 디렉티브 → `@reference "./globals.css";` (Next.js CSS 로더 파일별 처리에서 token scope 공유). v4 `@apply` 제약 (utilities 만 허용) 흡수: `badge-base` 합성 → 각 variant 가 base utility 셋 직접, `theme("colors.accent-soft")` 박혀 있던 box-shadow → `shadow-[0_0_0_3px_theme(colors.accent-soft)]` 임의값 utility.
+  > - `eslint.config.mjs` / `tsconfig.json` — `Stock and Coin Analysis App/` 폴더 제외 (Figma export, PRD §9 q8 옵션 B — PR9 후 별도 cleanup PR 로 제거).
+  > - DESIGN.md → `tailwind.theme.json` 어댑터 (`adaptDesignTokens` + `adaptFontSize` + `inject-breakpoints.mjs`) 무회귀. v8 토큰 cascade 의 base.
+  > 
+  > 본 PR1 은 시각 톤 변경 0 — v7 rev2 토큰 셋이 v4 위에서 그대로 cascade. PR2 가 DESIGN.md v8 + Pretendard + 한국식 등락 토큰 등 본격 디자인 변경 진입.
+  > 
+  > ## Test plan
+  > 
+  > ### AC-V4-1~8 (PRD §5.1)
+  > 
+  > - [x] **AC-V4-1**: `npm ls tailwindcss` → `tailwindcss@4.3.0`.
+  > - [x] **AC-V4-2**: `npm ls @tailwindcss/postcss` → `@tailwindcss/postcss@4.3.0` (1건).
+  > - [x] **AC-V4-3**: `app/globals.css` 첫 디렉티브 `@import "tailwindcss";`. `@tailwind base/components/utilities` 디렉티브 0건. (`grep -nE '^@tailwind ' app/globals.css app/components.css` → 0건)
+  > - [x] **AC-V4-4**: `postcss.config.mjs` 가 `@tailwindcss/postcss` 단일 플러그인. `tailwindcss` 직접 호출 0건.
+  > - [x] **AC-V4-5**: `tailwind.config.ts` 의 `theme.extend` 패턴 + `tailwind.theme.json` import 무회귀 (본 PR 무수정).
+  > - [x] **AC-V4-6**: `@config "../tailwind.config.ts"` 디렉티브가 `app/globals.css` line 18 에 존재.
+  > - [x] **AC-V4-7**: `npm run build` 0 에러. `.next/` 산출물 정상 (`/`, `/api/whitelist/search`, `/api/workbench/analyze`).
+  > - [x] **AC-V4-8**: 현 `/` 화면 시각 회귀 0 — 컴파일 CSS 의 `bg-surface { background-color: #ffffff }`, `bg-surface-muted { background-color: #f6f8fa }` 등 v7 rev2 토큰 그대로 cascade. theme(spacing.navbar-h) 임의값도 60px 로 해석.
+  > 
+  > ### AC-COMMON (PRD §5.7)
+  > 
+  > - [x] **AC-COMMON-1**: `npm run typecheck` 0 에러.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR2** `feat(design): v8 토큰 + finsight 톤 적용` — DESIGN.md v8 source 를 `package.json` `design:sync` + `scripts/inject-breakpoints.mjs` `DESIGN_PATH` 에 연결 + `npm run design:sync` 재생성 + `tailwind.config.ts` 의 `TYPOGRAPHY_EXTRAS` 에 `font-display` 1줄 추가 + Pretendard `next/font/local` self-host (PRD §9 q6 옵션 B) + `app/components.css` 의 신규 합성 토큰 (`badge-signal-up/down`, `badge-asset-stock/coin`, `card-ai`, `ai-heading` 등) cascade.
+  - **시안 폴더 cleanup** — PR9 머지 후 별도 `chore: remove figma make export after finsight-redesign` PR (PRD §9 q8 RESOLVED 옵션 B).
