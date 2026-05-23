@@ -48,7 +48,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" className={pretendard.variable}>
+    // suppressHydrationWarning — 일부 브라우저 확장 (예: WebClipper "webcrx") 이
+    // 클라이언트에서 <html> 에 추가 속성을 주입하여 SSR/CSR mismatch 가 발생.
+    // 외부 요인이므로 본 한 레벨에서만 경고 억제 (자식 트리에는 미전파).
+    <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
       </body>

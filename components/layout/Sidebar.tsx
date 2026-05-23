@@ -8,7 +8,8 @@
  *   - v8 (PR3): 글로벌 셸 6 메뉴 항목 — 모든 라우트가 공유. 워크벤치 한정 history / favorites
  *     는 PR5 의 워크벤치 재구성 시점에 별도 우측 패널 또는 페이지 내부로 흡수.
  *
- * 위치: Header 아래 좌측 sticky, 너비 `spacing.sidebar-w` (264px), 세로 `100vh - navbar-h`.
+ * 위치 (PR6 fix): viewport 좌측 전체 높이 (Header 옆이 아닌, Header 위) — 부모
+ *       `(main)/layout.tsx` 의 `h-screen flex` 가 잡아준다. 너비 `spacing.sidebar-w` (264px).
  * 모바일에서는 hidden (CSS 합성 토큰 `sidebar` 안 `hidden lg:flex`).
  *
  * 내부 콘텐츠:
@@ -31,7 +32,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className="sidebar sticky top-navbar-h min-h-[calc(100vh-theme(spacing.navbar-h))] max-h-[calc(100vh-theme(spacing.navbar-h))]"
+      className="sidebar"
       data-component="sidebar"
       aria-label="주 메뉴"
     >

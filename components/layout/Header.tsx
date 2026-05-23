@@ -8,45 +8,81 @@
  *         backdrop-blur + bg-surface/80 + border-b border-border-line.
  *
  * 내부 배치:
- *   - 좌측: FinSight wordmark (Activity 로고 + 텍스트, font-display + text-accent-vivid)
- *   - 우측: 프로필 아이콘 (모든 뷰포트 공통, 데스크탑·모바일 동일 노출)
+ *   - 좌측: FinSight wordmark (모바일 전용 — `lg:hidden`. 데스크탑은 Sidebar 가 brand 호스트).
+ *   - 가운데~우측 (데스크탑 한정 `hidden lg:flex`): 글로벌 마켓 티커 KOSPI / NASDAQ / BTC.
+ *   - 우측 끝: 프로필 아이콘 (모든 뷰포트 공통).
  *
- * 데스크탑은 Sidebar 가 좌측을 점유하므로 wordmark 도 sidebar 폭 안에 정렬 — 본 PR3 의
- * 단순화: Header 전폭에서 좌측 정렬, sidebar 내부 brand 와 시각 중복 없도록 sidebar 가
- * brand 영역을 흡수하고 데스크탑에선 Header 의 wordmark 를 숨김 (`lg:hidden`).
+ * PR6 fix (사용자 dev 실측):
+ *   - 좌측 wordmark `lg:invisible` → `lg:hidden` (자리도 차지하지 않음).
+ *   - 데스크탑 글로벌 마켓 티커 추가 — 시안 (`Stock and Coin Analysis App/src/app/components/
+ *     Header.tsx`) 의 KOSPI / NASDAQ / BTC 3 건 정합. 색상은 한국식 등락 토큰
+ *     (`text-signal-up` red / `text-signal-down` blue) 으로 매핑.
  *
  * ARIA: `<header role="banner">` 자동 적용.
  */
 
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { Activity, User } from "lucide-react";
 import {
   NAV_BRAND_LABEL,
   HEADER_PROFILE_ARIA,
 } from "@/lib/copy/layout/navCopy";
+import { HEADER_MARKET_TICKERS } from "@/lib/mock/layout/marketTickers";
+import { cn } from "@/lib/utils/cn";
 
 export function Header() {
   return (
     <header className="header-glass sticky top-0 z-[50]">
-      {/* 좌측 wordmark — 데스크탑에서는 사이드바 brand 영역과 시각 중복 회피 (lg:hidden). */}
+      {/* 좌측 wordmark — 모바일 전용. 데스크탑(`>= lg`)에서는 Sidebar 가 brand 호스트이므로
+       *  자리도 차지하지 않도록 `lg:hidden` (이전 `lg:invisible` → 자리 차지 회귀 수정). */}
       <Link
         href="/"
-        className="header-brand lg:invisible"
+        className="header-brand lg:hidden"
         aria-label={NAV_BRAND_LABEL}
       >
         <Activity className="header-brand-icon" aria-hidden="true" />
         <span className="header-brand-text">{NAV_BRAND_LABEL}</span>
       </Link>
-      {/* 우측 프로필 아이콘 — PR3 에서는 라우팅만 (`/profile` 미존재 → not-found). */}
-      <Link
-        href="/profile"
-        className="header-profile-button"
-        aria-label={HEADER_PROFILE_ARIA}
-      >
-        <User aria-hidden="true" />
-      </Link>
+      <div className="flex items-center gap-lg ml-auto">
+        {/* 글로벌 마켓 티커 (데스크탑 한정) — KOSPI / NASDAQ / BTC mock. */}
+        <div
+          className="hidden lg:flex items-center gap-lg text-caption"
+          aria-label="글로벌 마켓 시세"
+        >
+          {HEADER_MARKET_TICKERS.map((t, i) => (
+            <Fragment key={t.code}>
+              {i > 0 && (
+                <span className="w-px h-3 bg-border-line" aria-hidden="true" />
+              )}
+              <div className="flex items-center gap-sm">
+                <span className="text-text-muted">{t.code}</span>
+                <span className="text-body-sm-strong text-text-strong tabular-nums">
+                  {t.value}
+                </span>
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    t.isUp ? "text-signal-up" : "text-signal-down",
+                  )}
+                >
+                  {t.isUp ? "▲" : "▼"} {Math.abs(t.changePct).toFixed(1)}%
+                </span>
+              </div>
+            </Fragment>
+          ))}
+        </div>
+        {/* 우측 프로필 아이콘 — PR3 에서는 라우팅만 (`/profile` 미존재 → not-found). */}
+        <Link
+          href="/profile"
+          className="header-profile-button"
+          aria-label={HEADER_PROFILE_ARIA}
+        >
+          <User aria-hidden="true" />
+        </Link>
+      </div>
     </header>
   );
 }

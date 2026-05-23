@@ -7,18 +7,19 @@
  *   URL 영향 0건 — Next.js 라우트 그룹은 URL 에 반영되지 않음.
  *
  * 책임:
- *   - Header 렌더 (sticky top-0, 글래스 효과).
- *   - 데스크탑(`>= lg`): Sidebar (264px) + main 영역의 2-column 셸.
+ *   - 데스크탑(`>= lg`): Sidebar (264px, viewport 전체 높이) + 우측 컬럼.
+ *                      우측 컬럼 안에서 Header (sticky top) + main (스크롤 영역).
  *   - 모바일(`< md`): Header 상단 + main + BottomNav 하단 (BottomNav 가 fixed bottom-0 이므로
  *     main 의 padding-bottom 으로 콘텐츠 가림 회피).
  *   - WorkbenchSessionProvider — 워크벤치 페이지가 `/` 에 mount 되어 있는 동안 history /
  *     favorites in-session state 를 호스트 (PR3 시점 임시 — PR5 의 `/analyze` 이전 시 정리).
  *
- * 변경 사유 (legacy `(workbench)/layout.tsx` → 본 파일):
- *   - 워크벤치 한정 history/favorites 측면 패널 (Sidebar/MobileDrawer/SidebarContent) 제거.
- *   - 6 메뉴 글로벌 셸 (Header / Sidebar / BottomNav) 도입.
- *   - 워크벤치 페이지 (`page.tsx`) 의 ticker change 이벤트 dispatch 는 그대로 동작
- *     (수신자가 mount 되어 있지 않으면 자연 무시 — 회귀 위험 0).
+ * 변경 사유 (PR6 fix — 사용자 dev 실측):
+ *   - 시안 (`Stock and Coin Analysis App/src/app/components/AppLayout.tsx`) 의 구조 정합:
+ *     Header 가 전폭이 아니라 우측 컬럼 안에서 sticky. Sidebar 는 좌측 전체 높이 점유.
+ *   - `min-h-screen flex flex-col` (Header 전폭) → `h-screen overflow-hidden flex` (Sidebar 가
+ *     좌측 viewport 전체 높이 점유, main 만 overflow-y-auto).
+ *   - `min-h-[calc(...)]` v3 calc 제거 — 부모 `h-screen` 이 높이를 잡아준다.
  */
 
 "use client";
@@ -35,13 +36,18 @@ export default function MainLayout({
 }) {
   return (
     <WorkbenchSessionProvider>
-      <div className="min-h-screen flex flex-col bg-surface-muted">
-        <Header />
-        <div className="flex flex-1 min-h-0 items-stretch min-h-[calc(100vh-theme(spacing.navbar-h))]">
-          <Sidebar />
+      <div className="flex h-screen overflow-hidden bg-surface-muted">
+        {/* 좌측 Sidebar — viewport 전체 높이 점유 (데스크탑 한정, `< lg` 에선 sidebar 합성
+         *  토큰의 `hidden lg:flex` 가 미렌더). */}
+        <Sidebar />
+        {/* 우측 컬럼 — Header (sticky top) + main (overflow-y-auto). */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header />
           {/* main 영역 — 모바일에서 BottomNav (fixed bottom-0, h=navbar-h) 가
            *  콘텐츠 위에 올라가지 않도록 하단 padding 으로 spacer 확보. md+ 에서는 BottomNav 미렌더. */}
-          <main className="flex-1 min-w-0 main-area pb-navbar-h md:pb-0">{children}</main>
+          <main className="flex-1 overflow-y-auto pb-navbar-h md:pb-0 main-area">
+            {children}
+          </main>
         </div>
         <BottomNav />
       </div>
