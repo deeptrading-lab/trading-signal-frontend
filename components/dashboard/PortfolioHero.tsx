@@ -46,9 +46,11 @@ export interface PortfolioHeroProps {
 
 export function PortfolioHero({ portfolio }: PortfolioHeroProps) {
   const isUp = portfolio.profitPct >= 0;
-  // 한국식 — 상승 = 빨강 (signal-up), 하락 = 파랑 (signal-down).
-  // Bright Blue hero 위에서는 red 대비 OK / blue 대비 약하나 down 케이스 빈도 + soft 페어 미도입 정합 유지.
-  const signalColor = isUp ? "text-signal-up" : "text-signal-down";
+  // 한국식 — 상승 = 빨강, 하락 = 파랑. hero scope 한정으로 밝은 톤 적용:
+  // - signal-up (red-500 #ef4444) on blue-700~400 배경 = 대비비 1.4~2.5:1 (AA 미흡) → red-300 (#fca5a5) 으로 4.5+ 보강
+  // - signal-down (blue-500) on blue 그라데이션 = 자기 색과 묻힘 → blue-200 (#bfdbfe) 으로 분리
+  // Tailwind 기본 palette 활용 (hex 직타 0). 사용자 dev 실측 후 적용 2026-05-24.
+  const signalColor = isUp ? "text-red-300" : "text-blue-200";
   const SignalIcon = isUp ? ArrowUpRight : ArrowDownRight;
 
   return (
