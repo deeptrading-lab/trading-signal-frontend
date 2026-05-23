@@ -1,9 +1,10 @@
 /**
- * Tailwind theme — DESIGN.md (`docs/design/design-tone-refinement.md`, v7-rev2) 의 토큰을
+ * Tailwind theme — DESIGN.md (`docs/design/finsight-redesign.md`, v8) 의 토큰을
  * `tailwind.theme.json` 으로 export 한 결과를 그대로 흡수한다.
- * v7-rev2 는 v6 (polish-followups) 의 토큰 키 셋 무수정 계승 + 1차 v7 의 colors 11 키 hex 재조정 +
- * 후속 v7-rev2 의 신규 토큰 (colors 2 / typography 1 / spacing 1 / components 2) 추가.
- * 합성 토큰 48 키·typography 16·spacing 23·rounded 3·breakpoints 4 키 셋 전체.
+ * v8 = v7-rev2 의 토큰 키 셋 무수정 계승 + (a) 한국식 등락 의미 토큰 (signal-up / signal-down + soft 페어)
+ * + (b) 자산 식별 토큰 (asset-stock / asset-coin + soft 페어) + (c) AI 그라데이션 토큰 + (d) Pretendard 폰트
+ * + (e) 카드 셸 lg/xl 라운드 + (f) 카드 padding/hero 토큰 + (g) font-display 신규 typography.
+ * 합성 토큰 61 키·typography 17·spacing 29·rounded 5·breakpoints 4 키 셋 전체.
  *
  * 파이프라인:
  *   1) 디자이너가 DESIGN.md 의 토큰을 수정.
@@ -33,11 +34,13 @@ import themeJson from "./tailwind.theme.json";
 // DESIGN.md 의 typography 토큰을 직접 옮겨둔다 (export 도구가 lineHeight / fontFeature 를 누락하므로 보완).
 // v4 신규 키 `nav-brand`, `sidebar-section` 도 함께 등록.
 // v5 신규 키 `button-sm`, `label-sm`, `input-suffix` 도 함께 등록.
+// v8 신규 키 `font-display` 도 함께 등록 (36px / 800 / lineHeight 1.12 / letterSpacing -0.02em).
 const TYPOGRAPHY_EXTRAS: Record<
   string,
   { lineHeight: string; fontFeature?: string; letterSpacing?: string }
 > = {
   display: { lineHeight: "1.18" },
+  "font-display": { lineHeight: "1.12", letterSpacing: "-0.02em" },
   h1: { lineHeight: "1.2" },
   h2: { lineHeight: "1.35" },
   "body-md": { lineHeight: "1.55" },
