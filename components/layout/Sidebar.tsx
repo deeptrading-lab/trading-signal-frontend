@@ -39,7 +39,9 @@ export function Sidebar() {
       {/* 상단 브랜드 — Header 의 wordmark 와 시각 중복을 피하기 위해
        *   데스크탑에서는 본 sidebar 가 brand 의 1차 호스트. */}
       <Link href="/" className="sidebar-brand" aria-label={NAV_BRAND_LABEL}>
-        <Activity className="sidebar-brand-icon" aria-hidden="true" />
+        <span className="sidebar-brand-badge" aria-hidden="true">
+          <Activity className="sidebar-brand-icon" />
+        </span>
         <span className="sidebar-brand-text">{NAV_BRAND_LABEL}</span>
       </Link>
 

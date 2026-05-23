@@ -358,14 +358,22 @@
    *   .sidebar-brand mb-8 → `mb-2xl` (24px) 근사.
    *   .sidebar-nav-item rounded-xl/px-4/py-3/gap-3 → `rounded-md/px-lg/h-12/gap-md` 근사.
    *   icon size 20px → `h-5 w-5` (시안 `<Icon size={20} />` 정합). */
+  /* 시안 정합 (사용자 dev 실측 2026-05-24):
+   *   - badge = 파란 사각형 (accent-vivid bg) + 흰 아이콘 (text-surface)
+   *   - 텍스트 = text-text-strong (검은색) — 시안 brand 텍스트 본체 색
+   *   - 아이콘 size 20px (h-5 w-5) + badge 32x32 (h-2xl w-2xl) + rounded-sm (8px)
+   *     — 시안 `<div class="w-8 h-8 rounded-lg bg-blue-600"><Activity size={20}/></div>` 정합 */
   .sidebar-brand {
-    @apply inline-flex items-center gap-sm mb-2xl px-sm text-accent-vivid no-underline;
+    @apply inline-flex items-center gap-sm mb-2xl px-sm no-underline;
+  }
+  .sidebar-brand-badge {
+    @apply inline-flex items-center justify-center h-2xl w-2xl rounded-sm bg-accent-vivid text-surface;
   }
   .sidebar-brand-icon {
-    @apply h-2xl w-2xl;
+    @apply h-5 w-5;
   }
   .sidebar-brand-text {
-    @apply text-nav-brand;
+    @apply text-nav-brand text-text-strong;
   }
   .sidebar-nav {
     @apply flex flex-col gap-xs w-full;
