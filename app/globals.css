@@ -31,9 +31,16 @@
     @apply bg-surface-muted text-text-strong font-sans;
   }
 
-  /* 폰트 패밀리 alias — DESIGN.md 가 시스템 sans 만 쓰지만 Arial 우선 정렬 유지. */
+  /* 폰트 패밀리 — Pretendard self-host (next/font/local) → `--font-pretendard` 변수.
+   * PRD finsight-redesign §3.1 + §9 q6 RESOLVED 옵션 B (self-host). 시스템 fallback 은
+   * next/font 가 fallback 배열로 자동 주입하지만, html 레벨에서도 명시해 SSR 단계에서 안전망. */
   html {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family:
+      var(--font-pretendard),
+      -apple-system,
+      BlinkMacSystemFont,
+      Arial,
+      sans-serif;
   }
 
   /* tnum 자릿수 정렬: Tailwind preflight 가 흡수하지 않음 — 수치 표시(가격·수량) 자릿수 정렬용 헬퍼. */

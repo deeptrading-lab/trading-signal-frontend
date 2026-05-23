@@ -1621,3 +1621,26 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **PR2** `feat(design): v8 토큰 + finsight 톤 적용` — DESIGN.md v8 source 를 `package.json` `design:sync` + `scripts/inject-breakpoints.mjs` `DESIGN_PATH` 에 연결 + `npm run design:sync` 재생성 + `tailwind.config.ts` 의 `TYPOGRAPHY_EXTRAS` 에 `font-display` 1줄 추가 + Pretendard `next/font/local` self-host (PRD §9 q6 옵션 B) + `app/components.css` 의 신규 합성 토큰 (`badge-signal-up/down`, `badge-asset-stock/coin`, `card-ai`, `ai-heading` 등) cascade.
   - **시안 폴더 cleanup** — PR9 머지 후 별도 `chore: remove figma make export after finsight-redesign` PR (PRD §9 q8 RESOLVED 옵션 B).
+
+### 2026-05-23 — feat(design): v8 토큰 + Pretendard cascade (PR2/9 finsight-redesign) (#27)
+
+- **slug**: `finsight-redesign` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/27
+- **요약**: feat(design): v8 토큰 cascade — DESIGN.md v8 source 채택 + Pretendard self-host + 합성 토큰 신설
+- **현재 상태**: QA 통과 + 리뷰 승인 (라벨 `review-approved`). handoff-append workflow 가 직전 PR 본문 인용 안의 과거 `(#27)` (2026-05-01 HANDOFF 워크플로우 자체 PR) 부분일치로 false-positive skip — reviewer 가 본 entry 를 직접 백필
+- **변경 요약**:
+  - `package.json` design:sync source → `docs/design/finsight-redesign.md` (v8)
+  - `scripts/inject-breakpoints.mjs` DESIGN_PATH 동기화
+  - `tailwind.theme.json` design:sync 재생성 — colors 26 (v7 rev2 13 + signal-up/-soft + signal-down/-soft + asset-stock/-soft + asset-coin/-soft + gradient-ai-from/-to/-soft 13 신규), typography 17, spacing 29 (card-px·card-py·card-px-mobile·card-py-mobile·hero-px·hero-py 6 신규), rounded 5 (lg 16px·xl 24px 2 신규)
+  - `tailwind.config.ts` TYPOGRAPHY_EXTRAS 에 `font-display` (lineHeight 1.12 / letterSpacing -0.02em) 1줄
+  - `app/components.css` 합성 토큰 클래스 신설 — `.card-info` / `.card-hero` / `.card-ai` / `.gradient-ai-bg` / `.badge-signal-up` / `.badge-signal-down` / `.badge-asset-stock` / `.badge-asset-coin` / `.signal-up-text` / `.signal-down-text` / `.ai-heading`. 기존 카드 셸 `rounded-sm + p-[16px]` → `rounded-lg + p-card-px-mobile lg:p-card-px` cascade. hex/px 직타 0 건 (주석 1 건은 설명용)
+  - `app/globals.css` html `font-family` 를 `var(--font-pretendard), -apple-system, BlinkMacSystemFont, Arial, sans-serif` 로 교체
+  - `app/layout.tsx` `next/font/local` 정의 — 4 weight (400 / 500 / 700 / 800), display:swap, preload:true, variable `--font-pretendard`, fallback 명시. `<html className={pretendard.variable}>` SSR 안전
+  - `public/fonts/pretendard/*.woff2` 4 (Regular / Medium / Bold / ExtraBold subset, 합계 약 1.04 MB) — Pretendard OFL-1.1 (npm `pretendard@1.3.9`) 출처. PRD §9 q6 옵션 B (self-host)
+- **AC 결과** (QA 리포트 `docs/qa/finsight-redesign-pr2.md`):
+  - §5.2 AC-V8-8~11 4/4 pass, §5.7 AC-COMMON (적용 6건) 전부 pass, §5.8 AC-GATE-1·2 pass / GATE-3 N/A
+  - 라운드트립 10/10 (5 케이스 × 375 / 1280 뷰포트), 에지 3/3, Pretendard 5/5
+- **다음 작업 후보** (PR 본문 + QA 머지 게이트 부록 기반, 절대적 지시 아님):
+  - **PR3** `feat(layout): finsight shell` — Sidebar 6 메뉴 확장 + Header glass (backdrop-blur + bg-surface/80) + 모바일 BottomNav 신설. PR3 안 신설 합성 토큰 후보 `.bottom-nav` / `.bottom-nav-item-active` / `.header-glass`. DESIGN.md v8 의 `bottom-nav*` / `navbar*` 토큰을 `components.css @layer components` 로 흡수
+  - **Pretendard 운영 모니터링** — woff2 4 weight self-host 가 Vercel 정적 자산으로 묶임. LCP 영향 + next/font size-adjust fallback 동작 확인
+  - **handoff-append workflow 보강** — `grep -q "(#${PR_NUMBER})"` 가 본문 인용 안 `(#27)` 같은 과거 PR 부분일치를 false-positive 매칭. 차후 `^### .*\(#${PR_NUMBER}\)$` 패턴으로 좁히기

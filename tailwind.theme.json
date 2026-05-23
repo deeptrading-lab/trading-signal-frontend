@@ -16,56 +16,70 @@
         "info": "#1c4fd1",
         "info-soft": "#e7efff",
         "critical": "#8e1717",
-        "critical-soft": "#fde1e1"
+        "critical-soft": "#fde1e1",
+        "signal-up": "#c81e1e",
+        "signal-up-soft": "#fee2e2",
+        "signal-down": "#1d4ed8",
+        "signal-down-soft": "#dbeafe",
+        "asset-stock": "#1e40af",
+        "asset-stock-soft": "#dbeafe",
+        "asset-coin": "#c2410c",
+        "asset-coin-soft": "#ffedd5",
+        "gradient-ai-from": "#4338ca",
+        "gradient-ai-to": "#1d4ed8",
+        "gradient-ai-soft": "#eef2ff"
       },
       "fontFamily": {
         "display": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
+        ],
+        "font-display": [
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "h1": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "h2": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "body-md": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "body-sm": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "body-sm-strong": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "body-strong": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "caption": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "button": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "button-sm": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "badge": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "mono-numeric": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "nav-brand": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "sidebar-section": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "label-sm": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "input-suffix": [
-          "Arial"
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ]
       },
       "fontSize": {
@@ -73,6 +87,13 @@
           "30px",
           {
             "fontWeight": "700"
+          }
+        ],
+        "font-display": [
+          "36px",
+          {
+            "letterSpacing": "-0.02em",
+            "fontWeight": "800"
           }
         ],
         "h1": [
@@ -171,6 +192,8 @@
       "borderRadius": {
         "sm": "8px",
         "md": "12px",
+        "lg": "16px",
+        "xl": "24px",
         "pill": "999px"
       },
       "spacing": {
@@ -196,7 +219,13 @@
         "dropdown-item-gap": "2px",
         "button-primary-h": "40px",
         "button-sm-h": "32px",
-        "hit-area-min": "40px"
+        "hit-area-min": "40px",
+        "card-px": "20px",
+        "card-py": "20px",
+        "card-px-mobile": "16px",
+        "card-py-mobile": "16px",
+        "hero-px": "24px",
+        "hero-py": "24px"
       },
       "screens": {
         "sm": "640px",

@@ -1,7 +1,45 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./components.css";
 import { Providers } from "./providers";
+
+/**
+ * Pretendard (Korean-Hangul + Latin subset) — `next/font/local` 로 self-host.
+ * - `public/fonts/pretendard/` 의 woff2 4 종 (400 / 500 / 700 / 800) 을 흡수.
+ * - CSS variable `--font-pretendard` 로 export → `tailwind.theme.json.fontFamily` 의
+ *   각 토큰 첫 패밀리 `Pretendard` 와 정합 (브라우저는 `Pretendard` 글리프를 본 self-host 에서 우선 로드).
+ * - `next/font` 가 size-adjust + font-display: swap 을 자동 주입해 FOUT 0 건.
+ * - PRD finsight-redesign §9 q6 RESOLVED 옵션 B (self-host).
+ */
+const pretendard = localFont({
+  src: [
+    {
+      path: "../public/fonts/pretendard/Pretendard-Regular.subset.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/pretendard/Pretendard-Medium.subset.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/pretendard/Pretendard-Bold.subset.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/pretendard/Pretendard-ExtraBold.subset.woff2",
+      weight: "800",
+      style: "normal",
+    },
+  ],
+  variable: "--font-pretendard",
+  display: "swap",
+  preload: true,
+  fallback: ["-apple-system", "BlinkMacSystemFont", "Arial", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   title: "TradingSignalEngine",
@@ -10,7 +48,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={pretendard.variable}>
       <body>
         <Providers>{children}</Providers>
       </body>
