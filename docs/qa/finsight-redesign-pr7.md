@@ -101,3 +101,80 @@ recharts chunk 0 — Fear & Greed 는 CSS 그라데이션 (`from-red-500 via-yel
 전 항목 통과 (PAGE-1~8 = 7 pass + 1 N/A · COMMON-1~9 = 9 pass · GATE-1~3 = 3 pass). server-safe 정적 컴포넌트 패턴 + v8 토큰 cascade + Tailwind color 명명 (slate / emerald / red / yellow) 의도적 사용 사유 모두 코드 코멘트 + PR 본문 표 명시. `/dashboard` 번들 103 KB (-77 KB vs target). PR8 base 정합 4 검증 PASS.
 
 **판정: qa-passed**. 본 리포트 commit + push 직후 `qa-passed` 라벨 부여 (이전 `impl-ready` 제거). HANDOFF append workflow 트리거 — PR 본문 `## 다음 작업` 절 (PR8 진입 + chore 후보 + 향후 디자인 갱신) 존재 확인 완료.
+
+---
+
+## 9. 재검증 (HEAD `05f6095` — 2026-05-24)
+
+직전 QA (HEAD `cfa3094`) 이후 사용자 dev 실측 → fix 6건 누적. PortfolioHero 배경/사이드바 brand 시안 정합 변경에 대한 재검증.
+
+### 9.1 누적 fix commit 6건 요약
+
+| # | Commit | 변경 의도 | 사용자 선택 |
+| --- | --- | --- | --- |
+| 1 | `b586a73` | PortfolioHero Bright Blue (`from-blue-700 to-blue-400`) 단톤 + blob/bar 가독성 보강 | reject — signal-up (red) 과 색 충돌 (대비 1.4~2.5) |
+| 2 | `683daa7` | 라벨/바 가독성 보강 (`text-white/60` → `/80`, bar fill `/40` → `/70`) | superseded — 5번에 의해 무효화 |
+| 3 | `5bbc2a7` | 신호 색 hero scope 보강 (`red-300` / `blue-200` override) | reject — Bright Blue 단톤 자체 폐기로 무효 |
+| 4 | `e8e1cf2` | Purple/Indigo (`from-indigo-700 to-purple-600`) 단톤 + 신호 색 v8 토큰 원복 | reject — 보색 관계지만 hero 톤 부담 |
+| 5 | `c878791` | **White surface (`card-hero` v8 토큰) 채택** + shadow-sm | **accept (최종)** — 시안의 다른 카드들과 톤 일관 + 한국식 signal-up/-down (red/blue) 가독성 자연 |
+| 6 | `05f6095` | **사이드바 brand 로고 시안 정합** — 파란 32x32 badge + 흰 Activity 아이콘 + 검은 FinSight 텍스트 | **accept** — 시안 `<div class="w-8 h-8 rounded-lg bg-blue-600"><Activity size={20}/></div>` 정합 |
+
+### 9.2 AC-FIX-1~7 검증
+
+| AC | 재현 | 기대 | 실측 | 판정 |
+| --- | --- | --- | --- | --- |
+| **FIX-1** White surface | `grep "card-hero shadow-sm" components/dashboard/PortfolioHero.tsx` + 다크 클래스 0건 grep | section 클래스 = `card-hero shadow-sm` + 다크/Blue/Purple 잔존 0 | L52 `<section className="card-hero shadow-sm">`. `git grep -nE "from-slate-900\|from-blue-700\|from-indigo-700\|from-purple-600" components/dashboard/` 3 hit 모두 코드 코멘트 (배경 결정 흐름 사유 문서) — 코드 0건 | pass |
+| **FIX-2** blob 제거 | `git grep -nE "blur-3xl\|mix-blend-multiply" components/dashboard/` | 0 hit | 0 hit (White surface 위 blob 어색 → 전량 제거) | pass |
+| **FIX-3** 신호 색 v8 토큰 | `git grep -nE "red-300\|blue-200" components/dashboard/` | 0 hit | 0 hit. `text-signal-up` x9 + `text-signal-down` x3 (PortfolioHero L48, Stat L80 cascade) | pass |
+| **FIX-4** 비중 바 토큰 | `grep "bg-asset-stock\|bg-asset-coin\|bg-surface-muted\|border-border-line" PortfolioHero.tsx` | bar fill = asset-*, track = surface-muted, 구분선 = border-line | L85 `bg-asset-stock`, L90 `bg-asset-coin`, L136 `bg-surface-muted` (트랙), L72 `border-border-line` (구분선) | pass |
+| **FIX-5** 라벨 색 v8 | `git grep -nE "text-white/60\|text-white/80" components/dashboard/` | 0 hit | 0 hit. `text-text-muted` x4 (PortfolioHero L53, L108, L134 + RatioStat 라벨) | pass |
+| **FIX-6** sidebar-brand-badge | `grep "sidebar-brand-badge" app/components.css` + Sidebar.tsx 구조 | CSS 정의 ≥1 + Activity in badge | components.css L369~L371 `.sidebar-brand-badge { @apply inline-flex h-2xl w-2xl rounded-sm bg-accent-vivid text-surface }` + L372~L374 `.sidebar-brand-icon { @apply h-5 w-5 }`. Sidebar.tsx L42~L44 `<span class="sidebar-brand-badge"><Activity class="sidebar-brand-icon" /></span>` | pass |
+| **FIX-7** brand 텍스트 색 | `grep "sidebar-brand-text" + "text-accent-vivid" components.css` | `.sidebar-brand-text` 에 `text-text-strong` 추가 + `.sidebar-brand` 자체 `text-accent-vivid` 제거 | L375~L377 `.sidebar-brand-text { @apply text-nav-brand text-text-strong }`. `.sidebar-brand` (L366~L368) 에 `text-accent-vivid` 0건. accent-vivid 사용처 = badge bg + nav-item-active 만 | pass |
+
+### 9.3 기존 AC 무회귀 재검증 (HEAD `05f6095`)
+
+- **AC-PAGE-1~8**: SSR 한글 9건 + 3 `aria-label` 유지. 정보 아키텍처 동일 (Hero / Top3 / Market 3 섹션). `text-signal-up` x9 / `text-signal-down` x3 / `bg-asset-stock` x9 / `bg-asset-coin` x5 unchanged.
+- **AC-COMMON-1~9**: `npm run typecheck` 종료 0, `npm run lint` 종료 0, `npm run build` `✓ Compiled successfully in 1455ms`. `/dashboard` **797 B / 103 KB** First Load — 무회귀. `/` 223 KB · `/analyze` 152 KB 무회귀. hex/px 직타 0 (PortfolioHero L136 `h-[8px]` 1곳 Tailwind arbitrary value 의도적 유지). hydration mismatch 0 (server-safe 정적).
+- **AC-GATE-1**: 본 리포트 commit + push 직후 `qa-passed` 라벨 부여. PR 본문 `## 다음 작업` 절 존재 확인.
+- **AC-GATE-2 (재정합)**: 사이드바 brand fix 는 글로벌 셸 cascade — PR8 `/market` 화면이 본 PR7 의 White `card-hero` 카드 셸 패턴 + 사이드바 brand 시각 정합 그대로 활용 가능. PR8 base 정합 4 검증 (§7) 무회귀.
+- **AC-GATE-3**: 부적합 0.
+
+### 9.4 라운드트립 재실행 (양 뷰포트)
+
+| # | 시나리오 | 응답 | 판정 |
+| --- | --- | --- | --- |
+| 1 | `/dashboard` 진입 (White hero + 사이드바 시안 brand) | HTTP 200. SSR 마커 — `card-hero` x4 / `shadow-sm` x2 / `text-signal-up` x9 / `text-signal-down` x3 / `bg-asset-stock` x7 / `bg-asset-coin` x5 / `bg-surface-muted` x8 / `border-border-line` x6 / `text-text-muted` x27 / `text-text-strong` x27 / `sidebar-brand-badge` x1 / `sidebar-brand-icon` x1 / `sidebar-brand-text` x1 | pass |
+| 2 | `/` (PR6 Home) 무회귀 + 사이드바 cascade | HTTP 200. `sidebar-brand-badge` x1 / `sidebar-brand-icon` x1 / `sidebar-brand-text` x1 — cascade 정합 | pass |
+| 3 | `/analyze` (PR5 워크벤치) 무회귀 + 사이드바 cascade | HTTP 200. sidebar-brand 3 마커 동일 노출 | pass |
+| 4 | `/market` / `/watchlist` / `/profile` 404 (PR8·PR9 예정) | HTTP 404 x3 | pass |
+
+양 뷰포트 (375 / 1280): SSR 마크업 동일 (Tailwind `md:` cascade). 모바일 — 사이드바 hidden (`hidden lg:flex`) → Header `header-brand` 가 wordmark 호스트 (별도 패턴, 본 fix 무영향). 데스크탑 — 사이드바 좌측 상단 brand badge 노출.
+
+### 9.5 사이드바 brand 시각 검증
+
+- **데스크탑 (1280)**: `.sidebar-brand` = `inline-flex items-center gap-sm mb-2xl px-sm`. `.sidebar-brand-badge` = `h-2xl w-2xl` (32x32) `rounded-sm` (8px) `bg-accent-vivid` (파랑) `text-surface` (흰 아이콘). `.sidebar-brand-icon` = `h-5 w-5` (20px Activity). `.sidebar-brand-text` = `text-nav-brand text-text-strong` (검은 FinSight). 시안 `<div class="w-8 h-8 rounded-lg bg-blue-600"><Activity size={20}/></div>` 1:1 정합.
+- **모바일 (375)**: 사이드바 `hidden lg:flex` → 본 brand 미노출. Header 의 `.header-brand` 가 별도 wordmark 호스트 — 본 fix 비대상, 무회귀.
+
+### 9.6 에지 E-FIX-1~4
+
+| # | 시나리오 | 검증 | 결과 |
+| --- | --- | --- | --- |
+| E-FIX-1 | White surface 위 Pretendard 가독성 | `text-text-strong` (#0f1419 추정) on `bg-surface` (#ffffff) — WCAG AAA 16+:1 | pass |
+| E-FIX-2 | 비중 바 `bg-asset-stock` on `bg-surface-muted` track | 강조 채도 blue/yellow on 회색 트랙 — 시안 정합 + 충분한 대비 | pass |
+| E-FIX-3 | 사이드바 badge `bg-accent-vivid` + `text-surface` 아이콘 | 파란 #1d4ed8 추정 + 흰 #ffffff — WCAG AAA (8+:1) | pass |
+| E-FIX-4 | 사이드바 brand 텍스트 `text-text-strong` on `bg-surface` | 검정 on 흰 — WCAG AAA (16+:1) | pass |
+
+### 9.7 머지 게이트 PR8 base 재정합
+
+| 검증 | 결과 |
+| --- | --- |
+| PR8 `/market` 패턴 — White `card-hero` 카드 셸 재활용 | PASS — `card-hero shadow-sm` 패턴 검증 완료, 재활용 가능 |
+| 사이드바 brand fix cascade — PR8 `/market` 진입 시 시안 brand 노출 | PASS — `/` `/analyze` `/dashboard` 3 라우트 SSR 정합 확인 — `/market` 신설 후에도 cascade 보장 |
+| PR8 카드 패턴 (`card`) + 도메인 폴더 (`components/market/`) 그대로 적용 | PASS — 본 PR7 의 server-safe 정적 + props-only 패턴 재활용 가능 |
+| 부적합 | 없음 — PR8 인계 commit log 변경 0 |
+
+### 9.8 재검증 결론
+
+전 항목 통과 (AC-FIX-1~7 = 7 pass · 기존 AC 무회귀 PAGE-1~8 / COMMON-1~9 / GATE-1~3 = 17 pass · 라운드트립 4 pass · 사이드바 brand 양 뷰포트 정합 · E-FIX 4 pass · PR8 base 재정합 4 PASS).
+
+**판정 유지: qa-passed** (HEAD `05f6095`). 본 리포트 commit + push 직후 `qa-passed` 라벨 재부여 + `impl-ready` 제거. HANDOFF append workflow 트리거 — PR 본문 `## 다음 작업` 절 존재 확인 완료.
