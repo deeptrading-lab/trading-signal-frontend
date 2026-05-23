@@ -1,5 +1,11 @@
 /**
- * 메인 = 워크벤치 (v4 layout-redesign).
+ * `/analyze` — AI 분석 워크벤치 (v4 layout-redesign + finsight-redesign PR5).
+ *
+ * PR5 (finsight-redesign): 라우트 이전 `/` → `/analyze`.
+ *   - 사이드바 / BottomNav 의 "AI 분석 워크벤치" 메뉴(`/analyze`) 가 본 페이지를 활성화.
+ *   - 워크벤치 컴포넌트·훅·API 도메인 폴더명(`workbench`) 유지 (PRD §9 q5 RESOLVED 옵션 A).
+ *   - 워크벤치 도메인 부속 파일 2개를 `components/workbench/` 로 동반 이전:
+ *       `FavoriteToggle.tsx` / `workbenchEvents.ts`.
  *
  * 구조 (위→아래, DESIGN.md v4 §Layout):
  *   ticker-header (별표 토글 포함)
@@ -32,7 +38,7 @@ import { useEffect, useRef } from "react";
 import { SearchPanel } from "@/components/workbench/SearchPanel";
 import { InputPanel } from "@/components/workbench/InputPanel";
 import { ResultGroup } from "@/components/workbench/ResultGroup";
-import { FavoriteToggle } from "@/components/layout/FavoriteToggle";
+import { FavoriteToggle } from "@/components/workbench/FavoriteToggle";
 import { useAnalyzeForm } from "@/hooks/workbench/useAnalyzeForm";
 import { useAnalyzeRun } from "@/hooks/workbench/useAnalyzeRun";
 import { useAnalyzeHistory } from "@/hooks/workbench/useAnalyzeHistory";
@@ -44,7 +50,7 @@ import {
   type WorkbenchSelectHistoryDetail,
   type WorkbenchSelectFavoriteDetail,
   type WorkbenchTickerChangeDetail,
-} from "@/components/layout/workbenchEvents";
+} from "@/components/workbench/workbenchEvents";
 import {
   TICKER_HEADER_EMPTY,
   FOOTER_DISCLAIMER,
