@@ -1728,3 +1728,45 @@
   - **PR5** `feat(analyze): workbench 라우트 이전` — 본 PR4 머지 직후 분기. 현 `app/(main)/page.tsx` (워크벤치) → `app/(main)/analyze/page.tsx`. PR3 QA 부록 #7.2 의 layout 잔존 6 파일 (Navbar / SidebarContent / MobileDrawer / FavoriteToggle / SidebarItem / workbenchEvents) 동반 정리. 워크벤치 도메인 폴더명 (`components/workbench/`, `hooks/workbench/`, `lib/api/workbench/`) 은 PRD §9 q5 결정대로 유지.
   - **PR6** `feat(home): 분석 대시보드 (mock)` — 본 PR4 의 `lib/mock/home/*` + `lib/copy/home/*` 활용. recharts `AreaChart` 가 가격 차트 진입점.
   - **운영 모니터링** — recharts 도입에 따른 bundle size 변화는 PR6 (실 import 시점) 에서 First Load JS 재측정. lighthouse 실측은 PR9 머지 후 `finsight-redesign-final` 단계.
+
+### 2026-05-23 — feat(analyze): /analyze 라우트 이전 + layout 잔존 정리 (PR5/9 finsight-redesign) (#30)
+
+- **slug**: `finsight-redesign-pr5-analyze-route` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/30
+- **요약**: feat(analyze): /analyze 라우트 이전 + layout 잔존 정리 (PR5/9 finsight-redesign)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > - 워크벤치 라우트 `/` → `/analyze` 이전. `app/(main)/page.tsx` 삭제 → PR6 가 Home AnalysisDashboard 로 신설 예정. 현 시점 `/` 는 PR3 의 (main)/not-found 노출.
+  > - 워크벤치 도메인 부속 2 파일 `components/workbench/` 로 동반 이전: `FavoriteToggle.tsx`, `workbenchEvents.ts`. 도메인 한 뎁스 룰 정합.
+  > - PR3 layout 잔존 4 파일 삭제 (호출처 0 검증): `Navbar.tsx`, `SidebarContent.tsx`, `MobileDrawer.tsx`, `SidebarItem.tsx`.
+  > - 워크벤치 도메인 폴더명 `workbench` 유지 (PRD §9 q5 RESOLVED 옵션 A).
+  > 
+  > 시리즈 9 개 중 5 번째. base = main `97476ff` (PR4 머지 직후).
+  > 
+  > ## 변경 파일 (7 + 1 보정 commit)
+  > 
+  > | 변화 | 파일 | 비고 |
+  > | --- | --- | --- |
+  > | rename (mv) | `app/(main)/page.tsx` → `app/(main)/analyze/page.tsx` | git mv 로 history 보존 + import 경로 2건 갱신 |
+  > | rename (mv) | `components/layout/FavoriteToggle.tsx` → `components/workbench/FavoriteToggle.tsx` | 워크벤치 도메인 안으로 |
+  > | rename (mv) | `components/layout/workbenchEvents.ts` → `components/workbench/workbenchEvents.ts` | 워크벤치 도메인 안으로 |
+  > | delete | `components/layout/Navbar.tsx` (64L) | PR3 에서 `Header.tsx` 로 교체됨, 호출처 0 |
+  > | delete | `components/layout/SidebarContent.tsx` (111L) | PR3 에서 `Sidebar.tsx` 로 흡수됨, 호출처 0 |
+  > | delete | `components/layout/MobileDrawer.tsx` (149L) | PR3 에서 `BottomNav.tsx` 로 교체됨, 호출처 0 |
+  > | delete | `components/layout/SidebarItem.tsx` (61L) | 구 사이드바 아이템, 호출처 0 |
+  > 
+  > 합계: 신설 1, 삭제 4 (385 라인), 이동 3.
+  > 
+  > 처리 후 `components/layout/` 잔여 4 파일: `Header.tsx` / `Sidebar.tsx` / `BottomNav.tsx` / `navItems.ts` (모두 PR3 글로벌 셸).
+  > 
+  > ## Test plan
+  > 
+  > AC-A-1 `/analyze` 진입 시 워크벤치 화면 그대로 렌더 — pass
+  > - 검증: `curl http://localhost:3000/analyze` → HTTP 200, SSR HTML 에 ticker-header / SearchPanel / InputPanel / ResultGroup empty state / footer 면책 문구 모두 정상 마크업.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR6 (Home AnalysisDashboard mock 화면)** — base = 본 PR5 머지 직후 main. `app/(main)/page.tsx` 신설 + `lib/mock/home/*` 8 파일 소비 + recharts 첫 사용 (`<AreaChart>` for `priceChart.ts`). 시안 (Stock and Coin Analysis App) AnalysisDashboard 컴포넌트 톤 정합. 사이드바 / BottomNav 의 "홈" (`/`) 메뉴가 본 화면 활성화.
+  - **운영 모니터링** — `/analyze` 라우트 진입 사용자의 기존 즐겨찾기 (`/` 북마크) → 404 not-found 진입 (의도된 임시 상태). PR6 머지 후 자동 해소.
+  - **관련 slug** — `finsight-redesign` (시리즈 9개 중 5/9 완료).
