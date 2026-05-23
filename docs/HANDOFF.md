@@ -1770,3 +1770,45 @@
   - **PR6 (Home AnalysisDashboard mock 화면)** — base = 본 PR5 머지 직후 main. `app/(main)/page.tsx` 신설 + `lib/mock/home/*` 8 파일 소비 + recharts 첫 사용 (`<AreaChart>` for `priceChart.ts`). 시안 (Stock and Coin Analysis App) AnalysisDashboard 컴포넌트 톤 정합. 사이드바 / BottomNav 의 "홈" (`/`) 메뉴가 본 화면 활성화.
   - **운영 모니터링** — `/analyze` 라우트 진입 사용자의 기존 즐겨찾기 (`/` 북마크) → 404 not-found 진입 (의도된 임시 상태). PR6 머지 후 자동 해소.
   - **관련 slug** — `finsight-redesign` (시리즈 9개 중 5/9 완료).
+
+### 2026-05-23 — feat(home): AnalysisDashboard mock (PR6/9 finsight-redesign) (#31)
+
+- **slug**: `finsight-redesign-pr6-home-analysis` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/31
+- **요약**: feat(home): AnalysisDashboard mock (PR6/9 finsight-redesign)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > - `/` 라우트에 시안 정합 AnalysisDashboard mock 화면 신설 — 9 컴포넌트 (`components/home/*`) + `app/(main)/page.tsx`.
+  > - recharts 첫 사용자 — `<AreaChart>` 가격 추이 차트. v8 토큰 (signal-up/down, asset-stock/coin, gradient-ai, font-display) 시각 cascade.
+  > - 시리즈 9 개 PR 중 6 번째 (PR6/9). PRD: `docs/prd/finsight-redesign.md` §3.3 PR6 + §5.6 AC-PAGE-1~8.
+  > 
+  > ## 변경 파일
+  > 
+  > | 파일 | 라인 | 역할 |
+  > |---|---|---|
+  > | `components/home/SearchToggle.tsx` | 67 | 주식/코인 세그먼트 토글 (asset 토큰 cascade) |
+  > | `components/home/SearchBar.tsx` | 49 | 검색 input + 돋보기 아이콘 (placeholder 분기) |
+  > | `components/home/AssetHeader.tsx` | 115 | 자산 헤더 (가격·등락·즐겨찾기) — useState 즐겨찾기 |
+  > | `components/home/TimeframeChips.tsx` | 53 | 1D~ALL 6 칩 활성 강조 |
+  > | `components/home/PriceChart.tsx` | 129 | recharts AreaChart — signal-up stroke + gradient fill |
+  > | `components/home/AiAnalysisCard.tsx` | 130 | card-ai + gradient-ai-bg + 3-up 미니카드 |
+  > | `components/home/MarketStatsCard.tsx` | 84 | 시장 정보 6-grid + native tooltip |
+  > | `components/home/TechnicalIndicatorsCard.tsx` | 116 | RSI 그라데이션 게이지 + MACD + 볼린저 |
+  > | `components/home/NewsCard.tsx` | 65 | 뉴스 3건 리스트 + 출처 badge-info |
+  > | `components/home/HomeDashboard.tsx` | 130 | client 셸 — 9 컴포넌트 그리드 조합 |
+  > | `app/(main)/page.tsx` | 50 | server entry — 7 mock import → HomeDashboard props |
+  > 
+  > **총 1,039 라인 (PRD §8.1 추정 400~700L 대비 +49% — 컴포넌트 헤더 주석 + 카피 매핑 분리 비중 큼)**.
+  > 
+  > ## 클라이언트/서버 분리 결정
+  > 
+  > | 컴포넌트 | 분리 | 사유 |
+  > |---|---|---|
+  > | `app/(main)/page.tsx` | server | mock import 전용 + props 전달만 |
+  > | `HomeDashboard` | client | 검색 토글·검색어·타임프레임 3 useState 호스트 |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR7 (Dashboard 포트폴리오)** — `app/(main)/dashboard/page.tsx` 신설 + `components/dashboard/*` 도메인 폴더 + `lib/mock/dashboard/*` (PR4 정착) 활용. 본 PR6 의 `components/home/` 패턴 + 합성 토큰 (`card-hero`, `badge-signal-*`, `badge-asset-*`) 재활용.
+  - **bundle size 모니터링** — PR7~9 누적 시 First Load JS / 라우트 추적. 300 KB 초과 라우트 발생 시 dynamic import 도입 검토.
+  - **PriceChart 색 토큰화** — recharts API 가 Tailwind class 미수용. 후속 PRD 에서 `getComputedStyle(document.documentElement).getPropertyValue('--color-signal-up')` 같은 동적 흡수 검토 (현 PR6 무관).
