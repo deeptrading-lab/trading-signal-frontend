@@ -1644,3 +1644,45 @@
   - **PR3** `feat(layout): finsight shell` — Sidebar 6 메뉴 확장 + Header glass (backdrop-blur + bg-surface/80) + 모바일 BottomNav 신설. PR3 안 신설 합성 토큰 후보 `.bottom-nav` / `.bottom-nav-item-active` / `.header-glass`. DESIGN.md v8 의 `bottom-nav*` / `navbar*` 토큰을 `components.css @layer components` 로 흡수
   - **Pretendard 운영 모니터링** — woff2 4 weight self-host 가 Vercel 정적 자산으로 묶임. LCP 영향 + next/font size-adjust fallback 동작 확인
   - **handoff-append workflow 보강** — `grep -q "(#${PR_NUMBER})"` 가 본문 인용 안 `(#27)` 같은 과거 PR 부분일치를 false-positive 매칭. 차후 `^### .*\(#${PR_NUMBER}\)$` 패턴으로 좁히기
+
+### 2026-05-23 — feat(layout): finsight shell (PR3/9 finsight-redesign) (#28)
+
+- **slug**: `finsight-redesign-pr3-layout-shell` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/28
+- **요약**: feat(layout): finsight shell (PR3/9 finsight-redesign)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > - finsight-redesign 시리즈 9개 중 **3번째 PR — 글로벌 셸**. base = PR2 (#27) 머지 직후 main (`55a707d`).
+  > - 6 메뉴 단일 정의 (`components/layout/navItems.ts`) + glass `Header` + 6 메뉴 `Sidebar` + 모바일 `BottomNav` + `not-found` 도입.
+  > - 라우트 그룹 `(workbench)` → `(main)` rename (URL 영향 0건, AC-L-5 RESOLVED).
+  > 
+  > ## 변경 파일
+  > 
+  > | 영역 | 파일 | 라인 |
+  > |---|---|---|
+  > | 의존성 | `package.json` / `package-lock.json` | +11 |
+  > | 라우트 그룹 rename | `app/(workbench)/{layout,page}.tsx` → `app/(main)/{layout,page}.tsx` | 0 변경 (rename + layout 본문 갱신 50줄) |
+  > | 셸 구현 | `app/(main)/layout.tsx` / `app/components.css` / `app/not-found.tsx` / `app/(main)/not-found.tsx` / `components/layout/{Header,Sidebar,BottomNav,navItems}.{tsx,ts}` / `lib/copy/layout/navCopy.ts` | +415 / -33 |
+  > 
+  > 총 **~415 신규 + 33 변경 라인** (PRD §8 추정 200~350L 와 정합 — not-found 2개 + 합성 토큰 7개로 약간 상회).
+  > 
+  > ## AC 자가검증
+  > 
+  > ### AC-L-1 Sidebar 6 메뉴 + 활성 강조 — PASS
+  > - `components/layout/navItems.ts` — `/dashboard`/`/`/`/analyze`/`/market`/`/watchlist`/`/profile` 6 항목.
+  > - `isNavItemActive(itemPath, pathname)` — `/` 정확 일치, 나머지 prefix 매칭.
+  > - `Sidebar.tsx` → `aria-current=\"page\"` + `sidebar-nav-item-active` (bg-accent-vivid-soft text-accent-vivid).
+  > 
+  > ### AC-L-2 Header glass + sticky — PASS
+  > - `Header.tsx` — `header-glass sticky top-0 z-[50]`.
+  > - `.header-glass { backdrop-blur-md bg-surface/80 border-b border-border-line h-navbar-h }`.
+  > - FinSight wordmark — Activity 로고 + 텍스트 (text-accent-vivid + text-nav-brand). 데스크탑 `lg:invisible` 로 사이드바 brand 와 시각 중복 회피.
+  > 
+  > ### AC-L-3 BottomNav 모바일만 + useBreakpoint().isMobile — PASS
+  > - `BottomNav.tsx` — `if (!isMobile) return null;` (조기 반환).
+  > - `window.innerWidth` / `window.matchMedia` 직접 호출 0건: `git grep -nE \"window\\.innerWidth|window\\.matchMedia\" -- components/ hooks/` → useBreakpoint.ts 외 0건.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR4 (mock 데이터 폴더 + recharts 의존성)** — 본 PR3 후 곧바로 진입. `lib/mock/{dashboard,home,market,watchlist,profile}/*.ts` + `recharts@latest` 추가. PR3 의 navItems path 와 폴더명 매핑 그대로 활용.
+  - **워크벤치 history/favorites 잔존 코드 (PR5 정리)** — `components/layout/{Navbar,SidebarContent,MobileDrawer,FavoriteToggle,SidebarItem,workbenchEvents}.tsx` 가 PR3 의 layout 에서 mount 해제됐으나 파일 상태로 남음. PR5 의 `/analyze` 라우트 이전 시 함께 정리.
+  - **font 최적화 모니터링 (선택)** — Pretendard 1.07 MB 자체는 `display: swap` 으로 LCP 무영향이지만, 후속 PR9 머지 후 `finsight-redesign-final` 점검 시 lighthouse 실측 1회 권장.
