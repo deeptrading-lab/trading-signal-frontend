@@ -1686,3 +1686,45 @@
   - **PR4 (mock 데이터 폴더 + recharts 의존성)** — 본 PR3 후 곧바로 진입. `lib/mock/{dashboard,home,market,watchlist,profile}/*.ts` + `recharts@latest` 추가. PR3 의 navItems path 와 폴더명 매핑 그대로 활용.
   - **워크벤치 history/favorites 잔존 코드 (PR5 정리)** — `components/layout/{Navbar,SidebarContent,MobileDrawer,FavoriteToggle,SidebarItem,workbenchEvents}.tsx` 가 PR3 의 layout 에서 mount 해제됐으나 파일 상태로 남음. PR5 의 `/analyze` 라우트 이전 시 함께 정리.
   - **font 최적화 모니터링 (선택)** — Pretendard 1.07 MB 자체는 `display: swap` 으로 LCP 무영향이지만, 후속 PR9 머지 후 `finsight-redesign-final` 점검 시 lighthouse 실측 1회 권장.
+
+### 2026-05-23 — feat(mock): 5 도메인 mock 데이터 + recharts (PR4/9 finsight-redesign) (#29)
+
+- **slug**: `finsight-redesign-pr4-mock-data` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/29
+- **요약**: feat(mock): 5 도메인 mock 데이터 + recharts (PR4/9 finsight-redesign)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > - 시안 (`Stock and Coin Analysis App/`) 의 인라인 mock 5 화면 분량을 본 저장소 컨벤션 안에서 `lib/mock/<domain>/<file>.ts` 의미 단위 분할 표준 (PRD §3.4) 으로 이식. 5 도메인 (dashboard / home / market / watchlist / profile) × 의미 단위 18 mock 파일.
+  > - 각 mock 은 `lib/types/<domain>/*.ts` 도메인 타입 (총 18 신규 타입 파일) import 해 작성. 사용자 노출 한글 카피 0건 — 모두 `lib/copy/<domain>/*.ts` 9 파일 (라벨 / placeholders / tooltips / buttons) 의 카피 키 (`labelKey` / `bodyKey` / `summaryKey` / `displayKey` / `syncedAtKey`) 로 분리.
+  > - `recharts@3.8.1` 추가 (PR3 의 `lucide-react@1.16.0` 정합). 시안의 motion / framer / canvas-confetti / Radix 풀세트 등 비도입 — 의존성 추가 1건.
+  > - `docs/rules/frontend.md` 의 도메인 한 뎁스 절에 mock 폴더 위치 + 카피 키 룰 + `lib/copy/<domain>/` 절 갱신 (PR3 인계 흡수 — `lib/copy/layout/` 도메인 정합 명시).
+  > 
+  > ## 파일 구조 표 (도메인 × 의미 단위)
+  > 
+  > | 도메인 | mock 파일 | types 파일 | copy 파일 |
+  > |---|---|---|---|
+  > | dashboard | portfolio / holdings / fearGreed / marketSnapshot (4) | 동일 4 | labels / tooltips (2) |
+  > | home | currentAsset / searchOptions / priceChart / aiAnalysis / marketStats / technicalIndicators / news / timeframes (8) | 동일 8 | labels / placeholders / tooltips (3) |
+  > | market | themes / indices (2) | 동일 2 | labels (1) |
+  > | watchlist | items (1) | 동일 1 | labels (1) |
+  > | profile | user / exchanges / menuItems (3) | 동일 3 | labels / buttons (2) |
+  > | **합계** | **18** | **18** | **9** |
+  > 
+  > 총 변경: 5 commit / +1,021 / -3 (의존성 자동 lock 파일 포함 ~1,418L).
+  > 
+  > ## 의존성
+  > 
+  > - `recharts@3.8.1` 추가 — peer dep react ^16.8~19 / react-dom ^16~19 정합 (현재 react 19).
+  > - `lucide-react@1.16.0` — PR3 에서 이미 도입. 본 PR4 무수정.
+  > 
+  > ## AC 검증 표
+  > 
+  > ### AC-M (PRD §5.4)
+  > 
+  > | AC | 명령 / 실측 | 판정 |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR5** `feat(analyze): workbench 라우트 이전` — 본 PR4 머지 직후 분기. 현 `app/(main)/page.tsx` (워크벤치) → `app/(main)/analyze/page.tsx`. PR3 QA 부록 #7.2 의 layout 잔존 6 파일 (Navbar / SidebarContent / MobileDrawer / FavoriteToggle / SidebarItem / workbenchEvents) 동반 정리. 워크벤치 도메인 폴더명 (`components/workbench/`, `hooks/workbench/`, `lib/api/workbench/`) 은 PRD §9 q5 결정대로 유지.
+  - **PR6** `feat(home): 분석 대시보드 (mock)` — 본 PR4 의 `lib/mock/home/*` + `lib/copy/home/*` 활용. recharts `AreaChart` 가 가격 차트 진입점.
+  - **운영 모니터링** — recharts 도입에 따른 bundle size 변화는 PR6 (실 import 시점) 에서 First Load JS 재측정. lighthouse 실측은 PR9 머지 후 `finsight-redesign-final` 단계.
