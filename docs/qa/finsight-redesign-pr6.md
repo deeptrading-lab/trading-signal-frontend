@@ -120,3 +120,76 @@ useState 합계 = 4 위치 (HomeDashboard x3 + AssetHeader x1). hydration mismat
 - 라운드트립 5/5 통과, Client/Server 분리 9/9, v8 토큰 cascade 8 종 노출, Bundle size 300 kB 한계 안 (마진 +26%), 에지 6/6 통과.
 - 라벨: `impl-ready` 제거 → `qa-passed` 부여.
 - 후속: PR7 (Dashboard 포트폴리오) 진입 가능.
+
+---
+
+## 10. 재검증 (HEAD `a31c6b1` — 2026-05-24)
+
+직전 QA (`b323a1d`) 후 사용자 dev 실측 발견 → fix 2건 추가:
+- `941784a` — fix(layout): suppressHydrationWarning + AppLayout 시안 구조 정합 + sidebar item 시안 톤
+- `a31c6b1` — feat(layout): Header 데스크탑 글로벌 마켓 티커 (mock)
+
+변경 7 파일: `app/layout.tsx`, `app/(main)/layout.tsx`, `app/components.css`, `components/layout/Sidebar.tsx`, `components/layout/Header.tsx`, `lib/types/layout/marketTicker.ts` (신설), `lib/mock/layout/marketTickers.ts` (신설).
+
+### 10.1 AC-FIX 1~6 검증
+
+| AC | 재현 | 기대 | 실측 | 판정 |
+| --- | --- | --- | --- | --- |
+| **FIX-1** suppressHydrationWarning | `grep "suppressHydrationWarning" app/layout.tsx` | ≥1 hit | x2 (주석 + `<html ... suppressHydrationWarning>`). 사용자 dev 실측에서 webcrx 외부 확장 mismatch 해소 | pass |
+| **FIX-2** AppLayout 시안 구조 | SSR HTML grep — `<aside class="sidebar">` 가 `<header class="header-glass">` 의 형제가 아닌 우측 컬럼 외부 | sidebar → flex flex-col flex-1 wrapper → header 순 | grep 결과 `<aside class="sidebar">` → `<div class="flex flex-col flex-1 overflow-hidden">` → `<header class="header-glass sticky top-0 z-[50]">` — 시안 (`Stock and Coin Analysis App/src/app/components/AppLayout.tsx`) 정합 | pass |
+| **FIX-3** Sidebar item 시안 톤 | `grep "sidebar-nav-item" app/components.css` | `@apply ... h-12 px-lg gap-md rounded-md` + icon `h-5 w-5` | `.sidebar-nav-item` = `flex items-center gap-md h-12 px-lg ... rounded-md`. `.sidebar-nav-item-icon` = `h-5 w-5 shrink-0`. 시안 `<Icon size={20} />` 정합 | pass |
+| **FIX-4** Header 데스크탑 마켓 티커 | curl `/` + grep `KOSPI\|NASDAQ\|2,750.23\|16,400.12\|89,240,000` | 3 코드 + 3 값 노출 + signal-up red 2 / signal-down blue 1 | grep `KOSPI`/`NASDAQ`/`2,750.23`/`16,400.12`/`89,240,000` 모두 노출. `signal-up` x7 (baseline x5 + 티커 KOSPI/NASDAQ 2건), `signal-down` x2 (baseline x1 + BTC 1건) — 한국식 등락 cascade 정합. `aria-label="글로벌 마켓 시세"` 적용 | pass |
+| **FIX-5** `lg:invisible` 잔존 0 | `git grep -nE "lg:invisible" -- components/ app/` | className 0 hit (주석 허용) | 2 hit 모두 Header.tsx JSDoc/인라인 주석 (회귀 사유 설명) — 실제 className 0 | pass |
+| **FIX-6** layout mock/types 도메인 폴더 | `ls lib/mock/layout/ lib/types/layout/` | 신설 2 파일 | `lib/mock/layout/marketTickers.ts` (787B) + `lib/types/layout/marketTicker.ts` (812B). `MarketTicker` interface (`code`/`value`/`changePct`/`isUp`) 정합, mock 배열 3건 (KOSPI/NASDAQ/BTC) | pass |
+
+### 10.2 기존 AC 무회귀 재검증
+
+| AC 그룹 | 재검증 | 판정 |
+| --- | --- | --- |
+| **COMMON-1** typecheck | `npm run typecheck` → tsc 종료 0 | pass |
+| **COMMON-2** lint | `npm run lint` → eslint 종료 0 | pass |
+| **COMMON-3** build | `npm run build` → `✓ Compiled successfully`, `/` 112 kB / 223 kB · `/analyze` 34.8 kB / 152 kB · shared 102 kB (모두 PR6 baseline 동일 — fix 가 bundle 무영향) | pass |
+| **COMMON-4** BFF | `git grep "fetch(" -- components/home app/(main)/page.tsx` 0 hit. `http://127.0.0.1` 은 route handler fallback 3건 한정 (무회귀) | pass |
+| **COMMON-5** 한글 카피 톤 | `lib/copy/layout/navCopy` (`NAV_BRAND_LABEL`/`HEADER_PROFILE_ARIA`) + `aria-label="글로벌 마켓 시세"` 신규 한국어 — 톤 정합 | pass |
+| **COMMON-6** 컨벤션 | `lib/types/layout/` + `lib/mock/layout/` 도메인 한 뎁스 신설, barrel 0, PascalCase 정합 | pass |
+| **COMMON-7** hex 직타 | `app/components.css` hex 직타 0 (주석만), 신규 mock/types 파일 hex 0 — PriceChart CHART_TOKENS 격리는 PR6 baseline 무회귀 | pass |
+| **COMMON-8** hydration | dev SSR (localhost:3001) GET / 200, 콘솔 mismatch 0 (recharts `width(-1)` ResponsiveContainer SSR 알려진 무영향 동작만). `suppressHydrationWarning` 으로 외부 확장 주입 mismatch 해소 | pass |
+| **PAGE-1~8** Home 9 섹션 | curl `/` + grep — 비트코인 x5 / BTC/KRW x2 / AI 투자 분석 x2 / 가격 추이 x2 / 시장 정보 x2 / 기술적 지표 x2 / 실시간 관련 뉴스 x2 모두 정합 | pass |
+| **v8 토큰 cascade** | `asset-coin` x5 / `card-ai` x1 / `gradient-ai` x3 모두 baseline 동일 | pass |
+
+### 10.3 라운드트립 재실행
+
+| # | 시나리오 | HTTP | SSR | 판정 |
+| --- | --- | --- | --- | --- |
+| 1 | `/` 진입 (HomeDashboard + 새 layout shell) | 200 | 9 섹션 + sidebar 6 메뉴 (active `/` x1) + 마켓 티커 3건 | pass |
+| 2 | `/analyze` 무회귀 | 200 | layout 변경이 워크벤치 무영향 | pass |
+| 3 | `/dashboard` 404 무회귀 (PR7) | 404 | not-found 무회귀 | pass |
+| 4 | `/market` `/watchlist` `/profile` 404 무회귀 | 404 x3 | 정합 | pass |
+| 5 | 모바일 UA (`iPhone OS 17_0`) SSR 마크업 | 200 + 동일 본문 (chunk timestamp 차이 1건 외 diff 0) | breakpoint cascade 정합 (`hidden lg:flex` 으로 desktop 한정 마운트) | pass |
+
+### 10.4 에지 케이스 (E-FIX)
+
+| # | 시나리오 | 기대 | 실측 | 판정 |
+| --- | --- | --- | --- | --- |
+| **E-FIX-1** webcrx 등 클라이언트 확장 주입 | `<html>` mismatch 0 | `suppressHydrationWarning` 한 레벨 한정 적용 (자식 트리에 미전파) | pass |
+| **E-FIX-2** 데스크탑 (1280) Header 폭 | sidebar 옆 우측 컬럼 안 sticky (전폭 X) | SSR `<div class="flex flex-col flex-1 overflow-hidden"> > <header class="header-glass sticky top-0 z-[50]">` — 우측 컬럼 안 sticky 정합 | pass |
+| **E-FIX-3** 모바일 (375) Sidebar/BottomNav | sidebar unmount (`hidden lg:flex`), BottomNav `fixed bottom-0` | sidebar 합성 토큰의 `hidden lg:flex` cascade + BottomNav `bottom-nav` 정합 | pass |
+| **E-FIX-4** 마켓 티커 `hidden lg:flex` | 모바일 unmount / 데스크탑 노출 | `<div class="hidden lg:flex items-center gap-lg text-caption" aria-label="글로벌 마켓 시세">` 정합 | pass |
+| **E-FIX-5** 마켓 티커 타입 정합 | `MarketTicker` interface 정합 | `lib/types/layout/marketTicker.ts` 4 필드 (`code`/`value`/`changePct`/`isUp`), `lib/mock/layout/marketTickers.ts` 3건 모두 만족, typecheck 통과 | pass |
+
+### 10.5 머지 게이트 부록 — PR7 base 재정합
+
+| # | 검증 포인트 | 결과 |
+| --- | --- | --- |
+| 1 | 새 AppLayout 구조 (sidebar viewport 전체 + 우측 컬럼 안 header sticky) 위에서 PR7 `/dashboard` mount | PASS — PR7 의 `app/(main)/dashboard/page.tsx` 가 자연스럽게 `main` 영역 (overflow-y-auto) 안으로 cascade |
+| 2 | 새 `.sidebar-nav-item` 시안 톤 (h-12 / px-lg / rounded-md) 무회귀 | PASS — PR7 가 sidebar 자체 수정 없음 |
+| 3 | 새 마켓 티커 mock — PR7 dashboard 와 충돌 0 | PASS — Header 만 갱신, dashboard 영역 무영향 |
+| 4 | `lib/mock/layout/` + `lib/types/layout/` 도메인 폴더 신설 — PR7 의 `lib/mock/dashboard/*` 와 충돌 0 | PASS — 도메인 분리 |
+
+→ **PR7 base 부적합 0건. 본 PR6 보정 commit 0.**
+
+### 10.6 재검증 결론
+
+- **AC-FIX 1~6 6/6 통과** + 기존 AC 무회귀 (20/20 유지) + 라운드트립 5/5 + 에지 5/5 + PR7 base 재정합 통과.
+- 라벨: `impl-ready` 제거 → `qa-passed` 재부여.
+- 후속 (본 PR6 머지 후): PR7 (Dashboard 포트폴리오) 진입.
