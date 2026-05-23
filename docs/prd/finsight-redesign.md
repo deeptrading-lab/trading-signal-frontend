@@ -198,6 +198,41 @@
   - 데스크탑 (1280·1920) sidebar 6 메뉴 진입.
   - 자산 식별 토큰 / 한국식 등락 토큰 일관 적용 — 모든 화면.
 
+### 3.8 머지 게이트 절차 + 시리즈 종료 후 최종 점검
+
+본 PRD 가 분할 PR 시리즈 (PR1~PR9) 인 점을 반영한 추가 절차. 사용자 명시 합의 (2026-05-23):
+
+> "각 PR 마다 최종 머지 전에 최종 점검을 한번 하고 다음 PR 내용까지 참고해서 문제될게 없으면 머지하는걸로 하자. 최종적으로 작업이 끝나면 PRD 기반으로 잘 되었는지 점검도 해야해."
+
+#### 3.8.1 각 PR 머지 게이트 (PR1~PR9 공통)
+
+각 PR 은 **두 조건 모두 통과** 후 머지:
+
+1. **본 PR 의 AC + 라벨 흐름 통과** — impl-ready → qa-passed → review-approved (AGENTS.md 기본 흐름).
+2. **다음 PR 의 §3.3 명세 + §5.X AC 미리 검토** — 본 PR 의 산출물이 다음 PR 의 base 로 적합한지 정합 검증.
+
+| 본 PR | 다음 PR 정합 검증 포인트 |
+|---|---|
+| PR1 (v4) | PR2 의 v8 토큰 cascade 가 PR1 의 v4 어댑터 위에서 깨지지 않음 |
+| PR2 (v8 토큰) | PR3 의 layout shell 컴포넌트가 v8 토큰 (signal-up/down, asset-stock/coin, gradient-ai) 으로 자연 cascade |
+| PR3 (layout) | PR4 의 mock 폴더 구조 + `lucide-react`/`recharts` 의존성이 PR3 sidebar/header/bottomnav 와 import 충돌 없음 |
+| PR4 (mock) | PR5 의 `/analyze` 라우트 이전 시 workbench 도메인 import 가 mock 폴더와 충돌 없음 |
+| PR5 (`/analyze`) | PR6 의 `app/page.tsx` 신설 (Home AnalysisDashboard) 이 PR5 의 라우트 이전과 충돌 없음 |
+| PR6 (Home) | PR7 의 Dashboard 가 PR6 의 컴포넌트 (예: 토글 검색·차트) 패턴을 재활용 가능 |
+| PR7 (Dashboard) | PR8 의 Market 화면이 PR7 의 카드 셸 패턴 재활용 가능 |
+| PR8 (Market) | PR9 의 Watchlist 테이블 12-col grid 가 PR8 의 카드 그리드 패턴과 정합 |
+| PR9 (Watchlist+Profile) | 시리즈 종료 — 다음 PR 검토 대신 §3.8.2 진입 |
+
+다음 PR 검토에서 base 부적합이 발견되면 **본 PR 의 범위에서 보정 후 머지**. 보정이 본 PR scope 초과 시 사용자 / PM 협의로 PR 분할 또는 scope 조정.
+
+#### 3.8.2 시리즈 종료 후 최종 점검 (PR9 머지 직후)
+
+PR9 머지 직후 별도 검증 단계 진입:
+
+- **main 상태에서 PRD 의 §2 목표 + §5 AC 전체 + §6 가정 + §8 영향 분석을 1:1 검증** — 미흡한 항목 발견 시 cleanup PR (`finsight-redesign-final-check`) 로 보정.
+- **점검 산출물**: `docs/qa/finsight-redesign-final.md` 별도 파일. 각 영역 별 검증 결과 + 미흡 항목 + cleanup PR 링크.
+- **사용자 confirm 게이트**: 최종 점검 진입 직전 사용자에게 "PRD 기반 최종 점검 진입 OK?" 1회 확인.
+
 ## 4. 범위 외 (Out of Scope)
 
 - **BE 호출 신설** — 5개 mock 화면 (Dashboard / Home / Market / Watchlist / Profile) 의 BE 연결은 별도 PRD. mock data 만 본 PRD 범위.
@@ -290,6 +325,17 @@
 - **AC-COMMON-8**: hydration mismatch 콘솔 경고 0건.
 - **AC-COMMON-9**: 시리즈 슬러그 일관 — 모든 PR 의 브랜치명 `feature/finsight-redesign-<phase>` 형태 또는 단일 `feature/finsight-redesign` 누적 push. `[OPEN QUESTION] q4` resolved 에 따라 결정.
 
+### 5.8 머지 게이트 + 시리즈 종료 후 최종 점검 (§3.8 정합)
+
+- **AC-GATE-1** (PR1~PR8 공통): 본 PR 의 라벨 흐름 (impl-ready → qa-passed → review-approved) 통과.
+- **AC-GATE-2** (PR1~PR8 공통): 머지 직전 다음 PR 의 §3.3 명세 + §5.X AC 를 1회 검토. 본 PR 산출물이 다음 PR base 로 적합한지 PR 본문 (또는 QA 리포트 부록) 에 1단락 정합 검증 결과 명시. §3.8.1 표의 검증 포인트 인용.
+- **AC-GATE-3** (PR1~PR8 공통): AC-GATE-2 에서 base 부적합 발견 시 본 PR 범위에서 보정 후 commit. 보정 사유 commit log 명시.
+- **AC-FINAL-1**: PR9 머지 후 `docs/qa/finsight-redesign-final.md` 신설. §2 목표 항목 별 main 상태 검증 결과 표.
+- **AC-FINAL-2**: AC-FINAL-1 의 점검 결과에 §5 의 모든 AC ID 매핑 + pass / fail / N/A 마크. fail 항목은 cleanup PR 링크 또는 사유 명시.
+- **AC-FINAL-3**: AC-FINAL-1 에 §6 가정 검증 — 가정 11건이 main 상태에서 여전히 유효한지 1:1 확인.
+- **AC-FINAL-4**: AC-FINAL-1 에 §8 영향 분석의 회귀 위험 11건이 main 상태에서 회귀 0건인지 검증.
+- **AC-FINAL-5**: 사용자 confirm 게이트 — 최종 점검 진입 직전 사용자에게 "PRD 기반 최종 점검 진입 OK?" 1회 확인 후 진행.
+
 ## 6. 가정 · 제약
 
 ### 6.1 가정
@@ -316,6 +362,7 @@
 - **사용자 노출 한글 카피 톤 무회귀** — `lib/copy/<domain>/` 패턴 유지.
 - **mock data 안 사용자 노출 한글 카피 직접 작성 금지** — 카피는 `lib/copy/<domain>/`. mock 은 데이터·숫자·ticker 만.
 - **WCAG AA 4.5:1 무회귀** — DESIGN.md v8 prose 의 대비비 표 게이트.
+- **머지 게이트 절차 적용** — §3.8 + §5.8 강제. 각 PR 머지 전 다음 PR base 정합 검증 1회 + 시리즈 종료 후 PRD 기반 최종 점검 (`docs/qa/finsight-redesign-final.md`).
 
 ## 7. 참고
 
@@ -387,11 +434,11 @@
 - 분할 PRD 로 두지 않는 이유 — 각 PR 의 변경 영역이 의존적 (PR1 v4 없으면 PR2 토큰 동기화 못 함, PR2 토큰 없으면 PR3~PR9 모든 화면 cascade 안 됨). PRD 단위로 분할하면 PRD 간 의존 그래프 관리 비용 > 단일 PRD 의 §3.3 Phase 분할 비용.
 - **단일 PRD 결정** — §9 OPEN QUESTION q4 의 PM 권고 채택.
 
-## 9. OPEN QUESTION
+## 9. OPEN QUESTION → DECISION LOG
 
-각 질문에 PM 권고 동봉. 사용자 / 디자이너 결정 후 `[RESOLVED]` 로 갱신.
+사용자가 2026-05-23 PM 권고 10건 모두 채택. 각 항목 `[RESOLVED]` 로 마크. 후속 단계에서 재검토 가능.
 
-- `[OPEN QUESTION] q1 — 사이드바 메뉴 6개 vs 5개 (분석 영역 통합)`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고)] q1 — 사이드바 메뉴 6개 vs 5개 (분석 영역 통합)`
 
   현재 안 = 6개 메뉴 (`/dashboard`, `/`, `/analyze`, `/market`, `/watchlist`, `/profile`). `/` (종목 분석 mock) 과 `/analyze` (실분석) 가 시각적으로 비슷한 정보를 다뤄 사용자 혼동 가능.
 
@@ -399,7 +446,7 @@
   - **옵션 B**: 5 메뉴 통합 + 한 화면 (`/analyze` 또는 `/explore`) 안에 "탐색" / "실분석" 탭 분리. 사이드바 단순.
   - **PM 권고**: **옵션 A** (6 메뉴 유지). 시안의 5 화면 + `/analyze` 분리 의도 그대로 살리고, 사용자가 두 흐름을 별도 routing 으로 인식. 메뉴 라벨이 핵심.
 
-- `[OPEN QUESTION] q2 — mock 데이터 위치: `lib/mock/<domain>/<file>.ts` vs `lib/mock/<domain>/index.ts` 단일`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고)] q2 — mock 데이터 위치: `lib/mock/<domain>/<file>.ts` vs `lib/mock/<domain>/index.ts` 단일`
 
   현재 안 = 도메인 별 폴더 + 의미 단위 분할 파일 (`portfolio.ts` / `holdings.ts` 등). 페이지별 분산.
 
@@ -407,7 +454,7 @@
   - **옵션 B**: 도메인 별 단일 `index.ts`. `lib/mock/dashboard/index.ts` 가 모든 mock 을 export. 컴포넌트는 `import { portfolio, holdings } from "@/lib/mock/dashboard"`.
   - **PM 권고**: **옵션 A**. 컨벤션 (`docs/rules/frontend.md` 의 barrel 금지) 정합. tree-shaking + grep 신뢰도. 의미 단위로 분리하면 mock 추가·교체 비용 낮음.
 
-- `[OPEN QUESTION] q3 — shadcn/ui 풀세트 도입 vs 점진 도입`
+- `[RESOLVED 2026-05-23 — 옵션 B 채택 (PM 권고)] q3 — shadcn/ui 풀세트 도입 vs 점진 도입`
 
   시안은 shadcn/ui 풀세트 (40+ 컴포넌트). 본 PRD 가 풀세트를 한 번에 도입 vs 필요한 것만 점진.
 
@@ -416,7 +463,7 @@
   - **옵션 C**: 풀세트 한 번에 + 본 저장소 토큰 cascade 적용.
   - **PM 권고**: **옵션 B** (점진 도입). 본 저장소의 `lib/copy/` / `cn` / 컨벤션 8개 절 정합이 더 중요. shadcn 풀세트는 본 저장소 컨벤션과 별도 톤 (예: shadcn 의 `cn` 헬퍼 vs 본 저장소 `lib/utils/cn.ts`) — 통합 비용이 더 큼. 본 PRD 가 컨벤션 안에서 컴포넌트 작성하는 편이 후속 유지보수 비용 낮음.
 
-- `[OPEN QUESTION] q4 — 단일 PRD vs Phase 별 분리 PRD`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고)] q4 — 단일 PRD vs Phase 별 분리 PRD`
 
   현재 안 = 단일 PRD (`docs/prd/finsight-redesign.md`) + §3.3 의 Phase 분할 (9 PR).
 
@@ -425,7 +472,7 @@
   - **옵션 C**: PR 1개당 PRD 1개 (9 PRD). 가장 세분화.
   - **PM 권고**: **옵션 A** (단일 PRD). §8.4 의 사유 — 9 PR 모두 동일 의도 + 의존적. PRD 분할이 추적 비용 증가. 단 본 PRD 가 길어지므로 Phase 2 진입 전 사용자 / 디자이너가 §3.3 의 Phase 2 분할을 다시 확인하는 1단계 권장.
 
-- `[OPEN QUESTION] q5 — workbench 도메인 폴더명 유지 vs `analyze` rename`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고)] q5 — workbench 도메인 폴더명 유지 vs `analyze` rename`
 
   현재 = `components/workbench/`, `hooks/workbench/`, `lib/api/workbench/`, `lib/types/workbench/`, `lib/copy/workbench/`. 라우트만 `/analyze` 로 이동 시 도메인 폴더명과 라우트명 불일치.
 
@@ -433,7 +480,7 @@
   - **옵션 B**: `analyze` 로 rename. 라우트명 = 도메인 폴더명. 일관성. 단 git history 단절 + import 경로 전체 갱신 비용.
   - **PM 권고**: **옵션 A** (유지). `docs/rules/frontend.md` 컨벤션 의도 — "도메인 폴더명은 비즈니스 도메인 단위로 통일. 한 화면이 여러 도메인을 호출하더라도 폴더는 비즈니스 단위 그대로". 라우트 변경 = URL 의도 변경, 폴더 변경 = 도메인 의도 변경. 두 변경의 결합도 낮음. 또한 후속 (예: `/analyze` + `/analyze/streaming` 두 라우트가 한 workbench 도메인 호출) 시 폴더명 유지가 자연.
 
-- `[OPEN QUESTION] q6 — Pretendard CDN 임포트 vs `next/font` self-host`
+- `[RESOLVED 2026-05-23 — 옵션 B 채택 (PM 권고)] q6 — Pretendard CDN 임포트 vs `next/font` self-host`
 
   Pretendard 도입 방식.
 
@@ -442,7 +489,7 @@
   - **옵션 C** — `next/font/google` — Pretendard 가 Google Fonts 등록 후 시점. 작성일 기준 미등록 (확인 필요).
   - **PM 권고**: **옵션 B** (`next/font/local` + Pretendard subset). FOUT 없음 + 외부 의존 0 + Next.js 의 폰트 최적화 (preload / font-display swap / size-adjust) 자동. 폰트 파일 크기는 `subset` (Korean-Hangul + Latin) 으로 ~100KB 안으로 흡수 가능. CDN 은 운영 안정성 위험 (CDN downtime 시 fallback).
 
-- `[OPEN QUESTION] q7 — PR9 (Watchlist + Profile) 묶음 vs 분할`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고, 600L 초과 시 즉시 분할)] q7 — PR9 (Watchlist + Profile) 묶음 vs 분할`
 
   현재 안 = PR9 단일 (두 화면 묶음).
 
@@ -450,7 +497,7 @@
   - **옵션 B**: PR9 (Watchlist) + PR10 (Profile) 분할. 한 PR 변경량 가장 작게.
   - **PM 권고**: **옵션 A** (묶음 유지). 두 화면이 모두 mock 만 다루고 BE 호출 0. 분할 시 PR 메타 비용 (PR 본문 / QA 리포트 / HANDOFF entry / reviewer 사이클) 이 변경 비용보다 큼. 단 PR9 구현 중 분량이 600L 초과 시 PR9 (Watchlist) + PR10 (Profile) 즉시 분할 (FE Dev 판단).
 
-- `[OPEN QUESTION] q8 — 시안 (`Stock and Coin Analysis App/`) 폴더 처리`
+- `[RESOLVED 2026-05-23 — 옵션 B 채택 (PM 권고)] q8 — 시안 (`Stock and Coin Analysis App/`) 폴더 처리`
 
   본 PRD 머지 후 시안 폴더 처리.
 
@@ -459,7 +506,7 @@
   - **옵션 C**: `.gitignore` 추가 + 로컬 보관. 다른 개발자가 다시 받지 않도록.
   - **PM 권고**: **옵션 B**. 본 PRD 시리즈 (PR1~PR9) 모두 머지 후 별도 chore PR (`chore: remove figma make export after finsight-redesign`) 로 폴더 제거. PR9 머지 직후 자연 시점.
 
-- `[OPEN QUESTION] q9 — Phase 2 의 화면 순서 (PR6 Home vs PR7 Dashboard 우선순위)`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고)] q9 — Phase 2 의 화면 순서 (PR6 Home vs PR7 Dashboard 우선순위)`
 
   현재 안 = PR6 Home → PR7 Dashboard → PR8 Market → PR9 Watchlist+Profile.
 
@@ -468,7 +515,7 @@
   - **옵션 C**: `/analyze` 가 이미 PR5 에서 정착하므로 Home / Dashboard 순서 무관.
   - **PM 권고**: **옵션 A** (Home 우선). 사용자가 진입 후 보는 첫 화면 (`/`) 이 가장 임팩트 있어야 함. Dashboard 는 보유 자산이 있어야 의미가 살아 — mock 단계에서는 Home 의 정보 탐색이 더 자연.
 
-- `[OPEN QUESTION] q10 — Tailwind v4 의 시안 CSS-first 패턴 흡수 정도`
+- `[RESOLVED 2026-05-23 — 옵션 A 채택 (PM 권고)] q10 — Tailwind v4 의 시안 CSS-first 패턴 흡수 정도`
 
   시안은 v4 의 `@theme inline` / `@utility` / `@source` 디렉티브 활용. 본 PRD 의 어댑터 단일 진실 원천 룰과 충돌 가능.
 
