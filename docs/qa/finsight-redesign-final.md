@@ -8,7 +8,7 @@
 
 ## 1. 요약
 
-PRD §2 목표 7건 모두 main 상태 정착 (pass 7/7). §5 AC 합계 — pass 51 / fail 0 / N/A 0 (AC-V4-1~8 + AC-V8-1~11 + AC-L-1~5 + AC-M-1~6 + AC-A-1~5 + AC-PAGE-1~8 + AC-COMMON-1~9 + AC-GATE-1~3 + AC-FINAL-1~5). §6 가정 11건 모두 main 상태 유효 (cleanup 인계 1건 — 시안 폴더). §8.2 회귀 위험 11건 모두 회귀 0건 — Pretendard FOUT 0 (next/font/local subset), v4 빌드 잔존물 0, 합성 토큰 cascade WCAG AA 무회귀, `/analyze` BE adapter 인터페이스 무수정. typecheck / lint / build 0 에러, prerender 11 라우트 모두 정상 (○ `/`, `/analyze`, `/dashboard`, `/market`, `/watchlist`, `/profile`, `/icon`, `/_not-found` + ƒ `/[...not_found]`, `/api/whitelist/search`, `/api/workbench/analyze`). 시리즈 종료 cleanup 인계 5건 — §7 명시.
+PRD §2 목표 7건 모두 main 상태 정착 (pass 7/7). §5 AC 합계 — pass 60 / fail 0 / N/A 0 (AC-V4-1~8 + AC-V8-1~11 + AC-L-1~5 + AC-M-1~6 + AC-A-1~5 + AC-PAGE-1~8 + AC-COMMON-1~9 + AC-GATE-1~3 + AC-FINAL-1~5). §6 가정 11건 모두 main 상태 유효 (cleanup 인계 1건 — 시안 폴더). §8.2 회귀 위험 11건 모두 회귀 0건 — Pretendard FOUT 0 (next/font/local subset), v4 빌드 잔존물 0, 합성 토큰 cascade WCAG AA 무회귀, `/analyze` BE adapter 인터페이스 무수정. typecheck / lint / build 0 에러, prerender 11 라우트 모두 정상 (○ `/`, `/analyze`, `/dashboard`, `/market`, `/watchlist`, `/profile`, `/icon`, `/_not-found` + ƒ `/[...not_found]`, `/api/whitelist/search`, `/api/workbench/analyze`). 시리즈 종료 cleanup 인계 5건 — §7 명시.
 
 ## 2. §2 목표 7건 — main 상태 1:1 검증
 
@@ -119,12 +119,13 @@ PRD §2 목표 7건 모두 main 상태 정착 (pass 7/7). §5 AC 합계 — pass
 | GATE-2 다음 PR base 정합 | 각 PR QA 리포트 GATE-2 절 | 8 게이트 통과 (PR1→PR2 ... PR8→PR9) | pass |
 | GATE-3 보정 commit | git log | PR6/PR7 fix commit (`fix(home): PriceChart ResizeObserver`, `fix(dashboard): White hero`) 정착 | pass |
 | FINAL-1 본 리포트 | 본 파일 신설 | `docs/qa/finsight-redesign-final.md` | pass |
-| FINAL-2 AC 매핑 | §3.1~3.8 표 | 51 AC 모두 pass | pass |
+| FINAL-2 AC 매핑 | §3.1~3.8 표 | 60 AC 모두 pass | pass |
 | FINAL-3 §6 가정 11건 | §4 표 | 11/11 유효 (1건 cleanup 인계) | pass |
 | FINAL-4 §8.2 회귀 위험 11건 | §5 표 | 11/11 회귀 0건 | pass |
 | FINAL-5 사용자 confirm | 2026-05-24 사용자 입력 | confirm 완료 | pass |
 
-**AC 합계 = pass 51 / fail 0 / N/A 0**.
+**AC 합계 = pass 60 / fail 0 / N/A 0** (V4 8 + V8 11 + L 5 + M 6 + A 5 + PAGE 8 + COMMON 9 + GATE 3 + FINAL 5 + FINAL-2 본 표 자기 인용).
+- 세부: V4 8 / V8 11 / L 5 / M 6 / A 5 / PAGE 8 / COMMON 9 / GATE 3 / FINAL 5 = 60
 
 ## 4. §6 가정 11건 — main 상태 유효성
 
