@@ -17,10 +17,15 @@
  * 안에서만 노출. 후속 PRD 에서 `getComputedStyle(root)` 등 동적 토큰 흡수로 발전 가능.
  *
  * 'use client' — recharts ResponsiveContainer 가 DOM 측정 (ResizeObserver) 을 요구.
+ *
+ * mounted 패턴 — ResponsiveContainer 가 SSR / 첫 client render 단계에서 부모 측정 전이라
+ * width=-1 / height=-1 경고 발생. mounted 후에만 ResponsiveContainer 마운트 → DOM 측정
+ * 완료 후 안정 렌더 + 콘솔 경고 0건. PR #34 chore 적용 (사용자 dev 실측 후 2026-05-24).
  */
 
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -63,67 +68,73 @@ function formatTooltipValue(value: unknown): [string, string] {
 }
 
 export function PriceChart({ data }: PriceChartProps) {
+  // mounted 후에만 ResponsiveContainer 마운트 — width(-1) 경고 회피.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   return (
     <div className="h-[320px] w-full min-w-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="priceChartFill" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="5%"
-                stopColor={CHART_TOKENS.fill}
-                stopOpacity={0.3}
-              />
-              <stop
-                offset="95%"
-                stopColor={CHART_TOKENS.fill}
-                stopOpacity={0}
-              />
-            </linearGradient>
-          </defs>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            vertical={false}
-            stroke={CHART_TOKENS.grid}
-          />
-          <XAxis
-            dataKey="date"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 12, fill: CHART_TOKENS.axisTick }}
-            dy={10}
-          />
-          <YAxis
-            domain={["auto", "auto"]}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={formatYAxis}
-            tick={{ fontSize: 12, fill: CHART_TOKENS.axisTick }}
-            width={60}
-            orientation="right"
-          />
-          <Tooltip
-            contentStyle={{
-              borderRadius: 8,
-              border: "none",
-              boxShadow: "0 4px 12px rgba(23, 32, 42, 0.1)",
-              backgroundColor: CHART_TOKENS.tooltipBg,
-              color: CHART_TOKENS.tooltipText,
-            }}
-            formatter={formatTooltipValue}
-            labelStyle={{ color: CHART_TOKENS.axisTick, marginBottom: 4 }}
-          />
-          <Area
-            type="monotone"
-            dataKey="price"
-            stroke={CHART_TOKENS.stroke}
-            strokeWidth={2}
-            fillOpacity={1}
-            fill="url(#priceChartFill)"
-            activeDot={{ r: 6, strokeWidth: 0 }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      {mounted ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="priceChartFill" x1="0" y1="0" x2="0" y2="1">
+                <stop
+                  offset="5%"
+                  stopColor={CHART_TOKENS.fill}
+                  stopOpacity={0.3}
+                />
+                <stop
+                  offset="95%"
+                  stopColor={CHART_TOKENS.fill}
+                  stopOpacity={0}
+                />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke={CHART_TOKENS.grid}
+            />
+            <XAxis
+              dataKey="date"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 12, fill: CHART_TOKENS.axisTick }}
+              dy={10}
+            />
+            <YAxis
+              domain={["auto", "auto"]}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={formatYAxis}
+              tick={{ fontSize: 12, fill: CHART_TOKENS.axisTick }}
+              width={60}
+              orientation="right"
+            />
+            <Tooltip
+              contentStyle={{
+                borderRadius: 8,
+                border: "none",
+                boxShadow: "0 4px 12px rgba(23, 32, 42, 0.1)",
+                backgroundColor: CHART_TOKENS.tooltipBg,
+                color: CHART_TOKENS.tooltipText,
+              }}
+              formatter={formatTooltipValue}
+              labelStyle={{ color: CHART_TOKENS.axisTick, marginBottom: 4 }}
+            />
+            <Area
+              type="monotone"
+              dataKey="price"
+              stroke={CHART_TOKENS.stroke}
+              strokeWidth={2}
+              fillOpacity={1}
+              fill="url(#priceChartFill)"
+              activeDot={{ r: 6, strokeWidth: 0 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }
