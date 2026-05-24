@@ -1853,3 +1853,64 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **PR9 (Watchlist + Profile)** 진입 — 본 PR8 의 `components/market/` 도메인 한 뎁스 패턴 + mock 직접 import 패턴 재활용. `lib/mock/watchlist/items.ts` + `lib/mock/profile/{user, exchanges, menuItems}.ts` (PR4 정착) 활용. Watchlist 는 12-col grid 테이블 (`md:grid-cols-12`), Profile 은 카드 + 거래소 연동 placeholder.
   - PR9 머지 후 시리즈 종료 단계 — PRD 기반 최종 점검 (§3.8 합의 절차).
+
+### 2026-05-24 — chore(meta): favicon + title FinSight + recharts width fix (#34)
+
+- **slug**: `finsight-meta-polish` · **author**: @HY0118 (backfill — qa-passed workflow grep 패턴 false-negative 로 자동 append 누락)
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/34
+- **요약**: chore(meta): favicon + title FinSight + recharts width fix
+- **현재 상태**: main 머지됨 (`mergedAt 2026-05-24T03:42:56Z`)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > finsight-redesign 시리즈 외부 별도 chore PR. PRD 없이 다음 3건 묶음.
+  > 
+  > - **A. recharts `width(-1) height(-1)` 경고 해소** — `components/home/PriceChart.tsx` 의 ResponsiveContainer 부모 div 에 `min-w-0` 추가. recharts 경고 메시지가 직접 제안한 권장 해법 (`add a minWidth(0)`). 시각 무회귀.
+  > - **B. metadata title 갱신** — `app/layout.tsx` 의 `title` 이 이전 브랜드명 `TradingSignalEngine` 잔존 → `FinSight`. description (`AI 기반 매수·매도 판단 보조 서비스`) 은 도메인 정합 — 유지.
+  > - **C. favicon 신설** — `app/icon.tsx` (`next/og` ImageResponse 동적 생성). 사이드바 brand badge 와 정합 (accent-vivid `#1d4ed8` 배경 + 흰 lucide Activity).
+  > 
+  > ## 변경 파일
+  > 
+  > | 파일 | 변경 | 라인 |
+  > |---|---|---|
+  > | `components/home/PriceChart.tsx` | `min-w-0` 추가 | +1 / -1 |
+  > | `app/layout.tsx` | title `FinSight` | +1 / -1 |
+  > | `app/icon.tsx` | 신설 | +43 |
+  > 
+  > 총 3 파일 / +45 -2.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR8** `feat(market): 시장 동향` 진입 — `app/market/page.tsx` + 인기 테마/섹터/주요 지수 카드.
+  - 본 PR 의 favicon hex `#1d4ed8` 은 토큰 동기화 시 갱신 필요 (주석 명시) — 토큰 변경 시 grep `app/icon.tsx`.
+  - SSR 측면 recharts 경고는 별도 작업 후보 (dynamic import ssr:false 리팩터, PriceChart 외 다른 차트 도입 시).
+
+### 2026-05-24 — feat(watchlist, profile): 관심종목 + 마이페이지 (PR9/9 finsight-redesign) (#36)
+
+- **slug**: `finsight-redesign-pr9-watchlist-profile` · **author**: @HY0118 (backfill — qa-passed workflow grep 패턴 false-negative 로 자동 append 누락)
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/36
+- **요약**: feat(watchlist, profile): 관심종목 + 마이페이지 (PR9/9 finsight-redesign 시리즈 종료)
+- **현재 상태**: main 머지됨 (`mergedAt 2026-05-24T04:31:35Z`), finsight-redesign 시리즈 9 PR 종료
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > - 시리즈 9 PR 중 **마지막** (`PR9/9`). `/watchlist` + `/profile` 두 라우트 신설로 6 메뉴 라우트(`/`, `/dashboard`, `/analyze`, `/market`, `/watchlist`, `/profile`) 모두 정착.
+  > - PRD `docs/prd/finsight-redesign.md` §3.3 PR9 + §5.6 AC-PAGE-1~8 정합. 시안 `Stock and Coin Analysis App/src/app/components/{Watchlist,Profile}.tsx` 정보 아키텍처를 본 저장소 컨벤션(`docs/rules/frontend.md`) + v8 토큰으로 재구성.
+  > - 분량 589L (Watchlist 215L + Profile 374L) — PRD §9 q7 RESOLVED 의 600L 분할 게이트 통과 (단일 PR 유지).
+  > 
+  > ## 변경 파일
+  > 
+  > | 파일 | 라인 | 도메인 |
+  > | --- | --- | --- |
+  > | `components/watchlist/WatchlistPage.tsx` | 54 | Watchlist |
+  > | `components/watchlist/WatchlistTable.tsx` | 60 | Watchlist |
+  > | `components/watchlist/WatchlistRow.tsx` | 72 | Watchlist |
+  > | `app/(main)/watchlist/page.tsx` | 29 | Watchlist |
+  > | `components/profile/ProfilePage.tsx` | 57 | Profile |
+  > | `components/profile/ProfileCard.tsx` | 87 | Profile |
+  > | `components/profile/ConnectedExchangesCard.tsx` | 89 | Profile |
+  > | `components/profile/SettingsMenuCard.tsx` | 104 | Profile |
+  > | `app/(main)/profile/page.tsx` | 37 | Profile |
+  > | **합계** | **589** | |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **`docs/qa/finsight-redesign-final.md` 작성** — QA 가 시리즈 종료 후 PRD 기반 최종 점검 리포트 작성 (AC-PAGE-1~8 × 6 화면 + AC-COMMON-1~9 + AC-GATE-1·2·3 full matrix).
+  - **cleanup PR (별도 slug)** — 위 머지 게이트 인계 5건 처리: HANDOFF 백필 + `NOT_FOUND_HOME_CTA`/root `not-found.tsx` 결정 + 시안 폴더 제거 + `[...not_found]` 검토 + `@next/bundle-analyzer` 도입.
+  - **Vercel 연동** — 사용자 메모 `project_vercel-deferred.md` 정합, 시리즈 완료 후 별도 chore.
