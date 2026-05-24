@@ -1812,3 +1812,44 @@
   - **PR7 (Dashboard 포트폴리오)** — `app/(main)/dashboard/page.tsx` 신설 + `components/dashboard/*` 도메인 폴더 + `lib/mock/dashboard/*` (PR4 정착) 활용. 본 PR6 의 `components/home/` 패턴 + 합성 토큰 (`card-hero`, `badge-signal-*`, `badge-asset-*`) 재활용.
   - **bundle size 모니터링** — PR7~9 누적 시 First Load JS / 라우트 추적. 300 KB 초과 라우트 발생 시 dynamic import 도입 검토.
   - **PriceChart 색 토큰화** — recharts API 가 Tailwind class 미수용. 후속 PRD 에서 `getComputedStyle(document.documentElement).getPropertyValue('--color-signal-up')` 같은 동적 흡수 검토 (현 PR6 무관).
+
+### 2026-05-24 — feat(market): 시장 동향 화면 mock (PR8/9 finsight-redesign) (#35)
+
+- **slug**: `finsight-redesign-pr8-market` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/35
+- **요약**: feat(market): 시장 동향 화면 mock (PR8/9 finsight-redesign)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > - 시리즈 9개 중 8번째 PR — `/market` 라우트를 채워 catch-all (`[...not_found]`) 을 자연 무력화.
+  > - 시안 `Stock and Coin Analysis App/src/app/components/MarketTrends.tsx` 의 정보 아키텍처 (좌: 인기 테마/섹터, 우: 주요 지수) 를 본 저장소 컨벤션 + v8 토큰 cascade 안에서 재구성.
+  > - BFF 호출 0건, 차트 0건 (recharts 미사용 — server bundle parity with `/dashboard` 56K).
+  > 
+  > ## 컴포넌트 표
+  > 
+  > | 파일 | 라인 수 | 역할 |
+  > |---|---|---|
+  > | `components/market/ThemesCard.tsx` | 65 | 인기 테마/섹터 4건 — 테마명 + 한국식 등락률 + 대표 종목 ("엔비디아, 마이크로소프트, 루닛 등"), hover → border-accent-vivid |
+  > | `components/market/IndicesCard.tsx` | 59 | 주요 지수 6건 2-col grid — 지수명 + 값(tabular-nums) + 변동률 + TrendingUp/Down 아이콘 |
+  > | `components/market/MarketPage.tsx` | 56 | 셸 컴포저 — 페이지 타이틀(Compass + "시장 동향") + 2-col 그리드 |
+  > | `app/(main)/market/page.tsx` | 36 | 라우트 — server component, mock props 전달 |
+  > | **합계** | **216** | |
+  > 
+  > ## v8 토큰 활용 표
+  > 
+  > | 위치 | 시안 (Tailwind 기본) | v8 토큰 cascade |
+  > |---|---|---|
+  > | 카드 셸 | `bg-white border-slate-200 rounded-2xl p-6 shadow-sm` | `.card` 합성 토큰 |
+  > | 페이지 타이틀 아이콘 (Compass) | `text-blue-500` | `text-accent-vivid` |
+  > | 인기 테마 헤더 아이콘 (Flame) | `text-orange-500` | `text-accent-vivid` |
+  > | 주요 지수 헤더 아이콘 (TrendingUp) | `text-emerald-500` | `text-accent-vivid` |
+  > | 변동률 상승 | `text-red-500` | `signal-up-text` (한국식 빨강) |
+  > | 변동률 하락 | `text-blue-500` | `signal-down-text` (한국식 파랑) |
+  > | 테마 항목 셸 hover | `hover:border-blue-200` | `hover:border-accent-vivid` |
+  > | 지수 박스 배경 | `bg-slate-50` | `bg-surface-muted` |
+  > | 숫자 표기 | (없음) | `tabular-nums` 일관 |
+  > | 폰트 | Inter | Pretendard cascade (전역) |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR9 (Watchlist + Profile)** 진입 — 본 PR8 의 `components/market/` 도메인 한 뎁스 패턴 + mock 직접 import 패턴 재활용. `lib/mock/watchlist/items.ts` + `lib/mock/profile/{user, exchanges, menuItems}.ts` (PR4 정착) 활용. Watchlist 는 12-col grid 테이블 (`md:grid-cols-12`), Profile 은 카드 + 거래소 연동 placeholder.
+  - PR9 머지 후 시리즈 종료 단계 — PRD 기반 최종 점검 (§3.8 합의 절차).
