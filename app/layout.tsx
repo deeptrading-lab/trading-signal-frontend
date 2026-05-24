@@ -42,7 +42,7 @@ const pretendard = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "TradingSignalEngine",
+  title: "FinSight",
   description: "AI 기반 매수·매도 판단 보조 서비스",
 };
 
