@@ -64,7 +64,7 @@ function formatTooltipValue(value: unknown): [string, string] {
 
 export function PriceChart({ data }: PriceChartProps) {
   return (
-    <div className="h-[320px] w-full">
+    <div className="h-[320px] w-full min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
           <defs>
