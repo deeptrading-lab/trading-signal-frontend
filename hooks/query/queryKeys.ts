@@ -2,9 +2,27 @@
  * TanStack Query 의 queryKey 상수 모음.
  *
  * 후속 PRD 화면 컴포넌트가 invalidate/refetch 시 동일 키를 참조할 수 있도록 한 곳에서 관리한다.
+ *
+ * `docs/rules/frontend.md` §7 — query key 는 본 파일 한 곳에 모은다. 컴포넌트·도메인 훅에서
+ * 인라인 배열 리터럴로 키를 만들지 않는다.
+ *
+ * PRD `stock-api-integration` §3.4 — stock + disclosure 도메인 키 추가.
+ *   - 함수형 빌더는 도메인 훅이 동일 시그니처로 호출 + invalidate.
+ *   - `as const` 로 readonly tuple 강제 → typo 회귀 차단.
  */
 
 export const queryKeys = {
   whitelist: (q: string) => ["whitelist", "search", q] as const,
   analyze: ["workbench", "analyze"] as const,
+  stock: {
+    price: (ticker: string) => ["stock", "price", ticker] as const,
+    daily: (ticker: string, period: "D" | "W" | "M") =>
+      ["stock", "daily", ticker, period] as const,
+    search: (keyword: string) => ["stock", "search", keyword] as const,
+  },
+  disclosure: {
+    company: (ticker: string) => ["disclosure", "company", ticker] as const,
+    list: (ticker: string, count: number) =>
+      ["disclosure", "list", ticker, count] as const,
+  },
 } as const;
