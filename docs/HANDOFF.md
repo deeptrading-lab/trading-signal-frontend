@@ -1971,3 +1971,32 @@
   - 1~2주 운영 후 §6.1 TTL 수치 재조정.
   - KIS 모의 (vts) 환경 `hts_kor_isnm` 빈 응답 케이스 — 실전 (prod) 환경에서 실응답 확인 후 mappers 우선순위 재검토 가능성.
   - `/profile/[ticker]` 화면 IA 확장 (검색 / 타임프레임 chip / 사이드 통계 / 뉴스) — 후속 PRD.
+
+### 2026-05-29 — feat(api,hooks): dashboard/market/watchlist 어댑터 + 훅 (PR-C/3 stock-api-integration) (#40)
+
+- **slug**: `stock-api-integration` (PR-C/3, **시리즈 종료**) · **author**: @HY0118 (backfill — handoff-append.yml grep 패턴이 본 저장소의 옛 PR #40 헤더 `### 2026-05-05 — docs(handoff) (#40)` 와 자체 false-positive 매칭. PR-A/B 가 다른 레포 충돌이었던 반면 PR-C 는 같은 레포 옛 entry 와 충돌 — **세 번째 발생, 패턴 다양화**. 후속 chore `handoff-append.yml grep 패턴 강화 (PR URL anchor)` 절대 우선순위)
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/40
+- **요약**: PRD §3.5 후반부 — Dashboard / Market / Watchlist 3 도메인 어댑터 (`lib/api/<domain>/holdings|indices|list.ts`) + 훅 (`hooks/<domain>/useQuery*.ts`) 신설. 화면 mock 유지 (시각 변경 0). 후속 한 도메인씩 화면 전환 PR 들의 base. **`stock-api-integration` 3 PR 시리즈 종료**.
+- **현재 상태**: review-approved → HANDOFF 백필 후 머지 예정. 시리즈 종료.
+- **PR 본문 발췌**:
+  > 신설 9 파일 (어댑터 3 + 훅 3 + 테스트 3):
+  > - `lib/api/{dashboard,market,watchlist}/{holdings,indices,list}.ts` — PR-A 의 `fetchStockPriceClient` 반복 호출 + `Promise.all` 병렬. 빈 배열 입력 시 즉시 빈 배열 반환.
+  > - `hooks/{dashboard,market,watchlist}/useQuery*.ts` — `useQuery` + 어댑터 + `queryKeys.*` factory + `queryConfig.*` TTL.
+  > - 단위 테스트 7건 (PR-A 21 + PR-B 6 + PR-C 7 = 34 PASS).
+  >
+  > 미변경 (의도, PRD AC-11 정합):
+  > - `app/(main)/{dashboard,market,watchlist}/page.tsx` mock import 그대로.
+  > - `components/{dashboard,market,watchlist}/*` 그대로.
+  > - Signals 도메인 어댑터 미신설 (PRD 명시 — 후속 PRD `signal-algorithm` 영역).
+  >
+  > AC 15/15 PASS (QA), `/signals` 404 는 git log 전체 히스토리에 page 파일 0 hit 으로 의도된 미구현 확정 (회귀 아님).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Dashboard 화면 mock → 실데이터** — `useQueryHoldings` import + 보유 종목 ticker 영구화 결정 (localStorage / BE). 한 도메인 한 PR.
+  - **Market 화면 mock → 실데이터** — `useQueryIndices` + 해외 지수 확장 결정. KIS 시장지수 매퍼 정밀화.
+  - **Watchlist 화면 mock → 실데이터** — `useQueryWatchlist` + localStorage 영구화. 사용자 ticker IA 정립.
+  - **PRD `signal-algorithm`** — Signals 도메인 시그널 알고리즘. 본 시리즈의 시세 + 공시 데이터 입력.
+  - **chore: handoff-append.yml grep 패턴 강화 (절대 우선순위)** — 세 번 발생, 패턴 다양화 (다른 레포 PR #38/#39 + 자체 레포 옛 PR #40). PR URL anchor (`**PR**: https://.../pull/${PR_NUMBER}$`) 기반 패턴 추가 chore PR.
+  - 1~2주 운영 후 §6.1 TTL 수치 재조정 — Vercel 연동 + `X-Data-Source` 헤더 분포 수집 기반.
+  - **PRD `stock-order-integration`** — 사용자 의지 + 실전계좌 (72245021) 다중 게이트 (`lib/api/kis/README.md` 체크리스트 적용).
+  - **PRD `realtime-quote-websocket`** — 폴링 → KIS WebSocket 30+ 채널 전환.
+  - Vercel 연동 — 사용자 메모 `project_vercel-deferred.md` 정합, 본 시리즈 종료 후 별도 chore.

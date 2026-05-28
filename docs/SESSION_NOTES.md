@@ -558,3 +558,48 @@ A·F·B 모든 즉시 가능 트랙 종결. 다음 세션은 P2 누적 follow-up
 
 - KIS 모의 환경에서 `hts_kor_isnm` 가 빈 문자열인 케이스 — PRD §3.1 의 "1차 종목명 소스" 가정과 다름. 실전 (prod) 환경에서 실제 응답 확인 후 mappers 우선순위 조정 가능성 (현재는 fallback 으로 ticker 노출, DART `corpName` 으로 자연 보완).
 - `/profile/[ticker]` 화면에 종목 검색 / 타임프레임 chip / 사이드 통계 / 뉴스 (`PriceChart` 시안 정합) 미도입 — 본 PR-B 는 PRD §3.5 의 4개 영역만. 후속 PRD 또는 chore 에서 정식 종목 상세 IA 정립.
+
+---
+
+## 2026-05-29 — stock-api-integration PR-C 진입 + 시리즈 종료 (Dashboard / Market / Watchlist 어댑터 + 훅)
+
+**요약**: PR-B (#39) 머지 직후, PRD §8.2 3분할의 마지막 PR-C 에 진입. PRD §3.5 의 "도메인 어댑터
+매핑" 표 후반부 — Dashboard / Market / Watchlist 3 도메인에 **어댑터 (`lib/api/<domain>/`) + 훅
+(`hooks/<domain>/useQuery*.ts`) 신설**. 화면 컴포넌트는 mock 그대로 유지 (시각 변경 0). 후속 한
+도메인씩 화면 전환 PR 들의 base 작업으로, 본 PR 로 `stock-api-integration` 시리즈 종료. Signals
+도메인 어댑터는 PRD 명시대로 신설 안 함 (시그널 알고리즘 자체가 후속 PRD `signal-algorithm` 영역).
+
+### 처리한 일
+
+- **3 도메인 어댑터 신설** — `lib/api/dashboard/holdings.ts` (`getHoldings(tickers)`), `lib/api/market/indices.ts` (`getMarketIndices(codes?)` + `DEFAULT_INDEX_CODES`), `lib/api/watchlist/list.ts` (`getWatchlist(tickers)`). 모두 PR-A 의 `fetchStockPriceClient` 반복 호출 + Promise.all 병렬. 빈 배열 입력 시 네트워크 호출 0 즉시 반환.
+- **3 도메인 훅 신설** — `hooks/dashboard/useQueryHoldings.ts`, `hooks/market/useQueryIndices.ts`, `hooks/watchlist/useQueryWatchlist.ts`. 모두 `useQuery` + 어댑터 + ticker/code 빈 배열 시 enabled=false.
+- **`queryKeys.ts` 확장** — `dashboard.holdings(tickers)`, `market.indices(codes)`, `watchlist.list(tickers)` factory 추가. tickers 배열은 `.slice().sort().join(",")` 정규화로 순서 무관 캐시 hit.
+- **`queryConfig.ts` 확장** — `dashboard.holdings`, `market.indices`, `watchlist.list` TTL (10s / 5min) 추가. 실시간성 우선 (현재가 정합).
+- **단위 테스트 7건 신설** — 각 어댑터 빈 배열 / 정상 호출 / 입력 순서 보존 검증. PR-A 21 + PR-B 6 + PR-C 7 = 34건 모두 PASS.
+- **dev 서버 라운드트립 확인** — 5개 도메인 라우트 (`/`, `/dashboard`, `/market`, `/watchlist`, `/profile/005930`) 양 뷰포트 정상 응답. Profile 만 실데이터 (PR-B), 나머지 mock 유지.
+
+### 결정·합의 사항
+
+- **KIS multi-price 신규 TR_ID 도입 보류** — 본 PR-C 는 PR-A 의 `/api/stock/price` BFF 반복 호출 + Promise.all 채택. 이유: (1) PR-A 토큰 single-flight + mock fallback 인프라 재활용, (2) TanStack Query 의 ticker 별 캐시 hit 가능, (3) KIS 신규 TR_ID 도입은 후속 PR 의 성능 데이터 기반 자연 진입. 본 PR-C 는 인터페이스만 정착.
+- **시장 지수 매퍼 정밀화 보류** — KIS `inquire-index-price` 별도 TR_ID 존재하나 본 PR 은 일반 `/api/stock/price` (종목코드 0001=KOSPI / 1001=KOSDAQ) 재활용. 응답 필드 차이 (전일 대비 등) 는 후속 화면 전환 PR 의 책임 — 본 PR 은 인터페이스만 정착.
+- **Signals 도메인 어댑터 미신설** — PRD §3.5 명시 — 시그널 알고리즘 자체가 후속 PRD `signal-algorithm` 영역. `lib/api/signals/` 폴더 신설 안 함.
+- **화면 미변경** — `app/(main)/dashboard/page.tsx`, `app/(main)/market/page.tsx`, `app/(main)/watchlist/page.tsx` mock import 유지. 후속 한 도메인씩 mock → 훅 전환 PR 진입 base.
+- **시리즈 종료 회귀** — 5개 도메인 (`/`, `/dashboard`, `/market`, `/watchlist`, `/profile/005930`) HTTP 200 확인. AC-15 무회귀 정합.
+
+### 다음 세션 시작 포인트 (`stock-api-integration` 시리즈 종료 후)
+
+| 우선 | 항목 | 트리거 | 비고 |
+|---|---|---|---|
+| 1 | **Dashboard 화면 mock → 실데이터** (`useQueryHoldings` import + 보유 종목 ticker 영구화 결정) | PR-C 머지 직후 | 한 도메인 한 PR |
+| 2 | **Market 화면 mock → 실데이터** (`useQueryIndices` + 해외 지수 확장 결정) | Dashboard 머지 후 | KIS 시장지수 매퍼 정밀화 시점 |
+| 3 | **Watchlist 화면 mock → 실데이터** (`useQueryWatchlist` + localStorage 영구화 결정) | Market 머지 후 | 사용자 ticker 영구화 IA |
+| 4 | **PRD `signal-algorithm`** — Signals 도메인 시그널 알고리즘 | 위 3건 머지 후 안정 확인 | 시세 + 공시 데이터 입력 |
+| 5 | 1~2주 운영 후 §6.1 TTL 수치 재조정 | Vercel 연동 + `X-Data-Source` 헤더 분포 수집 | chore PR |
+| 6 | **PRD `stock-order-integration`** | 사용자 의지 + 다중 게이트 설계 | 실전계좌 안전장치 필수 |
+| 7 | **PRD `realtime-quote-websocket`** | 폴링 → WebSocket 전환 결정 | KIS WS 30+ 채널 |
+
+### 미결·블록
+
+- 화면 전환 후속 PR 들에서 KIS 모의 환경 한계 (일부 종목명 빈 문자열) 가 실제로 화면 카피에 노출될 가능성. mappers 우선순위 조정 또는 DART corpName fallback 도입 필요 가능성.
+- 시장 지수 매퍼는 본 PR-C 에서 인터페이스만 정착, 실제 KIS 지수 응답 필드 (전일 대비 등) 가 종목과 다를 경우 후속 화면 전환 PR 이 별도 mapper 도입해야 할 수 있음.
+- Signals 화면 (`app/(main)/signals/page.tsx`) 미존재 — PRD AC-15 의 "/signals" 진입 항목이 본 저장소 main 에 부재. PRD `signal-algorithm` 진입 시 함께 신설 권고.
