@@ -2000,3 +2000,47 @@
   - **PRD `stock-order-integration`** — 사용자 의지 + 실전계좌 (72245021) 다중 게이트 (`lib/api/kis/README.md` 체크리스트 적용).
   - **PRD `realtime-quote-websocket`** — 폴링 → KIS WebSocket 30+ 채널 전환.
   - Vercel 연동 — 사용자 메모 `project_vercel-deferred.md` 정합, 본 시리즈 종료 후 별도 chore.
+
+### 2026-05-28 — chore(workflow): handoff-append grep 패턴을 PR URL anchor 로 강화 (#41)
+
+- **slug**: `chore/handoff-grep-pr-url-anchor` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/41
+- **요약**: chore(workflow): handoff-append grep 패턴을 PR URL anchor 로 강화
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > `stock-api-integration` 시리즈 3 PR (#38 / #39 / #40) 모두에서 동일한 false-positive 로 인한 자동 entry 누락 사례 3회 발생. workflow 의 PR 중복 검출 grep 패턴을 **PR URL line anchor** 기반으로 강화.
+  > 
+  > ## 문제
+  > 
+  > 기존 grep 패턴:
+  > 
+  > ```bash
+  > grep -qE "^### .*\(#${PR_NUMBER}\)\$" docs/HANDOFF.md
+  > ```
+  > 
+  > - entry 헤더 라인의 PR 번호만 매칭.
+  > - 다른 레포 (`trading-signal-engine`) backfill entry 들이 같은 번호 (#38/#39/#40) 헤더 형식으로 본 저장소 `docs/HANDOFF.md` 에 포함되어 있어 신규 entry 추가가 **항상 false-positive skip**.
+  > - PR-A/B/C 모두 수동 백필로 reviewer 차단 사유 해소 후 머지 — 매 PR 마다 동일한 백필 부담.
+  > 
+  > 옛 entry 3건 (line 268 / 310 / 341):
+  > 
+  > ```
+  > ### 2026-05-05 — docs: SESSION_NOTES.md 신설 + 직전·당일 세션 backfill (#38)
+  > - **PR**: https://github.com/deeptrading-lab/trading-signal-engine/pull/38
+  > 
+  > ### 2026-05-05 — docs(qa): handoff-session-notes 리포트 backfill (#39)
+  > - **PR**: https://github.com/deeptrading-lab/trading-signal-engine/pull/39
+  > 
+  > ### 2026-05-05 — docs(handoff): SESSION_NOTES.md read 의무화 (manager·status·AGENTS) (#40)
+  > - **PR**: https://github.com/deeptrading-lab/trading-signal-engine/pull/40
+  > ```
+  > 
+  > → 모두 다른 레포 backfill, 본 레포 PR 과 충돌.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 본 PR 머지 직후 다음 작업 PR 부터 `qa-passed` 라벨 부착 시 HANDOFF 자동 entry 가 백필 부담 없이 추가됨을 자연 검증.
+  - 사용자 메모 `reference_handoff-workflow-grep.md` 업데이트 — 새 패턴 (PR URL anchor) 기록. 본 PR 머지 후 별도 작업.
+  - 화면 mock → 실데이터 한 도메인씩 PR (Dashboard / Market / Watchlist) 진행 — PRD §10 권고.
+  - `symbols.json` 350 풀 시드 확장 chore PR — DART CORPCODE.xml 기반 검증.
+  - 후속 PRD `signal-algorithm` / `stock-order-integration` (실전계좌 다중 게이트 의무) / `realtime-quote-websocket` 자연 진입 가능 상태.
