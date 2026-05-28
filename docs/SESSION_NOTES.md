@@ -410,3 +410,109 @@ A·F·B 모든 즉시 가능 트랙 종결. 다음 세션은 P2 누적 follow-up
 ### 참고: 미머지된 워킹트리 (본 SESSION_NOTES update)
 
 본 SESSION_NOTES 갱신은 새 룰 (한 브랜치 한 PR) 따라 별도 PR 만들지 않음. 다음 작업 PR (PRD `layout-redesign` 의 `feature/layout-redesign` 브랜치) 첫 commit (`docs(session): 2026-05-21 세션 정리`) 으로 묻어 들어간다.
+
+---
+
+## 2026-05-24 — 주식 API 조사 세션 (리서치 전용)
+
+**요약**: PRD `claude-cli-analysis` 이후 실제 주식 데이터를 붙이기 위해 국내 주요 증권사 API 사전 조사. 레포에 도입할 API 스택 결정. 별도 PR 없음 — 리서치 문서만 커밋.
+
+### 조사한 것
+
+- 키움 REST API (openapi.kiwoom.com) — 공식 문서 + 사용 가이드
+- 한국투자증권 KIS Developers (apiportal.koreainvestment.com) — 전체 엔드포인트 목록 + GitHub 샘플
+- 보조: FinanceDataReader, OpenDART, KRX Open API, 공공데이터포털
+
+→ 상세 비교: `docs/references/korean-stock-api-comparison.md`
+
+### 결정 사항
+
+**API 스택 = KIS Developers 중심 + FinanceDataReader 보조**
+
+| 역할 | 채택 | 이유 |
+|---|---|---|
+| 실시간 시세 / 종목분석 / 주문 | KIS Developers | 재무비율·투자의견·순위분석·WebSocket 전부 포함. GitHub 샘플 풍부 |
+| 과거 가격 데이터 / 차트 | FinanceDataReader | 계좌 불필요, pip install 즉시 사용 |
+| 재무제표 장기 시계열 | OpenDART | 계좌 불필요, 무료, KIS보다 기간 넓음 |
+| 공식 상장 종목 리스트 | KRX Open API | 완전 무료 |
+| 키움 REST API | 보류 | 국내주식만 지원, 재무분석 없음. 이 레포 용도와 맞지 않음 |
+
+**두 API 모두 증권사 계좌 필수** — KIS 계좌 개설 후 App Key/App Secret 발급이 첫 번째 선결 조건.
+
+### 할 일 (다음 세션 진입 전 체크리스트)
+
+#### 🔑 계좌 / 키 발급 (사람이 직접 해야 함)
+- [ ] 한국투자증권 계좌 개설 (없는 경우) + HTS ID 연결
+- [ ] KIS Developers 포털 ([apiportal.koreainvestment.com](https://apiportal.koreainvestment.com)) 에서 Open API 서비스 신청
+- [ ] **모의투자** App Key + App Secret 발급 (개발/테스트용)
+- [ ] (선택) 실전투자 App Key + App Secret 발급
+- [ ] OpenDART API 키 발급 ([opendart.fss.or.kr](https://opendart.fss.or.kr)) — 무료, 즉시 가능
+
+#### 🏗️ 레포 작업 (코드)
+- [ ] **PRD `stock-api-integration`** 작성
+  - BFF (`app/api/stock/`) 레이어 설계
+  - KIS REST 래퍼 (`lib/api/kis/`) 구조
+  - FinanceDataReader Python 스크립트 or 별도 서비스 연동 방식 결정
+  - 환경변수 스키마 (`KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_ACCOUNT_NO` 등)
+- [ ] KIS 토큰 발급 + 갱신 로직 구현 (OAuth-like, 만료 시 자동 재발급)
+- [ ] 국내주식 현재가 시세 API 연동 (`/uapi/domestic-stock/v1/quotations/inquire-price`)
+- [ ] 종목 기본정보 API 연동 (주식기본조회)
+- [ ] 재무비율 API 연동 (대차대조표 / 손익계산서 / 재무비율)
+- [ ] FinanceDataReader 과거 가격 데이터 연동 (BFF Python 서브프로세스 or 별도 Flask/FastAPI)
+
+#### 📋 선택적 / 추후
+- [ ] WebSocket 실시간 시세 연동
+- [ ] 순위 분석 API 연동 (거래량순위, 등락률순위 등)
+- [ ] 외인/기관 매매동향 API 연동
+- [ ] OpenDART 재무제표 장기 시계열 연동
+- [ ] KRX Open API 상장 종목 리스트 캐싱
+
+### 미결·블록
+
+- **KIS 계좌/키 발급 전까지 코드 연동 불가** — 모의투자 계좌라도 먼저 발급 필요.
+- FinanceDataReader는 Python 기반 — Next.js BFF에서 subprocess 호출 또는 별도 Python 마이크로서비스 결정 필요 (PRD 단계에서 결정).
+- Rate Limit: KIS 신규 고객 초당 호출 제한 있음 (2026.03.20 공지). PRD에서 캐싱 전략 포함 필요.
+
+### 참고
+
+- 상세 API 비교표: `docs/references/korean-stock-api-comparison.md`
+- 이전 세션 PRD 큐: `layout-redesign` → `component-compactness` → `claude-cli-analysis` → **`stock-api-integration`** (신규 추가)
+
+---
+
+## 2026-05-28 — stock-api-integration PRD 작성 + PR-A 진입
+
+**요약**: 직전 (2026-05-24) 세션에서 결정된 한국 주식 API 도입을 PRD 로 정착시키고, KIS Developers 모의투자 + OpenDART 키 발급 + end-to-end 검증을 통과한 뒤, PRD §8.2 의 3분할 (PR-A/B/C) 중 첫 번째 PR-A 에 진입했다. 본 PR-A 는 BFF 인프라 (`lib/api/kis/`, `lib/api/dart/`, `app/api/stock/*`, `app/api/disclosure/*`, queryKeys, queryConfig, mock fixture, 단위 테스트) 만 다루고, 도메인 훅·화면 전환은 후속 PR-B/PR-C 로 자연 분리한다.
+
+### 처리한 일
+
+- **KIS Developers 모의투자 키 발급** — 계좌 50190357 + App Key 36자 + App Secret 180자. `.env.local` 저장 (gitignore 보호).
+- **OpenDART 키 발급** — 40자 키, 즉시 사용 가능. `.env.local` 저장.
+- **end-to-end 검증** — KIS `oauth2/tokenP` 토큰 발급 + `inquire-price` 삼성전자 현재가 + OpenDART `list.json` 공시 조회 모두 정상 응답 확인.
+- **PRD 작성** — `docs/prd/stock-api-integration.md`. 7개 OPEN QUESTION 모두 [RESOLVED] 동봉 (FDR 제외 / 토큰 메모리 캐시 + 토글 인터페이스 / 수동 시드 350개 / 주문 placeholder + README 체크리스트 / TTL §6.1 표 그대로 / 3분할 / 검색은 symbols.json fuzzy).
+- **본 PR-A 진입** — 브랜치 `feature/stock-api-integration-A` 생성. 첫 commit 으로 PRD + SESSION_NOTES + 직전 리서치 참고 문서 (`korean-stock-api-comparison.md`) 묶음 (단독 SESSION_NOTES PR 금지 정책 준수).
+
+### 결정·합의 사항
+
+- **3분할 시리즈 (PR-A/B/C)** — finsight-redesign 시리즈 (단일 슬러그 PR 분할 한정 룰 해제) 패턴 동일 적용. 머지 게이트 절차 적용.
+- **KIS 응답 스키마 함정 회귀 차단** — `bstp_kor_isnm = 업종명`, 종목명은 `hts_kor_isnm` 우선 → `prdt_name` → ticker fallback. `types.ts` doc comment + `mappers.ts` 우선순위 + 단위 테스트 (AC-10) 3단 방어.
+- **토큰 캐시 = 인스턴스 메모리 only** — `KIS_TOKEN_STORE=memory|kv` 토글 인터페이스만 박아두고 실 구현은 memory. Vercel KV 도입은 배포 시점 별도 결정.
+- **mock fallback** — 환경변수 미설정 시 BFF route 가 `lib/mock/stock/`·`lib/mock/disclosure/` 의 fixture 반환 + `X-Data-Source: mock` 헤더. 빌드 타임 키 검증 0 (Vercel preview 보호).
+- **단위 테스트 = vitest 도입** — 본 저장소 최초 테스트 인프라. PRD AC-6 (token single-flight + cache + 갱신) + AC-10 (mappers 종목명 추출) + AC-13 보강 (DART counter quota).
+- **주문 라우트 미생성 + 후속 PRD 진입 체크리스트** — `lib/api/kis/index.ts` 에 "주문 함수 미존재" 주석 + `app/api/order/*` 미생성. README 또는 `lib/api/kis/README.md` 에 다중 게이트 (비밀번호 재확인 / dry-run / 금액 상한 / audit log) 의무 명시.
+
+### 다음 세션 시작 포인트 (PR-B/PR-C 진입 base)
+
+| 우선 | 항목 | 트리거 | 비고 |
+|---|---|---|---|
+| 1 | **PR-B 진입** — `hooks/stock/` + `hooks/disclosure/` + Profile 도메인 종단 전환 (4 컴포넌트 mock → 훅, AC-8) | PR-A 머지 직후 | 본 시리즈의 "되는가?" 단일 증거 |
+| 2 | **PR-C 진입** — Dashboard / Market / Watchlist 어댑터 + 훅 신설 (화면 mock 유지) | PR-B 머지 직후 | 후속 PR 들의 base 작업 |
+| 3 | 1~2주 운영 후 §6.1 TTL 수치 재조정 | PR-A/B/C 머지 + Vercel 연동 후 `X-Data-Source` 헤더 분포 데이터 수집 | chore PR |
+| 4 | PRD `signal-algorithm` 진입 검토 | PR-B 머지 후 시세 + 공시 데이터 안정 확인 | Signals 도메인 |
+| 5 | PRD `stock-order-integration` 진입 검토 | 사용자 의지 + 다중 게이트 설계 | 실전계좌 안전장치 필수 |
+
+### 미결·블록
+
+- 본 SESSION_NOTES entry update + 직전 리서치 문서 + PRD 3건은 PR-A 의 **첫 commit** 으로 묶어 동봉 (단독 PR 금지 정책 준수). 본 commit 이후 PR-A 의 구현 commit 누적.
+- Vercel 미연동 (`project_vercel-deferred.md`) — 시리즈 종료 후 별도 chore 로 진입 예정.
+- KIS rate limit 정확 수치 (초당 호출 제한) 공식 문서 미명시 — 본 PR-A 는 토큰 single-flight + 응답 캐싱 TTL 으로 1차 회피. 운영 데이터로 후속 조정.
