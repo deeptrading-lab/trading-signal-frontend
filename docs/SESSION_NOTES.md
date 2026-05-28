@@ -516,3 +516,45 @@ A·F·B 모든 즉시 가능 트랙 종결. 다음 세션은 P2 누적 follow-up
 - 본 SESSION_NOTES entry update + 직전 리서치 문서 + PRD 3건은 PR-A 의 **첫 commit** 으로 묶어 동봉 (단독 PR 금지 정책 준수). 본 commit 이후 PR-A 의 구현 commit 누적.
 - Vercel 미연동 (`project_vercel-deferred.md`) — 시리즈 종료 후 별도 chore 로 진입 예정.
 - KIS rate limit 정확 수치 (초당 호출 제한) 공식 문서 미명시 — 본 PR-A 는 토큰 single-flight + 응답 캐싱 TTL 으로 1차 회피. 운영 데이터로 후속 조정.
+
+---
+
+## 2026-05-29 — stock-api-integration PR-B 진입 (Profile 종단 전환)
+
+**요약**: PR-A (#38) 머지 직후, PRD §8.2 3분할 중 두 번째 PR-B 에 진입. PR-A 가 정착한 BFF 인프라
+(`lib/api/kis/`, `lib/api/dart/`, BFF 5 라우트, queryKeys, queryConfig, 토큰 캐시, mock fallback) 위에
+**도메인 훅 5개** (`hooks/stock/` 3 + `hooks/disclosure/` 2) 와 **`/profile/[ticker]` 종목 상세 화면 4 영역**
+(StockHeader / StockDailyChart / CompanyOverview / DisclosureList) 을 신설해 AC-8 "이게 됐다" 종단 검증
+통과. dev 서버 기동 후 `/profile/005930` 진입 시 4개 BFF API 200 + 실 KIS / DART 데이터 라운드트립
+확인 (`docs/qa/stock-api-integration-pr-b-roundtrip.md` 자가검증 리포트).
+
+### 처리한 일
+
+- **BFF 클라이언트 4개 신설** — `lib/api/stock/{price,daily,search}.ts` + `lib/api/disclosure/{company,list}.ts`. 모두 same-origin `httpClient` (`/api`) 경유. KIS / DART 직접 호출 0건.
+- **도메인 훅 5개 신설** — `hooks/stock/useQueryStockPrice.ts`, `useQueryStockDaily.ts`, `useQueryStockSearch.ts`, `hooks/disclosure/useQueryDisclosureCompany.ts`, `useQueryDisclosureList.ts`. 각 훅이 PR-A 의 `queryKeys.{stock,disclosure}.*` factory + `queryConfig.{stock,disclosure}.*` TTL 사용. 컴포넌트는 `useQuery()` 직접 호출 0 (AC-5 정합).
+- **Profile 도메인 컴포넌트 5개 신설** — `components/profile/StockProfilePage.tsx` (셸) + `StockHeader.tsx` + `StockDailyChart.tsx` (recharts AreaChart, PriceChart 패턴 정합) + `CompanyOverview.tsx` + `DisclosureList.tsx`. 모두 각자 로딩·에러·빈 상태 카피 책임.
+- **라우트 신설** — `app/(main)/profile/[ticker]/page.tsx` (Next.js 16 params Promise 형태). 기존 `/profile` (마이페이지) 와 자연 공존.
+- **카피 분리** — `lib/copy/profile/stockDetail.ts` 신설 (섹션 타이틀 + 로딩·에러·빈 상태 + 기업개황 필드 라벨 + 시장 enum 한글 매핑).
+- **단위 테스트 6건 신설** — BFF 클라이언트 4개 axios mock 라운드트립 (price/daily/company/list 호출 시그니처 검증). PR-A 21건 + PR-B 6건 = 27건 모두 PASS.
+- **자가검증 리포트** — `docs/qa/stock-api-integration-pr-b-roundtrip.md`. dev 서버 기동 후 4개 BFF 라운드트립 + SSR HTML 카피 grep + KIS/DART 실응답 본문 캡처 (스크린샷 대체).
+
+### 결정·합의 사항
+
+- **`/profile/[ticker]` 동적 라우트 신설** — PRD `/profile/005930` 표기 정합. 기존 `/profile` (마이페이지) 는 정적 세그먼트, `/[ticker]` 는 동적 — Next.js App Router 가 자연 공존. 마이페이지는 보존, 종목 상세는 신설 화면.
+- **AssetHeader vs StockHeader 책임 분리** — Home 도메인 (`components/home/AssetHeader.tsx`) = mock 시안 보존용, Profile 도메인 (`components/profile/StockHeader.tsx`) = 실데이터 + Korean 시장 (KOSPI/KOSDAQ) 특화. 시각 톤은 정합, 데이터 소스만 다름.
+- **`bstp_kor_isnm` 회귀 차단 vs 모의 환경 빈 응답** — KIS 모의 (vts) `inquire-price.output.hts_kor_isnm` 가 빈 문자열인 경우 ticker 그대로 사용 (mappers.ts `extractStockName` 우선순위 #3). 화면에는 ticker 가 노출되지만 DART `corpName` ("삼성전자(주)") 으로 정식명 자연 보완. 실전 (prod) 환경에서는 `hts_kor_isnm` 정상 응답 기대.
+- **한국식 등락 컬러 (red=up/blue=down) 유지** — finsight-redesign 시리즈가 정착한 `signal-up` / `signal-down` 토큰 그대로. `mapDirection` (mappers.ts) 의 KIS `prdy_vrss_sign` → "up"/"down"/"flat" 결과를 StockHeader 가 직접 사용.
+
+### 다음 세션 시작 포인트 (PR-C 진입 base)
+
+| 우선 | 항목 | 트리거 | 비고 |
+|---|---|---|---|
+| 1 | **PR-C 진입** — Dashboard / Market / Watchlist 어댑터 + 훅 신설 (화면 mock 유지) | PR-B 머지 직후 | 후속 한 도메인씩 화면 전환 PR 들의 base 작업 |
+| 2 | 1~2주 운영 후 §6.1 TTL 수치 재조정 | PR-B/C 머지 + Vercel 연동 후 `X-Data-Source` 헤더 분포 수집 | chore PR |
+| 3 | PRD `signal-algorithm` 진입 검토 | PR-C 머지 후 5 도메인 어댑터 안정 확인 | Signals 도메인 |
+| 4 | PRD `stock-order-integration` 진입 검토 | 사용자 의지 + 다중 게이트 설계 | 실전계좌 안전장치 필수 |
+
+### 미결·블록
+
+- KIS 모의 환경에서 `hts_kor_isnm` 가 빈 문자열인 케이스 — PRD §3.1 의 "1차 종목명 소스" 가정과 다름. 실전 (prod) 환경에서 실제 응답 확인 후 mappers 우선순위 조정 가능성 (현재는 fallback 으로 ticker 노출, DART `corpName` 으로 자연 보완).
+- `/profile/[ticker]` 화면에 종목 검색 / 타임프레임 chip / 사이드 통계 / 뉴스 (`PriceChart` 시안 정합) 미도입 — 본 PR-B 는 PRD §3.5 의 4개 영역만. 후속 PRD 또는 chore 에서 정식 종목 상세 IA 정립.
