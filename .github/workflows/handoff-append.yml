@@ -27,13 +27,14 @@ jobs:
       - name: Skip if HANDOFF entry for this PR already exists
         id: check
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          # Entry 헤더 라인만 매칭: "### YYYY-MM-DD — <title> (#<N>)"
-          # 이전 패턴 `(#N)` 은 다른 entry 의 본문 인용 안 `(#34)` 같은 부분 일치 (예: 다른 레포 PR # 인용)
-          # 와도 매칭되어 false-negative skip 사례 발생 (#34, #36).
-          if [ -f docs/HANDOFF.md ] && grep -qE "^### .*\(#${PR_NUMBER}\)\$" docs/HANDOFF.md; then
-            echo "entry already exists for PR #${PR_NUMBER}, skipping"
+          # PR URL 라인 정확 매칭: "- **PR**: https://github.com/<owner>/<repo>/pull/<N>"
+          # 이전 헤더 패턴 `^### .*\(#N\)$` 은 다른 레포 (trading-signal-engine 등) 의 같은 번호 PR
+          # backfill entry 헤더와 동일 형식이라 false-positive skip 사례 3회 발생 (#38/#39/#40).
+          # PR URL 은 owner/repo 가 박혀 있어 본 레포 PR 만 정확히 매칭.
+          if [ -f docs/HANDOFF.md ] && grep -qFx "- **PR**: ${PR_URL}" docs/HANDOFF.md; then
+            echo "entry already exists for ${PR_URL}, skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
