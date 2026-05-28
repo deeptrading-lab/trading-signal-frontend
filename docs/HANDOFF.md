@@ -1942,3 +1942,32 @@
   - PRD `signal-algorithm` 진입 — 본 PR-A 의 시세 + 공시 데이터를 입력으로 시그널 계산.
   - PRD `stock-order-integration` 진입 시 `lib/api/kis/README.md` 의 다중 게이트 체크리스트 적용.
   - Vercel 연동 — 사용자 메모 `project_vercel-deferred.md` 정합, 시리즈 종료 후 별도 chore.
+
+### 2026-05-29 — feat(profile): /profile/[ticker] 종목 상세 + stock/disclosure 훅 (PR-B/3 stock-api-integration) (#39)
+
+- **slug**: `stock-api-integration` (PR-B/3) · **author**: @HY0118 (backfill — handoff-append.yml grep 패턴이 다른 레포 trading-signal-engine PR #39 헤더 `### 2026-05-05 — docs(qa): handoff-session-notes 리포트 backfill (#39)` 와 또 false-positive 매칭. PR-A 와 동일 패턴 두 번째 발생. 후속 chore `handoff-append.yml grep 패턴 강화 (PR URL anchor)` 우선순위 ↑)
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/39
+- **요약**: PR-A 정착 BFF 인프라 위에 도메인 훅 5개 + Profile 도메인 종단 전환 (4 컴포넌트 mock → 훅, AC-8 "이게 됐다" 단일 증거 통과). `/profile/[ticker]` 동적 라우트 신설 + 기존 `/profile` (마이페이지) 자연 공존.
+- **현재 상태**: review-changes-requested → HANDOFF 누락 해소 후 review-approved 진입 예정. PR-C (Dashboard/Market/Watchlist 어댑터) 미진입.
+- **PR 본문 발췌**:
+  > 신설 16 파일:
+  > - BFF 클라이언트 5건 (`lib/api/{stock,disclosure}/*.ts`)
+  > - 도메인 훅 5건 (`hooks/{stock,disclosure}/useQuery*.ts`) — `queryKeys.{stock,disclosure}.*` factory + `queryConfig.*` TTL 사용
+  > - Profile 도메인 화면 5건 + 동적 라우트 (`app/(main)/profile/[ticker]/page.tsx` + `components/profile/{StockProfilePage,StockHeader,StockDailyChart,CompanyOverview,DisclosureList}.tsx`)
+  > - 카피 단일 진실 원천 (`lib/copy/profile/stockDetail.ts`)
+  > - 단위 테스트 6건 (PR-A 21 + PR-B 6 = 27건 PASS)
+  >
+  > AC-8 종단 검증:
+  > - `/profile/005930` 진입 → 4 BFF (`/api/stock/price`, `/api/stock/daily`, `/api/disclosure/company`, `/api/disclosure/list`) 모두 200 + `X-Data-Source: kis/dart` 실데이터 응답.
+  > - 삼성전자 현재가 299,500 + 30 candle 차트 + 기업개황 (DART `삼성전자(주)`) + 공시 5건 렌더.
+  >
+  > `bstp_kor_isnm` 회귀 차단 자연 확인:
+  > - KIS 모의 환경 `hts_kor_isnm` 빈 응답 → mappers.ts `extractStockName` 우선순위 #3 (ticker fallback) 적용 → 화면에는 "005930" 표시 + DART `corpName` 으로 정식명 보완. "전기·전자" (업종명) 절대 미노출.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR-C (다음 진입)** — Dashboard / Market / Watchlist 어댑터 + 훅 신설 (화면 mock 유지). 후속 한 도메인씩 화면 전환 PR 들의 base.
+  - **chore: handoff-append.yml grep 패턴 추가 강화 (우선순위 ↑)** — PR-A 후속 권고였으나 PR-B 에서 동일 false-positive 두 번째 발생으로 우선순위 상승. PR URL anchor (`**PR**: https://.../pull/${PR_NUMBER}`) 기반 패턴 추가.
+  - **chore: recharts 토큰 중앙화** — reviewer note. PR-B 의 StockDailyChart 가 `lib/charts/*` 추출 가능.
+  - **chore: `[ticker]` 동적 라우트 가드** — reviewer note. ticker 6자리 정규식 검증 미들웨어 추가 가능.
+  - 1~2주 운영 후 §6.1 TTL 수치 재조정.
+  - KIS 모의 (vts) 환경 `hts_kor_isnm` 빈 응답 케이스 — 실전 (prod) 환경에서 실응답 확인 후 mappers 우선순위 재검토 가능성.
+  - `/profile/[ticker]` 화면 IA 확장 (검색 / 타임프레임 chip / 사이드 통계 / 뉴스) — 후속 PRD.
