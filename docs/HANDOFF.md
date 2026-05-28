@@ -1914,3 +1914,31 @@
   - **`docs/qa/finsight-redesign-final.md` 작성** — QA 가 시리즈 종료 후 PRD 기반 최종 점검 리포트 작성 (AC-PAGE-1~8 × 6 화면 + AC-COMMON-1~9 + AC-GATE-1·2·3 full matrix).
   - **cleanup PR (별도 slug)** — 위 머지 게이트 인계 5건 처리: HANDOFF 백필 + `NOT_FOUND_HOME_CTA`/root `not-found.tsx` 결정 + 시안 폴더 제거 + `[...not_found]` 검토 + `@next/bundle-analyzer` 도입.
   - **Vercel 연동** — 사용자 메모 `project_vercel-deferred.md` 정합, 시리즈 완료 후 별도 chore.
+
+### 2026-05-28 — feat(api,bff): KIS+DART 클라이언트 + 5 BFF 라우트 인프라 (PR-A/3 stock-api-integration) (#38)
+
+- **slug**: `stock-api-integration` (PR-A/3) · **author**: @HY0118 (backfill — qa-passed workflow grep 패턴이 다른 레포 trading-signal-engine PR #38 헤더와 false-positive 매칭으로 자동 append 누락. 후속 chore: PR URL anchor 기반 grep 패턴 추가 강화)
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/38
+- **요약**: KIS Developers (모의 50190357) + OpenDART 조회 BFF 인프라 정착. `lib/api/kis/` 10파일 + `lib/api/dart/` 6파일 + `app/api/{stock,disclosure}/` 5라우트 + queryKeys/queryConfig 확장 + 단위 테스트 21건 PASS. PRD §8.2 3분할 (A/B/C) 중 첫 PR.
+- **현재 상태**: review-changes-requested → HANDOFF 누락 해소 후 review-approved 진입 예정. PR-B (hooks + Profile 종단) 미진입.
+- **PR 본문 발췌**:
+  > PRD §9 [RESOLVED] 7건 반영:
+  > - q1: FDR 제외, q2: 토큰 메모리 + 토글 인터페이스, q3: 수동 시드 350개, q4: 주문 placeholder + README, q5: TTL 표 그대로, q6: 3분할 A/B/C, q7: substring fuzzy 검색.
+  >
+  > 회귀 차단 의무:
+  > - R2 `bstp_kor_isnm` = 업종명. 종목명은 `hts_kor_isnm` → `prdt_name` → ticker 우선순위 (mappers.ts + AC-10 단위 테스트 4 케이스).
+  > - R1 토큰 single-flight (Promise dedupe, AC-6 #4 5건 동시 → 발급 1회).
+  > - 모의 도메인 포트 `:29443` 명시.
+  > - 주문 라우트 미생성 + `lib/api/kis/index.ts` 주석 + `README.md` 다중 게이트 (비밀번호 재확인 / dry-run / 금액 상한 / audit log).
+  >
+  > AC 9건 PASS (AC-1/2/3/6/7/10/12/13/14). AC-4/5/8/9/11/15 는 PR-B/PR-C 범위.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR-B (다음 진입)** — `hooks/stock/` + `hooks/disclosure/` 5개 useQuery 훅 + Profile 도메인 4 컴포넌트 mock → 훅 종단 전환 (AC-8 "이게 됐다" 단일 증거).
+  - **PR-C (PR-B 머지 후)** — Dashboard / Market / Watchlist 어댑터 + 훅 신설 (화면 mock 유지). 후속 한 도메인씩 화면 전환 PR 들의 base.
+  - **chore: handoff-append.yml grep 패턴 추가 강화** — PR URL anchor 기반 추가 패턴 (line 274 `**PR**: https://.../pull/${PR_NUMBER}`) 으로 본 false-positive 회피. reviewer note N (후속).
+  - **chore: BFF route 5개 중복 추출** — `withTimeout` + `jsonWithDataSource` + `mapErrorToResponse` ~200L 중복을 `lib/api/utils/bffResponse.ts` 로 추출. reviewer note N-2.
+  - **chore: `symbols.json` 350개 풀 시드 확장** — 1차 ~100개 시드 → KOSPI 200 + KOSDAQ 150 풀 시드 (DART CORPCODE.xml 기반 검증).
+  - 1~2주 운영 후 §6.1 TTL 수치 재조정 (`X-Data-Source` 헤더 분포 기반).
+  - PRD `signal-algorithm` 진입 — 본 PR-A 의 시세 + 공시 데이터를 입력으로 시그널 계산.
+  - PRD `stock-order-integration` 진입 시 `lib/api/kis/README.md` 의 다중 게이트 체크리스트 적용.
+  - Vercel 연동 — 사용자 메모 `project_vercel-deferred.md` 정합, 시리즈 종료 후 별도 chore.
