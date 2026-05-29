@@ -31,7 +31,16 @@
 export { fetchStockPrice, fetchStockDaily } from "./price";
 export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
-export { searchSymbols, getCorpCode, getSymbolsMeta } from "./search";
+export {
+  fetchIntstockMultprice,
+  MULTPRICE_CHUNK_SIZE,
+} from "./intstock-multprice";
+export {
+  searchSymbols,
+  getCorpCode,
+  getSymbolName,
+  getSymbolsMeta,
+} from "./search";
 export { getAccessToken } from "./token";
 export { isKisConfigured, resolveKisEnv } from "./client";
 export { INDEX_NAME_BY_CODE } from "./types";
@@ -42,5 +51,7 @@ export type {
   StockInfo,
   StockMarket,
   MarketIndexQuote,
+  WatchlistQuote,
   KisInquireIndexPriceOutput,
+  KisIntstockMultpriceItem,
 } from "./types";
