@@ -151,6 +151,66 @@ export type StockSearchResult = {
 };
 
 /**
+ * 주식기본조회 응답 (`GET /uapi/domestic-stock/v1/quotations/search-stock-info`).
+ *
+ * TR_ID = `CTPF1002R`. params `PRDT_TYPE_CD=300`(주식/ETF/ETN/ELW) + `PDNO=<6자리 ticker>`.
+ *
+ * ## ⚠️ 실전 전용 — 모의(vts) 미지원
+ *
+ * 본 엔드포인트는 prod 키에서만 동작한다(`tr_cont` 다음조회 불가, 단건 object output).
+ * BFF route 는 `isKisConfigured()` AND `resolveKisEnv()==="prod"` 이중 게이트 통과 시에만 호출.
+ *
+ * ## ⚠️ 종목명 1차 소스 = `prdt_abrv_name`
+ *
+ * `inquire-price` 의 `hts_kor_isnm` 은 prod 에서도 빈 값으로 오는 케이스가 확인됨(2026-05-29).
+ * 따라서 표시용 종목명은 본 응답의 `prdt_abrv_name`("삼성전자") 가 1차 소스다.
+ * `bstp_kor_isnm`(업종명)·`extractStockName`(inquire-price) 은 종목명으로 사용하지 않는다.
+ *
+ * 스펙: `docs/references/kis-api/domestic-stock-quotations.md` §2-7.
+ */
+export type KisSearchStockInfoOutput = {
+  /** ⚠️ 상품약어명 = 표시용 종목명 (1차 소스). "삼성전자". */
+  prdt_abrv_name?: string;
+  /** 상품명(정식). "삼성전자보통주". 2차 fallback. */
+  prdt_name?: string;
+  /** 시장 ID — `STK`유가/`KSQ`코스닥/`KNX`코넥스/`ETF`… */
+  mket_id_cd?: string;
+  /** 거래소 구분 — `02`증권거래소(코스피)/`03`코스닥… */
+  excg_dvsn_cd?: string;
+  /** 증권그룹 — `ST`주권/`EF`ETF/`EN`ETN/`EW`ELW… */
+  scty_grp_id_cd?: string;
+  /** 코스피200 종목 여부 ("Y"/"N"). */
+  kospi200_item_yn?: string;
+  /** 거래정지 여부 ("Y"/"N"). */
+  tr_stop_yn?: string;
+  /** 관리종목 여부 ("Y"/"N"). */
+  admn_item_yn?: string;
+  /** 상장주수 (시총 계산용). */
+  lstg_stqt?: string;
+};
+
+/**
+ * 클라이언트 친화 종목 메타 스키마 — `search-stock-info` 매핑 결과.
+ *
+ * 종목명·시장 배지·거래정지/관리 경고 배지의 단일 진실 원천. BFF 가 시세(`StockPrice`)와 합성.
+ */
+export type StockMarket = "KOSPI" | "KOSDAQ" | "KONEX" | "ETF" | "기타";
+
+export type StockInfo = {
+  ticker: string;
+  /** ⚠️ 표시용 종목명 — `prdt_abrv_name` → `prdt_name` → ticker. */
+  name: string;
+  /** 시장 배지 — `mket_id_cd`/`excg_dvsn_cd` 매핑. */
+  market: StockMarket;
+  /** 거래정지 여부 — 경고 배지용. */
+  isTradeStopped: boolean;
+  /** 관리종목 여부 — 경고 배지용. */
+  isAdminItem: boolean;
+  /** 코스피200 종목 여부. */
+  isKospi200?: boolean;
+};
+
+/**
  * 국내 업종 현재지수 조회 응답
  * (`GET /uapi/domestic-stock/v1/quotations/inquire-index-price`).
  *

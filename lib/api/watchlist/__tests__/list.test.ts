@@ -1,24 +1,21 @@
 /**
  * `lib/api/watchlist/list.ts` 단위 테스트.
  *
- * PRD `stock-api-integration` (PR-C) §3.5 — Watchlist 어댑터 회귀 차단.
- *
- * 검증:
- *   1. 빈 배열 입력 → 빈 배열 즉시 반환.
- *   2. ticker 배열 → 각 ticker 별 fetchStockPriceClient 병렬 호출 + 입력 순서 보존.
+ * PRD `watchlist-real-data` §3.4 — 어댑터 재배선 회귀 차단:
+ *   1. 빈 배열 입력 → 빈 배열 즉시 반환 (BFF 호출 X).
+ *   2. ticker 배열 → `/watchlist` BFF 단일 호출 + tickers 콤마 params + 입력 순서 보존.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/api/stock/price", () => ({
-  fetchStockPriceClient: vi.fn(),
+vi.mock("@/lib/api/client", () => ({
+  httpClient: { get: vi.fn() },
 }));
 
-import { getWatchlist } from "../list";
-import { fetchStockPriceClient } from "@/lib/api/stock/price";
-import type { StockPrice } from "@/lib/api/kis/types";
+import { getWatchlist, type WatchlistQuote } from "../list";
+import { httpClient } from "@/lib/api/client";
 
-const buildQuote = (ticker: string): StockPrice => ({
+const buildQuote = (ticker: string): WatchlistQuote => ({
   ticker,
   name: ticker,
   price: 1_000,
@@ -33,23 +30,23 @@ describe("getWatchlist", () => {
     vi.clearAllMocks();
   });
 
-  it("빈 배열 입력 시 즉시 빈 배열 반환", async () => {
+  it("빈 배열 입력 시 즉시 빈 배열 반환 (BFF 호출 안 함)", async () => {
     const result = await getWatchlist([]);
     expect(result).toEqual([]);
-    expect(fetchStockPriceClient).not.toHaveBeenCalled();
+    expect(httpClient.get).not.toHaveBeenCalled();
   });
 
-  it("ticker 별 fetchStockPriceClient 병렬 호출 + 입력 순서 보존", async () => {
-    const mockFn = fetchStockPriceClient as ReturnType<typeof vi.fn>;
-    mockFn.mockImplementation((ticker: string) =>
-      Promise.resolve(buildQuote(ticker)),
-    );
-    const result = await getWatchlist(["005930", "035720", "000660"]);
-    expect(mockFn).toHaveBeenCalledTimes(3);
-    expect(result.map((q) => q.ticker)).toEqual([
-      "005930",
-      "035720",
-      "000660",
-    ]);
+  it("/watchlist BFF 단일 호출 + tickers 콤마 params + 입력 순서 보존", async () => {
+    const getMock = httpClient.get as ReturnType<typeof vi.fn>;
+    const tickers = ["005930", "035720", "000660"];
+    getMock.mockResolvedValue({ data: tickers.map(buildQuote) });
+
+    const result = await getWatchlist(tickers);
+
+    expect(getMock).toHaveBeenCalledTimes(1);
+    expect(getMock).toHaveBeenCalledWith("/watchlist", {
+      params: { tickers: "005930,035720,000660" },
+    });
+    expect(result.map((q) => q.ticker)).toEqual(tickers);
   });
 });

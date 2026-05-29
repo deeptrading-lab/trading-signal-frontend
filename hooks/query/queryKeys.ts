@@ -45,5 +45,8 @@ export const queryKeys = {
   watchlist: {
     list: (tickers: readonly string[]) =>
       ["watchlist", "list", normalizeTickers(tickers)] as const,
+    /** 관심종목 종목명·메타 (긴 TTL) — 후속 메타 단독 훅 분리 시 참조. */
+    info: (tickers: readonly string[]) =>
+      ["watchlist", "info", normalizeTickers(tickers)] as const,
   },
 } as const;
