@@ -5,22 +5,14 @@
  * 해외(S&P 500/NASDAQ)·환율(USDKRW)·코인(BTC Dominance) 4종은 별도 트랙
  * (`market-foreign-data`)에서 다루므로 본 mock 에서 제거.
  *
- * 두 가지 모델을 제공한다:
- *   1. 표시 모델 `MARKET_INDICES_MOCK` (`MarketIndex[]`) — 기존 server component 호환.
- *   2. 데이터 모델 `getMockMarketIndices(codes)` (`MarketIndexQuote[]`) — BFF fallback.
+ * 데이터 모델 `getMockMarketIndices(codes)` (`MarketIndexQuote[]`) — BFF fallback.
+ *   화면은 이제 server component 가 표시 모델 mock 을 직접 import 하지 않고,
+ *   `IndicesCardContainer`(client) 가 BFF 경유 fetch → 미설정/타임아웃 시 본 데이터 모델 mock 으로 graceful degrade.
  *
  * mock 안에 사용자 노출 한글 카피는 0건 — 지수명·코드 같은 식별자만 (frontend.md §3).
  */
 
 import { INDEX_NAME_BY_CODE, type MarketIndexQuote } from "@/lib/api/kis/types";
-import type { MarketIndices } from "@/lib/types/market/indices";
-
-/** 국내 지수 3종 표시 모델 mock (server component 직접 import 호환). */
-export const MARKET_INDICES_MOCK: MarketIndices = [
-  { name: "KOSPI", value: "2,750.23", changeDisplay: "+1.20%", isUp: true },
-  { name: "KOSDAQ", value: "862.14", changeDisplay: "+0.45%", isUp: true },
-  { name: "KOSPI200", value: "372.51", changeDisplay: "-0.18%", isUp: false },
-];
 
 /**
  * 데이터 모델 fixture — 코드별 `MarketIndexQuote`.
