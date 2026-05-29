@@ -23,6 +23,10 @@ export const WATCHLIST_BADGE_ADMIN_ITEM = "관리종목";
 /** 행별 삭제 버튼 aria. */
 export const WATCHLIST_REMOVE_LABEL = "관심종목에서 제거";
 
+/** 디그레이드 행(부분 실패) — 시세 누락 종목을 담은 채로 안내+재시도. */
+export const WATCHLIST_ROW_FAILED = "시세를 불러오지 못했어요";
+export const WATCHLIST_ROW_RETRY = "다시 시도";
+
 /** 로딩 / 에러 / 빈 상태(§3.9). */
 export const WATCHLIST_ERROR_TITLE =
   "관심종목 시세를 불러오지 못했어요.";

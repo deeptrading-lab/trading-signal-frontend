@@ -7,6 +7,12 @@
  *   - 행별 삭제 버튼 신설(§9 q5) — `onRemove(ticker)`. 행 본문 클릭 시 `/profile/[ticker]` 라우팅.
  *   - 거래정지/관리종목 경고 배지 — 기존 `badge-critical`/`badge-warn` 토큰(신규 토큰 0, §9 q6).
  *
+ * `fix/watchlist-partial-render` — 부분실패 종목 누락 방지(좌조인 렌더):
+ *   - `quote` 가 없는(시세 실패/누락) ticker 는 "디그레이드 행" 으로 렌더한다. 종목명은 알 수
+ *     없으니 ticker + 한글 안내 + 재시도 버튼(`onRetry`). 삭제 버튼은 정상 행과 동일 제공.
+ *   - 디그레이드 행은 시세 미확정이므로 `/profile` 라우팅(행 클릭) 을 막는다.
+ *   - 기존 행 구조/토큰 재사용(신규 토큰 0).
+ *
  * v8 토큰 유지: 12-col grid · 등락 칩 `badge-signal-up`/`badge-signal-down`(상승 빨강/하락 파랑) ·
  *   row hover `hover:bg-surface-muted` · 삭제 버튼 `button-icon`.
  */
@@ -23,15 +29,63 @@ import {
   WATCHLIST_BADGE_TRADE_STOPPED,
   WATCHLIST_BADGE_ADMIN_ITEM,
   WATCHLIST_REMOVE_LABEL,
+  WATCHLIST_ROW_FAILED,
+  WATCHLIST_ROW_RETRY,
 } from "@/lib/copy/watchlist/labels";
 
 export interface WatchlistRowProps {
-  quote: WatchlistQuote;
+  /** ticker — 좌조인 렌더의 기준 키. quote 없으면 디그레이드 행. */
+  ticker: string;
+  /** 매칭된 시세. undefined = 시세 실패/누락(디그레이드 행). */
+  quote?: WatchlistQuote;
   onRemove: (ticker: string) => void;
+  /** 디그레이드 행 재시도 — 전체 쿼리 refetch. */
+  onRetry: () => void;
 }
 
-export function WatchlistRow({ quote, onRemove }: WatchlistRowProps) {
+export function WatchlistRow({
+  ticker,
+  quote,
+  onRemove,
+  onRetry,
+}: WatchlistRowProps) {
   const router = useRouter();
+
+  if (!quote) {
+    // 디그레이드 행 — 담은 종목은 사라지지 않는다. ticker + 안내 + 재시도 + 삭제.
+    return (
+      <div className="grid grid-cols-12 gap-md items-center p-md">
+        <div className="col-span-7 flex flex-col gap-xs min-w-0">
+          <span className="text-body-strong text-text-strong">{ticker}</span>
+          <span className="text-caption text-text-muted">
+            {WATCHLIST_ROW_FAILED}
+          </span>
+        </div>
+
+        <div className="col-span-3 flex justify-end">
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={onRetry}
+          >
+            {WATCHLIST_ROW_RETRY}
+          </button>
+        </div>
+
+        <div className="col-span-2 flex justify-end">
+          <button
+            type="button"
+            className="button-icon"
+            aria-label={`${ticker} ${WATCHLIST_REMOVE_LABEL}`}
+            onClick={() => onRemove(ticker)}
+          >
+            <Trash2 className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const isUp = quote.direction === "up";
   const isFlat = quote.direction === "flat";
   const signalBadgeClass = isUp ? "badge-signal-up" : "badge-signal-down";
