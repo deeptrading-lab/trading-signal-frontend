@@ -4,13 +4,19 @@
  * PRD `stock-api-integration` (PR-C) §3.5 — Watchlist 도메인 훅 신설. 화면 전환은 후속 PR.
  *
  * - queryKey = `queryKeys.watchlist.list(tickers)`. tickers 정규화 (sort + join) 로 순서 무관 캐시.
- * - staleTime / gcTime = `queryConfig.watchlist.list` (10s / 5min).
+ * - staleTime / gcTime = `queryConfig.watchlist.list` (30s / 5min).
  * - enabled — tickers 빈 배열 시 비활성. localStorage 영구화는 후속 PR 책임.
+ * - placeholderData = keepPreviousData (`watchlist-batch-quotes` §3.4) — 상단 새로고침/
+ *   tickers 변경 등 refetch 중 이전 데이터를 유지해 이미 불러온 행이 빈 스켈레톤으로 깜박이지 않는다.
  */
 
 "use client";
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  keepPreviousData,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { getWatchlist, type WatchlistQuote } from "@/lib/api/watchlist/list";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
@@ -34,6 +40,7 @@ export function useQueryWatchlist(
     enabled: (options?.enabled ?? true) && tickers.length > 0,
     staleTime: queryConfig.watchlist.list.staleTime,
     gcTime: queryConfig.watchlist.list.gcTime,
+    placeholderData: keepPreviousData,
     retry: 1,
     refetchOnWindowFocus: false,
   });

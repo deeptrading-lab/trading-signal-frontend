@@ -12,18 +12,16 @@ export const WATCHLIST_TABLE_PRICE = "현재가";
 export const WATCHLIST_TABLE_CHANGE = "등락률";
 export const WATCHLIST_TABLE_ACTIONS = "관리";
 
-/** 경고 배지(§3.6) — 거래정지 / 관리종목. */
-export const WATCHLIST_BADGE_TRADE_STOPPED = "거래정지";
-export const WATCHLIST_BADGE_ADMIN_ITEM = "관리종목";
-
 /** 행별 삭제 버튼 aria. */
 export const WATCHLIST_REMOVE_LABEL = "관심종목에서 제거";
 
-/** 디그레이드 행(부분 실패) — 시세 누락 종목을 담은 채로 안내+재시도. */
+/** 상단 단일 새로고침(`watchlist-batch-quotes` §3.4) — per-row 재시도 대체. 전체 query refetch. */
+export const WATCHLIST_REFRESH = "새로고침";
+/** 새로고침 진행 sr-only 안내. */
+export const WATCHLIST_REFRESHING = "관심종목 시세를 새로고침하는 중";
+
+/** 디그레이드 행(부분 실패) — 시세 누락 종목을 담은 채로 안내(전체 새로고침은 상단). */
 export const WATCHLIST_ROW_FAILED = "시세를 불러오지 못했어요";
-export const WATCHLIST_ROW_RETRY = "다시 시도";
-/** 디그레이드 행 로딩 안내(sr-only) — 재시도 진행 알림. */
-export const WATCHLIST_ROW_RETRYING = "시세를 다시 불러오는 중";
 /** 시세 로딩 sr-only 안내. */
 export const WATCHLIST_LOADING = "관심종목 시세를 불러오는 중";
 
