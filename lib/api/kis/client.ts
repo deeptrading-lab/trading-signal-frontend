@@ -3,9 +3,15 @@
  *
  * PRD `stock-api-integration` §3.1, §3.7, §7 사전 검증 메모 (2026-05-28):
  *   - **모의 도메인 포트 명시**: `openapivts.koreainvestment.com:29443`. 포트 누락 시 connection refused.
- *   - **실전 도메인**: `openapi.koreainvestment.com:9443`. 본 PRD 권장 X (실전계좌 안전장치).
+ *   - **실전 도메인**: `openapi.koreainvestment.com:9443`.
  *   - **단일 진입**: 모든 KIS REST 호출이 본 인스턴스를 거친다. 직접 fetch 금지.
  *   - **timeout**: 5s (api-integration-dev 안정성 의무).
+ *
+ * 정책 (2026-05-29 확정): 이 프로젝트는 **조회·분석 전용**이며 실전(prod) 데이터가 필요하므로
+ * `.env` 에 `KIS_ENV=prod` 설정을 권장한다. 모의(vts)는 지수·순위·수급·재무 등 시그널 핵심
+ * 데이터 대부분이 실전 전용이라 부적합. 조회만 하므로 prod 키로도 계좌 영향 없음(돈 미입금).
+ * 주문(order) API 는 영구 미구현 — 안전 경계는 env 가 아니라 주문 코드 부재다.
+ * 미설정 시 `resolveKisEnv()` 는 안전하게 vts 로 폴백(데이터 제한되니 prod 명시 권장).
  *
  * 본 클라이언트는 **서버 측 only** — Next.js route handler (`app/api/stock/*`) 에서만 import.
  * 브라우저 코드가 직접 import 하면 KIS App Key / Secret 누설 위험. ESLint 가 잡지 못해 reviewer 가 검토.
