@@ -2044,3 +2044,45 @@
   - 화면 mock → 실데이터 한 도메인씩 PR (Dashboard / Market / Watchlist) 진행 — PRD §10 권고.
   - `symbols.json` 350 풀 시드 확장 chore PR — DART CORPCODE.xml 기반 검증.
   - 후속 PRD `signal-algorithm` / `stock-order-integration` (실전계좌 다중 게이트 의무) / `realtime-quote-websocket` 자연 진입 가능 상태.
+
+### 2026-05-29 — feat(market): 지수 카드 KIS 실데이터 전환 (market-real-data) (#43)
+
+- **slug**: `market-real-data` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/43
+- **요약**: feat(market): 지수 카드 KIS 실데이터 전환 (market-real-data)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > `/market` 화면의 **주요 지수 카드**를 하드코딩 mock → KIS `inquire-index-price`(`FHPUP02100000`) **실데이터**로 전환했다. 데이터 계층(KIS 호출·BFF·어댑터·매퍼·테스트)은 직전 api-integration-dev 가 `a4c38af` 로 완료했고, 본 PR 은 **화면/훅 배선 + 상태 처리**를 담당한다.
+  > 
+  > PRD: [docs/prd/market-real-data.md](docs/prd/market-real-data.md)
+  > 
+  > ### 변경
+  > - **`IndicesCardContainer`(client) 신설** — `useQueryIndices(국내 3종)` 호출 → 로딩 스켈레톤 / 에러(한글 + 재시도) / 빈 / **부분 성공**(3종 중 일부만 와도 렌더) 분기. 커스텀훅 의무화 준수(`useQuery` 직접 import 0).
+  > - **표시 변환** — `MarketIndexQuote`(데이터 모델) → `MarketIndex`(표시 모델): `value`→`formatNumber`(천단위 콤마), `changePercent`→`formatPct({ sign: true })`(부호+%), `direction → isUp`. 기존 셀 3요소(지수명·현재가·등락률) 유지 — 신규 필드 0(q6 디자이너 미합류).
+  > - **page/MarketPage 배선** — 지수 mock 직접 import 제거. ThemesCard 는 **mock 유지**(q2). 지수 영역만 client 경계.
+  > - **`queryConfig.market.indices` staleTime 10s → 30s**(q7=b, 단일 진실 원천 1줄).
+  > - 지수 로딩/에러/빈/재시도 한글 카피 추가(`lib/copy/market/labels.ts`).
+  > - 표시 모델 mock(`MARKET_INDICES_MOCK`) 제거 — 데이터 모델 `getMockMarketIndices` 만 BFF fallback 으로 유지.
+  > - 기존 v8 토큰(`card`/`card-critical`/`signal-up-text`/`skeleton`/`button-secondary`) 재사용, 신규 토큰 도입 0.
+  > 
+  > ### 변경 파일
+  > - `components/market/IndicesCardContainer.tsx`(신규)
+  > - `components/market/MarketPage.tsx` · `app/(main)/market/page.tsx`(배선)
+  > - `hooks/market/useQueryIndices.ts`(주석 갱신)
+  > - `lib/query/queryConfig.ts`(staleTime 30s)
+  > - `lib/copy/market/labels.ts`(상태 카피)
+  > - `lib/mock/market/indices.ts`(표시 모델 mock 제거)
+  > 
+  > ## AC 체크
+  > 
+  > - [x] **AC-1~2** KIS 지수 모듈 + BFF 라우트 + 헤더 — api-integration-dev `a4c38af` 완료(`X-Data-Source`/`X-KIS-Env` 확인).
+  > - [x] **AC-3** KIS 직접 호출 없음 — `git grep -n "inquire-index-price" components hooks` → 0(화면/훅 KIS 직접 호출 0).
+  > - [x] **AC-4** queryKeys + 커스텀훅 정합 — `useQuery( in components/market` → 0, `useQueryIndices(` in container → 존재, `queryKeys.market.indices` in hook → 존재.
+  > - [x] **AC-5** 매퍼 단위 테스트 — `index-price.mappers.test.ts` 7 tests 통과.
+  > - [x] **AC-6** mock fallback — 미설정/비prod 시 `getMockMarketIndices` + `X-Data-Source: mock`(route.test.ts).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **해외 지수/환율/코인 트랙(`market-foreign-data` 가칭)** — 본 트랙에서 제거된 4종(S&P 500/NASDAQ/USDKRW/BTC Dominance), 소스 리서치 진행 중.
+  - **테마/섹터 실데이터 트랙(`market-themes-data` 가칭)** — ThemesCard mock → 실데이터(q2 후속).
+  - 지수 TTL(현 30s) 운영 데이터(`X-Data-Source` 분포) 기반 재조정 chore + 거래량/상승하락 종목수 셀 추가(디자이너 1회 리뷰).
