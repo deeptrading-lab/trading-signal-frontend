@@ -2086,3 +2086,45 @@
   - **해외 지수/환율/코인 트랙(`market-foreign-data` 가칭)** — 본 트랙에서 제거된 4종(S&P 500/NASDAQ/USDKRW/BTC Dominance), 소스 리서치 진행 중.
   - **테마/섹터 실데이터 트랙(`market-themes-data` 가칭)** — ThemesCard mock → 실데이터(q2 후속).
   - 지수 TTL(현 30s) 운영 데이터(`X-Data-Source` 분포) 기반 재조정 chore + 거래량/상승하락 종목수 셀 추가(디자이너 1회 리뷰).
+
+### 2026-05-29 — feat(watchlist): 관심종목 KIS 실데이터 전환 + localStorage 영구화 (watchlist-real-data) (#44)
+
+- **slug**: `watchlist-real-data` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/44
+- **요약**: feat(watchlist): 관심종목 KIS 실데이터 전환 + localStorage 영구화 (watchlist-real-data)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > `/watchlist` 화면을 mock(server component)에서 **KIS 실데이터(client container + 훅)**로 전환하고, 관심종목 ticker 를 **localStorage 로 영구화**한다. 데이터 계층(`search-stock-info` 호출 + 합성 BFF + 어댑터 재배선)은 직전 api-integration-dev 가 같은 브랜치에 완료(09a194a)했고, 본 PR 은 저장소 격리 + 영구화 훅 + 화면 배선 + 추가/삭제 UX + 상태처리를 얹는다.
+  > 
+  > PRD: [`docs/prd/watchlist-real-data.md`](../blob/feature/watchlist-real-data/docs/prd/watchlist-real-data.md)
+  > 
+  > ## 변경 요약
+  > - **저장소 격리** `lib/api/watchlist/store.ts` — `readTickers`/`writeTickers`/`hasSeeded`/`markSeeded`. **유일한 localStorage 접근점**(engine DB 교체 경계). SSR 안전(window 가드) + 깨진 JSON graceful.
+  > - **영구화 훅** `hooks/watchlist/useWatchlistTickers.ts` — `{ tickers, addTicker, removeTicker, hasTicker }`(저장소 중립 시그니처). 최초 진입 시 대표주 3종 시드(`WATCHLIST_SEED_TICKERS = 005930/000660/035420`), 전부 삭제 시 재시드 금지(seeded 플래그), 중복/soft cap 30 가드.
+  > - **화면 배선** — `page.tsx` server 유지 + `WatchlistContainer`(client) 신설: `useWatchlistTickers` → `useQueryWatchlist` 로 실데이터. `WatchlistPage`/`Table`/`Row` client 전환.
+  > - **행별 삭제** `Trash2` 버튼(양 뷰포트), 행 클릭 시 `/profile/[ticker]`.
+  > - **거래정지/관리종목 경고 배지** — `badge-critical`/`badge-warn`(신규 토큰 0).
+  > - **검색 모달** `WatchlistAddModal.tsx` — `useQueryStockSearch` 재사용, 이미 담긴 종목 비활성("추가됨"), ESC/오버레이 닫힘.
+  > - **상태처리** — 로딩 스켈레톤 / 에러(한글+재시도) / 빈 상태 CTA / 부분성공(받은 것만).
+  > - **표시 변환** — `formatNumber`(천단위) + `formatPct`(부호). 한국식 색(상승 빨강/하락 파랑) 유지.
+  > - 코인·해외 mock 제거 — `lib/mock/watchlist/items.ts`/`lib/types/watchlist/items.ts`(레거시 표시 모델) 삭제(국내주식만, §9 q4).
+  > - copy `lib/copy/watchlist/labels.ts` 확장(모달/상태/배지/삭제).
+  > 
+  > ## AC 체크
+  > - [x] AC-1/2/3 KIS 호출·매퍼·BFF (데이터 계층 커밋 09a194a + route.test.ts 7 통과)
+  > - [x] AC-4 KIS 직접 호출 없음 — `grep -rn "search-stock-info|fetchStockInfo|inquire-price" components hooks app/(main)` 0(테스트 제외), `lib/api/watchlist` 에 KIS client 0
+  > - [x] AC-5 커스텀훅만 소비 — `grep "useQuery(" components/watchlist` 0, `useQueryWatchlist|useWatchlistTickers` 6
+  > - [x] AC-6 저장소 추상화 경계 — `grep "localStorage" hooks/watchlist/useWatchlistTickers.ts` **0**(접근은 store.ts 격리 모듈에만). `WATCHLIST_SEED` 존재. store 단위 테스트 5 통과(라운드트립/시드플래그/SSR 가드)
+  > - [x] AC-7 추가/삭제 UX — `WatchlistAddModal.tsx` 1건, `useQueryStockSearch`/`removeTicker` 배선
+  > - [x] AC-8 mock fallback + 국내주식만 — 빈 tickers→`X-Data-Source: mock` + `[]`. `grep "crypto|BTC|ETH|엔비디아|테슬라" lib/mock/watchlist` 0(레거시 삭제)
+  > - [x] AC-9 실데이터(prod, 아래 스모크)
+  > - [x] AC-10 한국식 색 — `badge-signal-up`/`badge-signal-down` 유지
+  > - [x] AC-11 typecheck/lint/build/test 0 — 아래
+  > - [x] AC-12 화면 회귀 0 — SSR 셸 "관심종목"/"+ 종목 추가" 렌더 확인
+  > 
+  > ## 검증 결과
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **engine API DB 영구화 마이그레이션**(`watchlist-engine-persistence` 가칭) — `store.ts` 의 read/write 만 engine API 호출로 교체, 훅 시그니처·컴포넌트·BFF 무변경 목표(경계는 본 PR 에서 마련).
+  - **`intstock_multprice` 일괄 시세 최적화** — 종목당 단건 N회 → 1회 일괄(응답 필드 수집 선행). 동시 호출 부분실패(NAVER 사례) 완화에도 도움.
+  - 코인/해외주식 관심종목은 별도 소스 트랙(§4).
