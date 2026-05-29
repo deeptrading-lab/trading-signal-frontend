@@ -1,0 +1,101 @@
+/**
+ * WatchlistContainer — `/watchlist` 데이터/상태 경계 (client component).
+ *
+ * PRD `watchlist-real-data` §3.6 방안 A — page.tsx(server) 아래 단일 client 컨테이너.
+ *
+ * 책임:
+ *   - `useWatchlistTickers()` 로 영구화된 ticker 배열 + 추가/삭제 핸들러.
+ *   - `useQueryWatchlist(tickers)` 로 시세+메타 실데이터(BFF `/api/watchlist`).
+ *   - 로딩 / 에러(한글+재시도) / 빈 상태(CTA) / 성공(부분성공=받은 것만) 분기.
+ *   - 추가 모달(`WatchlistAddModal`) 오픈 상태 관리.
+ *
+ * 커스텀훅만 소비(frontend.md §1) — `useQuery` 직접 import 0.
+ */
+
+"use client";
+
+import { useState } from "react";
+import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
+import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
+import { WatchlistPage } from "./WatchlistPage";
+import { WatchlistTable } from "./WatchlistTable";
+import { WatchlistAddModal } from "./WatchlistAddModal";
+import {
+  WATCHLIST_ERROR_TITLE,
+  WATCHLIST_ERROR_HINT,
+  WATCHLIST_RETRY,
+  WATCHLIST_EMPTY_TITLE,
+  WATCHLIST_EMPTY_HINT,
+  WATCHLIST_EMPTY_CTA,
+} from "@/lib/copy/watchlist/labels";
+
+export function WatchlistContainer() {
+  const { tickers, addTicker, removeTicker, hasTicker } = useWatchlistTickers();
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const query = useQueryWatchlist(tickers);
+  const quotes = query.data ?? [];
+
+  // tickers 0건 — 시드 전부 삭제 등(§3.9 빈 상태). enabled=false 라 query 는 idle.
+  const isEmpty = tickers.length === 0;
+  // 데이터가 아직 없고 fetch 중일 때만 스켈레톤(이전 데이터 있으면 표 유지).
+  const showSkeleton = !isEmpty && query.isPending && quotes.length === 0;
+  const showError = !isEmpty && query.isError && quotes.length === 0;
+
+  return (
+    <>
+      <WatchlistPage onAdd={() => setModalOpen(true)}>
+        {isEmpty ? (
+          <div className="card flex flex-col items-center gap-sm py-2xl text-center">
+            <p className="text-body-strong text-text-strong">
+              {WATCHLIST_EMPTY_TITLE}
+            </p>
+            <p className="text-body-sm text-text-muted">
+              {WATCHLIST_EMPTY_HINT}
+            </p>
+            <button
+              type="button"
+              className="button-primary mt-sm"
+              onClick={() => setModalOpen(true)}
+            >
+              {WATCHLIST_EMPTY_CTA}
+            </button>
+          </div>
+        ) : showError ? (
+          <div className="card flex flex-col items-center gap-sm py-2xl text-center">
+            <p className="text-body-strong text-text-strong">
+              {WATCHLIST_ERROR_TITLE}
+            </p>
+            <p className="text-body-sm text-text-muted">
+              {WATCHLIST_ERROR_HINT}
+            </p>
+            <button
+              type="button"
+              className="button-secondary mt-sm"
+              onClick={() => query.refetch()}
+            >
+              {WATCHLIST_RETRY}
+            </button>
+          </div>
+        ) : (
+          <WatchlistTable
+            quotes={quotes}
+            isLoading={showSkeleton}
+            skeletonRows={Math.min(tickers.length, 6)}
+            onRemove={removeTicker}
+          />
+        )}
+      </WatchlistPage>
+
+      <WatchlistAddModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onAdd={(ticker) => {
+          addTicker(ticker);
+          setModalOpen(false);
+        }}
+        hasTicker={hasTicker}
+      />
+    </>
+  );
+}

@@ -20,8 +20,11 @@ import type {
   KisInquireDailyPriceItem,
   KisInquireIndexPriceOutput,
   KisInquirePriceOutput,
+  KisSearchStockInfoOutput,
   MarketIndexQuote,
   StockDailyCandle,
+  StockInfo,
+  StockMarket,
   StockPrice,
 } from "./types";
 import { INDEX_NAME_BY_CODE } from "./types";
@@ -86,6 +89,53 @@ export function mapStockPrice(
     open: output.stck_oprc ? toNumber(output.stck_oprc) : undefined,
     high: output.stck_hgpr ? toNumber(output.stck_hgpr) : undefined,
     low: output.stck_lwpr ? toNumber(output.stck_lwpr) : undefined,
+  };
+}
+
+/**
+ * `search-stock-info.output` → 시장 배지 매핑.
+ *
+ * 1차 `mket_id_cd`(STK유가/KSQ코스닥/KNX코넥스/ETF) → 없거나 미매핑 시 2차 `excg_dvsn_cd`(02코스피/03코스닥).
+ * 둘 다 못 맞추면 "기타" graceful degrade.
+ */
+function mapMarket(
+  mketIdCd: string | undefined,
+  excgDvsnCd: string | undefined,
+): StockMarket {
+  const mket = mketIdCd?.trim().toUpperCase();
+  if (mket === "STK") return "KOSPI";
+  if (mket === "KSQ") return "KOSDAQ";
+  if (mket === "KNX") return "KONEX";
+  if (mket === "ETF") return "ETF";
+
+  const excg = excgDvsnCd?.trim();
+  if (excg === "02") return "KOSPI";
+  if (excg === "03") return "KOSDAQ";
+
+  return "기타";
+}
+
+/**
+ * KIS search-stock-info 응답 → 클라이언트 친화 `StockInfo`.
+ *
+ * ⚠️ 종목명 1차 소스 = `prdt_abrv_name`("삼성전자"). 빈 값이면 `prdt_name` → ticker.
+ * `inquire-price` 의 `hts_kor_isnm`/`bstp_kor_isnm`/`extractStockName` 은 사용하지 않는다.
+ */
+export function mapStockInfo(
+  output: KisSearchStockInfoOutput,
+  ticker: string,
+): StockInfo {
+  const abrv = output.prdt_abrv_name?.trim();
+  const full = output.prdt_name?.trim();
+  const name = abrv || full || ticker;
+
+  return {
+    ticker,
+    name,
+    market: mapMarket(output.mket_id_cd, output.excg_dvsn_cd),
+    isTradeStopped: output.tr_stop_yn?.trim() === "Y",
+    isAdminItem: output.admn_item_yn?.trim() === "Y",
+    isKospi200: output.kospi200_item_yn?.trim() === "Y",
   };
 }
 

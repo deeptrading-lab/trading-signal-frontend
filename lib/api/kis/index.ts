@@ -20,6 +20,7 @@
  *
  *   - `fetchStockPrice(ticker)` — 현재가
  *   - `fetchStockDaily(ticker, period)` — 일자별 시세
+ *   - `fetchStockInfo(ticker)` — 종목 기본정보 (종목명·시장·거래정지/관리, ⚠️실전 전용, 조회 only)
  *   - `fetchIndexPrice(code)` — 국내 업종 현재지수 (조회 only)
  *   - `searchSymbols(keyword)` — 종목 검색 (symbols.json 기반)
  *   - `getCorpCode(ticker)` — DART corp_code 매핑
@@ -28,6 +29,7 @@
  */
 
 export { fetchStockPrice, fetchStockDaily } from "./price";
+export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
 export { searchSymbols, getCorpCode, getSymbolsMeta } from "./search";
 export { getAccessToken } from "./token";
@@ -37,6 +39,8 @@ export type {
   StockPrice,
   StockDailyCandle,
   StockSearchResult,
+  StockInfo,
+  StockMarket,
   MarketIndexQuote,
   KisInquireIndexPriceOutput,
 } from "./types";
