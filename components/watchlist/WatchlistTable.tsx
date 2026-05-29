@@ -17,6 +17,7 @@
 
 "use client";
 
+import { useMemo } from "react";
 import { WatchlistRow } from "./WatchlistRow";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
 import {
@@ -24,6 +25,7 @@ import {
   WATCHLIST_TABLE_PRICE,
   WATCHLIST_TABLE_CHANGE,
   WATCHLIST_TABLE_ACTIONS,
+  WATCHLIST_LOADING,
 } from "@/lib/copy/watchlist/labels";
 
 export interface WatchlistTableProps {
@@ -33,6 +35,8 @@ export interface WatchlistTableProps {
   quotes: WatchlistQuote[];
   isLoading?: boolean;
   skeletonRows?: number;
+  /** ticker → 표시명 fallback(추가 시점 store name → 시드 name). 디그레이드 행 식별용. */
+  getName?: (ticker: string) => string | null;
   onRemove: (ticker: string) => void;
   /** 디그레이드 행 재시도 — 전체 쿼리 refetch. */
   onRetry: () => void;
@@ -43,10 +47,14 @@ export function WatchlistTable({
   quotes,
   isLoading = false,
   skeletonRows = 3,
+  getName,
   onRemove,
   onRetry,
 }: WatchlistTableProps) {
-  const quoteByTicker = new Map(quotes.map((q) => [q.ticker, q]));
+  const quoteByTicker = useMemo(
+    () => new Map(quotes.map((q) => [q.ticker, q])),
+    [quotes],
+  );
 
   return (
     <section className="bg-surface text-text-strong border border-border-line rounded-lg overflow-hidden">
@@ -56,36 +64,45 @@ export function WatchlistTable({
         <div className="col-span-3 text-right">{WATCHLIST_TABLE_CHANGE}</div>
         <div className="col-span-2 text-right">{WATCHLIST_TABLE_ACTIONS}</div>
       </div>
-      <div className="divide-y divide-border-line">
-        {isLoading
-          ? Array.from({ length: skeletonRows }).map((_, i) => (
+      <div
+        className="divide-y divide-border-line"
+        aria-busy={isLoading ? true : undefined}
+      >
+        {isLoading ? (
+          <>
+            <span className="sr-only">{WATCHLIST_LOADING}</span>
+            {Array.from({ length: skeletonRows }).map((_, i) => (
               <div
-                key={i}
+                key={`sk-${i}`}
                 className="grid grid-cols-12 gap-md items-center p-md"
                 aria-hidden="true"
               >
                 <div className="col-span-4 flex flex-col gap-xs">
-                  <div className="h-4 w-2/3 rounded-pill bg-surface-muted" />
-                  <div className="h-3 w-1/3 rounded-pill bg-surface-muted" />
+                  <div className="skeleton-line skeleton-line-medium" />
+                  <div className="skeleton-line skeleton-line-narrow" />
                 </div>
                 <div className="col-span-3 flex justify-end">
-                  <div className="h-4 w-1/2 rounded-pill bg-surface-muted" />
+                  <div className="skeleton-line skeleton-line-narrow" />
                 </div>
                 <div className="col-span-3 flex justify-end">
-                  <div className="h-4 w-1/2 rounded-pill bg-surface-muted" />
+                  <div className="skeleton-line skeleton-line-narrow" />
                 </div>
                 <div className="col-span-2" />
               </div>
-            ))
-          : tickers.map((ticker) => (
-              <WatchlistRow
-                key={ticker}
-                ticker={ticker}
-                quote={quoteByTicker.get(ticker)}
-                onRemove={onRemove}
-                onRetry={onRetry}
-              />
             ))}
+          </>
+        ) : (
+          tickers.map((ticker) => (
+            <WatchlistRow
+              key={ticker}
+              ticker={ticker}
+              quote={quoteByTicker.get(ticker)}
+              fallbackName={getName?.(ticker) ?? null}
+              onRemove={onRemove}
+              onRetry={onRetry}
+            />
+          ))
+        )}
       </div>
     </section>
   );

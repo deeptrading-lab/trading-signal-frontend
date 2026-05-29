@@ -12,10 +12,6 @@ export const WATCHLIST_TABLE_PRICE = "현재가";
 export const WATCHLIST_TABLE_CHANGE = "등락률";
 export const WATCHLIST_TABLE_ACTIONS = "관리";
 
-/** WatchlistAssetType enum 한글 매핑. */
-export const ASSET_TYPE_STOCK = "주식";
-export const ASSET_TYPE_CRYPTO = "코인";
-
 /** 경고 배지(§3.6) — 거래정지 / 관리종목. */
 export const WATCHLIST_BADGE_TRADE_STOPPED = "거래정지";
 export const WATCHLIST_BADGE_ADMIN_ITEM = "관리종목";
@@ -26,6 +22,10 @@ export const WATCHLIST_REMOVE_LABEL = "관심종목에서 제거";
 /** 디그레이드 행(부분 실패) — 시세 누락 종목을 담은 채로 안내+재시도. */
 export const WATCHLIST_ROW_FAILED = "시세를 불러오지 못했어요";
 export const WATCHLIST_ROW_RETRY = "다시 시도";
+/** 디그레이드 행 로딩 안내(sr-only) — 재시도 진행 알림. */
+export const WATCHLIST_ROW_RETRYING = "시세를 다시 불러오는 중";
+/** 시세 로딩 sr-only 안내. */
+export const WATCHLIST_LOADING = "관심종목 시세를 불러오는 중";
 
 /** 로딩 / 에러 / 빈 상태(§3.9). */
 export const WATCHLIST_ERROR_TITLE =
@@ -41,7 +41,13 @@ export const WATCHLIST_EMPTY_CTA = "종목 추가";
 export const WATCHLIST_MODAL_TITLE = "관심종목 추가";
 export const WATCHLIST_MODAL_CLOSE = "닫기";
 export const WATCHLIST_SEARCH_PLACEHOLDER = "종목명·코드 입력 (예: 삼성전자, 005930)";
-export const WATCHLIST_SEARCH_EMPTY = "일치하는 종목이 없어요.";
+/** 시드 한정(대표 종목 위주) 안내 + 6자리 코드 직접 추가 경로 인지. */
+export const WATCHLIST_SEARCH_EMPTY =
+  "대표 종목 위주로만 검색돼요. 6자리 종목코드로도 추가할 수 있어요.";
 export const WATCHLIST_SEARCH_PENDING = "검색 중…";
 export const WATCHLIST_SEARCH_PROMPT = "추가할 종목을 검색해 주세요.";
 export const WATCHLIST_SEARCH_ADDED = "추가됨";
+/** 6자리 ticker 직접 추가(시드 미수록 보완) — `{ticker}` 치환. */
+export const WATCHLIST_SEARCH_ADD_RAW = (ticker: string) => `${ticker} 직접 추가`;
+/** 직접 추가 항목의 보조 라벨(코드 기반). */
+export const WATCHLIST_SEARCH_RAW_META = "코드";

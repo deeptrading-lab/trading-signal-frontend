@@ -20,9 +20,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
+import { getSymbolName } from "@/lib/api/kis/search";
 import { WatchlistPage } from "./WatchlistPage";
 import { WatchlistTable } from "./WatchlistTable";
 import { WatchlistAddModal } from "./WatchlistAddModal";
@@ -36,8 +37,15 @@ import {
 } from "@/lib/copy/watchlist/labels";
 
 export function WatchlistContainer() {
-  const { tickers, addTicker, removeTicker, hasTicker } = useWatchlistTickers();
+  const { tickers, addTicker, removeTicker, hasTicker, getName } =
+    useWatchlistTickers();
   const [modalOpen, setModalOpen] = useState(false);
+
+  // 디그레이드 행 표시명 — 추가 시점 store name 우선, 없으면 시드 name fallback.
+  const resolveName = useCallback(
+    (ticker: string) => getName(ticker) ?? getSymbolName(ticker),
+    [getName],
+  );
 
   const query = useQueryWatchlist(tickers);
   const quotes = query.data ?? [];
@@ -68,7 +76,10 @@ export function WatchlistContainer() {
             </button>
           </div>
         ) : showError ? (
-          <div className="card flex flex-col items-center gap-sm py-2xl text-center">
+          <div
+            className="card flex flex-col items-center gap-sm py-2xl text-center"
+            role="alert"
+          >
             <p className="text-body-strong text-text-strong">
               {WATCHLIST_ERROR_TITLE}
             </p>
@@ -89,6 +100,7 @@ export function WatchlistContainer() {
             quotes={quotes}
             isLoading={showSkeleton}
             skeletonRows={Math.min(tickers.length, 6)}
+            getName={resolveName}
             onRemove={removeTicker}
             onRetry={() => query.refetch()}
           />
@@ -98,8 +110,8 @@ export function WatchlistContainer() {
       <WatchlistAddModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onAdd={(ticker) => {
-          addTicker(ticker);
+        onAdd={(ticker, name) => {
+          addTicker(ticker, name);
           setModalOpen(false);
         }}
         hasTicker={hasTicker}

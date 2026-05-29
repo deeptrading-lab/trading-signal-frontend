@@ -17,6 +17,10 @@ import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
 
 export type UseQueryWatchlistOptions = {
+  /**
+   * 외부에서 명시적으로 비활성화할 때 사용. 미전달이어도 내부 `tickers.length > 0` 가드로
+   * 빈 배열이면 자동 비활성화된다 — `WatchlistContainer` 는 이 가드에 의존해 옵션을 넘기지 않는다.
+   */
   enabled?: boolean;
 };
 
