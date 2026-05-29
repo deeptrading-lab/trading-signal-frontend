@@ -67,6 +67,16 @@ export function getCorpCode(ticker: string): string | null {
 }
 
 /**
+ * ticker → 시드 종목명 역참조. 시드(symbols.json) 미수록이면 null.
+ *
+ * 디그레이드 행(시세 부분실패) 등 시세 응답 없이 종목명이 필요한 표시 경로의 fallback.
+ * store 에 추가 시점 종목명이 없을 때만 보조로 쓴다(클라이언트 import 가능, 부수효과 0).
+ */
+export function getSymbolName(ticker: string): string | null {
+  return SYMBOLS.find((s) => s.ticker === ticker)?.name ?? null;
+}
+
+/**
  * 시드 메타 — BFF route handler 가 응답 헤더 (`X-Symbols-Source: seed-v0.1.0`) 에 표기.
  */
 export function getSymbolsMeta(): {

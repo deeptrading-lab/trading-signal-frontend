@@ -6,17 +6,24 @@
  * 책임:
  *   - `useWatchlistTickers()` 로 영구화된 ticker 배열 + 추가/삭제 핸들러.
  *   - `useQueryWatchlist(tickers)` 로 시세+메타 실데이터(BFF `/api/watchlist`).
- *   - 로딩 / 에러(한글+재시도) / 빈 상태(CTA) / 성공(부분성공=받은 것만) 분기.
+ *   - 로딩 / 에러(한글+재시도) / 빈 상태(CTA) / 성공(좌조인=담은 ticker 전부) 분기.
  *   - 추가 모달(`WatchlistAddModal`) 오픈 상태 관리.
+ *
+ * `fix/watchlist-partial-render` — 부분실패 종목 누락 방지:
+ *   - 행을 BFF 성공분(`quotes`) 이 아니라 사용자가 담은 `tickers` 기준으로 `WatchlistTable`
+ *     에 넘긴다(좌조인). 시세 실패로 drop 된 종목은 표 안에서 디그레이드 행으로 남는다.
+ *   - 전체 쿼리 에러(전부 실패=BFF 502, 보유 데이터 0) 만 카드형 ErrorCard 로 분기하고,
+ *     일부만 누락된 부분 실패는 행 단위 디그레이드로 처리한다.
  *
  * 커스텀훅만 소비(frontend.md §1) — `useQuery` 직접 import 0.
  */
 
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
+import { getSymbolName } from "@/lib/api/kis/search";
 import { WatchlistPage } from "./WatchlistPage";
 import { WatchlistTable } from "./WatchlistTable";
 import { WatchlistAddModal } from "./WatchlistAddModal";
@@ -30,8 +37,15 @@ import {
 } from "@/lib/copy/watchlist/labels";
 
 export function WatchlistContainer() {
-  const { tickers, addTicker, removeTicker, hasTicker } = useWatchlistTickers();
+  const { tickers, addTicker, removeTicker, hasTicker, getName } =
+    useWatchlistTickers();
   const [modalOpen, setModalOpen] = useState(false);
+
+  // 디그레이드 행 표시명 — 추가 시점 store name 우선, 없으면 시드 name fallback.
+  const resolveName = useCallback(
+    (ticker: string) => getName(ticker) ?? getSymbolName(ticker),
+    [getName],
+  );
 
   const query = useQueryWatchlist(tickers);
   const quotes = query.data ?? [];
@@ -62,7 +76,10 @@ export function WatchlistContainer() {
             </button>
           </div>
         ) : showError ? (
-          <div className="card flex flex-col items-center gap-sm py-2xl text-center">
+          <div
+            className="card flex flex-col items-center gap-sm py-2xl text-center"
+            role="alert"
+          >
             <p className="text-body-strong text-text-strong">
               {WATCHLIST_ERROR_TITLE}
             </p>
@@ -79,10 +96,13 @@ export function WatchlistContainer() {
           </div>
         ) : (
           <WatchlistTable
+            tickers={tickers}
             quotes={quotes}
             isLoading={showSkeleton}
             skeletonRows={Math.min(tickers.length, 6)}
+            getName={resolveName}
             onRemove={removeTicker}
+            onRetry={() => query.refetch()}
           />
         )}
       </WatchlistPage>
@@ -90,8 +110,8 @@ export function WatchlistContainer() {
       <WatchlistAddModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onAdd={(ticker) => {
-          addTicker(ticker);
+        onAdd={(ticker, name) => {
+          addTicker(ticker, name);
           setModalOpen(false);
         }}
         hasTicker={hasTicker}
