@@ -38,8 +38,6 @@ export interface WatchlistTableProps {
   /** ticker → 표시명 fallback(추가 시점 store name → 시드 name). 디그레이드 행 식별용. */
   getName?: (ticker: string) => string | null;
   onRemove: (ticker: string) => void;
-  /** 디그레이드 행 재시도 — 전체 쿼리 refetch. */
-  onRetry: () => void;
 }
 
 export function WatchlistTable({
@@ -49,7 +47,6 @@ export function WatchlistTable({
   skeletonRows = 3,
   getName,
   onRemove,
-  onRetry,
 }: WatchlistTableProps) {
   const quoteByTicker = useMemo(
     () => new Map(quotes.map((q) => [q.ticker, q])),
@@ -99,7 +96,6 @@ export function WatchlistTable({
               quote={quoteByTicker.get(ticker)}
               fallbackName={getName?.(ticker) ?? null}
               onRemove={onRemove}
-              onRetry={onRetry}
             />
           ))
         )}

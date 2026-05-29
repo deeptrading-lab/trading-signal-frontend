@@ -52,13 +52,20 @@ export function WatchlistContainer() {
 
   // tickers 0건 — 시드 전부 삭제 등(§3.9 빈 상태). enabled=false 라 query 는 idle.
   const isEmpty = tickers.length === 0;
-  // 데이터가 아직 없고 fetch 중일 때만 스켈레톤(이전 데이터 있으면 표 유지).
+  // 데이터가 아직 없고 fetch 중일 때만 스켈레톤(이전 데이터 있으면 표 유지=placeholderData).
   const showSkeleton = !isEmpty && query.isPending && quotes.length === 0;
   const showError = !isEmpty && query.isError && quotes.length === 0;
+  // 상단 새로고침 — 표가 떠 있을 때만(빈/초기 로딩/전체 에러 카드 분기 제외).
+  const canRefresh = !isEmpty && !showSkeleton && !showError;
 
   return (
     <>
-      <WatchlistPage onAdd={() => setModalOpen(true)}>
+      <WatchlistPage
+        onAdd={() => setModalOpen(true)}
+        onRefresh={() => query.refetch()}
+        isRefreshing={query.isFetching}
+        canRefresh={canRefresh}
+      >
         {isEmpty ? (
           <div className="card flex flex-col items-center gap-sm py-2xl text-center">
             <p className="text-body-strong text-text-strong">
@@ -102,7 +109,6 @@ export function WatchlistContainer() {
             skeletonRows={Math.min(tickers.length, 6)}
             getName={resolveName}
             onRemove={removeTicker}
-            onRetry={() => query.refetch()}
           />
         )}
       </WatchlistPage>

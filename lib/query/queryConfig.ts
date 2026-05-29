@@ -76,21 +76,13 @@ export const queryConfig = {
   },
   watchlist: {
     /**
-     * 관심종목 시세 — `inquire-price` 합성. stock.price 와 동등한 짧은 TTL(실시간성).
-     * PRD `watchlist-real-data` §3.6.
+     * 관심종목 시세 — `intstock_multprice` 일괄 1콜. 일괄이라 초당 한도 여유 충분 →
+     * staleTime 30s 로 상향(지수 `market.indices` 선례). 폴링 없음(수동 새로고침 + staleTime).
+     * PRD `watchlist-batch-quotes` §3.3 / §9 q5 RESOLVED.
      */
     list: {
-      staleTime: 10 * SECOND,
+      staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
-    },
-    /**
-     * 관심종목 종목명·메타 — `search-stock-info`. 거의 변하지 않으므로 긴 TTL
-     * (disclosure.company 선례). PRD §9 q2 — 시세와 별도 TTL 분리.
-     * 현재 BFF 가 시세와 한 응답으로 합성하지만, 후속 메타 단독 훅 분리 시 본 항목 참조.
-     */
-    info: {
-      staleTime: 1 * DAY,
-      gcTime: 7 * DAY,
     },
   },
 } as const;

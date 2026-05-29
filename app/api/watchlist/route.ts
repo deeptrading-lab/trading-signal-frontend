@@ -1,51 +1,36 @@
 /**
- * `/api/watchlist` BFF route — 관심종목 시세+메타 합성.
+ * `/api/watchlist` BFF route — 관심종목 일괄 시세 조회.
  *
  * 브라우저 → 본 route handler → KIS REST 단방향. 직접 호출 금지 (AGENTS.md BFF 원칙).
  *
- * PRD `watchlist-real-data` §3.3:
+ * PRD `watchlist-batch-quotes` §3.2 — 종목당 시세+메타 **2N콜** 합성을 폐기하고
+ * `intstock_multprice` **일괄 1콜**(N>30 시 ⌈N/30⌉ 청크)로 교체:
  *   - GET ?tickers=005930,000660 (또는 반복 ?tickers=005930&tickers=000660). 빈값 → 빈 배열(200).
- *   - **soft cap 30** — 초과분 truncate + `X-Watchlist-Truncated` 헤더 경고.
- *   - 종목당 **시세(fetchStockPrice) + 메타(fetchStockInfo)** 합성:
- *     · 시세 게이트(단일) — `inquire-price` 는 모의 지원 → `isKisConfigured()` 만 통과하면 KIS, 아니면 mock.
- *     · 메타 게이트(이중) — `search-stock-info` 는 실전 전용 → `isKisConfigured()` AND
- *       `resolveKisEnv()==="prod"` 통과 시에만 호출. 그 외엔 종목명 fallback
- *       (symbols.json 시드 name → ticker), 시세 `extractStockName` 의존 금지.
- *   - **부분 성공** — 종목별·API별 `Promise.allSettled`. 시세 성공 + 메타 실패면 fallback name 으로 디그레이드.
+ *   - **soft cap 30** — 초과분 truncate + `X-Watchlist-Truncated` 헤더(§3.2, 1콜 보장).
+ *   - **이중 게이트(§9 q1)** — `isKisConfigured()` AND `resolveKisEnv()==="prod"` 통과 시에만 KIS 실호출.
+ *     `intstock_multprice` 는 모의(vts) 검증 전이라 보수적으로 prod 전용. 그 외엔 mock fallback.
+ *   - **로드 시 종목명 메타 호출 0** — 종목명은 클라 store/시드가 해결. BFF 응답 `name` 은
+ *     일괄응답에 없으므로 시드 fallback(`getSymbolName`) → ticker 로만 채운다. 클라가 store name 으로 덮음.
+ *   - **부분 성공** — 일괄 응답에 일부 ticker 누락 가능 → 받은 종목만 반환(프론트가 좌조인 디그레이드).
+ *     누락 ticker 는 `X-Watchlist-Failed` 헤더로 노출(진단용).
+ *   - **transient 1회 재시도** — rate-limit(EGW00201)/네트워크성 단일 콜 실패 시 짧은 backoff 후 1회.
  *   - 5s 타임아웃 가드, 4xx 메시지 통과, 5xx/전체실패 한글 fallback, `Cache-Control: no-store`.
  *   - `X-Data-Source` (kis/mock/mock-timeout) + `X-KIS-Env` 헤더.
- *
- * ## fix `watchlist-real-data` — rate-limit 부분실패 완화 (데이터 계층)
- *   - **동시성 제한**: 무제한 `Promise.allSettled(tickers.map(...))` 가 prod KIS 초당 거래건수 한도를
- *     넘겨(종목당 시세+메타 2콜) 일부 시세 콜을 떨어뜨리던 문제 → 동시 실행 수를 `CONCURRENCY`(2) 로 제한.
- *   - **transient 재시도**: 시세/메타 호출이 rate-limit(KIS `EGW00201` "초당 거래건수 초과") 또는
- *     네트워크성(transport) 실패면 짧은 backoff 후 1회 재시도. 비즈니스 에러(잘못된 종목코드 등)는 재시도 안 함.
- *   - **실패 ticker 노출**: 전부 drop 하지 않고 성공분만 안정 반환. 시세 실패 종목은 `X-Watchlist-Failed`
- *     헤더(콤마 구분)로 프론트에 알려 "재시도" UX 에 활용 가능하게 한다.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  fetchStockPrice,
-  fetchStockInfo,
+  fetchIntstockMultprice,
+  getSymbolName,
   isKisConfigured,
   resolveKisEnv,
-  searchSymbols,
-  type StockInfo,
-  type StockPrice,
+  type WatchlistQuote,
 } from "@/lib/api/kis";
 import { isApiError, type ApiError } from "@/lib/api/errors";
 import { getMockWatchlist } from "@/lib/mock/watchlist/quotes";
-import type { WatchlistQuote } from "@/lib/api/watchlist/list";
 
-/** 관심종목 soft cap — 초과분 truncate (§3.3). */
+/** 관심종목 soft cap — 초과분 truncate (§3.2, 1콜 보장). */
 const SOFT_CAP = 30;
-
-/**
- * 동시 실행 종목 수. 종목당 내부 시세+메타 2콜이라 실효 동시 KIS 콜 ≈ 2*CONCURRENCY.
- * prod KIS 초당 거래건수 한도(보수적)에 맞춰 소량(2)으로 제한. 과도한 throttle 로 체감 지연 X.
- */
-const CONCURRENCY = 2;
 
 /** transient 실패 1회 재시도 backoff (ms). 초당 한도 회복 여지를 두되 체감 지연은 최소. */
 const RETRY_BACKOFF_MS = 200;
@@ -72,31 +57,26 @@ export async function GET(request: NextRequest) {
     extraHeaders["X-Watchlist-Truncated"] = `soft-cap-${SOFT_CAP}`;
   }
 
-  // 시세 게이트(단일) 미통과 → 전체 mock.
-  if (!isKisConfigured()) {
+  // 이중 게이트 — 미설정 또는 prod 가 아니면 KIS 실호출을 시도하지 않고 mock.
+  if (!isKisConfigured() || resolveKisEnv() !== "prod") {
     return jsonWithDataSource(getMockWatchlist(tickers), "mock", extraHeaders);
   }
 
-  const metaEnabled = resolveKisEnv() === "prod"; // 메타 게이트(이중).
-
   try {
-    const { quotes, failed } = await withTimeout(
-      fetchWatchlistSettled(tickers, metaEnabled),
+    const quotes = await withTimeout(
+      withRetry(() => fetchIntstockMultprice(tickers)),
       5_000,
     );
-    // 전부 실패 → 비즈니스/네트워크 에러 fallback.
+    // 전체 실패(빈 응답·전 청크 실패) → 비즈니스/네트워크 에러 fallback.
     if (quotes.length === 0) {
-      return mapErrorToResponse(
-        failed[0]?.reason ?? new Error("__ALL_FAILED__"),
-        tickers,
-        truncated,
-      );
+      return mapErrorToResponse(new Error("__ALL_FAILED__"), tickers, truncated);
     }
-    // 부분 실패 종목은 헤더로 노출 — 프론트가 좌조인 + 재시도 UX 에 활용.
-    if (failed.length > 0) {
-      extraHeaders["X-Watchlist-Failed"] = failed.map((f) => f.ticker).join(",");
+    // 일괄응답 누락 ticker → 헤더로 노출(프론트 좌조인 디그레이드 + 진단).
+    const missing = findMissing(tickers, quotes);
+    if (missing.length > 0) {
+      extraHeaders["X-Watchlist-Failed"] = missing.join(",");
     }
-    return jsonWithDataSource(quotes, "kis", extraHeaders);
+    return jsonWithDataSource(applyNameFallback(quotes), "kis", extraHeaders);
   } catch (error) {
     return mapErrorToResponse(error, tickers, truncated);
   }
@@ -113,88 +93,27 @@ function parseTickers(raw: string[]): { tickers: string[]; truncated: boolean } 
   return { tickers: unique.slice(0, SOFT_CAP), truncated };
 }
 
-type WatchlistFailure = { ticker: string; reason: unknown };
-type WatchlistSettled = {
-  quotes: WatchlistQuote[];
-  failed: WatchlistFailure[];
-};
+/** 입력 tickers 중 일괄응답에 없는 종목코드(누락분). */
+function findMissing(tickers: string[], quotes: WatchlistQuote[]): string[] {
+  const present = new Set(quotes.map((q) => q.ticker));
+  return tickers.filter((t) => !present.has(t));
+}
 
 /**
- * 종목 합성 — 동시성 제한 풀로 부분 성공 + 실패 ticker 수집.
- *
- * 무제한 fan-out 대신 동시 `CONCURRENCY` 종목만 실행 → prod KIS 초당 거래건수 한도 완화.
- * 종목당 시세 + (prod 시) 메타를 합성. 시세 성공 + 메타 실패 → fallback name 디그레이드.
- * 시세 자체가 실패한 종목은 결과에서 제외하고 `failed` 에 사유와 함께 기록한다.
+ * 종목명 fallback — 일괄응답엔 신뢰 가능한 종목명이 없으므로 시드 name → ticker 로 채운다(§3.2).
+ * 클라이언트가 store name 으로 최종 표시명을 덮으므로 BFF name 은 식별 폴백 역할.
+ * ⚠️ 종목명 메타 API(`hts_kor_isnm`/`bstp_kor_isnm` 등)를 사용하지 않는다.
  */
-async function fetchWatchlistSettled(
-  tickers: string[],
-  metaEnabled: boolean,
-): Promise<WatchlistSettled> {
-  const quotes: WatchlistQuote[] = [];
-  const failed: WatchlistFailure[] = [];
-
-  // 입력 ticker 순서 보존을 위해 인덱스 슬롯에 채운 뒤 정렬 추출.
-  const slots = new Array<WatchlistQuote | undefined>(tickers.length);
-  await runWithConcurrency(tickers, CONCURRENCY, async (ticker, index) => {
-    try {
-      slots[index] = await fetchOneQuote(ticker, metaEnabled);
-    } catch (reason) {
-      failed.push({ ticker, reason });
-    }
-  });
-
-  for (const slot of slots) {
-    if (slot) quotes.push(slot);
-  }
-  return { quotes, failed };
+function applyNameFallback(quotes: WatchlistQuote[]): WatchlistQuote[] {
+  return quotes.map((q) => ({
+    ...q,
+    name: getSymbolName(q.ticker) ?? q.ticker,
+  }));
 }
 
 /**
- * 동시 실행 수를 `limit` 으로 제한하는 작은 풀 — 외부 라이브러리 없이.
- * 워커 `limit` 개가 공유 커서에서 다음 인덱스를 집어 처리. 모든 작업은 throw 하지 않게 worker 내부에서 처리.
- */
-async function runWithConcurrency<T>(
-  items: T[],
-  limit: number,
-  worker: (item: T, index: number) => Promise<void>,
-): Promise<void> {
-  let cursor = 0;
-  const size = Math.max(1, Math.min(limit, items.length || 1));
-  const runners = Array.from({ length: size }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      await worker(items[index], index);
-    }
-  });
-  await Promise.all(runners);
-}
-
-/** 한 종목 합성 — 시세 필수(실패 시 throw), 메타는 best-effort(실패 시 fallback name). 둘 다 transient 1회 재시도. */
-async function fetchOneQuote(
-  ticker: string,
-  metaEnabled: boolean,
-): Promise<WatchlistQuote> {
-  const [priceSettled, infoSettled] = await Promise.allSettled([
-    withRetry(() => fetchStockPrice(ticker)),
-    metaEnabled
-      ? withRetry(() => fetchStockInfo(ticker))
-      : Promise.reject(new Error("__META_DISABLED__")),
-  ]);
-
-  // 시세 실패 → 종목 전체 실패(상위에서 제외 + failed 기록).
-  if (priceSettled.status !== "fulfilled") {
-    throw priceSettled.reason;
-  }
-  const price = priceSettled.value;
-
-  const info =
-    infoSettled.status === "fulfilled" ? infoSettled.value : undefined;
-  return composeQuote(ticker, price, info);
-}
-
-/**
- * transient(rate-limit/네트워크성) 실패 시 짧은 backoff 후 1회 재시도.
- * 비즈니스 에러(잘못된 종목코드 등)·메타 비활성 sentinel 은 즉시 throw — 재시도 무의미.
+ * transient(rate-limit/네트워크성) 실패 시 짧은 backoff 후 1회 재시도(단일 일괄 콜 단위).
+ * 비즈니스 에러(잘못된 종목코드 등)는 즉시 throw — 재시도 무의미.
  */
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -231,39 +150,6 @@ function isRateLimitError(error: ApiError): boolean {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** 시세 + 메타(있으면) → WatchlistQuote. 메타 없으면 종목명 fallback(시드 name → ticker). */
-function composeQuote(
-  ticker: string,
-  price: StockPrice,
-  info: StockInfo | undefined,
-): WatchlistQuote {
-  return {
-    ticker,
-    name: info?.name ?? fallbackName(ticker),
-    market: info?.market,
-    price: price.price,
-    change: price.change,
-    changePercent: price.changePercent,
-    direction: price.direction,
-    volume: price.volume,
-    open: price.open,
-    high: price.high,
-    low: price.low,
-    isTradeStopped: info?.isTradeStopped,
-    isAdminItem: info?.isAdminItem,
-  };
-}
-
-/**
- * 메타 미동봉 시 종목명 fallback — symbols.json 시드 name → 없으면 ticker (§9 q3).
- * ⚠️ 시세 응답의 `extractStockName`(hts_kor_isnm prod 빈 값) 에 의존하지 않는다.
- */
-function fallbackName(ticker: string): string {
-  const [match] = searchSymbols(ticker);
-  if (match && match.ticker === ticker) return match.name;
-  return ticker;
 }
 
 function jsonWithDataSource(

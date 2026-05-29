@@ -20,12 +20,14 @@ import type {
   KisInquireDailyPriceItem,
   KisInquireIndexPriceOutput,
   KisInquirePriceOutput,
+  KisIntstockMultpriceItem,
   KisSearchStockInfoOutput,
   MarketIndexQuote,
   StockDailyCandle,
   StockInfo,
   StockMarket,
   StockPrice,
+  WatchlistQuote,
 } from "./types";
 import { INDEX_NAME_BY_CODE } from "./types";
 
@@ -186,6 +188,37 @@ export function mapIndexPrice(
     yearLow: output.dryy_bstp_nmix_lwpr
       ? toNumber(output.dryy_bstp_nmix_lwpr)
       : undefined,
+  };
+}
+
+/**
+ * KIS intstock-multprice 응답 종목 1건 → 정규 `WatchlistQuote`.
+ *
+ * PRD `watchlist-batch-quotes` §3.1 / AC-5.
+ *
+ * - 등락 부호(`prdy_vrss_sign`) → `mapDirection` 재사용, 모든 숫자 문자열 → `toNumber` 재사용.
+ * - ⚠️ `name` 은 본 응답에서 신뢰값이 오지 않으므로 매퍼가 종목명을 채우지 않는다 — 인자 `ticker` 를
+ *   임시 식별값으로만 두고, 실제 종목명 폴백(시드 → ticker)은 BFF 가, 최종 표시명은 클라 store 가 결정.
+ * - ⚠️ `inter_kor_isnm`(관심 종목명)·`bstp_kor_isnm`(업종명)을 `name` 에 절대 대입하지 않는다(AC-5).
+ *
+ * @param item KIS intstock-multprice.output 종목 1건.
+ * @param ticker BFF 가 좌조인에 쓰는 입력 ticker(6자리). 응답 `inter_shrn_iscd` 와 동일해야 함.
+ */
+export function mapIntstockMultprice(
+  item: KisIntstockMultpriceItem,
+  ticker: string,
+): WatchlistQuote {
+  return {
+    ticker,
+    name: ticker, // 식별 임시값. BFF 가 시드 fallback, 클라가 store name 으로 덮음.
+    price: toNumber(item.inter2_prpr),
+    change: toNumber(item.inter2_prdy_vrss),
+    changePercent: toNumber(item.prdy_ctrt),
+    direction: mapDirection(item.prdy_vrss_sign),
+    volume: toNumber(item.acml_vol),
+    open: item.inter2_oprc ? toNumber(item.inter2_oprc) : undefined,
+    high: item.inter2_hgpr ? toNumber(item.inter2_hgpr) : undefined,
+    low: item.inter2_lwpr ? toNumber(item.inter2_lwpr) : undefined,
   };
 }
 
