@@ -149,3 +149,101 @@ export type StockSearchResult = {
   name: string;
   market: "KOSPI" | "KOSDAQ";
 };
+
+/**
+ * 국내 업종 현재지수 조회 응답
+ * (`GET /uapi/domestic-stock/v1/quotations/inquire-index-price`).
+ *
+ * TR_ID = `FHPUP02100000`. `FID_COND_MRKT_DIV_CODE=U` (업종), `FID_INPUT_ISCD=<code>`.
+ *
+ * ## ⚠️ 종목명/업종명 함정 — 지수는 종목이 아니다
+ *
+ * 본 응답에는 **사용 가능한 식별 이름 필드가 없다**. `inquire-price` 의 `bstp_kor_isnm`
+ * (업종명) 처럼 보이는 필드를 종목/지수명으로 끌어쓰면 안 된다 (PRD §1.4, §3.2 경고).
+ * 지수명은 **클라이언트 상수 `INDEX_NAME_BY_CODE`** (`0001`→"KOSPI" 등) 로만 부여한다.
+ *
+ * 모든 값은 KIS 관례대로 문자열 (숫자도 string).
+ */
+export type KisInquireIndexPriceOutput = {
+  /** 업종 지수 현재가. "2750.23". */
+  bstp_nmix_prpr: string;
+  /** 업종 지수 전일 대비. 부호 포함. "+33.10". */
+  bstp_nmix_prdy_vrss: string;
+  /** 전일 대비 부호. "1" 상한 / "2" 상승 / "3" 보합 / "4" 하한 / "5" 하락. */
+  prdy_vrss_sign: string;
+  /** 업종 지수 전일 대비율 (퍼센트). "1.20". */
+  bstp_nmix_prdy_ctrt: string;
+  /** 누적 거래량. */
+  acml_vol: string;
+  /** 누적 거래대금. */
+  acml_tr_pbmn: string;
+  /** 업종 지수 시가. */
+  bstp_nmix_oprc?: string;
+  /** 업종 지수 고가. */
+  bstp_nmix_hgpr?: string;
+  /** 업종 지수 저가. */
+  bstp_nmix_lwpr?: string;
+  /** 상승 종목 수. */
+  ascn_issu_cnt?: string;
+  /** 하락 종목 수. */
+  down_issu_cnt?: string;
+  /** 보합 종목 수. */
+  stnr_issu_cnt?: string;
+  /** 상한 종목 수. */
+  uplm_issu_cnt?: string;
+  /** 하한 종목 수. */
+  lslm_issu_cnt?: string;
+  /** 연중 지수 최고가. */
+  dryy_bstp_nmix_hgpr?: string;
+  /** 연중 지수 최저가. */
+  dryy_bstp_nmix_lwpr?: string;
+};
+
+/**
+ * 지수 코드 → 지수명 클라이언트 상수.
+ *
+ * ⚠️ `inquire-index-price` 응답에는 지수명 필드가 없으므로 본 상수가 단일 진실 원천.
+ * 종목명 API (`extractStockName`/`bstp_kor_isnm`) 는 절대 사용하지 않는다 (지수는 종목 아님).
+ */
+export const INDEX_NAME_BY_CODE: Record<string, string> = {
+  "0001": "KOSPI",
+  "1001": "KOSDAQ",
+  "2001": "KOSPI200",
+};
+
+/**
+ * 클라이언트 친화 지수 스키마 — BFF route 가 응답하는 형태.
+ *
+ * 화면 컴포넌트가 KIS snake_case 를 직접 다루지 않도록 `mappers.ts` 의 `mapIndexPrice` 가 변환.
+ */
+export type MarketIndexQuote = {
+  /** 지수 코드 ("0001"/"1001"/"2001"). */
+  code: string;
+  /** 지수명 — `INDEX_NAME_BY_CODE` 상수 매핑. */
+  name: string;
+  /** 현재 지수 값 (숫자). */
+  value: number;
+  /** 전일 대비 (부호 포함). */
+  change: number;
+  /** 전일 대비율 (퍼센트, 부호 포함). */
+  changePercent: number;
+  /** 등락 방향 — "up" / "down" / "flat". */
+  direction: "up" | "down" | "flat";
+  /** 누적 거래량. */
+  volume: number;
+  /** 누적 거래대금. */
+  tradeAmount?: number;
+  /** 상승 종목 수. */
+  advances?: number;
+  /** 하락 종목 수. */
+  declines?: number;
+  /** 보합 종목 수. */
+  unchanged?: number;
+  /** 시가·고가·저가. */
+  open?: number;
+  high?: number;
+  low?: number;
+  /** 연중 최고가·최저가. */
+  yearHigh?: number;
+  yearLow?: number;
+};

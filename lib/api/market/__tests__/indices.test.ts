@@ -1,59 +1,72 @@
 /**
  * `lib/api/market/indices.ts` 단위 테스트.
  *
- * PRD `stock-api-integration` (PR-C) §3.5 — Market 어댑터 회귀 차단.
+ * PRD `market-real-data` §3.4 — 어댑터 재배선 회귀 차단.
  *
  * 검증:
- *   1. 기본 codes 미입력 → KOSPI 0001 + KOSDAQ 1001 호출.
- *   2. codes 명시 입력 → 명시된 codes 만 호출.
- *   3. 빈 배열 입력 → 빈 배열 즉시 반환.
+ *   1. 기본 codes 미입력 → 국내 3종(0001/1001/2001)으로 `/market/indices` 단일 호출.
+ *   2. codes 명시 입력 → 명시된 codes 로 호출.
+ *   3. 빈 배열 입력 → HTTP 호출 없이 즉시 빈 배열 반환.
+ *   4. `/api/stock/price` 반복 호출이 아니라 `/market/indices` 단일 BFF 호출.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/api/stock/price", () => ({
-  fetchStockPriceClient: vi.fn(),
+vi.mock("@/lib/api/client", () => ({
+  httpClient: { get: vi.fn() },
 }));
 
 import { getMarketIndices, DEFAULT_INDEX_CODES } from "../indices";
-import { fetchStockPriceClient } from "@/lib/api/stock/price";
-import type { StockPrice } from "@/lib/api/kis/types";
+import { httpClient } from "@/lib/api/client";
+import type { MarketIndexQuote } from "@/lib/api/kis/types";
 
-const buildQuote = (ticker: string): StockPrice => ({
-  ticker,
-  name: ticker,
-  price: 2_750,
+const buildQuote = (code: string): MarketIndexQuote => ({
+  code,
+  name: code,
+  value: 2_750,
   change: 33,
   changePercent: 1.2,
   direction: "up",
   volume: 0,
 });
 
+const mockGet = httpClient.get as ReturnType<typeof vi.fn>;
+
 describe("getMarketIndices", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (fetchStockPriceClient as ReturnType<typeof vi.fn>).mockImplementation(
-      (ticker: string) => Promise.resolve(buildQuote(ticker)),
-    );
+    mockGet.mockImplementation((_url: string, config?: { params?: { codes?: string[] } }) => {
+      const codes = config?.params?.codes ?? [];
+      return Promise.resolve({ data: codes.map(buildQuote) });
+    });
   });
 
-  it("기본 codes 미입력 시 KOSPI 0001 + KOSDAQ 1001 호출", async () => {
-    expect(DEFAULT_INDEX_CODES).toEqual(["0001", "1001"]);
+  it("기본 codes 미입력 시 국내 3종(0001/1001/2001)으로 /market/indices 단일 호출", async () => {
+    expect(DEFAULT_INDEX_CODES).toEqual(["0001", "1001", "2001"]);
     const result = await getMarketIndices();
-    expect(fetchStockPriceClient).toHaveBeenCalledTimes(2);
-    expect(result.map((q) => q.ticker)).toEqual(["0001", "1001"]);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledWith(
+      "/market/indices",
+      expect.objectContaining({
+        params: { codes: ["0001", "1001", "2001"] },
+      }),
+    );
+    expect(result.map((q) => q.code)).toEqual(["0001", "1001", "2001"]);
   });
 
-  it("codes 명시 입력 시 명시된 codes 만 호출", async () => {
+  it("codes 명시 입력 시 명시된 codes 로 호출", async () => {
     const result = await getMarketIndices(["0001"]);
-    expect(fetchStockPriceClient).toHaveBeenCalledTimes(1);
-    expect(fetchStockPriceClient).toHaveBeenCalledWith("0001");
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledWith(
+      "/market/indices",
+      expect.objectContaining({ params: { codes: ["0001"] } }),
+    );
     expect(result).toHaveLength(1);
   });
 
-  it("빈 배열 입력 시 즉시 빈 배열 반환", async () => {
+  it("빈 배열 입력 시 HTTP 호출 없이 즉시 빈 배열 반환", async () => {
     const result = await getMarketIndices([]);
     expect(result).toEqual([]);
-    expect(fetchStockPriceClient).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 });

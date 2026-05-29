@@ -20,6 +20,7 @@
  *
  *   - `fetchStockPrice(ticker)` — 현재가
  *   - `fetchStockDaily(ticker, period)` — 일자별 시세
+ *   - `fetchIndexPrice(code)` — 국내 업종 현재지수 (조회 only)
  *   - `searchSymbols(keyword)` — 종목 검색 (symbols.json 기반)
  *   - `getCorpCode(ticker)` — DART corp_code 매핑
  *   - `getAccessToken()` — 토큰 발급 + 캐시 (내부 사용)
@@ -27,11 +28,15 @@
  */
 
 export { fetchStockPrice, fetchStockDaily } from "./price";
+export { fetchIndexPrice } from "./index-price";
 export { searchSymbols, getCorpCode, getSymbolsMeta } from "./search";
 export { getAccessToken } from "./token";
 export { isKisConfigured, resolveKisEnv } from "./client";
+export { INDEX_NAME_BY_CODE } from "./types";
 export type {
   StockPrice,
   StockDailyCandle,
   StockSearchResult,
+  MarketIndexQuote,
+  KisInquireIndexPriceOutput,
 } from "./types";
