@@ -18,10 +18,13 @@
 
 import type {
   KisInquireDailyPriceItem,
+  KisInquireIndexPriceOutput,
   KisInquirePriceOutput,
+  MarketIndexQuote,
   StockDailyCandle,
   StockPrice,
 } from "./types";
+import { INDEX_NAME_BY_CODE } from "./types";
 
 /**
  * 종목명 추출 — `bstp_kor_isnm` 절대 사용 안 함.
@@ -96,6 +99,44 @@ function formatDate(stckBsopDate: string): string {
     return `${stckBsopDate.slice(0, 4)}-${stckBsopDate.slice(4, 6)}-${stckBsopDate.slice(6, 8)}`;
   }
   return stckBsopDate;
+}
+
+/**
+ * KIS inquire-index-price 응답 → 클라이언트 친화 `MarketIndexQuote`.
+ *
+ * ⚠️ 지수명은 응답에 없으므로 `INDEX_NAME_BY_CODE` 상수로만 부여 — 종목명 API 미사용.
+ * 상수에 없는 코드는 graceful degrade 로 code 그대로 name 에 사용.
+ */
+export function mapIndexPrice(
+  output: KisInquireIndexPriceOutput,
+  code: string,
+): MarketIndexQuote {
+  return {
+    code,
+    name: INDEX_NAME_BY_CODE[code] ?? code,
+    value: toNumber(output.bstp_nmix_prpr),
+    change: toNumber(output.bstp_nmix_prdy_vrss),
+    changePercent: toNumber(output.bstp_nmix_prdy_ctrt),
+    direction: mapDirection(output.prdy_vrss_sign),
+    volume: toNumber(output.acml_vol),
+    tradeAmount: output.acml_tr_pbmn
+      ? toNumber(output.acml_tr_pbmn)
+      : undefined,
+    advances: output.ascn_issu_cnt ? toNumber(output.ascn_issu_cnt) : undefined,
+    declines: output.down_issu_cnt ? toNumber(output.down_issu_cnt) : undefined,
+    unchanged: output.stnr_issu_cnt
+      ? toNumber(output.stnr_issu_cnt)
+      : undefined,
+    open: output.bstp_nmix_oprc ? toNumber(output.bstp_nmix_oprc) : undefined,
+    high: output.bstp_nmix_hgpr ? toNumber(output.bstp_nmix_hgpr) : undefined,
+    low: output.bstp_nmix_lwpr ? toNumber(output.bstp_nmix_lwpr) : undefined,
+    yearHigh: output.dryy_bstp_nmix_hgpr
+      ? toNumber(output.dryy_bstp_nmix_hgpr)
+      : undefined,
+    yearLow: output.dryy_bstp_nmix_lwpr
+      ? toNumber(output.dryy_bstp_nmix_lwpr)
+      : undefined,
+  };
 }
 
 /**

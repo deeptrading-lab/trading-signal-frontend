@@ -3,9 +3,9 @@
  *
  * PRD `stock-api-integration` (PR-C) §3.5 — Market 도메인 훅 신설. 화면 전환은 후속 PR.
  *
- * - codes 기본값 = `DEFAULT_INDEX_CODES` (KOSPI 0001 + KOSDAQ 1001).
+ * - codes 기본값 = `DEFAULT_INDEX_CODES` (국내 3종: KOSPI 0001 / KOSDAQ 1001 / KOSPI200 2001).
  * - queryKey = `queryKeys.market.indices(codes)`. codes 정규화 (sort + join) 로 순서 무관 캐시.
- * - staleTime / gcTime = `queryConfig.market.indices` (10s / 5min).
+ * - staleTime / gcTime = `queryConfig.market.indices` (30s / 5min).
  * - enabled — codes 빈 배열 시 비활성.
  */
 

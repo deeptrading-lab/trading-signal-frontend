@@ -65,8 +65,12 @@ export const queryConfig = {
     },
   },
   market: {
+    /**
+     * 시장 지수 — 실시간성 요구 낮음. KIS `inquire-index-price` rate limit 보호 위해
+     * staleTime 30s (PRD `market-real-data` §9 q7=b). 단일 진실 원천.
+     */
     indices: {
-      staleTime: 10 * SECOND,
+      staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
   },
