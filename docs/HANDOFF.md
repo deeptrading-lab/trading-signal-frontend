@@ -2128,3 +2128,45 @@
   - **engine API DB 영구화 마이그레이션**(`watchlist-engine-persistence` 가칭) — `store.ts` 의 read/write 만 engine API 호출로 교체, 훅 시그니처·컴포넌트·BFF 무변경 목표(경계는 본 PR 에서 마련).
   - **`intstock_multprice` 일괄 시세 최적화** — 종목당 단건 N회 → 1회 일괄(응답 필드 수집 선행). 동시 호출 부분실패(NAVER 사례) 완화에도 도움.
   - 코인/해외주식 관심종목은 별도 소스 트랙(§4).
+
+### 2026-05-29 — fix(watchlist): 부분실패 종목 누락 방지 (좌조인 렌더 + 동시성 제한/재시도) (#45)
+
+- **slug**: `fix/watchlist-partial-render` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/45
+- **요약**: fix(watchlist): 부분실패 종목 누락 방지 (좌조인 렌더 + 동시성 제한/재시도)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 문제 (확진)
+  > - 사용자가 관심목록에 3종(005930 삼성전자 / 000660 SK하이닉스 / 035420 NAVER)을 담았는데 **화면엔 2종만** 표시.
+  > - 원인 1 (데이터): `/api/watchlist` 가 종목당 시세+메타 2콜을 무제한 fan-out → prod KIS **초당 거래건수 한도** 초과로 일부 시세 콜이 떨어짐.
+  > - 원인 2 (화면): `WatchlistContainer` 가 `const quotes = query.data ?? []` 즉 **BFF 성공 결과 기준**으로만 렌더 → drop 된 종목이 화면에서 사라짐.
+  > - **라이브 재현**: 시드 3종 BFF 호출 시 응답 `count 2`, `x-watchlist-failed: 035420` (재호출 시 `000660` 등 timing 에 따라 다른 종목이 drop — rate-limit 성격).
+  > 
+  > ## 수정
+  > ### 데이터 계층 (commit fbc994b, 직전 api-integration-dev)
+  > - 동시성 제한: `runWithConcurrency` 풀로 동시 실행 종목 `CONCURRENCY`(2) 제한.
+  > - transient 재시도: `withRetry` — rate-limit(`EGW00201`/'초당 거래건수') / network 실패만 200ms backoff 후 1회 재시도. 비즈니스 에러는 비재시도.
+  > - 실패 ticker 노출: 성공분만 안정 반환 + 시세 실패 종목을 `X-Watchlist-Failed` 헤더로 전달.
+  > - 테스트 4종 추가.
+  > 
+  > ### 프론트엔드 (commit 1333f3b, 본 단계)
+  > - **tickers 좌조인 렌더**: `WatchlistTable` 이 행을 `quotes` 가 아니라 사용자가 담은 **`tickers`** 기준으로 그리고 by-ticker 로 매칭 → 담은 종목은 절대 사라지지 않음.
+  > - **디그레이드 행**: `quote` 가 없는 ticker 는 `WatchlistRow` 가 ticker 표시 + 한글 안내("시세를 불러오지 못했어요") + **재시도 버튼**(`query.refetch()`) + 삭제 버튼으로 렌더. 시세 미확정이라 `/profile` 라우팅은 차단. 기존 행 구조/토큰 재사용(**신규 토큰 0**).
+  > - **상태 보존**: 초기 로딩 스켈레톤(tickers 수), 전체 실패(보유 0)만 ErrorCard, 부분 누락은 행 단위 디그레이드, 빈 상태(0종) CTA 유지.
+  > - 누락 판정은 별도 헤더 surface 없이 **tickers − quotes 차집합**(Map by-ticker)으로 처리 — 과설계 회피.
+  > 
+  > ## 검증
+  > - `typecheck` PASS / `lint` PASS / `build` PASS / `test` 73 passed (15 files).
+  > - dev 서버(`:3300`) 라운드트립:
+  >   - `/watchlist` 페이지 HTTP 200.
+  >   - BFF `?tickers=005930,000660,035420` → 응답 2종 + `x-watchlist-failed` 헤더로 1종 drop 라이브 확인(원인 재현). 재호출 시 drop 대상이 바뀜(rate-limit timing).
+  >   - 좌조인 로직상 drop 된 종목은 디그레이드 행으로 렌더되어 **3종 모두 표시**됨(행 = tickers 기준). 재시도 버튼은 `query.refetch()` 호출.
+  > 
+  > ## UI 개선 적용 항목 (docs/reviews/watchlist-ui-review.md 기반, commit 675c5a5)
+  > 
+  > 리포트의 13개 개선점(높음 3 / 중간 5 / 낮음 5)을 신규 토큰 0 · 주관적 재디자인 0 원칙으로 일괄 반영.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `intstock_multprice`(관심종목 일괄조회) 단일 콜 도입으로 종목당 2콜 fan-out 자체를 제거 — rate-limit 근본 해소, 별도 PRD/slug.
+  - **전체 종목 마스터 연동**(UI 점검 #3 중기): 시드 ~100종목 한정을 KIS 종목 마스터/검색 API 또는 350종목 풀 시드로 확장. 디그레이드 행 name fallback·검색 커버리지 모두 개선. 별도 PRD/slug.
+  - 운영 모니터링: prod 에서 `X-Watchlist-Failed` 빈도 관찰. 디그레이드 행이 상시 노출되면 동시성/재시도 파라미터 재조정.
