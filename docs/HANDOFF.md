@@ -2170,3 +2170,45 @@
   - `intstock_multprice`(관심종목 일괄조회) 단일 콜 도입으로 종목당 2콜 fan-out 자체를 제거 — rate-limit 근본 해소, 별도 PRD/slug.
   - **전체 종목 마스터 연동**(UI 점검 #3 중기): 시드 ~100종목 한정을 KIS 종목 마스터/검색 API 또는 350종목 풀 시드로 확장. 디그레이드 행 name fallback·검색 커버리지 모두 개선. 별도 PRD/slug.
   - 운영 모니터링: prod 에서 `X-Watchlist-Failed` 빈도 관찰. 디그레이드 행이 상시 노출되면 동시성/재시도 파라미터 재조정.
+
+### 2026-05-29 — feat(watchlist): intstock_multprice 일괄조회 전환 + 재시도 UX 개선 (watchlist-batch-quotes) (#46)
+
+- **slug**: `watchlist-batch-quotes` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/46
+- **요약**: feat(watchlist): intstock_multprice 일괄조회 전환 + 재시도 UX 개선 (watchlist-batch-quotes)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 문제
+  > 
+  > - `/watchlist` BFF 가 종목당 시세(`inquire-price`) + 메타(`search-stock-info`) **2N콜**(동시성 2 풀링) 을 합성 → 종목 수가 늘면 **초당 호출제한 `EGW00201`("초당 거래건수 초과")** 로 일부 종목 시세 실패(디그레이드 행).
+  > - 디그레이드 행의 per-row "다시 시도" 버튼이 실제로는 `query.refetch()`(**전체 재조회**) 라 한 행만 재시도한 줄 알지만 성공한 행까지 다시 그려져 **깜박인다**.
+  > 
+  > ## 해결
+  > 
+  > **데이터 계층(직전 단계 `cfa425a`)**
+  > - `lib/api/kis/intstock-multprice.ts` 신설 — `fetchIntstockMultprice(tickers)`, TR_ID `FHKST11300006`, 30종목/콜 청크(⌈N/30⌉), `Promise.allSettled` 부분성공, 입력 ticker 좌조인.
+  > - `mapIntstockMultprice` — `inter2_*` → `WatchlistQuote`(WS 호환 정규 모델). `inter_kor_isnm`/`bstp_kor_isnm` 종목명 미사용.
+  > - BFF route 일괄 1콜 전환 — `fetchStockPrice` 반복·`search-stock-info` 호출 0, 이중 게이트(`isKisConfigured && prod`), mock fallback, `X-Watchlist-Failed`, 5s 타임아웃, soft cap 30.
+  > - `queryConfig.watchlist.list` staleTime 10s → **30s**.
+  > 
+  > **화면/UX(이번 단계 `4a91031`)**
+  > - per-row "다시 시도" 버튼·콜백 prop 제거 → **표 상단 헤더 단일 "새로고침" 1개** (`query.refetch()`, `isFetching` 스핀/비활성, 빈/로딩/전체에러 분기 제외 `canRefresh` 가드).
+  > - `useQueryWatchlist` 에 `placeholderData: keepPreviousData` — refetch 중 기존 행 유지(깜박임 완화).
+  > - 표시 종목명 **store name → 시드 → quote.name** 우선(정상/디그레이드 행 공통). `WatchlistQuote.name` 은 BFF 폴백일 뿐이라 store name 으로 덮음.
+  > - 디그레이드 행은 유지(좌조인)하되 안내 + 삭제만. 거래정지/관리종목 배지는 데이터 소스(`search-stock-info`) 부재로 보류(미표시) + 미사용 배지 라벨·렌더 제거(데드코드 0).
+  > 
+  > ## 검증
+  > 
+  > - `npm run typecheck` / `lint` / `test`(86 passed) / `build` — **0 에러/전부 통과**.
+  > - **dev 라운드트립(`KIS_ENV=prod`, 실키)**:
+  >   - `/watchlist` 페이지 SSR **HTTP 200**.
+  >   - `GET /api/watchlist?tickers=005930,000660,035420` → **3종 모두 1콜 정상**(`x-data-source: kis`, `X-Watchlist-Failed` 없음 = `EGW00201` 0건), 응답 225ms.
+  >   - 디그레이드: `tickers=005930,999999` → 005930 만 반환 + `X-Watchlist-Failed: 999999`(좌조인 디그레이드 행, store/시드 이름 표시).
+  >   - 빈 tickers → `x-data-source: mock`.
+  > - AC grep:
+  >   - AC-7 `git grep -nE "onRetry|WATCHLIST_ROW_RETRY" components/watchlist/WatchlistRow.tsx` → **0건**.
+  >   - AC-8 상단 새로고침 버튼 1개(`WatchlistPage` `onRefresh`→`query.refetch()`), per-row 0개.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `watchlist-realtime-ws` — `H0STCNT0` WS push 실시간 시세(초기 스냅샷/REST 폴백으로 본 트랙 `fetchIntstockMultprice`·`WatchlistQuote` 재사용).
+  - 거래정지/관리종목 배지 복원(별도 트랙) — 지연로드(보임 종목만 per-row `search-stock-info`) 또는 일괄응답 동등 필드 검증.
+  - `intstock_multprice` 모의(vts) 검증 후 이중 게이트 → 단일 게이트 완화 후속 chore.
