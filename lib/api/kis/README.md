@@ -11,7 +11,9 @@ lib/api/kis/
 ├── README.md            # 본 파일
 ├── index.ts             # public export (주문 함수 미존재 주석 + 진입점)
 ├── client.ts            # axios 인스턴스 + base URL 결정 + 환경변수 가드
-├── token.ts             # access_token 발급 + 캐시 + 갱신 + single-flight
+├── store.ts             # 인스턴스 간 공유 store 추상화(memory/Upstash) + 분산 락 + fail-soft
+├── token.ts             # access_token 2단 캐시(L1 메모리 + L2 store) + 분산 single-flight
+├── index-store.ts       # 국내 지수(0001/1001) L2 공유 store 래퍼(크로스-라우트 dedup)
 ├── price.ts             # 현재가 / 일자별 시세
 ├── search.ts            # symbols.json substring 검색 + corp_code 매핑
 ├── mappers.ts           # KIS snake_case → 클라이언트 친화 스키마 (종목명 우선순위)
@@ -45,7 +47,8 @@ lib/api/kis/
 | `KIS_ACCOUNT_NO` | ✅ | ❌ | 8자리 계좌번호 (조회는 미사용, 주문에서 필요) |
 | `KIS_ACCOUNT_PRODUCT_CD` | ✅ | ❌ | 2자리 상품코드 (조회는 미사용) |
 | `KIS_ENV` | △ | ✅ | "vts" (모의, 기본) / "prod" (실전, 권장 X) |
-| `KIS_TOKEN_STORE` | △ | △ | "memory" (기본) / "kv" (placeholder, 본 PR-A 미구현) |
+| `KIS_TOKEN_STORE` | △ | ✅ | "memory" (기본/폴백) / "kv" (Upstash 공유 store) — PRD `kis-token-store` |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | △ | ✅ | Upstash REST 연결(`kv` 모드). `UPSTASH_REDIS_REST_*` 도 흡수. 서버 전용 |
 
 `KIS_APP_KEY` 또는 `KIS_APP_SECRET` 미설정 시 BFF route 가 **mock 응답** 반환 + `X-Data-Source: mock` 헤더 (Vercel preview 빌드 보호).
 
@@ -55,9 +58,23 @@ lib/api/kis/
 종목명은 `hts_kor_isnm` → `prdt_name` → ticker 순서로 추출합니다 (`mappers.ts::extractStockName`).
 회귀 차단 단위 테스트는 `__tests__/mappers.test.ts` 에서 검증합니다 (AC-10).
 
-## 토큰 캐시
+## 토큰 캐시 (PRD `stock-api-integration` + `kis-token-store`)
 
-- 인스턴스 메모리 only (`token.ts`).
+- **2단 캐시**: L1 = 인스턴스 메모리(`token.ts` cache+inflight), L2 = 공유 store(`store.ts`).
+  - `KIS_TOKEN_STORE=memory`(기본) → L2 가 인스턴스 내 Map(사실상 no-op) → 현행 동작 무회귀.
+  - `KIS_TOKEN_STORE=kv` → Upstash Redis 공유. 키 `kis:token:{env}:{appkeyhash}`(SHA-256 앞16자, 평문 금지).
 - 만료 60s 전부터 자동 갱신.
-- 동시 호출은 single-flight 로 dedupe (Promise dedupe).
-- 단위 테스트 (`__tests__/token.test.ts`) 가 4가지 동작 검증 (AC-6).
+- **single-flight 2단**: 인스턴스 내(Promise dedupe) + 인스턴스 간(분산 락 `SET NX PX 10s` + 폴링).
+  - 락 미획득 + 폴링 만료 시 직접 발급 fallback(가용성 우선).
+- **fail-soft**: store 미설정/타임아웃/에러 시 인메모리로 graceful degrade(store 는 SPOF 아님).
+- 단위 테스트: `__tests__/token.test.ts`(memory 7케이스 무회귀 + kv 분산 single-flight/fallback/fail-soft),
+  `__tests__/store.test.ts`(store 추상화·락·키 해시·fail-soft).
+
+## 지수 공유 캐시 (PRD `kis-token-store` §3.3, 부수)
+
+- 국내(`0001`/`1001`)만 L2 공유 store(`index-store.ts` `fetchIndexPriceShared`, 키 `kis:index:{code}`, TTL 30s).
+- 헤더 티커·indices 라우트가 L1 인메모리 miss 시 본 래퍼 경유 → 크로스-라우트/크로스-인스턴스 dedup.
+- 락 없음(TTL만) + fail-soft. L1 라우트 캐시는 그대로(L1+L2 병행). 테스트 `__tests__/index-store.test.ts`.
+
+⚠️ **Upstash 프로비저닝은 사용자 작업** — Vercel Marketplace Upstash(무료·Tokyo) 연결 + env 주입.
+미설정 시 memory 폴백이라 머지/실행에 무해.
