@@ -17,6 +17,9 @@ export const NAV_MENU_MARKET = "시장 동향";
 export const NAV_MENU_WATCHLIST = "관심 종목";
 export const NAV_MENU_PROFILE = "마이페이지";
 
+/** v9 (home-market-redesign) PR2 — AI 분석 "준비 중" 배지 카피. */
+export const NAV_MENU_COMING_SOON_BADGE = "준비 중";
+
 export const HEADER_PROFILE_ARIA = "프로필 메뉴";
 
 export const HEADER_MARKET_TICKER_ARIA = "글로벌 마켓 시세";

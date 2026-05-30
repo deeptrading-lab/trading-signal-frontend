@@ -1,34 +1,12 @@
 /**
- * MarketSnapshotCard — `/dashboard` 오늘장 특징 (Fear & Greed Index + 상승/하락 종목 수).
+ * MarketSnapshotCard — 공포·탐욕 게이지 + 상승/하락 종목 수.
  *
  * PR7 (finsight-redesign) 신규.
- *
- * 시안 `Dashboard.tsx` L90~L119 정합.
- *   - 헤더: TrendingUp 아이콘 + "오늘장 특징".
- *   - Fear & Greed Index 인디케이터:
- *      - 라벨 + 값 + Greed 텍스트.
- *      - 그라데이션 막대 — 시안 `from-red-500 via-yellow-500 to-emerald-500` (글로벌 컨벤션, 공포=red, 탐욕=green).
- *      - **결정**: Fear & Greed Index 는 등락 의미가 아닌 시장 심리 인덱스 — 글로벌 컨벤션 유지가
- *        의미상 자연. v8 의 `signal-up/-down` (한국식 등락) 적용 시 의미 충돌. 시안의
- *        red→yellow→green cascade 를 v8 토큰에 매핑:
- *           red → `signal-down` (#1d4ed8 blue) 은 의미 충돌 — 사용 X.
- *           red → `critical` (#8e1717 red, 본 저장소 위험/오류 의미) 활용.
- *           yellow → `warn` (#a14a06, 본 저장소 경고 의미).
- *           green → `signal-up` (#c81e1e red, 한국식 상승) 은 의미 충돌 — 사용 X.
- *        → **타협 (옵션 C)**: Fear & Greed 만 글로벌 컨벤션 유지하되 v8 토큰 cascade 로
- *        `from-critical via-warn to-asset-stock` 사용 — `asset-stock` (blue) 이 "긍정·탐욕" 의미로
- *        부적합하므로 다시 검토 → **최종 채택**: 시안의 글로벌 컨벤션 그대로 — Tailwind 기본 팔레트
- *        `from-red-500 via-yellow-500 to-emerald-500` 활용 (color 명명 활용, hex 직타 0).
- *        본 그라데이션은 Fear & Greed 인덱스 한정 의미 — 등락 토큰과 의도적 분리. 코멘트로 사유 명시.
- *   - 상승/하락 종목 수 2-up:
- *      - 상승 종목 = `text-signal-up` (red, 한국식).
- *      - 하락 종목 = `text-signal-down` (blue, 한국식).
- *
- * v8 토큰:
- *   - 카드 셸 = `card` 합성 토큰.
- *   - 헤더 아이콘 = `text-accent-vivid` (시안의 `text-purple-500` 대신 v8 cascade).
- *   - 상승/하락 = `text-signal-up` / `text-signal-down` (한국식).
- *   - Fear & Greed 인디케이터 박스 = `bg-surface-muted` (시안 `bg-slate-50` 정합).
+ * home-market-redesign PR2 — fng-* 토큰 적용:
+ *   - 그라데이션 트랙: `from-red-500 via-yellow-500 to-emerald-500` → `from-fng-extreme-fear via-fng-neutral to-fng-extreme-greed`
+ *   - 트랙 배경: `bg-border-line` → `bg-fng-track`
+ *   - 구간 라벨: 값에 따른 `fng-band-*` 배지 (5구간 의미축)
+ *   - 게이지 점수: `text-gauge-score` (40px/800)
  *
  * 정적 server-safe 컴포넌트 — useState 0.
  */
@@ -57,6 +35,30 @@ const FEAR_GREED_LABEL_MAP: Record<FearGreedLabel, string> = {
   EXTREME_GREED: FEAR_GREED_EXTREME_GREED,
 };
 
+/** 구간 값에 따른 fng-band-* CSS 클래스 반환. */
+function getFngBandClass(label: FearGreedLabel): string {
+  const map: Record<FearGreedLabel, string> = {
+    EXTREME_FEAR: "fng-band-extreme-fear",
+    FEAR: "fng-band-fear",
+    NEUTRAL: "fng-band-neutral",
+    GREED: "fng-band-greed",
+    EXTREME_GREED: "fng-band-extreme-greed",
+  };
+  return map[label];
+}
+
+/** 구간 값에 따른 fng-* 텍스트 색상 클래스 반환 (게이지 점수 숫자). */
+function getFngScoreColorClass(label: FearGreedLabel): string {
+  const map: Record<FearGreedLabel, string> = {
+    EXTREME_FEAR: "text-fng-extreme-fear",
+    FEAR: "text-fng-fear",
+    NEUTRAL: "text-fng-neutral",
+    GREED: "text-fng-greed",
+    EXTREME_GREED: "text-fng-extreme-greed",
+  };
+  return map[label];
+}
+
 export interface MarketSnapshotCardProps {
   fearGreed: FearGreed;
   snapshot: MarketSnapshot;
@@ -66,6 +68,9 @@ export function MarketSnapshotCard({
   fearGreed,
   snapshot,
 }: MarketSnapshotCardProps) {
+  const bandClass = getFngBandClass(fearGreed.label);
+  const scoreColorClass = getFngScoreColorClass(fearGreed.label);
+
   return (
     <section className="card" aria-label={MARKET_TODAY_TITLE}>
       <header className="mb-lg flex items-center justify-between">
@@ -79,21 +84,34 @@ export function MarketSnapshotCard({
       </header>
 
       <div className="flex flex-col gap-lg">
-        {/* Fear & Greed Index — 글로벌 컨벤션 (red→yellow→green) 유지.
-         *  사유: 시장 심리 인덱스 의미 = "공포→탐욕" 글로벌 컨벤션. 한국식 등락 (signal-up/-down) 적용 시
-         *  의미 충돌 (등락 의미가 아니므로 의도적 분리). Tailwind 기본 팔레트 활용. */}
+        {/* Fear & Greed Index — fng-* 의미축 토큰 적용.
+         *  home-market-redesign PR2: 별도 의미축(DESIGN.md §Colors — 한국 등락색 충돌 해소).
+         *  트랙: from-fng-extreme-fear via-fng-neutral to-fng-extreme-greed (파랑→회색→와인).
+         *  점수: gauge-score(40px/800) + 구간별 fng-* 색.
+         *  라벨: fng-band-* 배지 (5구간 WCAG AA 통과). */}
         <div className="rounded-md bg-surface-muted p-lg">
           <div className="mb-sm flex items-center justify-between">
             <span className="text-body-sm-strong text-text-strong">
               {FEAR_GREED_TITLE}
             </span>
-            <span className="text-body-sm-strong text-emerald-500 tabular-nums">
-              {fearGreed.value} ({FEAR_GREED_LABEL_MAP[fearGreed.label]})
+            <span className={bandClass}>
+              {FEAR_GREED_LABEL_MAP[fearGreed.label]}
             </span>
           </div>
-          <div className="h-[8px] w-full overflow-hidden rounded-pill bg-border-line">
+          {/* 게이지 점수 (40px/800 — 색이 보조축이므로 숫자가 의미의 정본) */}
+          <div className="mb-md flex items-end gap-md">
+            <span
+              className={`text-gauge-score tabular-nums ${scoreColorClass}`}
+              aria-label={`게이지 점수 ${fearGreed.value}`}
+            >
+              {fearGreed.value}
+            </span>
+            <span className="text-caption text-text-muted pb-xs">/ 100</span>
+          </div>
+          {/* 그라데이션 게이지 트랙 — fng-* 의미축 (파랑→회색→와인). */}
+          <div className="h-[8px] w-full overflow-hidden rounded-pill bg-fng-track">
             <div
-              className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500"
+              className="h-full bg-gradient-to-r from-fng-extreme-fear via-fng-neutral to-fng-extreme-greed"
               style={{ width: `${fearGreed.value}%` }}
               aria-hidden="true"
             />

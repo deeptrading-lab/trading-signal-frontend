@@ -1,35 +1,28 @@
 /**
- * components/layout/navItems.ts — finsight 글로벌 셸 6 메뉴 단일 정의.
+ * components/layout/navItems.ts — finsight 글로벌 셸 메뉴 단일 정의.
  *
  * PR3 (finsight-redesign) 신규.
- * `Sidebar` (데스크탑) / `BottomNav` (모바일) 양쪽이 이 파일에서 import → 메뉴 정의 1곳.
+ * home-market-redesign PR2 — 6메뉴 → 3메뉴 + AI분석 "준비 중" 항목 분리.
+ *   - 제거: /dashboard (PR1 에서 /profile redirect), /analyze (준비 중 별도), /market (/ 흡수)
+ *   - 유지: / (홈), /watchlist (관심종목), /profile (마이페이지)
+ *   - 분리: NAV_ITEM_ANALYZE — 클릭 불가 "준비 중" 전용 (Sidebar/BottomNav 하단 고정)
  *
- * 라우트 정합 (PRD §3.3 PR3 + §5.3 AC-L-1):
- *   - `/dashboard` — 대시보드 (PR9 에서 채움)
- *   - `/` — 홈 (현 PR3 시점 = 워크벤치 화면, PR5 에서 `/analyze` 로 이전, PR6 의 AnalysisDashboard 로 교체)
- *   - `/analyze` — AI 분석 워크벤치 (PR5 에서 채움)
- *   - `/market` — 시장 동향 (PR8 에서 채움)
- *   - `/watchlist` — 관심 종목 (PR9 에서 채움)
- *   - `/profile` — 마이페이지 (PR9 에서 채움)
+ * `Sidebar` (데스크탑) / `BottomNav` (모바일) 양쪽이 이 파일에서 import → 메뉴 정의 1곳.
  *
  * 활성 판별 — pathname 매칭. `/` 만 정확 일치, 나머지는 prefix 매칭 (서브라우트 진입 시 부모 메뉴 활성).
  */
 
 import {
-  LayoutDashboard,
-  Activity,
+  House,
   Compass,
-  TrendingUp,
   Star,
   User,
   type LucideIcon,
 } from "lucide-react";
 
 import {
-  NAV_MENU_DASHBOARD,
   NAV_MENU_HOME,
   NAV_MENU_ANALYZE,
-  NAV_MENU_MARKET,
   NAV_MENU_WATCHLIST,
   NAV_MENU_PROFILE,
 } from "@/lib/copy/layout/navCopy";
@@ -44,13 +37,19 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { path: "/dashboard", label: NAV_MENU_DASHBOARD, icon: LayoutDashboard },
-  { path: "/", label: NAV_MENU_HOME, icon: Activity },
-  { path: "/analyze", label: NAV_MENU_ANALYZE, icon: Compass },
-  { path: "/market", label: NAV_MENU_MARKET, icon: TrendingUp },
+  { path: "/", label: NAV_MENU_HOME, icon: House },
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, icon: Star },
   { path: "/profile", label: NAV_MENU_PROFILE, icon: User },
 ];
+
+/**
+ * AI 분석 "준비 중" 항목 — 클릭 불가, Sidebar/BottomNav 하단 고정.
+ * `path` 없음 — 링크가 아닌 비활성 div 로 렌더.
+ */
+export const NAV_ITEM_ANALYZE = {
+  label: NAV_MENU_ANALYZE,
+  icon: Compass,
+} as const;
 
 /**
  * 활성 라우트 판별.

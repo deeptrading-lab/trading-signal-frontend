@@ -475,4 +475,60 @@
   .holdings-table-cell {
     @apply px-table-cell-px;
   }
+
+  /* ===== v9 (home-market-redesign) PR2 — nav "준비 중" 합성 토큰 =====
+   * DESIGN.md v9 §Components — sidebar-item-coming-soon / bottom-nav-item-coming-soon.
+   * 색 신규 0 — text-muted(dimmed) + surface-muted(준비 중 배지 bg). hex/px 직타 0건. */
+
+  /* sidebar-nav-item-coming-soon: sidebar-nav-item 과 동일 셸 + disabled 상태. */
+  .sidebar-nav-item-coming-soon {
+    @apply flex items-center gap-md rounded-md px-lg h-12 text-body-sm-strong
+           text-text-muted cursor-not-allowed opacity-60;
+  }
+  /* bottom-nav-item-coming-soon: bottom-nav-item 과 동일 셸 + disabled 상태. */
+  .bottom-nav-item-coming-soon {
+    @apply flex flex-col items-center justify-center gap-1 flex-1 text-caption text-text-muted opacity-60 cursor-not-allowed;
+  }
+
+  /* fng-band-* 배지 — 공포·탐욕 구간 라벨 배지. DESIGN.md v9 `fng-band-*` 합성 토큰 정합.
+   * 5구간 의미축: 극공포(청색) / 공포(청록) / 중립(회색) / 탐욕(황토) / 극탐욕(와인).
+   * WCAG AA 4.5:1 모두 통과 (design.md §Colors WCAG 표). */
+  .fng-band-extreme-fear {
+    @apply inline-flex items-center h-[28px] px-md rounded-pill text-badge
+           bg-fng-extreme-fear-soft text-fng-extreme-fear whitespace-nowrap;
+  }
+  .fng-band-fear {
+    @apply inline-flex items-center h-[28px] px-md rounded-pill text-badge
+           bg-fng-fear-soft text-fng-fear whitespace-nowrap;
+  }
+  .fng-band-neutral {
+    @apply inline-flex items-center h-[28px] px-md rounded-pill text-badge
+           bg-fng-neutral-soft text-fng-neutral whitespace-nowrap;
+  }
+  .fng-band-greed {
+    @apply inline-flex items-center h-[28px] px-md rounded-pill text-badge
+           bg-fng-greed-soft text-fng-greed whitespace-nowrap;
+  }
+  .fng-band-extreme-greed {
+    @apply inline-flex items-center h-[28px] px-md rounded-pill text-badge
+           bg-fng-extreme-greed-soft text-fng-extreme-greed whitespace-nowrap;
+  }
+  /* badge-coming-soon: "준비 중" pill. DESIGN.md v9 badge-coming-soon. */
+  .badge-coming-soon {
+    @apply inline-flex items-center h-[24px] px-sm rounded-pill text-badge
+           bg-surface-muted text-text-muted whitespace-nowrap;
+  }
+
+  /* disclosure-row: 공시 피드 행 — surface × text-strong, hover surface-muted. */
+  .disclosure-row {
+    @apply flex items-start gap-md py-disclosure-row-py bg-surface text-text-strong rounded-sm cursor-pointer;
+  }
+  .disclosure-row:hover {
+    @apply bg-surface-muted;
+  }
+  /* disclosure-tag: 종목 태그 배지 — accent-soft × primary. DESIGN.md v9 disclosure-tag. */
+  .disclosure-tag {
+    @apply inline-flex items-center h-[24px] px-sm rounded-pill text-badge
+           bg-accent-soft text-primary whitespace-nowrap shrink-0;
+  }
 }

@@ -27,7 +27,18 @@
         "asset-coin-soft": "#ffedd5",
         "gradient-ai-from": "#4338ca",
         "gradient-ai-to": "#1d4ed8",
-        "gradient-ai-soft": "#eef2ff"
+        "gradient-ai-soft": "#eef2ff",
+        "fng-extreme-fear": "#1d6fb8",
+        "fng-extreme-fear-soft": "#e3f0fa",
+        "fng-fear": "#256353",
+        "fng-fear-soft": "#e1f0eb",
+        "fng-neutral": "#4b525c",
+        "fng-neutral-soft": "#f0f1f3",
+        "fng-greed": "#82500c",
+        "fng-greed-soft": "#fbf0dc",
+        "fng-extreme-greed": "#a83246",
+        "fng-extreme-greed-soft": "#fbe4e8",
+        "fng-track": "#eceff3"
       },
       "fontFamily": {
         "display": [
@@ -196,6 +207,13 @@
           {
             "fontWeight": "700"
           }
+        ],
+        "gauge-score": [
+          "40px",
+          {
+            "letterSpacing": "-0.02em",
+            "fontWeight": "800"
+          }
         ]
       },
       "borderRadius": {
@@ -235,10 +253,15 @@
         "card-py-mobile": "16px",
         "hero-px": "24px",
         "hero-py": "24px",
+        "home-grid-gap": "16px",
+        "gauge-w": "220px",
+        "gauge-h": "120px",
+        "gauge-track-w": "14px",
         "donut-size": "168px",
         "donut-thickness": "22px",
         "table-row-h": "48px",
-        "table-cell-px": "12px"
+        "table-cell-px": "12px",
+        "disclosure-row-py": "12px"
       },
       "screens": {
         "sm": "640px",
