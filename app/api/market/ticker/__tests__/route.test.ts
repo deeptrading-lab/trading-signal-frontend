@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   isKisConfigured: vi.fn(),
   resolveKisEnv: vi.fn(),
+  // 국내(0001/1001)는 fetchIndexPriceShared(L2 store 경유, kis-token-store §3.3)로 호출된다.
   fetchIndexPrice: vi.fn(),
   fetchOverseasIndex: vi.fn(),
   fetchBtcKrw: vi.fn(),
@@ -27,7 +28,8 @@ vi.mock("@/lib/api/kis", async () => {
     ...actual,
     isKisConfigured: mocks.isKisConfigured,
     resolveKisEnv: mocks.resolveKisEnv,
-    fetchIndexPrice: mocks.fetchIndexPrice,
+    // 국내 실호출 진입점 = fetchIndexPriceShared. 기존 fetchIndexPrice 단언과 호환되게 같은 mock.
+    fetchIndexPriceShared: mocks.fetchIndexPrice,
     fetchOverseasIndex: mocks.fetchOverseasIndex,
   };
 });

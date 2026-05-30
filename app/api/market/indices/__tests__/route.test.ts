@@ -19,6 +19,7 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   isKisConfigured: vi.fn(),
   resolveKisEnv: vi.fn(),
+  // 라우트는 L1 miss 시 fetchIndexPriceShared(L2 store 경유) 를 호출한다(kis-token-store §3.3).
   fetchIndexPrice: vi.fn(),
 }));
 
@@ -30,7 +31,9 @@ vi.mock("@/lib/api/kis", async () => {
     ...actual,
     isKisConfigured: mocks.isKisConfigured,
     resolveKisEnv: mocks.resolveKisEnv,
-    fetchIndexPrice: mocks.fetchIndexPrice,
+    // fetchIndexPriceShared 가 라우트의 실호출 진입점 — 기존 fetchIndexPrice 단언과 호환되도록
+    // 같은 mock 으로 매핑(국내 0001/1001 외 코드도 본 mock 이 받는다 — store 미경유는 구현 내부).
+    fetchIndexPriceShared: mocks.fetchIndexPrice,
   };
 });
 
