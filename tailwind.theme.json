@@ -80,6 +80,9 @@
         ],
         "input-suffix": [
           "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
+        ],
+        "table-cell-numeric": [
+          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ]
       },
       "fontSize": {
@@ -187,6 +190,12 @@
           {
             "fontWeight": "400"
           }
+        ],
+        "table-cell-numeric": [
+          "14px",
+          {
+            "fontWeight": "700"
+          }
         ]
       },
       "borderRadius": {
@@ -225,7 +234,11 @@
         "card-px-mobile": "16px",
         "card-py-mobile": "16px",
         "hero-px": "24px",
-        "hero-py": "24px"
+        "hero-py": "24px",
+        "donut-size": "168px",
+        "donut-thickness": "22px",
+        "table-row-h": "48px",
+        "table-cell-px": "12px"
       },
       "screens": {
         "sm": "640px",
