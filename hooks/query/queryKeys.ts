@@ -10,7 +10,8 @@
  *   - 함수형 빌더는 도메인 훅이 동일 시그니처로 호출 + invalidate.
  *   - `as const` 로 readonly tuple 강제 → typo 회귀 차단.
  *
- * PR-C (§3.5) — dashboard / market / watchlist 도메인 어댑터 키 추가.
+ * PR-C (§3.5) — profile(계좌) / market / watchlist 도메인 어댑터 키 추가.
+ *   (home-market-redesign PR1 — dashboard 도메인 → profile 도메인 이전.)
  *   - 화면 컴포넌트는 본 PR 에서 mock 그대로 유지하지만, 후속 PR 들이 한 도메인씩 mock → 훅 전환
  *     시 동일 factory 를 참조하기 위해 미리 정착.
  *   - tickers 배열은 readonly tuple 안정성을 위해 `.slice().sort()` 정규화 후 join → 순서 무관 캐시.
@@ -34,9 +35,9 @@ export const queryKeys = {
     list: (ticker: string, count: number) =>
       ["disclosure", "list", ticker, count] as const,
   },
-  dashboard: {
+  profile: {
     holdings: (tickers: readonly string[]) =>
-      ["dashboard", "holdings", normalizeTickers(tickers)] as const,
+      ["profile", "holdings", normalizeTickers(tickers)] as const,
   },
   market: {
     indices: (codes: readonly string[]) =>
