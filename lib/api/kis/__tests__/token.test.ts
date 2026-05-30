@@ -14,6 +14,7 @@ import {
   resetTokenCacheForTest,
   type TokenFetcher,
 } from "../token";
+import { MemoryKisStore, setKisStoreForTest, type KisStore } from "../store";
 import type { KisTokenResponse } from "../types";
 
 const APP_KEY = "test-app-key";
@@ -39,6 +40,9 @@ function makeMockFetcher(
 describe("getAccessToken", () => {
   beforeEach(() => {
     resetTokenCacheForTest();
+    // L2 store 도 매 테스트 격리 — 기본 memory store(인스턴스 내 Map)를 새로 주입.
+    // memory 모드는 L1·inflight 만으로 현행과 동일 동작(무회귀, kis-token-store §3.1).
+    setKisStoreForTest(new MemoryKisStore());
   });
 
   it("[#1] 첫 호출 시 fetcher 를 1회 호출하고 access_token 을 반환한다", async () => {
@@ -223,5 +227,205 @@ describe("getAccessToken", () => {
       kind: "server",
       message: "유효하지 않은 자격증명입니다.",
     });
+  });
+});
+
+/**
+ * kv 모드 — 인스턴스 간 공유 store + 분산 single-flight(SET NX PX).
+ *
+ * 실제 Upstash 라이브 검증은 프로비저닝(사용자 작업) 후라 불가 → **fake store 주입**으로 커버.
+ * 인스턴스 경계는 매 호출 전 `resetTokenCacheForTest()`(L1·inflight 비움)로 흉내 — 각 호출이
+ * 새 인스턴스처럼 store/락 경로를 독립적으로 탄다. store(KisStore)는 인스턴스 간 공유 그대로 유지.
+ */
+describe("getAccessToken — kv 모드(분산 single-flight, fake store)", () => {
+  /** 호출 추적이 가능한 fake KisStore — 락은 1회만 성공(NX). */
+  function makeFakeStore(): KisStore & {
+    entries: Map<string, CacheEntryLike>;
+    getCalls: () => number;
+    setCalls: () => Array<{ key: string; ttlSec: number }>;
+    acquireCalls: () => number;
+  } {
+    const entries = new Map<string, CacheEntryLike>();
+    const locks = new Set<string>();
+    let getCalls = 0;
+    let acquireCalls = 0;
+    const setCalls: Array<{ key: string; ttlSec: number }> = [];
+    return {
+      entries,
+      getCalls: () => getCalls,
+      setCalls: () => setCalls,
+      acquireCalls: () => acquireCalls,
+      async get<T>(key: string): Promise<T | null> {
+        getCalls += 1;
+        return (entries.get(key) as T | undefined) ?? null;
+      },
+      async set<T>(key: string, value: T, ttlSec: number): Promise<void> {
+        setCalls.push({ key, ttlSec });
+        entries.set(key, value as unknown as CacheEntryLike);
+      },
+      async del(key: string): Promise<void> {
+        entries.delete(key);
+      },
+      async acquireLock(key: string): Promise<string | null> {
+        acquireCalls += 1;
+        if (locks.has(key)) return null; // 이미 잠김 → 미획득.
+        locks.add(key);
+        return `lock-${acquireCalls}`;
+      },
+      async releaseLock(key: string): Promise<void> {
+        locks.delete(key);
+      },
+    };
+  }
+  type CacheEntryLike = { token: string; expiresAt: number };
+
+  beforeEach(() => {
+    resetTokenCacheForTest();
+  });
+
+  it("[kv] 첫 인스턴스 발급 → store SET, 둘째 인스턴스 store hit 시 fetcher 0회", async () => {
+    const store = makeFakeStore();
+    const { fetcher, callCount } = makeMockFetcher([
+      { access_token: "issued", expires_in: 86_400 },
+    ]);
+    const token = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store,
+    });
+    // store SET 으로 발급분이 기록됨(키는 해시).
+    expect(token).toBe("issued");
+    expect(callCount()).toBe(1);
+    expect(store.setCalls().length).toBe(1);
+    expect(store.setCalls()[0].key).toMatch(/^kis:token:prod:[0-9a-f]{16}$/);
+
+    // 두 번째 인스턴스(L1 비움) → store hit → fetcher 추가 0회.
+    resetTokenCacheForTest();
+    const second = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store,
+    });
+    expect(second).toBe("issued");
+    expect(callCount()).toBe(1); // store hit — 추가 발급 0.
+  });
+
+  it("[kv][AC-3] 락 잡은 인스턴스만 발급, 미획득 인스턴스는 폴링으로 store 수렴", async () => {
+    const store = makeFakeStore();
+    let issued = 0;
+    // 발급은 느리게(락 보유 인스턴스가 store 에 쓸 때까지 폴링 인스턴스가 대기).
+    const slowFetcher: TokenFetcher = async () => {
+      issued += 1;
+      await new Promise((r) => setTimeout(r, 80));
+      return { access_token: "locked-token", expires_in: 86_400 };
+    };
+
+    // 인스턴스 A — 락 획득 후 발급.
+    const a = getAccessToken({
+      fetcher: slowFetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store,
+    });
+    // 인스턴스 B — L1 비워 새 인스턴스로 만들고 즉시 발사(락 미획득 → 폴링).
+    resetTokenCacheForTest();
+    const b = getAccessToken({
+      fetcher: slowFetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store,
+    });
+
+    const [ta, tb] = await Promise.all([a, b]);
+    expect(ta).toBe("locked-token");
+    expect(tb).toBe("locked-token");
+    // 락은 A 만 획득 → 발급 1회. B 는 폴링으로 store 에서 같은 토큰 수신.
+    expect(issued).toBe(1);
+  });
+
+  it("[kv][AC-3] 락 미획득 + 폴링 만료 + store 비면 → 직접 발급 fallback", async () => {
+    // 락이 항상 미획득(다른 인스턴스가 잡았지만 store 를 끝내 못 채운 상황)인 store.
+    const stuckStore: KisStore = {
+      async get<T>(): Promise<T | null> {
+        return null; // 폴링 내내 store 비어 있음.
+      },
+      async set(): Promise<void> {},
+      async del(): Promise<void> {},
+      async acquireLock(): Promise<string | null> {
+        return null; // 항상 미획득.
+      },
+      async releaseLock(): Promise<void> {},
+    };
+    const { fetcher, callCount } = makeMockFetcher([
+      { access_token: "fallback-token", expires_in: 86_400 },
+    ]);
+
+    const token = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store: stuckStore,
+    });
+    // 폴링 만료 후 직접 발급(가용성 우선) — 토큰을 받아낸다.
+    expect(token).toBe("fallback-token");
+    expect(callCount()).toBe(1);
+  }, 5_000);
+
+  it("[kv][AC-6] store 가 throw/null 만 줘도 fail-soft — 인메모리 직접 발급 성공", async () => {
+    // 모든 store 메서드가 실패 신호(null/false)만 반환(Upstash 다운 시뮬레이션 — 실제 store 는 흡수).
+    const downStore: KisStore = {
+      async get<T>(): Promise<T | null> {
+        return null;
+      },
+      async set(): Promise<void> {},
+      async del(): Promise<void> {},
+      async acquireLock(): Promise<string | null> {
+        return null; // 락도 못 잡음.
+      },
+      async releaseLock(): Promise<void> {},
+    };
+    const { fetcher, callCount } = makeMockFetcher([
+      { access_token: "soft-token", expires_in: 86_400 },
+    ]);
+
+    const token = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store: downStore,
+    });
+    expect(token).toBe("soft-token");
+    expect(callCount()).toBe(1);
+  }, 5_000);
+
+  it("[kv] store SET TTL = (만료 - grace) 초로 설정된다", async () => {
+    const store = makeFakeStore();
+    const { fetcher } = makeMockFetcher([
+      { access_token: "ttl-token", expires_in: 3_600 }, // 1h.
+    ]);
+    await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store,
+    });
+    // TTL = (3600s - 60s grace) = 3540s.
+    expect(store.setCalls()[0].ttlSec).toBe(3_540);
   });
 });
