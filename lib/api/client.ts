@@ -5,6 +5,8 @@
  *   FastAPI 직접 호출 금지 (route handler 경유). 따라서 `baseURL` 은 same-origin `/api`.
  * - PRD §6: timeout 은 기본 30초 이내.
  * - PRD §9 OPEN QUESTION 3: 응답 인터셉터에서 BE 응답을 `ApiError` 골격으로 매핑한다.
+ * - PRD `app-password-gate` §3.6 / AC-20: 게이트 401(`/api/*`) 수신 시 `/login` 으로 유도
+ *   (세션 만료 graceful). 인증 API(`/api/auth/*`)·이미 `/login` 인 경우는 제외(무한 루프 가드).
  */
 
 import axios, { AxiosError, type AxiosInstance } from "axios";
@@ -53,6 +55,12 @@ function mapAxiosError(error: AxiosError): ApiError {
   const status = error.response.status;
   const data = error.response.data;
   const bodyMessage = extractMessage(data);
+
+  if (status === 401) {
+    // 게이트 미인증/세션 만료 — 브라우저면 `/login` 으로 유도(데이터 카드가 무한 에러로 남지 않게).
+    redirectToLogin(error);
+    return makeApiError("unauthorized", { status, detail: data });
+  }
 
   if (status === 422) {
     return makeApiError("validation", {
@@ -105,4 +113,27 @@ function extractMessage(data: unknown): string | null {
 function isWhitelistMissMessage(message: string | null): boolean {
   if (!message) return false;
   return /화이트리스트/.test(message);
+}
+
+/**
+ * 게이트 401 → `/login` 유도 (PRD app-password-gate §3.6 / AC-20).
+ *
+ * 무한 루프 가드:
+ *   (a) 브라우저 환경에서만 (`typeof window` — SSR/RSC 경로에서 window 접근 금지).
+ *   (b) 인증 API(`/api/auth/*`) 호출의 401 은 제외 (로그인 실패 401 이 리다이렉트로 오인되지 않게).
+ *   (c) 이미 `/login` 이면 제외 (`/login` → `/login` 루프 차단).
+ * `/login?next=<현재경로>` 로 이동해 로그인 후 복귀(같은 origin 절대경로).
+ */
+function redirectToLogin(error: AxiosError): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
+
+  const requestUrl = error.config?.url ?? "";
+  // axios baseURL 은 `/api` — 인증 API 는 `/auth/login`·`/auth/logout` 로 들어온다.
+  if (requestUrl.includes("/auth/login") || requestUrl.includes("/auth/logout")) {
+    return;
+  }
+
+  const next = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
 }
