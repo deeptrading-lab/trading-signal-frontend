@@ -2212,3 +2212,45 @@
   - `watchlist-realtime-ws` — `H0STCNT0` WS push 실시간 시세(초기 스냅샷/REST 폴백으로 본 트랙 `fetchIntstockMultprice`·`WatchlistQuote` 재사용).
   - 거래정지/관리종목 배지 복원(별도 트랙) — 지연로드(보임 종목만 per-row `search-stock-info`) 또는 일괄응답 동등 필드 검증.
   - `intstock_multprice` 모의(vts) 검증 후 이중 게이트 → 단일 게이트 완화 후속 chore.
+
+### 2026-05-30 — feat(header): 글로벌 마켓 티커 5종 실데이터 전환 (header-market-ticker) (#47)
+
+- **slug**: `header-market-ticker` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/47
+- **요약**: feat(header): 글로벌 마켓 티커 5종 실데이터 전환 (header-market-ticker)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경
+  > 
+  > 헤더 데스크탑 글로벌 마켓 티커를 **mock 3건 → 실데이터 5건**으로 전환한다.
+  > 
+  > - 소스: KIS 국내지수(코스피·코스닥, 재사용) + KIS 해외지수(S&P500=SPX / NASDAQ 종합=COMP, 신설) + CoinGecko BTC 원화(신설). 고정 순서 `[코스피, 코스닥, S&P500, NASDAQ, BTC]`.
+  > - prod 라이브 확정값: SPX **7,580.06** / COMP **26,972.62** / BTC 원화 (`X-Data-Source: kis`).
+  > - KIS 4콜 **2개씩 청크 + 청크 간 지연** + 소스별 in-memory TTL(국내 30s / 해외 10분 / BTC 3분)으로 초당 유량 제한(**EGW00201 0건**).
+  > - 본 PR(frontend 단계): 헤더 화면 배선 + 상태 처리. 데이터 계층(BFF·어댑터·훅·매퍼·테스트)은 직전 커밋 `a0cf9a5` 에 완료.
+  > 
+  > ### 파일
+  > | 파일 | 성격 |
+  > |---|---|
+  > | `components/layout/HeaderMarketTicker.tsx` | 신설 — client 컨테이너, `useQueryMarketTicker()` 소비 |
+  > | `components/layout/Header.tsx` | 수정 — mock import 제거 → `<HeaderMarketTicker />` |
+  > | `lib/copy/layout/navCopy.ts` | 수정 — 티커 aria-label 카피 분리 |
+  > 
+  > 티커 렌더 마크업/토큰은 기존 `Header.tsx` 에서 **그대로 이전**(비주얼 동일): `hidden lg:flex`(데스크탑 전용)·구분선 `w-px h-3 bg-border-line`·등락 한국식 색 `signal-up`(red)/`signal-down`(blue)·`▲/▼ {x.x}%`·`tabular-nums`. 로딩/빈 상태는 헤더 높이를 유지하는 slim placeholder(레이아웃 시프트 0). 전체 실패는 BFF mock degrade 라 `data` 우선 소비(끊김 0), 에러 배지 없음(보조 정보 — PRD §3.7/q6).
+  > 
+  > ## AC 체크 (본 단계 관련)
+  > 
+  > - [x] **AC-5** 커스텀훅만 소비 — `git grep "@tanstack/react-query" components/layout/` → **0건**. 컨테이너가 `useQueryMarketTicker` 만 import.
+  > - [x] **AC-6** 헤더 mock 직접 import 제거 — `git grep "HEADER_MARKET_TICKERS" components/layout/Header.tsx` → **0건**.
+  > - [x] **AC-4** BFF 경유(직접 호출 0) — `git grep -E "fetchIndexPrice|fetchOverseasIndex|fetchBtcKrw|getKisClient|coingecko/client" components/layout/` → **0건**.
+  > - [x] **AC-7/AC-8** 부분/전체 실패 graceful degrade — BFF `mock`/`mock-timeout` 으로 data 우선, 영역 숨김·에러 배지 없음. (route 단위 테스트 통과)
+  > - [x] **AC-10** `queryConfig.market.ticker.staleTime === 60s`(`60 * SECOND`).
+  > - [x] **AC-11** 표시 변환 — 지수 `isUp = direction==="up"`, BTC `isUp = krw_24h_change >= 0`, `value` 천단위 콤마, `▲/▼ {abs(changePct).toFixed(1)}%`.
+  > - [x] **AC-12** typecheck / lint / build 0 에러.
+  > - [x] **AC-13** 데스크탑 5건 표시 + 모바일 `hidden lg:flex` 비표시(SSR HTML 확인).
+  > - [x] **AC-3/AC-9/AC-14** (데이터 계층) — 합성 route 순서/헤더, 동시성 청크, 매퍼 단위 테스트 통과.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `market-foreign-data` 트랙 — 환율 USD/KRW(KIS 시장코드 X) + BTC Dominance(`/global`) 추가, `/market` 화면 확장.
+  - CoinGecko Demo 키(`COINGECKO_API_KEY`) env 추가 여부 — 429 빈도 운영 관찰 후 판단(현재 무키 + 3분 TTL 로 한도 내).
+  - `X-Data-Source` 분포 운영 데이터 기반 staleTime/소스별 TTL 재조정.

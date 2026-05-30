@@ -272,6 +272,78 @@ export const INDEX_NAME_BY_CODE: Record<string, string> = {
 };
 
 /**
+ * 해외 지수/환율 기간별 시세(일/주/월/년) 응답
+ * (`GET /uapi/overseas-price/v1/quotations/inquire-daily-chartprice`).
+ *
+ * TR_ID = `FHKST03030100`. `FID_COND_MRKT_DIV_CODE=N`(해외지수),
+ * `FID_INPUT_ISCD=<SPX|COMP>`, `FID_INPUT_DATE_1`(시작 YYYYMMDD),
+ * `FID_INPUT_DATE_2`(종료 YYYYMMDD), `FID_PERIOD_DIV_CODE=D`(일봉).
+ *
+ * ## ⚠️ 지수명 — 응답 한글명(`hts_kor_isnm`) 표시 의존 금지
+ *
+ * 국내 지수와 동일하게 지수명은 클라이언트 상수(`OVERSEAS_INDEX_NAME_BY_CODE`)가
+ * 단일 진실 원천이다. `hts_kor_isnm`(한글 종목/지수명)을 표시에 끌어쓰지 않는다
+ * (stock-api-integration AC-10 회귀 정책).
+ *
+ * ## ⚠️ output1(요약) → output2(시계열) 폴백
+ *
+ * - `output1` = 요약(현재값/등락). 미국장 마감 종가 기준.
+ * - `output2` = 일봉 시계열 배열(최신이 [0]). `output1` 의 현재값이 0/빈값이면
+ *   `output2[0].ovrs_nmix_prpr`(최신 캔들 종가)로 폴백.
+ *
+ * 모든 값은 KIS 관례대로 문자열(숫자도 string).
+ */
+export type KisOverseasDailyChartOutput1 = {
+  /** 해외 지수 현재값(요약). "7580.06". */
+  ovrs_nmix_prpr?: string;
+  /** 전일 대비. 부호 포함 문자열. */
+  ovrs_nmix_prdy_vrss?: string;
+  /** 전일 대비 부호. "1" 상한 / "2" 상승 / "3" 보합 / "4" 하한 / "5" 하락. */
+  prdy_vrss_sign?: string;
+  /** 전일 대비율(%). */
+  prdy_ctrt?: string;
+  /** ⚠️ 한글 지수명 — 표시 미사용(상수 매핑이 단일 진실). */
+  hts_kor_isnm?: string;
+};
+
+/** `output2` 일봉 캔들 1건. 최신이 배열 [0]. */
+export type KisOverseasDailyChartItem = {
+  /** 영업일자(YYYYMMDD). */
+  stck_bsop_date?: string;
+  /** 해외 지수 종가. "7580.06". */
+  ovrs_nmix_prpr?: string;
+  /** 시가 / 고가 / 저가. */
+  ovrs_nmix_oprc?: string;
+  ovrs_nmix_hgpr?: string;
+  ovrs_nmix_lwpr?: string;
+};
+
+/**
+ * `inquire-daily-chartprice` 전체 응답 — `output1`(요약) + `output2`(시계열).
+ *
+ * 공통 envelope(`KisEnvelope`)는 `output` 단일 키만 가정하므로 본 응답은 별도 타입을 둔다.
+ */
+export type KisOverseasDailyChartResponse = {
+  rt_cd: string;
+  msg_cd: string;
+  msg1: string;
+  output1?: KisOverseasDailyChartOutput1;
+  output2?: KisOverseasDailyChartItem[];
+};
+
+/**
+ * 해외 지수 코드 → 지수명 클라이언트 상수.
+ *
+ * ⚠️ `inquire-daily-chartprice` 응답의 `hts_kor_isnm` 은 표시에 끌어쓰지 않는다.
+ * 본 상수가 단일 진실 원천 — `SPX`→"S&P 500", `COMP`→"NASDAQ"(종합지수).
+ * 헤더 라벨 통념: "NASDAQ" = 종합지수(COMP). NDX(나스닥100)는 본 트랙 비사용.
+ */
+export const OVERSEAS_INDEX_NAME_BY_CODE: Record<string, string> = {
+  SPX: "S&P 500",
+  COMP: "NASDAQ",
+};
+
+/**
  * 관심종목 복수 시세 일괄조회 응답 종목 1건
  * (`GET /uapi/domestic-stock/v1/quotations/intstock-multprice`).
  *

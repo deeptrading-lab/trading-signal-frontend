@@ -56,7 +56,9 @@ export function extractStockName(
  * "4" 하한 / "5" 하락 → down
  * 그 외 → flat (안전한 fallback)
  */
-function mapDirection(sign: string | undefined): "up" | "down" | "flat" {
+export function mapDirection(
+  sign: string | undefined,
+): "up" | "down" | "flat" {
   if (sign === "1" || sign === "2") return "up";
   if (sign === "4" || sign === "5") return "down";
   return "flat";
@@ -67,7 +69,7 @@ function mapDirection(sign: string | undefined): "up" | "down" | "flat" {
  *
  * 부호 처리: KIS 의 `prdy_vrss` 는 음수 시 "-" 포함 문자열 (예: "-500"). parseFloat 이 자연 처리.
  */
-function toNumber(value: string | undefined): number {
+export function toNumber(value: string | undefined): number {
   if (!value) return 0;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;

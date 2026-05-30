@@ -31,6 +31,7 @@
 export { fetchStockPrice, fetchStockDaily } from "./price";
 export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
+export { fetchOverseasIndex } from "./overseas-index";
 export {
   fetchIntstockMultprice,
   MULTPRICE_CHUNK_SIZE,
@@ -43,7 +44,7 @@ export {
 } from "./search";
 export { getAccessToken } from "./token";
 export { isKisConfigured, resolveKisEnv } from "./client";
-export { INDEX_NAME_BY_CODE } from "./types";
+export { INDEX_NAME_BY_CODE, OVERSEAS_INDEX_NAME_BY_CODE } from "./types";
 export type {
   StockPrice,
   StockDailyCandle,
@@ -54,4 +55,7 @@ export type {
   WatchlistQuote,
   KisInquireIndexPriceOutput,
   KisIntstockMultpriceItem,
+  KisOverseasDailyChartOutput1,
+  KisOverseasDailyChartItem,
+  KisOverseasDailyChartResponse,
 } from "./types";

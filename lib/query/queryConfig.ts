@@ -73,6 +73,15 @@ export const queryConfig = {
       staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * 헤더 글로벌 마켓 티커 5종 — 거시 표시용 보조 정보. 짧을 필요 없음 →
+     * staleTime 60s(PRD `header-market-ticker` §9 q1). BFF 소스별 TTL(국내 30s/해외
+     * 10분/BTC 3분)이 실호출을 추가 보호. 단일 진실 원천.
+     */
+    ticker: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   watchlist: {
     /**

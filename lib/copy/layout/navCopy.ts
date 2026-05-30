@@ -19,6 +19,8 @@ export const NAV_MENU_PROFILE = "마이페이지";
 
 export const HEADER_PROFILE_ARIA = "프로필 메뉴";
 
+export const HEADER_MARKET_TICKER_ARIA = "글로벌 마켓 시세";
+
 export const NOT_FOUND_TITLE = "준비 중인 화면입니다";
 export const NOT_FOUND_DESCRIPTION =
   "곧 만나보실 수 있어요. 홈으로 돌아가 다른 메뉴를 둘러보세요.";
