@@ -13,6 +13,9 @@ const FALLBACK: Record<ApiError["kind"], string> = {
   validation: "입력 값을 다시 확인해 주세요.",
   whitelist_miss:
     "지원 종목이 아니에요. 현재는 AAPL 또는 BTC-USD 만 분석할 수 있어요.",
+  // 게이트 401 — axios 인터셉터가 `/login` 으로 유도(PRD app-password-gate §3.6).
+  // 리다이렉트 직전 잠깐 노출될 수 있는 폴백.
+  unauthorized: "로그인이 필요해요. 로그인 화면으로 이동할게요.",
   network: "엔진에 일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
   server: "엔진에 일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
 };
