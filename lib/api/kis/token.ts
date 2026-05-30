@@ -33,16 +33,33 @@
 
 import { getKisClient, resolveKisEnv, type KisEnv } from "./client";
 import { makeKisTokenError } from "./errors";
-import { getKisStore, hashAppKey, type KisStore } from "./store";
+import {
+  getKisStore,
+  hashAppKey,
+  STORE_POLL_TIMEOUT_MS,
+  type KisStore,
+} from "./store";
 import type { KisTokenResponse } from "./types";
 
 const GRACE_PERIOD_MS = 60_000; // 만료 60s 전부터 갱신.
 
 /** 분산 락 TTL(PX) — 데드락 방지. PRD §3.2 q5. */
 const LOCK_TTL_MS = 10_000;
-/** 락 미획득 시 store 재조회 폴링 — 50ms 간격 × 최대 ~2s. PRD §3.2 q5. */
+/**
+ * 락 미획득 시 store 재조회 폴링 — 50ms 간격.
+ *
+ * ⚠️ 폴링은 **store 가 정상인데 다른 인스턴스가 락을 잡은 경우에만** 진입한다(store 장애 신호 시
+ * 폴링을 건너뛰고 즉시 직접발급). 그래도 폴링 누적이 라우트 타임아웃(5s)을 위협하지 않도록:
+ *   - 각 폴링 get 타임아웃을 짧게(`STORE_POLL_TIMEOUT_MS`=150ms),
+ *   - 총 폴링 시간 상한(`POLL_MAX_TOTAL_MS`=1500ms)을 두어 그 안에 못 받으면 직접발급,
+ *   - 폴링 중 store 가 degrade(타임아웃·에러)하면 즉시 폴링 중단 → 직접발급(fail-soft).
+ */
 const POLL_INTERVAL_MS = 50;
-const POLL_MAX_ATTEMPTS = 40; // 40 × 50ms = 2s.
+/** 총 폴링 시간 상한 — 라우트 타임아웃(5s) 한참 아래. 초과 시 직접발급 fallback. */
+const POLL_MAX_TOTAL_MS = 1_500;
+const POLL_MAX_ATTEMPTS = Math.ceil(
+  POLL_MAX_TOTAL_MS / (POLL_INTERVAL_MS + STORE_POLL_TIMEOUT_MS),
+);
 
 type CacheEntry = {
   token: string;
@@ -166,18 +183,23 @@ async function resolveTokenViaStore(params: {
   const { appKey, appSecret, env, fetcher, now, store } = params;
   const storeKey = `kis:token:${env}:${hashAppKey(appKey)}`;
   const lockKey = `kis:lock:token:${env}:${hashAppKey(appKey)}`;
+  const issue = () => issueToken({ appKey, appSecret, env, fetcher, now });
 
   // 2-1. L2 store hit?
   const stored = await store.get<CacheEntry>(storeKey);
   if (stored && isFresh(stored, now)) {
     return stored;
   }
+  // store 도달 불가(타임아웃·에러)면 락/폴링이 무의미 → 즉시 직접발급 fail-soft(§3.4).
+  if (storeDegraded(store)) {
+    return issue();
+  }
 
   // 2-2. 분산 락 시도.
   const lockToken = await store.acquireLock(lockKey, LOCK_TTL_MS);
   if (lockToken) {
     try {
-      const entry = await issueToken({ appKey, appSecret, env, fetcher, now });
+      const entry = await issue();
       // store TTL = (만료 - grace) 초. 음수 방지로 최소 1s.
       const ttlSec = Math.max(
         1,
@@ -190,21 +212,43 @@ async function resolveTokenViaStore(params: {
     }
   }
 
-  // 2-3. 락 미획득 → 다른 인스턴스가 발급 중 → 짧게 폴링하며 store 재조회.
+  // 락 미획득(null)에는 두 의미가 섞인다:
+  //   ① store 정상 + 다른 인스턴스가 락 보유(→ 폴링으로 수렴해야 함)
+  //   ② store 도달 불가로 폴백(→ 폴링 무의미, 즉시 직접발급)
+  // ②면 폴링 starvation(누적 지연)을 피하기 위해 곧장 직접발급한다(QA AC-6 blocking 수정).
+  if (storeDegraded(store)) {
+    return issue();
+  }
+
+  // 2-3. (store 정상 + 락 미획득) → 다른 인스턴스가 발급 중 → 짧게 폴링하며 store 재조회.
+  //       각 get 은 짧은 타임아웃, 총 폴링 시간은 상한(POLL_MAX_TOTAL_MS) 내. 폴링 중 store 가
+  //       degrade 하면 즉시 중단 → 직접발급(누적 지연이 라우트 타임아웃을 넘지 않게).
   for (let i = 0; i < POLL_MAX_ATTEMPTS; i += 1) {
     await delay(POLL_INTERVAL_MS);
-    const polled = await store.get<CacheEntry>(storeKey);
+    const polled = await store.get<CacheEntry>(storeKey, STORE_POLL_TIMEOUT_MS);
     if (polled && isFresh(polled, now)) {
       return polled;
     }
+    if (storeDegraded(store)) {
+      break; // 폴링 도중 store 장애 → 직접발급으로 fail-soft.
+    }
   }
 
-  // 2-4. 폴링 만료해도 store 비면 → 직접 발급 fallback(가용성 우선, §3.2 q3).
-  return issueToken({ appKey, appSecret, env, fetcher, now });
+  // 2-4. 폴링 만료/중단 → 직접 발급 fallback(가용성 우선, §3.2 q3).
+  return issue();
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 직전 store 호출이 장애(타임아웃·에러)로 폴백했는지. store 가 신호를 노출하지 않으면(선택 메서드
+ * 미구현 — memory·단순 fake) 장애 없음(false)으로 간주. "정당한 miss/락-미획득" 과 "store 도달
+ * 불가" 를 구분해 후자일 때 폴링을 건너뛰고 즉시 직접발급하기 위한 fail-soft 판정.
+ */
+function storeDegraded(store: KisStore): boolean {
+  return store.wasLastCallDegraded?.() ?? false;
 }
 
 async function issueToken(params: {

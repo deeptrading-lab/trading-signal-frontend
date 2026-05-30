@@ -28,8 +28,21 @@
 import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
 
-/** store 호출 타임아웃 — store 지연이 토큰/지수 응답을 늘어지게 하지 않도록 짧게(fail-soft §3.4). */
+/**
+ * store 호출 타임아웃 — store 지연이 토큰/지수 응답을 늘어지게 하지 않도록 짧게(fail-soft §3.4).
+ *
+ * ⚠️ 폴링 루프(token.ts)는 이 타임아웃을 직렬 누적하면 라우트 타임아웃을 넘길 수 있으므로,
+ * 폴링 진입 자체를 store 장애 신호(`wasLastCallDegraded`)로 막고, 폴링 중 store get 에는
+ * 더 짧은 타임아웃(`STORE_POLL_TIMEOUT_MS`)을 별도 적용한다.
+ */
 const STORE_TIMEOUT_MS = 600;
+
+/**
+ * 폴링 중 store get 전용 짧은 타임아웃 — 폴링은 store 가 살아있다고 판단됐을 때만 진입하지만,
+ * 폴링 도중 store 가 죽어도 누적 지연이 폭주하지 않도록 일반 호출보다 짧게(150ms) 둔다.
+ */
+const STORE_POLL_TIMEOUT_MS = 150;
+export { STORE_POLL_TIMEOUT_MS };
 
 /**
  * 인스턴스 간 공유 store 의 최소 인터페이스. token.ts·지수 캐시가 이 인터페이스에만 의존.
@@ -37,8 +50,11 @@ const STORE_TIMEOUT_MS = 600;
  * 모든 메서드는 **throw 하지 않고** 실패 시 폴백 신호(null/false)를 반환한다(fail-soft).
  */
 export interface KisStore {
-  /** 키 조회. 미존재·에러·타임아웃 시 null. */
-  get<T>(key: string): Promise<T | null>;
+  /**
+   * 키 조회. 미존재·에러·타임아웃 시 null.
+   * @param timeoutMs store 호출 타임아웃(ms) — 폴링 등에서 더 짧게 줄 수 있다. 기본은 store 정책값.
+   */
+  get<T>(key: string, timeoutMs?: number): Promise<T | null>;
   /** TTL(초) 설정. 에러·타임아웃은 흡수(반환값 없음). */
   set<T>(key: string, value: T, ttlSec: number): Promise<void>;
   /** 키 삭제. 에러·타임아웃은 흡수. */
@@ -51,6 +67,17 @@ export interface KisStore {
   acquireLock(key: string, ttlMs: number): Promise<string | null>;
   /** 내 락만 해제(Lua compare-and-del). 에러·타임아웃은 흡수. */
   releaseLock(key: string, lockToken: string): Promise<void>;
+  /**
+   * **직전 store 호출이 장애(타임아웃·에러)로 폴백했는지** 신호(fail-soft 분기용).
+   *
+   * `null`(또는 false 락)에는 두 가지 의미가 섞인다: ① store 정상 + 정당한 miss/락-미획득,
+   * ② store 도달 불가(타임아웃·에러)로 폴백. 호출 측(`token.ts`)이 둘을 구분해 ②면 폴링을
+   * 건너뛰고 즉시 직접발급(fail-soft)할 수 있도록 직전 호출의 degrade 여부를 알린다.
+   *
+   * 선택 메서드 — MemoryKisStore·인메모리 fake 는 항상 `false`(장애 없음)로 간주(미구현 가능).
+   * @returns 직전 get/set/del/acquireLock/releaseLock 가 타임아웃·에러로 폴백했으면 true.
+   */
+  wasLastCallDegraded?(): boolean;
 }
 
 /**
@@ -68,24 +95,35 @@ function makeLockToken(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/** `withTimeoutSoft` 결과 — 값 + 장애(타임아웃·에러) 폴백 여부. */
+type SoftResult<T> = { value: T; degraded: boolean };
+
 /**
  * store 호출에 짧은 타임아웃 + 에러 흡수를 씌운다(fail-soft). 타임아웃·에러 시 fallback 반환.
  * store 는 최적화이지 SPOF 가 아니므로 어떤 실패도 throw 로 전파하지 않는다.
+ *
+ * @returns `{ value, degraded }` — degraded 는 타임아웃·에러로 폴백했는지(정상 완료면 false).
+ *   호출 측이 "store 정상 + 정당한 miss" 와 "store 도달 불가" 를 구분하는 데 쓴다.
  */
 async function withTimeoutSoft<T>(
   op: () => Promise<T>,
   fallback: T,
   ms = STORE_TIMEOUT_MS,
-): Promise<T> {
+): Promise<SoftResult<T>> {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), ms);
+  const TIMED_OUT = Symbol("timeout");
+  const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), ms);
   });
   try {
-    return await Promise.race([op(), timeout]);
+    const result = await Promise.race([op(), timeout]);
+    if (result === TIMED_OUT) {
+      return { value: fallback, degraded: true };
+    }
+    return { value: result as T, degraded: false };
   } catch {
     // store 에러는 폴백 신호로 흡수(로그는 호출 측 정책 — 여기선 조용히 degrade).
-    return fallback;
+    return { value: fallback, degraded: true };
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -164,33 +202,55 @@ export interface RedisLike {
  * 모든 호출은 `withTimeoutSoft` 로 감싸 fail-soft(에러·타임아웃 → 폴백 신호). 값은 JSON 직렬화.
  */
 export class UpstashKisStore implements KisStore {
+  /** 직전 store 호출이 타임아웃·에러로 폴백했는지 — `wasLastCallDegraded()` 가 노출. */
+  private lastDegraded = false;
+
   constructor(private readonly redis: RedisLike) {}
 
-  async get<T>(key: string): Promise<T | null> {
-    return withTimeoutSoft<T | null>(async () => {
-      const raw = await this.redis.get<unknown>(key);
-      if (raw === null || raw === undefined) return null;
-      // @upstash/redis 는 JSON 을 자동 역직렬화하기도 하므로 문자열·객체 모두 흡수.
-      if (typeof raw === "string") {
-        try {
-          return JSON.parse(raw) as T;
-        } catch {
-          return raw as unknown as T;
+  /** `withTimeoutSoft` 를 실행하고 degrade 여부를 인스턴스에 기록한 뒤 값만 반환. */
+  private async run<T>(
+    op: () => Promise<T>,
+    fallback: T,
+    ms = STORE_TIMEOUT_MS,
+  ): Promise<T> {
+    const { value, degraded } = await withTimeoutSoft(op, fallback, ms);
+    this.lastDegraded = degraded;
+    return value;
+  }
+
+  wasLastCallDegraded(): boolean {
+    return this.lastDegraded;
+  }
+
+  async get<T>(key: string, timeoutMs = STORE_TIMEOUT_MS): Promise<T | null> {
+    return this.run<T | null>(
+      async () => {
+        const raw = await this.redis.get<unknown>(key);
+        if (raw === null || raw === undefined) return null;
+        // @upstash/redis 는 JSON 을 자동 역직렬화하기도 하므로 문자열·객체 모두 흡수.
+        if (typeof raw === "string") {
+          try {
+            return JSON.parse(raw) as T;
+          } catch {
+            return raw as unknown as T;
+          }
         }
-      }
-      return raw as T;
-    }, null);
+        return raw as T;
+      },
+      null,
+      timeoutMs,
+    );
   }
 
   async set<T>(key: string, value: T, ttlSec: number): Promise<void> {
-    await withTimeoutSoft(async () => {
+    await this.run(async () => {
       await this.redis.set(key, JSON.stringify(value), { ex: ttlSec });
       return undefined;
     }, undefined);
   }
 
   async del(key: string): Promise<void> {
-    await withTimeoutSoft(async () => {
+    await this.run(async () => {
       await this.redis.del(key);
       return undefined;
     }, undefined);
@@ -198,7 +258,7 @@ export class UpstashKisStore implements KisStore {
 
   async acquireLock(key: string, ttlMs: number): Promise<string | null> {
     const token = makeLockToken();
-    return withTimeoutSoft<string | null>(async () => {
+    return this.run<string | null>(async () => {
       const result = await this.redis.set(key, token, { nx: true, px: ttlMs });
       // SET NX 성공 → "OK"(또는 truthy). 실패(이미 잠김) → null.
       return result ? token : null;
@@ -206,7 +266,7 @@ export class UpstashKisStore implements KisStore {
   }
 
   async releaseLock(key: string, lockToken: string): Promise<void> {
-    await withTimeoutSoft(async () => {
+    await this.run(async () => {
       await this.redis.eval(RELEASE_LOCK_LUA, [key], [lockToken]);
       return undefined;
     }, undefined);

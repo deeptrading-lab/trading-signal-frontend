@@ -14,7 +14,13 @@ import {
   resetTokenCacheForTest,
   type TokenFetcher,
 } from "../token";
-import { MemoryKisStore, setKisStoreForTest, type KisStore } from "../store";
+import {
+  MemoryKisStore,
+  UpstashKisStore,
+  setKisStoreForTest,
+  type KisStore,
+  type RedisLike,
+} from "../store";
 import type { KisTokenResponse } from "../types";
 
 const APP_KEY = "test-app-key";
@@ -428,4 +434,135 @@ describe("getAccessToken — kv 모드(분산 single-flight, fake store)", () =>
     // TTL = (3600s - 60s grace) = 3540s.
     expect(store.setCalls()[0].ttlSec).toBe(3_540);
   });
+
+  /**
+   * [kv][AC-6 regression] store 도달 불가(degrade 신호 + 매 호출 지연) 시 **폴링 루프에 진입하지 않고**
+   * 즉시 직접발급해야 한다(QA blocking 수정 단언). 기존 0ms-즉시-null fake 는 폴링 40회를 돌려도
+   * 빨라서 starvation 을 못 잡았다 → degrade 신호 + per-call 지연으로 starvation 경로를 실제 재현.
+   *
+   * 핵심 단언: store get/acquireLock 호출이 **각각 1회뿐**(폴링이 추가 get 을 누적하지 않음) + 빠름.
+   */
+  it("[kv][AC-6] store 다운(degrade+지연) 시 폴링 starvation 없이 즉시 직접발급", async () => {
+    let getCalls = 0;
+    let acquireCalls = 0;
+    // 도달 불가 store: 모든 호출이 짧게 지연(15ms)된 뒤 폴백 신호(null) + degraded=true.
+    // 실 Upstash 의 600ms 타임아웃을 작은 값으로 축약(테스트가 실시간 2s+ 를 타지 않게).
+    const CALL_DELAY_MS = 15;
+    const downStore: KisStore = {
+      async get<T>(): Promise<T | null> {
+        getCalls += 1;
+        await new Promise((r) => setTimeout(r, CALL_DELAY_MS));
+        return null; // store 도달 불가 → miss 처럼 보이지만 실은 장애.
+      },
+      async set(): Promise<void> {},
+      async del(): Promise<void> {},
+      async acquireLock(): Promise<string | null> {
+        acquireCalls += 1;
+        await new Promise((r) => setTimeout(r, CALL_DELAY_MS));
+        return null; // 락도 못 잡음(타임아웃 폴백).
+      },
+      async releaseLock(): Promise<void> {},
+      // ★ 핵심: "정당한 miss/락-미획득" 이 아니라 "store 도달 불가" 임을 신호.
+      wasLastCallDegraded: () => true,
+    };
+    const { fetcher, callCount } = makeMockFetcher([
+      { access_token: "direct-issue", expires_in: 86_400 },
+    ]);
+
+    const startedAt = Date.now();
+    const token = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store: downStore,
+    });
+    const elapsed = Date.now() - startedAt;
+
+    expect(token).toBe("direct-issue");
+    expect(callCount()).toBe(1); // 직접발급 1회.
+    // 폴링이 돌았다면 store.get 이 1 + POLL_MAX_ATTEMPTS(>=8) 회로 누적됐을 것.
+    // L2 조회 get(1회)에서 이미 degrade 신호 → 락 시도조차 없이 즉시 직접발급(최단 short-circuit).
+    expect(getCalls).toBe(1);
+    expect(acquireCalls).toBe(0); // degrade 가 L2 조회 직후 감지 → acquireLock 미진입.
+    // 폴링 누적(40×600ms≈27s) 없이 store 호출 1회분(≈15ms)만 → 라우트 타임아웃(5s) 한참 아래.
+    expect(elapsed).toBeLessThan(500);
+  }, 5_000);
+
+  /**
+   * [kv][AC-6] 실제 `UpstashKisStore` + redis 가 throw → degrade 신호가 자동으로 켜지고
+   * 토큰 경로가 폴링 없이 즉시 직접발급. (token.ts↔store.ts degrade 배선 end-to-end 검증.)
+   */
+  it("[kv][AC-6] UpstashKisStore + redis throw → degrade 자동 감지 후 즉시 직접발급", async () => {
+    const boom = () => Promise.reject(new Error("upstash unreachable"));
+    const downRedis: RedisLike = {
+      get: boom,
+      set: boom,
+      del: () => boom() as Promise<number>,
+      eval: boom,
+    };
+    const store = new UpstashKisStore(downRedis);
+    const { fetcher, callCount } = makeMockFetcher([
+      { access_token: "upstash-down-direct", expires_in: 86_400 },
+    ]);
+
+    const startedAt = Date.now();
+    const token = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store,
+    });
+    const elapsed = Date.now() - startedAt;
+
+    expect(token).toBe("upstash-down-direct");
+    expect(callCount()).toBe(1);
+    // get(L2 token) + acquireLock 만 degrade 폴백 → 폴링 없이 직접발급. throw 흡수라 호출은 즉시.
+    expect(store.wasLastCallDegraded()).toBe(true);
+    expect(elapsed).toBeLessThan(500);
+  }, 5_000);
+
+  /**
+   * [kv][AC-3 보강] store 가 **정상**(degrade=false)인데 락만 미획득이면 폴링은 유지된다(무회귀).
+   * store 가 잠시 비었다가 다른 인스턴스가 SET 하면 폴링이 그 값을 받아 수렴해야 한다.
+   */
+  it("[kv][AC-3] store 정상 + 락 미획득 → 폴링 유지(2회차 store hit 수렴)", async () => {
+    let getCalls = 0;
+    const entries = new Map<string, CacheEntryLike>();
+    const liveButLocked: KisStore = {
+      async get<T>(key: string): Promise<T | null> {
+        getCalls += 1;
+        // 첫 L2 조회는 miss, 두 번째 폴링 get 부터는 hit(다른 인스턴스가 채운 셈).
+        if (getCalls >= 2) {
+          entries.set(key, { token: "polled-token", expiresAt: 86_400_000 });
+        }
+        return (entries.get(key) as T | undefined) ?? null;
+      },
+      async set(): Promise<void> {},
+      async del(): Promise<void> {},
+      async acquireLock(): Promise<string | null> {
+        return null; // 다른 인스턴스가 락 보유.
+      },
+      async releaseLock(): Promise<void> {},
+      wasLastCallDegraded: () => false, // ★ store 는 정상 → 폴링해야 함.
+    };
+    const { fetcher, callCount } = makeMockFetcher([
+      { access_token: "should-not-issue", expires_in: 86_400 },
+    ]);
+
+    const token = await getAccessToken({
+      fetcher,
+      now: () => 0,
+      appKey: APP_KEY,
+      appSecret: APP_SECRET,
+      env: "prod",
+      store: liveButLocked,
+    });
+
+    expect(token).toBe("polled-token"); // 폴링으로 store 수렴.
+    expect(callCount()).toBe(0); // 직접발급 0 — 폴링이 살아있는 store 에서 받아옴.
+  }, 5_000);
 });
