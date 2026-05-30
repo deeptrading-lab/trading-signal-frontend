@@ -2338,3 +2338,46 @@
   - **PR2 — 홈 시장종합 + nav/사이드바 재편**: 홈(`/`) 교체(지수·공포탐욕 게이지·공시·검색), `/market`→`/` 흡수+리다이렉트, AI분석 사이드바 하단 "준비 중", nav 6→4. DESIGN.md 의 `fng-*`/공시/검색/nav-준비중 토큰을 그때 주입(본 PR 은 자산 토큰만 주입). 보존해 둔 `MarketSnapshotCard`·`fearGreed`/`marketSnapshot` mock 재활용.
   - `lib/copy/dashboard/tooltips.ts` 의 계좌 툴팁(TOOLTIP_PORTFOLIO_TOTAL/PROFIT)은 PR1 이전부터 orphan — PR2 에서 시장심리 위젯 정리 시 함께 cleanup 검토(TOOLTIP_FEAR_GREED 는 PR2 게이지 재활용 가능).
   - 실계좌 연동 시 `hooks/profile/useQueryHoldings`(live multi-price 어댑터, 현재 mock 직접 주입으로 미소비)로 mock→실데이터 전환(PRD §8.4).
+
+### 2026-05-30 — perf(market): 홈 국내지수 중복 호출 제거 + indices 라우트 청크/캐시 하드닝 (#51)
+
+- **slug**: `market-indices-consolidation` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/51
+- **요약**: perf(market): 홈 국내지수 중복 호출 제거 + indices 라우트 청크/캐시 하드닝
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 문제
+  > 
+  > 시장 종합 홈(`/`) 랜딩이 국내 지수를 세 경로로 따로 호출한다. 콜드 진입 시 KIS 초당 호출 제한(EGW00201)에 근접하고, 같은 데이터(코스피)를 중복으로 긁는다.
+  > 
+  > - **클라 dedup 부재** — `IndicesCardContainer`는 `useQueryIndices(['0001','1001','2001'])`, `FearGreedContainer`는 `useQueryIndices(['0001'])`. queryKey 정규화(`sort+join`)가 달라(`"0001,1001,2001"` vs `"0001"`) React Query dedup이 안 일어나 코스피를 **카드용 1콜 + 공포탐욕용 1콜** 두 번 받았다.
+  > - **indices 라우트 무보호** — `/api/market/indices`가 `Promise.allSettled(codes.map(...))`로 동시 난사. ticker 라우트가 정착시킨 청크+서버 TTL 캐시 패턴 미적용.
+  > - 콜드 진입 시 코스피 ×3(헤더+카드+공포탐욕). prod 단일 실전계좌 토큰으로 EGW00201 1회 발생 시 홈 전체가 mock degrade로 떨어진다(콜드스타트 SPX drop 사례).
+  > 
+  > ## 해결
+  > 
+  > 1. **공포·탐욕 ↔ 지수카드 쿼리 공유** — `FearGreedContainer`가 `useQueryIndices(DEFAULT_INDEX_CODES)`(`['0001','1001','2001']`)를 구독 → 지수카드와 동일 queryKey(`["market","indices","0001,1001,2001"]`)로 수렴 → 홈 마운트 시 React Query가 단일 in-flight로 dedup. 코스피 단독 1콜 제거. KOSPI는 `data?.find(q => q.code === '0001')`로 명시 선택(공유 쿼리에서 순서 비의존). breadth 공식·label·snapshot fallback은 무회귀.
+  > 2. **indices 라우트 하드닝** (ticker 패턴 이식) — 2개씩 청크 + 청크 간 120ms 지연(EGW00201 회피), 모듈 레벨 in-memory TTL 캐시(국내 30s, `queryConfig.market.indices.staleTime`/ticker 국내분 정합) + `resetIndicesCacheForTest`, `X-Cache: hit/miss` 디버깅 헤더. 이중 게이트·부분 성공·5s 타임아웃·`X-Data-Source`/`X-KIS-Env`·502 `__ALL_FAILED__`·mock-timeout 기존 동작 보존, codes 순서 응답 보장.
+  > 
+  > ## 검증
+  > 
+  > - `typecheck` / `lint` / `build` 0에러, `test` 153 passed (26 files). indices route 테스트 8건(기존 4 + 청크·서버캐시·캐시리셋·순서보존 4 신규).
+  > - **dedup**: 두 컨테이너 queryKey 동일(`["market","indices","0001,1001,2001"]`) → 홈에서 `/api/market/indices` 1건으로 합쳐짐(코드 리뷰 + queryKey 정규화 확인). 기존 공포탐욕 단독 `["market","indices","0001"]`는 별도 키로 2콜이었음.
+  > - **라우트 캐시(live, KIS_ENV=prod)**: 1차 호출 `X-Cache: miss`(`X-Data-Source: kis`), 30s TTL 내 동일 codes 재요청 `X-Cache: hit` — KIS 재호출 0건 확인.
+  > - breadth 무회귀: KOSPI(0001) 선택 → advances/declines 동일 산출, 0001 누락 시 기본값(value=50/NEUTRAL/up·down=0) fallback.
+  > 
+  > ## 후속
+  > 
+  > - 헤더 티커(`/api/market/ticker`) ↔ indices 라우트 국내지수 통합 — B 트랙(별도 PRD). 응답 shape/용도가 달라 통합 비용 큼.
+  > - 소스 레벨 `fetchIndexPrice` 캐시(+single-flight) — KIS 토큰 store(B) 트랙과 함께. serverless 인스턴스 분산 한계가 토큰 store와 동일.
+  > 
+  > ## 다음 작업
+  > 
+  > - QA: 홈 `/` 콜드 로드 시 Network 탭에서 `/api/market/indices` 1건 확인, 지수카드 3종·공포탐욕 게이지(코스피 breadth) 정상 출력, 부분 실패/타임아웃 시 화면 무중단.
+  > - Reviewer: BFF 패턴(브라우저 직접 호출 0), 서버캐시 staleness 30s 허용 범위, queryKey 단일 위치 정합.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 헤더 티커(`/api/market/ticker`) ↔ indices 라우트 국내지수 통합 — B 트랙(별도 PRD). 응답 shape/용도가 달라 통합 비용 큼.
+  - 소스 레벨 `fetchIndexPrice` 캐시(+single-flight) — KIS 토큰 store(B) 트랙과 함께. serverless 인스턴스 분산 한계가 토큰 store와 동일.
+  - QA: 홈 `/` 콜드 로드 시 Network 탭에서 `/api/market/indices` 1건 확인, 지수카드 3종·공포탐욕 게이지(코스피 breadth) 정상 출력, 부분 실패/타임아웃 시 화면 무중단.
+  - Reviewer: BFF 패턴(브라우저 직접 호출 0), 서버캐시 staleness 30s 허용 범위, queryKey 단일 위치 정합.
