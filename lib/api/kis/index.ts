@@ -31,6 +31,7 @@
 export { fetchStockPrice, fetchStockDaily } from "./price";
 export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
+export { fetchIndexPriceShared, isSharedIndexCode } from "./index-store";
 export { fetchOverseasIndex } from "./overseas-index";
 export {
   fetchIntstockMultprice,

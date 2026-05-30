@@ -13,18 +13,23 @@
  *   - 5s 타임아웃 가드, 4xx 메시지 통과, 5xx/네트워크 한글 fallback, `Cache-Control: no-store`.
  *
  * PRD `market-indices-consolidation` §3.2 — 하드닝 (ticker 라우트 패턴 이식):
- *   - **2개씩 청크 + 청크 간 지연**으로 `fetchIndexPrice(code)` 호출(EGW00201 회피).
- *     동시 난사 제거. 청크 크기/지연은 ticker 라우트(`KIS_CHUNK_SIZE=2`/`120ms`)와 정합.
- *   - **모듈 레벨 in-memory TTL 캐시**(`Map<code, {value, expiresAt}>`). 캐시 적중 code 는
+ *   - **2개씩 청크 + 청크 간 지연**으로 지수 호출(EGW00201 회피). 동시 난사 제거.
+ *     청크 크기/지연은 ticker 라우트(`KIS_CHUNK_SIZE=2`/`120ms`)와 정합.
+ *   - **L1 모듈 레벨 in-memory TTL 캐시**(`Map<code, {value, expiresAt}>`). 캐시 적중 code 는
  *     실호출 없이 즉시 반영, 미스 code 만 청크 대상. TTL 은 국내 지수 30s — ticker 라우트
  *     국내분(30s) + `queryConfig.market.indices.staleTime`(30s) 정합(단일 진실 원천).
  *   - 테스트 전용 캐시 리셋(`resetIndicesCacheForTest`) 노출 — ticker `resetTickerCacheForTest` 선례.
  *   - `X-Cache: hit/miss`(부분 적중 시 hit) 디버깅 헤더 — `X-Data-Source` 의미는 불변.
+ *
+ * PRD `kis-token-store` §3.3 — L2 공유 store(부수):
+ *   - L1(라우트 인메모리) miss 시 `fetchIndexPriceShared` 경유 → 국내(0001/1001) 는 공유 store
+ *     (TTL 30s)로 헤더 티커 라우트와 크로스-라우트/크로스-인스턴스 dedup. L1+L2 병행(라우트 캐시 유지).
+ *     store 장애 시 fail-soft(인메모리 + KIS 직접 호출로 degrade).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  fetchIndexPrice,
+  fetchIndexPriceShared,
   isKisConfigured,
   resolveKisEnv,
   type MarketIndexQuote,
@@ -113,8 +118,9 @@ async function fetchIndices(
   // 2개씩 청크 + 청크 간 짧은 지연.
   for (let i = 0; i < misses.length; i += KIS_CHUNK_SIZE) {
     const chunk = misses.slice(i, i + KIS_CHUNK_SIZE);
+    // L1(라우트 인메모리) miss → L2 공유 store 경유(국내 0001/1001 크로스-라우트 dedup, §3.3).
     const settled = await Promise.allSettled(
-      chunk.map((code) => fetchIndexPrice(code)),
+      chunk.map((code) => fetchIndexPriceShared(code)),
     );
     settled.forEach((r, idx) => {
       if (r.status === "fulfilled") {

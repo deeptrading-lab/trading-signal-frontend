@@ -11,8 +11,11 @@
  *   - **동시성 제어(EGW00201 회피)**: KIS 4콜을 **2개씩 청크 + 청크 간 짧은 지연**. 동시 난사 금지.
  *   - **부분 성공**: `Promise.allSettled` 로 묶어 성공분만 반영. BTC 실패해도 지수 표시, 일부 지수
  *     실패해도 나머지. **5건 모두 실패 시에만 전체 mock degrade**(`X-Data-Source: mock`/`mock-timeout`).
- *   - **소스별 in-memory TTL 캐싱**: 국내 30s / 해외 10분 / BTC 3분 (EGW00201·CoinGecko 한도 보호).
+ *   - **소스별 L1 in-memory TTL 캐싱**: 국내 30s / 해외 10분 / BTC 3분 (EGW00201·CoinGecko 한도 보호).
  *   - `X-Data-Source`(kis/mixed/mock/mock-timeout) + `X-KIS-Env` 헤더. 5s 타임아웃, `Cache-Control: no-store`.
+ *
+ * PRD `kis-token-store` §3.3 — L2 공유 store(부수): 국내(0001/1001)는 L1 miss 시 `fetchIndexPriceShared`
+ *   경유 → 공유 store(TTL 30s)로 indices 라우트와 크로스-라우트/크로스-인스턴스 dedup. 해외는 현행 직접.
  *
  * `MarketTicker.value` 는 사전 포매팅된 표시 문자열(타입 정의) — BFF 가 `formatNumber` 로 천단위
  * 콤마 포함 문자열로 변환해 응답한다(지수 소수 2자리, BTC 정수).
@@ -20,7 +23,7 @@
 
 import { NextResponse } from "next/server";
 import {
-  fetchIndexPrice,
+  fetchIndexPriceShared,
   fetchOverseasIndex,
   isKisConfigured,
   resolveKisEnv,
@@ -145,7 +148,10 @@ async function loadKisIndices(): Promise<Map<string, MarketIndexQuote>> {
     const chunk = misses.slice(i, i + KIS_CHUNK_SIZE);
     const settled = await Promise.allSettled(
       chunk.map(({ code, kind }) =>
-        kind === "domestic" ? fetchIndexPrice(code) : fetchOverseasIndex(code),
+        // 국내(0001/1001)는 L2 공유 store 경유로 indices 라우트와 dedup(§3.3). 해외는 현행 직접.
+        kind === "domestic"
+          ? fetchIndexPriceShared(code)
+          : fetchOverseasIndex(code),
       ),
     );
     settled.forEach((r, idx) => {

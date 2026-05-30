@@ -2381,3 +2381,46 @@
   - 소스 레벨 `fetchIndexPrice` 캐시(+single-flight) — KIS 토큰 store(B) 트랙과 함께. serverless 인스턴스 분산 한계가 토큰 store와 동일.
   - QA: 홈 `/` 콜드 로드 시 Network 탭에서 `/api/market/indices` 1건 확인, 지수카드 3종·공포탐욕 게이지(코스피 breadth) 정상 출력, 부분 실패/타임아웃 시 화면 무중단.
   - Reviewer: BFF 패턴(브라우저 직접 호출 0), 서버캐시 staleness 30s 허용 범위, queryKey 단일 위치 정합.
+
+### 2026-05-30 — feat(kis): 토큰 인스턴스 간 공유 store(Upstash) + 분산 single-flight (#52)
+
+- **slug**: `kis-token-store` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/52
+- **요약**: feat(kis): 토큰 인스턴스 간 공유 store(Upstash) + 분산 single-flight
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 문제
+  > 
+  > `lib/api/kis/token.ts` 의 access token 캐시는 **인스턴스 메모리 only** 다. Vercel serverless 는 트래픽에 따라 인스턴스가 여러 개 뜨고(콜드 스타트마다 새 메모리), 인스턴스 A·B·C 가 동시에 cache miss 면 각자 `/oauth2/tokenP` 를 호출 → 합산 발급 횟수가 인스턴스 수만큼 늘어난다. KIS 는 동일 appkey 에 토큰 발급 분당 제한(EGW00133 류)이 있어, 다중 사용자/콜드 스타트 다발 시 발급이 막히면 KIS 호출 전체가 mock 으로 떨어진다(콜드스타트 SPX drop 사례). 부수로, 헤더 티커와 indices 라우트가 같은 코스피/코스닥을 라우트별·인스턴스별로 중복 조회한다.
+  > 
+  > ## 해결
+  > 
+  > PRD `docs/prd/kis-token-store.md` 그대로.
+  > 
+  > - **토큰 2단 캐시 + 분산 single-flight (핵심)**
+  >   - L1 = 현행 인스턴스 메모리(cache + inflight Promise dedupe) **유지** → memory 모드 무회귀.
+  >   - L2 = 공유 store(`getKisStore()`). 키 `kis:token:{env}:{appkeyhash}`(SHA-256 hex 앞 16자, 평문 금지). TTL = 만료 − grace(60s).
+  >   - 분산 락 `SET NX PX 10s`(키 `kis:lock:token:{env}:{hash}`) → 잡은 1인스턴스만 발급, 나머지는 50ms 간격 × 최대 ~2s 폴링으로 store 수렴. 락 미획득 + 폴링 만료 시 **직접 발급 fallback**(가용성 우선).
+  > - **store 추상화** `lib/api/kis/store.ts` — `KisStore`(get/set/del/acquireLock/releaseLock). `KIS_TOKEN_STORE` 토글: `memory`(기본/로컬/미설정/store에러) | `kv`(Upstash, `SET NX PX` + Lua compare-and-del). `@upstash/redis` 직접 import 는 본 모듈에만(서버 전용 경계). 클라이언트/store 주입 가능(테스트).
+  > - **fail-soft (최상위)** — store 미설정/타임아웃(600ms)/에러는 throw 가 아니라 null/false 폴백 신호로 흡수 → 현행 인메모리 경로로 graceful degrade. store 는 최적화이지 SPOF 아님.
+  > - **지수 store(부수, 포함)** — `fetchIndexPriceShared`: 국내(`0001`/`1001`)만 L2 공유 store(TTL 30s, 락 없음) 경유 → 헤더 티커·indices 라우트 크로스-라우트/크로스-인스턴스 dedup. L1 라우트 인메모리 + L2 store **병행**(라우트 캐시 제거 0). 해외/BTC 는 현행 라우트 TTL 유지.
+  > 
+  > ## 지수 store 포함 여부
+  > 
+  > **본 PR 에 포함**(§3.6 — 같은 store 인프라 위, PR 라인 과대 아님). 국내 0001/1001 우선, L1+L2 병행(q7 ①②③).
+  > 
+  > ## ⚠️ 프로비저닝 필요 (사용자 작업)
+  > 
+  > 머지 후 **Vercel Marketplace 에서 Upstash for Redis(무료 티어·Regional Tokyo) 연결 + env 주입**(`KV_REST_API_*` 또는 `UPSTASH_REDIS_REST_*`, 코드가 둘 다 흡수) + Production env 에 `KIS_TOKEN_STORE=kv`. **미설정 상태로 머지돼도 `memory` 폴백으로 정상**(무해). 실제 Upstash 라이브 검증은 프로비저닝 후라 불가 → **fake redis 주입 단위테스트로 커버**(아래).
+  > 
+  > ## 검증
+  > 
+  > - `typecheck` / `lint` / `build` / `test`(178 통과, 28 파일) 0에러.
+  > - **memory 무회귀**: 기존 `token.test.ts` 7 케이스 green 유지(store 미설정 시 현행과 동일 — beforeEach 에서 fresh MemoryKisStore 주입으로 격리).
+  > - **kv 모드 단위테스트(fake 주입)**: store hit, 락 single-flight(발급 1회), 폴링 수렴, 직접발급 fallback, store 에러 fail-soft, TTL(만료−grace) — `token.test.ts` 5건 + `store.test.ts` 14건.
+  > - **지수 store**: `index-store.test.ts` 6건(store hit/miss dedup, 비국내 미경유, fail-soft) + 라우트 테스트 mock 정합.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **프로비저닝(사용자)**: Vercel Marketplace Upstash for Redis(무료·Regional Tokyo) 연결 + env 주입(`KV_REST_API_*` 또는 `UPSTASH_REDIS_REST_*`) + Production `KIS_TOKEN_STORE=kv` 설정. 연결 후 실제 주입 변수명 확인.
+  - **운영 관찰 후 튜닝**: 락 TTL 10s / 폴링 50ms×~2s 는 KIS 발급 제한 수치 확인 전 보수값. EGW00133/EGW00201 관찰 시 조정.
+  - **지수 store 확대(후속)**: 현재 국내 0001/1001 한정. 해외/BTC 확대 + EGW00201 관찰 시 지수 캐시에도 락 추가(q6).
+  - **무료 티어 초과 관찰(후속)**: 429/한도 경고 시 유료 검토.
