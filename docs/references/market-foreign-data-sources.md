@@ -145,7 +145,7 @@ BTC Dominance는 **글로벌 지표**(전체 암호화폐 시총 대비 비트�
 
 ### "(확인 필요)" 모음
 
-- KIS 해외지수 정확 종목코드: S&P500(`SPX`/`US500`?), NASDAQ(`COMP`/`IXIC`/`NDX`?), USD/KRW 환율 코드 — **KIS 해외지수 마스터 파일로 픽스**.
+- ✅ **확정(2026-05-30 prod 라이브)**: 시장코드 `N` + **S&P500=`SPX`**(7580.06), **NASDAQ 종합=`COMP`**(26972.62), NASDAQ-100=`NDX`(30333.18). `US500`/`.INX`/`IXIC`/`.IXIC` 는 0/무효. 응답 `ovrs_nmix_prpr`(현재값)·`prdy_ctrt`(등락률)·`prdy_vrss_sign`·`hts_kor_isnm`. (일봉 종가 기준) / **BTC 원화가격**: CoinGecko `/simple/price?ids=bitcoin&vs_currencies=krw&include_24hr_change=true` — 키 없이 동작 확인(`krw`+`krw_24h_change`). USD/KRW 환율 코드는 미확정(본 헤더 트랙 비범위).
 - KIS REST 초당 유량 정확 수치(계정 등급별) — 포털/계약 기준 확인.
 - CoinGecko Demo 플랜 정확 월 쿼터(공식 수치) — pricing 페이지 재확인.
 - exchangerate.host 무료 정책(키 요구로 변경됨) 최신 상태 확인.

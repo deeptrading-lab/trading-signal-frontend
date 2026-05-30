@@ -41,6 +41,8 @@ export const queryKeys = {
   market: {
     indices: (codes: readonly string[]) =>
       ["market", "indices", normalizeTickers(codes)] as const,
+    /** 헤더 글로벌 마켓 티커 5종 — 합성 BFF, 인자 없음. */
+    ticker: ["market", "ticker"] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>
