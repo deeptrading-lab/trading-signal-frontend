@@ -6,6 +6,11 @@
  *   2. 키 설정 + env != prod → 무조건 mock (KIS 실호출 안 함).
  *   3. 두 게이트 통과 + 부분 실패 → 성공분만 반환, X-Data-Source: kis, 200 유지.
  *   4. 두 게이트 통과 + 전부 실패 → 502 + 한글 fallback.
+ *
+ * PRD `market-indices-consolidation` AC-3 / AC-4 / AC-7 — 라우트 하드닝:
+ *   - 청크(2개씩) — codes 다수 시 동시 in-flight <= 2.
+ *   - 서버 TTL 캐시 — 동일 codes 재요청 시 TTL 내 fetchIndexPrice 추가 호출 0.
+ *   - resetIndicesCacheForTest 로 테스트 간 캐시 격리.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -29,16 +34,30 @@ vi.mock("@/lib/api/kis", async () => {
   };
 });
 
-import { GET } from "../route";
+import { GET, resetIndicesCacheForTest } from "../route";
 import { makeApiError } from "@/lib/api/errors";
+import type { MarketIndexQuote } from "@/lib/api/kis";
 
 function makeRequest(query = ""): NextRequest {
   return new NextRequest(`http://localhost/api/market/indices${query}`);
 }
 
+function makeQuote(code: string): MarketIndexQuote {
+  return {
+    code,
+    name: code,
+    value: 1,
+    change: 0,
+    changePercent: 0,
+    direction: "flat",
+    volume: 0,
+  };
+}
+
 describe("GET /api/market/indices", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetIndicesCacheForTest();
     mocks.resolveKisEnv.mockReturnValue("prod");
   });
 
@@ -72,15 +91,7 @@ describe("GET /api/market/indices", () => {
     mocks.resolveKisEnv.mockReturnValue("prod");
     mocks.fetchIndexPrice.mockImplementation((code: string) => {
       if (code === "1001") return Promise.reject(new Error("일시 오류"));
-      return Promise.resolve({
-        code,
-        name: code,
-        value: 1,
-        change: 0,
-        changePercent: 0,
-        direction: "flat",
-        volume: 0,
-      });
+      return Promise.resolve(makeQuote(code));
     });
     const res = await GET(makeRequest("?codes=0001,1001,2001"));
     expect(res.status).toBe(200);
@@ -101,5 +112,87 @@ describe("GET /api/market/indices", () => {
     const body = await res.json();
     expect(typeof body.error).toBe("string");
     expect(body.error).toMatch(/불러오지 못했어요/);
+  });
+
+  it("[indices-consolidation AC-5] codes 순서를 응답에 보존(부분 성공)", async () => {
+    mocks.isKisConfigured.mockReturnValue(true);
+    mocks.resolveKisEnv.mockReturnValue("prod");
+    // 호출 완료 순서를 codes 와 어긋나게(2001 먼저 resolve) 해도 응답 순서는 codes 기준.
+    mocks.fetchIndexPrice.mockImplementation((code: string) => {
+      const delayMs = code === "2001" ? 1 : 10;
+      return new Promise<MarketIndexQuote>((resolve) =>
+        setTimeout(() => resolve(makeQuote(code)), delayMs),
+      );
+    });
+    const res = await GET(makeRequest("?codes=0001,1001,2001"));
+    const body = await res.json();
+    expect(body.map((q: { code: string }) => q.code)).toEqual([
+      "0001",
+      "1001",
+      "2001",
+    ]);
+  });
+
+  it("[indices-consolidation AC-3] 동시 in-flight 가 청크 크기(2)를 넘지 않는다", async () => {
+    mocks.isKisConfigured.mockReturnValue(true);
+    mocks.resolveKisEnv.mockReturnValue("prod");
+    let inFlight = 0;
+    let maxInFlight = 0;
+    mocks.fetchIndexPrice.mockImplementation(
+      (code: string) =>
+        new Promise<MarketIndexQuote>((resolve) => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          setTimeout(() => {
+            inFlight -= 1;
+            resolve(makeQuote(code));
+          }, 5);
+        }),
+    );
+    // codes 4개 → 2개씩 청크 → 동시 in-flight 최대 2.
+    await GET(makeRequest("?codes=0001,1001,2001,2002"));
+    expect(maxInFlight).toBeLessThanOrEqual(2);
+    expect(mocks.fetchIndexPrice).toHaveBeenCalledTimes(4);
+  });
+
+  it("[indices-consolidation AC-4] 동일 codes 재요청 시 TTL 내 추가 KIS 호출 0(서버캐시)", async () => {
+    mocks.isKisConfigured.mockReturnValue(true);
+    mocks.resolveKisEnv.mockReturnValue("prod");
+    mocks.fetchIndexPrice.mockImplementation((code: string) =>
+      Promise.resolve(makeQuote(code)),
+    );
+
+    const first = await GET(makeRequest("?codes=0001,1001,2001"));
+    expect(first.headers.get("X-Cache")).toBe("miss");
+    const firstCalls = mocks.fetchIndexPrice.mock.calls.length;
+    expect(firstCalls).toBe(3);
+
+    const second = await GET(makeRequest("?codes=0001,1001,2001"));
+    expect(second.status).toBe(200);
+    expect(second.headers.get("X-Data-Source")).toBe("kis");
+    expect(second.headers.get("X-Cache")).toBe("hit");
+    // 두 번째 호출은 캐시 적중 → 추가 KIS 실호출 0.
+    expect(mocks.fetchIndexPrice.mock.calls.length).toBe(firstCalls);
+    const body = await second.json();
+    expect(body.map((q: { code: string }) => q.code)).toEqual([
+      "0001",
+      "1001",
+      "2001",
+    ]);
+  });
+
+  it("[indices-consolidation AC-4] resetIndicesCacheForTest 후 다시 실호출(캐시 격리)", async () => {
+    mocks.isKisConfigured.mockReturnValue(true);
+    mocks.resolveKisEnv.mockReturnValue("prod");
+    mocks.fetchIndexPrice.mockImplementation((code: string) =>
+      Promise.resolve(makeQuote(code)),
+    );
+
+    await GET(makeRequest("?codes=0001"));
+    expect(mocks.fetchIndexPrice.mock.calls.length).toBe(1);
+    resetIndicesCacheForTest();
+    await GET(makeRequest("?codes=0001"));
+    // 캐시 비운 뒤라 다시 실호출.
+    expect(mocks.fetchIndexPrice.mock.calls.length).toBe(2);
   });
 });
