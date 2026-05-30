@@ -2254,3 +2254,45 @@
   - `market-foreign-data` 트랙 — 환율 USD/KRW(KIS 시장코드 X) + BTC Dominance(`/global`) 추가, `/market` 화면 확장.
   - CoinGecko Demo 키(`COINGECKO_API_KEY`) env 추가 여부 — 429 빈도 운영 관찰 후 판단(현재 무키 + 3분 TTL 로 한도 내).
   - `X-Data-Source` 분포 운영 데이터 기반 staleTime/소스별 TTL 재조정.
+
+### 2026-05-30 — feat(auth): 앱 비밀번호 게이트 (app-password-gate) (#48)
+
+- **slug**: `app-password-gate` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/48
+- **요약**: feat(auth): 앱 비밀번호 게이트 (app-password-gate)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 목적
+  > 
+  > 배포된 앱(Vercel 프로덕션 도메인 포함)을 **단일 공유 비밀번호**로 보호한다. Vercel "All Deployments" 보호는 Pro($150/월) 필요 + Standard Protection 은 프로덕션 도메인을 공개 그대로 둔다 → **앱 자체 게이트로 Hobby(무료) 도메인을 보호**. 접근 제어 전용(매매/주문 무관).
+  > 
+  > PRD: `docs/prd/app-password-gate.md` (§9 OPEN QUESTION 5건 전부 RESOLVED).
+  > 
+  > ## 동작
+  > 
+  > - **루트 `middleware.ts`(Edge)** — 모든 요청 가로채기. 유효 세션 쿠키(`app_auth`, HMAC 서명) 없으면:
+  >   - 페이지 → `/login?next=<원경로>` **307 리다이렉트**(open-redirect 차단 — same-origin 절대경로만).
+  >   - `/api/*`(인증 API 제외) → **401 JSON** `{ "error": "unauthorized" }`(리다이렉트 X, axios 친화).
+  >   - 예외(항상 통과): `/login`·`/api/auth/*`·`/_next/static`·`/_next/image`·`/icon`·`/favicon`·`/fonts/*`. **matcher + 코드 가드 이중**.
+  >   - **무한 루프 가드**: 이미 `/login` 이거나 예외 경로면 절대 다시 리다이렉트 안 함.
+  > - **세션 crypto(`lib/auth/session.ts`)** — Edge 호환 **Web Crypto `crypto.subtle` HMAC-SHA256만**(Node `crypto`/`Buffer` 0). base64url 직접 구현. payload `{v, iat, exp=iat+30일}`. 검증 = 서명 재계산 constant-time 비교 + `exp > now`(만료의 단일 진실은 서명된 `exp`, 쿠키 maxAge 만 신뢰 X).
+  > - **로그인 route(`/api/auth/login`)** — body `{password}` constant-time 비교(타이밍 공격 방지). 일치 → `app_auth` 쿠키(`httpOnly`·`secure`(prod)·`sameSite=lax`·`Max-Age=2592000`(30일)·`path=/`). 불일치 → **~500ms 고정 지연** 후 401(비밀번호 값/힌트 노출 0). 카운터/잠금 없음(서버리스 분산 신뢰 불가 + 자기 잠금 회귀 회피).
+  > - **로그아웃 route(`/api/auth/logout`)** — 쿠키 `Max-Age=0` 삭제.
+  > - **`/login` 화면** — `(main)` 그룹 밖 풀스크린 미니멀 폼. 기존 v8 합성 클래스(`card`/`input`/`button-primary` 등)만, 신규 디자인 토큰 0. 제출은 도메인 훅(`hooks/auth/useLogin`) 경유(컴포넌트는 `useMutation` 직접 import 0). 카피는 `lib/copy/auth/`.
+  > - **axios 401 매핑(`lib/api/client.ts`)** — `/api/*` 401 수신 시 `/login?next=<현재경로>` 유도(세션 만료 graceful). 브라우저 가드(`typeof window`)·`/api/auth/*` 제외·이미 `/login` 이면 제외(루프 가드).
+  > 
+  > ## 자기 잠금(lockout) 방지
+  > 
+  > - 로컬 `APP_PASSWORD` 미설정 → 게이트 비활성(앱 공개)이라 개발 막힘 0(아래 검증 (b)).
+  > - 예외 화이트리스트(`/login`·정적·`/api/auth`)를 matcher + 코드 가드 이중 보장 + 무한 루프 가드 + axios 매핑의 `/api/auth`·`/login` 제외로 다중 방어. 카운터/잠금 코드 자체를 두지 않음(AC-19 grep 0).
+  > 
+  > ## 검증 (자가 QA)
+  > 
+  > `typecheck` / `lint` / `build` / `test` **전부 0 에러** (test: 26 파일 149개 통과, 신규 auth 테스트 33개 — session 8 / password 6 / login route 6 / middleware 16 / client 401 매핑 3 + 회귀).
+  > 
+  > dev 서버 라운드트립 (로컬 http, `APP_PASSWORD`+`APP_AUTH_SECRET` 임시 설정):
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Vercel 환경변수 등록** — `APP_PASSWORD`/`APP_AUTH_SECRET` 를 Vercel Project Settings 에 등록해야 프로덕션 게이트가 실제 활성. 등록 전까지 프로덕션 도메인은 공개 상태(경고 로그로 인지). MEMORY `project_vercel-deferred` 연동 후 적용.
+  - **(선택) `middleware.ts` → `proxy.ts` 마이그레이션** — Next.js 16 이 `middleware` 파일 컨벤션 deprecation 경고(빌드는 통과). 본 PRD/AC 는 `middleware.ts` 를 명시(AC-1)하므로 현 PR 은 유지. 별도 chore 후속에서 `proxy` 리네임 검토.
+  - **(후속 PRD) 강한 브루트포스 방어** — 외부 저장소(Upstash 등) 기반 분산 rate-limit·CAPTCHA(본 PR 은 ~500ms 고정 지연만, §4 비범위). 다중 사용자/계정은 Supabase 인증 트랙.
