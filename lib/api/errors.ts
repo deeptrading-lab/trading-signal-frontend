@@ -6,6 +6,7 @@
  *
  * - validation       : BE 422 (Pydantic 검증 실패) 또는 FE 사전 검증 실패
  * - whitelist_miss   : BE 400 "화이트리스트에 없습니다"
+ * - unauthorized     : 게이트 401 (세션 만료·미인증 — middleware 가 `/api/*` 에 반환, PRD app-password-gate §3.6)
  * - network          : 네트워크 단절·타임아웃 (axios `ECONNABORTED`, no-response)
  * - server           : 그 외 5xx, 또는 알 수 없는 4xx
  */
@@ -13,6 +14,7 @@
 export type ApiErrorKind =
   | "validation"
   | "whitelist_miss"
+  | "unauthorized"
   | "network"
   | "server";
 
@@ -38,6 +40,7 @@ export function isApiError(value: unknown): value is ApiError {
 const FALLBACK_MESSAGES: Record<ApiErrorKind, string> = {
   validation: "입력 값이 올바르지 않아요. 다시 확인해 주세요.",
   whitelist_miss: "지원 종목이 아니에요. AAPL 또는 BTC-USD 중 선택해 주세요.",
+  unauthorized: "로그인이 필요해요. 로그인 화면으로 이동할게요.",
   network: "엔진 통신에 실패했어요. 잠시 후 다시 시도해 주세요.",
   server: "엔진 응답 처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
 };
