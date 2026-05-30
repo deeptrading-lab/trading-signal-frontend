@@ -11,6 +11,15 @@
  *     전부 실패 시에만 에러/mock 처리.
  *   - `X-Data-Source` (kis/mock/mock-timeout) + `X-KIS-Env` 헤더 (stock/price route 정합).
  *   - 5s 타임아웃 가드, 4xx 메시지 통과, 5xx/네트워크 한글 fallback, `Cache-Control: no-store`.
+ *
+ * PRD `market-indices-consolidation` §3.2 — 하드닝 (ticker 라우트 패턴 이식):
+ *   - **2개씩 청크 + 청크 간 지연**으로 `fetchIndexPrice(code)` 호출(EGW00201 회피).
+ *     동시 난사 제거. 청크 크기/지연은 ticker 라우트(`KIS_CHUNK_SIZE=2`/`120ms`)와 정합.
+ *   - **모듈 레벨 in-memory TTL 캐시**(`Map<code, {value, expiresAt}>`). 캐시 적중 code 는
+ *     실호출 없이 즉시 반영, 미스 code 만 청크 대상. TTL 은 국내 지수 30s — ticker 라우트
+ *     국내분(30s) + `queryConfig.market.indices.staleTime`(30s) 정합(단일 진실 원천).
+ *   - 테스트 전용 캐시 리셋(`resetIndicesCacheForTest`) 노출 — ticker `resetTickerCacheForTest` 선례.
+ *   - `X-Cache: hit/miss`(부분 적중 시 hit) 디버깅 헤더 — `X-Data-Source` 의미는 불변.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -26,10 +35,21 @@ import { getMockMarketIndices } from "@/lib/mock/market/indices";
 /** 국내 지수 기본 3종 — KOSPI / KOSDAQ / KOSPI200. */
 const DEFAULT_INDEX_CODES = ["0001", "1001", "2001"] as const;
 
+const BFF_TIMEOUT_MS = 5_000;
+const KIS_CHUNK_SIZE = 2; // EGW00201 회피 — 2개씩 청크 (ticker 라우트 정합).
+const KIS_CHUNK_DELAY_MS = 120; // 청크 간 짧은 지연 (ticker 라우트 정합).
+
+/** 국내 지수 서버 TTL 30s — queryConfig.market.indices.staleTime / ticker 국내분과 정합. */
+const CACHE_TTL_MS = 30_000;
+
 const FALLBACK_TIMEOUT_MESSAGE =
   "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 const FALLBACK_SERVER_MESSAGE =
   "지수 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
+
+/** 모듈 레벨 in-memory TTL 캐시 — code 단위. 같은 인스턴스 warm 상태에서 KIS 실호출 보호. */
+type CacheEntry = { value: MarketIndexQuote; expiresAt: number };
+const indexCache = new Map<string, CacheEntry>();
 
 export async function GET(request: NextRequest) {
   const codes = parseCodes(request.nextUrl.searchParams.getAll("codes"));
@@ -42,13 +62,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await withTimeout(fetchIndicesSettled(codes), 5_000);
+    const { quotes, cacheHit } = await withTimeout(
+      fetchIndices(codes),
+      BFF_TIMEOUT_MS,
+    );
     // 전부 실패 → 비즈니스/네트워크 에러로 fallback 처리.
-    if (data.length === 0) {
+    if (quotes.length === 0) {
       return mapErrorToResponse(new Error("__ALL_FAILED__"), codes);
     }
-    return jsonWithDataSource(data, "kis", {
+    return jsonWithDataSource(quotes, "kis", {
       "X-KIS-Env": resolveKisEnv(),
+      "X-Cache": cacheHit ? "hit" : "miss",
     });
   } catch (error) {
     return mapErrorToResponse(error, codes);
@@ -64,19 +88,65 @@ function parseCodes(raw: string[]): string[] {
   return flattened.length > 0 ? flattened : [...DEFAULT_INDEX_CODES];
 }
 
-/** 병렬 호출 후 성공분(fulfilled)만 반환 — 부분 성공 (PRD §3.3 q4). */
-async function fetchIndicesSettled(
+/**
+ * codes 를 2개씩 청크 + 청크 간 지연으로 호출(EGW00201 회피). 캐시 적중 code 는 실호출 없이
+ * 즉시 반영, 미스 code 만 청크 대상. 부분 성공(성공분만 누적). 응답은 codes 순서를 보존한다.
+ */
+async function fetchIndices(
   codes: string[],
-): Promise<MarketIndexQuote[]> {
-  const results = await Promise.allSettled(
-    codes.map((code) => fetchIndexPrice(code)),
-  );
-  return results
-    .filter(
-      (r): r is PromiseFulfilledResult<MarketIndexQuote> =>
-        r.status === "fulfilled",
-    )
-    .map((r) => r.value);
+): Promise<{ quotes: MarketIndexQuote[]; cacheHit: boolean }> {
+  const resolved = new Map<string, MarketIndexQuote>();
+  let cacheHit = false;
+
+  // 캐시 적중분 먼저 반영 + 미스 code 만 청크 호출 대상으로 수집.
+  const misses: string[] = [];
+  for (const code of codes) {
+    const cached = readIndexCache(code);
+    if (cached) {
+      resolved.set(code, cached);
+      cacheHit = true;
+    } else {
+      misses.push(code);
+    }
+  }
+
+  // 2개씩 청크 + 청크 간 짧은 지연.
+  for (let i = 0; i < misses.length; i += KIS_CHUNK_SIZE) {
+    const chunk = misses.slice(i, i + KIS_CHUNK_SIZE);
+    const settled = await Promise.allSettled(
+      chunk.map((code) => fetchIndexPrice(code)),
+    );
+    settled.forEach((r, idx) => {
+      if (r.status === "fulfilled") {
+        const code = chunk[idx];
+        resolved.set(code, r.value);
+        writeIndexCache(code, r.value);
+      }
+    });
+    if (i + KIS_CHUNK_SIZE < misses.length) {
+      await delay(KIS_CHUNK_DELAY_MS);
+    }
+  }
+
+  // codes 순서를 보존해 성공분만 반환(부분 성공).
+  const quotes = codes
+    .map((code) => resolved.get(code))
+    .filter((quote): quote is MarketIndexQuote => quote !== undefined);
+
+  // 전부 실패 시 (실호출은 했지만 모두 reject) cacheHit 은 거짓.
+  if (quotes.length === 0) cacheHit = false;
+
+  return { quotes, cacheHit };
+}
+
+function readIndexCache(code: string): MarketIndexQuote | null {
+  const entry = indexCache.get(code);
+  if (entry && entry.expiresAt > Date.now()) return entry.value;
+  return null;
+}
+
+function writeIndexCache(code: string, value: MarketIndexQuote): void {
+  indexCache.set(code, { value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
 function jsonWithDataSource(
@@ -104,6 +174,10 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function mapErrorToResponse(error: unknown, codes: string[]): NextResponse {
@@ -137,4 +211,9 @@ function mapErrorToResponse(error: unknown, codes: string[]): NextResponse {
     { error: FALLBACK_SERVER_MESSAGE },
     { status: 502, headers: { "Cache-Control": "no-store" } },
   );
+}
+
+/** 테스트 전용 — 모듈 레벨 캐시 초기화. */
+export function resetIndicesCacheForTest(): void {
+  indexCache.clear();
 }
