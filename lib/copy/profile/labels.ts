@@ -6,6 +6,29 @@
 
 export const PROFILE_PAGE_TITLE = "마이페이지";
 
+/* "내 자산" 섹션 (home-market-redesign PR1 — 계좌 위젯 `/dashboard` → `/profile` 이전). */
+export const ASSET_SECTION_TITLE = "내 자산";
+
+/* 총자산 히어로 라벨 (`/dashboard` PortfolioHero 카피 이전). */
+export const ASSET_TOTAL_VALUE = "총 자산 평가 금액";
+export const ASSET_PRINCIPAL = "총 투자원금";
+export const ASSET_PROFIT = "총 평가손익";
+
+/* 자산비중 도넛 라벨. */
+export const ASSET_DONUT_CENTER = "자산";
+export const ASSET_RATIO_STOCK = "주식";
+export const ASSET_RATIO_CRYPTO = "코인";
+
+/* 보유종목 전체 테이블 (Top3 요약 아님 — PRD AC-2). */
+export const HOLDINGS_TABLE_TITLE = "보유종목";
+export const HOLDINGS_COL_NAME = "종목명";
+export const HOLDINGS_COL_AMOUNT = "평가액";
+export const HOLDINGS_COL_CHANGE = "수익률";
+export const HOLDINGS_COL_WEIGHT = "비중";
+export const HOLDINGS_SORT_HINT = "정렬";
+export const HOLDINGS_EMPTY = "보유 종목이 없어요.";
+export const ASSET_EMPTY = "보유 자산이 없어요.";
+
 /* 멤버십 enum 한글 매핑 (`lib/types/profile/user.ts` 의 `MembershipTier` 정합). */
 export const MEMBERSHIP_FREE = "FREE 멤버십";
 export const MEMBERSHIP_PRO = "PRO 멤버십";
