@@ -1,7 +1,8 @@
 /**
- * `lib/api/dashboard/holdings.ts` 단위 테스트.
+ * `lib/api/profile/holdings.ts` 단위 테스트.
  *
- * PRD `stock-api-integration` (PR-C) §3.5 — Dashboard 어댑터 회귀 차단.
+ * home-market-redesign PR1 — `lib/api/dashboard/__tests__/holdings.test.ts` 를 profile 도메인으로
+ * 이전(계좌 위젯 이전). 검증 내용 무변경.
  *
  * 검증:
  *   1. 빈 배열 입력 → 빈 배열 즉시 반환 (네트워크 호출 0).

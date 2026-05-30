@@ -2296,3 +2296,45 @@
   - **Vercel 환경변수 등록** — `APP_PASSWORD`/`APP_AUTH_SECRET` 를 Vercel Project Settings 에 등록해야 프로덕션 게이트가 실제 활성. 등록 전까지 프로덕션 도메인은 공개 상태(경고 로그로 인지). MEMORY `project_vercel-deferred` 연동 후 적용.
   - **(선택) `middleware.ts` → `proxy.ts` 마이그레이션** — Next.js 16 이 `middleware` 파일 컨벤션 deprecation 경고(빌드는 통과). 본 PRD/AC 는 `middleware.ts` 를 명시(AC-1)하므로 현 PR 은 유지. 별도 chore 후속에서 `proxy` 리네임 검토.
   - **(후속 PRD) 강한 브루트포스 방어** — 외부 저장소(Upstash 등) 기반 분산 rate-limit·CAPTCHA(본 PR 은 ~500ms 고정 지연만, §4 비범위). 다중 사용자/계정은 Supabase 인증 트랙.
+
+### 2026-05-30 — feat(profile): 계좌 위젯 마이페이지 '내 자산' 이전 + /dashboard 리다이렉트 (home-market-redesign PR1) (#49)
+
+- **slug**: `home-market-redesign` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/49
+- **요약**: feat(profile): 계좌 위젯 마이페이지 '내 자산' 이전 + /dashboard 리다이렉트 (home-market-redesign PR1)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > home-market-redesign **PR1 (2-PR 중 1/2, PRD §8.2)** — 계좌 위젯을 `/dashboard` 에서 `/profile` "내 자산" 섹션으로 이전한다. 홈 시장종합·nav 재편·공포탐욕·공시는 **PR2 영역으로 본 PR 미포함**.
+  > 
+  > - `/profile` "내 자산" 섹션 신설: 총자산 히어로(`AssetHero`) + 자산비중 **도넛**(`AssetDonut`, 막대→도넛 재시각화, PRD §3.1) + **보유종목 전체 테이블**(`HoldingsTable`, 종목명·평가액·수익률·비중 4열 정렬 가능 — Top3 요약 아님, AC-2).
+  > - 배치 순서(DESIGN.md): ProfileCard(무변경) → "내 자산" → ConnectedExchangesCard/SettingsMenuCard(무변경).
+  > - `/dashboard` → `/profile` 영구 리다이렉트(Next `redirect`, §9 q4=b / AC-4). 계좌 컴포넌트(PortfolioHero/HoldingsTop3/DashboardPage) 원위치 제거.
+  > - mock·타입·어댑터 `dashboard` → `profile` 도메인 이전. `fearGreed`/`marketSnapshot` mock·`MarketSnapshotCard` 는 **PR2(홈 시장심리) 재활용 위해 보존**.
+  > - 거래성 항목(예수금/주문가능/실현손익/입출금) 미노출(조회·분석 전용 스코프, AC-9).
+  > 
+  > ## 디자인 토큰 주입 방식 (선택 사유)
+  > 
+  > `package.json` 의 `design:sync` 는 source 가 `docs/design/finsight-redesign.md` 로 고정돼 v9 신규 토큰을 자동 export 하지 못한다. **회귀 없는 (a) 방식** 선택 — `tailwind.theme.json` 에 **PR1 에 필요한 토큰만 직접 병합**(finsight 기존 토큰 hex·사이즈 한 글자도 안 건드림):
+  > - spacing: `donut-size`(168px) / `donut-thickness`(22px) / `table-row-h`(48px) / `table-cell-px`(12px)
+  > - typography: `table-cell-numeric`(14px/700/tnum) — `tailwind.config.ts` TYPOGRAPHY_EXTRAS 에 lineHeight·tnum 등록
+  > - 자산 합성 토큰(`asset-hero`/`holdings-table-*`/도넛)은 **기존 색만 cascade** 하므로 `app/components.css` `@layer components` 흡수(색 신규 0).
+  > - 공포·탐욕(`fng-*`)·공시·검색·nav 준비중 토큰은 PR2 영역이라 **본 PR 미주입**.
+  > - (b) design:sync 스크립트 보강 대신 (a) 를 택한 이유: 스크립트가 2개 파일 병합 로직을 갖게 되면 전역 회귀 표면이 커지고, PR1 범위(자산 한정) 대비 과함. 신규 토큰이 소수라 직접 병합이 안전.
+  > 
+  > ## 자가검증 (수동 QA)
+  > 
+  > 모두 저장소 루트에서 실행. dev 서버 `localhost:3148` 라운드트립.
+  > 
+  > ### 빌드/품질 게이트 (AC-8)
+  > - `npm run typecheck` → exit 0 (clean `.next` 후 에러 0)
+  > - `npm run lint` → exit 0
+  > - `npm run build` → exit 0 (Turbopack, ✓ Compiled). 라우트: `/profile` = ○(static), `/dashboard` = ○(redirect)
+  > - `npm run test` → 21 files / **110 passed** (`profile/holdings.test.ts` 2건 포함)
+  > 
+  > ### AC-2 계좌 위젯 이전 + 전체 테이블
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR2 — 홈 시장종합 + nav/사이드바 재편**: 홈(`/`) 교체(지수·공포탐욕 게이지·공시·검색), `/market`→`/` 흡수+리다이렉트, AI분석 사이드바 하단 "준비 중", nav 6→4. DESIGN.md 의 `fng-*`/공시/검색/nav-준비중 토큰을 그때 주입(본 PR 은 자산 토큰만 주입). 보존해 둔 `MarketSnapshotCard`·`fearGreed`/`marketSnapshot` mock 재활용.
+  - `lib/copy/dashboard/tooltips.ts` 의 계좌 툴팁(TOOLTIP_PORTFOLIO_TOTAL/PROFIT)은 PR1 이전부터 orphan — PR2 에서 시장심리 위젯 정리 시 함께 cleanup 검토(TOOLTIP_FEAR_GREED 는 PR2 게이지 재활용 가능).
+  - 실계좌 연동 시 `hooks/profile/useQueryHoldings`(live multi-price 어댑터, 현재 mock 직접 주입으로 미소비)로 mock→실데이터 전환(PRD §8.4).

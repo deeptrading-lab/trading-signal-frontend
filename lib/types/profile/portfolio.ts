@@ -1,10 +1,11 @@
 /**
- * `/dashboard` 의 포트폴리오 hero 카드 데이터.
+ * `/profile` "내 자산" 섹션의 총자산 히어로 데이터.
  *
- * 본 PRD 단계 = mock. 후속 BE PRD (가칭 `dashboard-backend`) 에서 BE 응답 envelope 에 맞춰
- * 갱신될 가능성이 있어 핵심 외 필드는 옵셔널로 두지 않고 mock 단계에서 1차 정합으로 시작한다.
+ * home-market-redesign PR1 — `/dashboard` 의 `Portfolio` 를 마이페이지 자산 섹션으로 이전(PRD §3.1).
+ * 본 단계 = mock. 실계좌 연동 전까지 mock 유지(조회·분석 전용 스코프, PRD §4).
  *
  * 금액은 원(KRW) 정수, 비율은 백분율 숫자(예: 4.2 = +4.2%).
+ * 거래성 필드(예수금/주문가능/실현손익/입출금) 미포함 — 조회·분석 전용 스코프(AC-9).
  */
 
 export type Portfolio = {

@@ -51,14 +51,15 @@ export const queryConfig = {
     },
   },
   /**
-   * PR-C (§3.5) — 도메인 어댑터 TTL.
-   * 본 PR 은 인터페이스 + 훅만 신설하고 화면은 mock 유지. 후속 화면 전환 PR 진입 시 동일 TTL 참조.
+   * 도메인 어댑터 TTL.
+   * 화면 전환 후속 PR 진입 시 동일 TTL 참조.
    *
-   * - dashboard.holdings — 보유 종목 multi-price. stock.price 와 동일 실시간성 우선.
+   * - profile.holdings — 보유 종목 multi-price. stock.price 와 동일 실시간성 우선.
+   *   (home-market-redesign PR1 — dashboard.holdings → profile.holdings 이전.)
    * - market.indices — 시장 지수. 종목 현재가와 동등하게 짧은 TTL.
    * - watchlist.list — 관심종목 multi-price. stock.price 와 동등.
    */
-  dashboard: {
+  profile: {
     holdings: {
       staleTime: 10 * SECOND,
       gcTime: 5 * MINUTE,

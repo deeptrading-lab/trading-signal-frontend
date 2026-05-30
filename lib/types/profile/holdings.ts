@@ -1,8 +1,10 @@
 /**
- * `/dashboard` 의 보유 자산 Top N 카드 데이터.
+ * `/profile` "내 자산" 섹션의 보유종목 전체 테이블 데이터.
  *
- * `assetType` 은 시안의 `type: 'stock' | 'crypto'` 정합 — 자산 식별 토큰
- * (`asset-stock` / `asset-coin`) 의 cascade 분기 기준.
+ * home-market-redesign PR1 — `/dashboard` 의 `Holding` 을 마이페이지 자산 섹션으로 이전(PRD §3.1).
+ * 보유종목은 Top3 요약이 아닌 **전체 테이블**(종목명·평가액·수익률·비중, 정렬 가능 — AC-2).
+ *
+ * `assetType` 은 자산 식별 토큰(`asset-stock` / `asset-coin`)의 cascade 분기 기준.
  */
 
 export type HoldingAssetType = "stock" | "crypto";

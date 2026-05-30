@@ -1,22 +1,19 @@
 /**
- * Dashboard 도메인 어댑터 — 보유 종목 multi-price 조회.
+ * Profile 도메인 어댑터 — 보유 종목 multi-price 조회.
  *
- * PRD `stock-api-integration` (PR-C) §3.5 — Dashboard 도메인 어댑터만 신설, 화면 전환 X.
+ * home-market-redesign PR1 — `lib/api/dashboard/holdings.ts` 를 profile 도메인으로 이전
+ * (계좌 위젯 `/dashboard` → `/profile`). 인터페이스·구현 무변경, 도메인 폴더만 dashboard → profile.
  *
  * 인터페이스:
  *   `getHoldings(tickers: string[]): Promise<HoldingQuote[]>` — 보유 종목 ticker 배열을 입력받아
  *   각 종목의 현재가 + 종목명 + 등락을 반환. 화면 컴포넌트가 보유 수량과 곱해 평가 금액 계산.
  *
- * 구현 전략 (KIS multi-price API 확인 결과):
- *   - KIS `inquire-multiple-price` 엔드포인트는 존재하나 별도 TR_ID 필요 + 종목당 30개 제한.
- *   - 본 PR-C 는 **PR-A 의 `/api/stock/price` BFF 반복 호출 + Promise.all** 패턴 채택.
- *   - 이유:
- *     1. PR-A 의 토큰 single-flight + mock fallback 인프라를 그대로 재활용.
- *     2. TanStack Query 의 캐싱 + queryKeys 표준 정합 (각 ticker 별 캐시 hit 가능).
- *     3. KIS 신규 TR_ID 도입은 후속 PR 자연 진입 (성능 데이터 기반).
- *   - 빈 배열 입력 시 빈 배열 즉시 반환 (네트워크 호출 0).
+ * 구현 전략 (stock-api-integration PR-C 무회귀):
+ *   - PR-A 의 `/api/stock/price` BFF 반복 호출 + Promise.all 병렬(KIS multi-price TR 미도입).
+ *   - same-origin `/api` 만 사용(브라우저 → FastAPI 직접 호출 0, AGENTS.md BFF 원칙).
+ *   - 빈 배열 입력 시 빈 배열 즉시 반환(네트워크 호출 0).
  *
- * 후속 화면 전환 PR 들 (별도 slug) 이 본 어댑터를 import 한다.
+ * 현 PR1 의 자산 섹션은 mock 직접 주입(server)이라 본 어댑터는 실계좌 연동(후속, PRD §8.4)을 위한 준비.
  */
 
 import { fetchStockPriceClient } from "@/lib/api/stock/price";
@@ -31,7 +28,7 @@ import type { StockPrice } from "@/lib/api/kis/types";
 export type HoldingQuote = StockPrice;
 
 /**
- * 보유 종목 multi-price 조회 — 각 ticker 별 PR-A 의 stock/price BFF 호출 + Promise.all 병렬.
+ * 보유 종목 multi-price 조회 — 각 ticker 별 stock/price BFF 호출 + Promise.all 병렬.
  *
  * 실패 정책: Promise.all 은 첫 reject 즉시 전체 reject. 한 종목 실패 시 전체 실패.
  *   - 의도적 — 보유 종목 중 일부만 노출되면 평가 금액이 부정확해 오히려 위험.

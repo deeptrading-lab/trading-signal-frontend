@@ -26,6 +26,16 @@
  *   - v6 spacing 3 키 (`input-pr-suffix-sm` 36px / `-md` 44px / `-lg` 56px) 추가 흡수 —
  *     `pr-input-pr-suffix-sm/md/lg` 클래스가 자동 생성되어 InputPanel 의 단위별 분기에서 호출.
  *   - v4 rounded 1 키 (`md`) 도 borderRadius spread 로 흡수.
+ *
+ * home-market-redesign v9 (PR1) 토큰 주입 — `package.json` 의 `design:sync` 는 source 가
+ * `docs/design/finsight-redesign.md` 로 고정돼 있어 v9 신규 토큰을 자동 export 하지 못한다.
+ * 회귀 없는 경로로 **PR1 에 필요한 토큰만** `tailwind.theme.json` 에 직접 병합했다 (finsight 기존
+ * 토큰 hex·사이즈 무변경):
+ *   - spacing: `donut-size`(168px) / `donut-thickness`(22px) / `table-row-h`(48px) / `table-cell-px`(12px)
+ *   - typography: `table-cell-numeric`(14px / 700 / tnum) — 위 TYPOGRAPHY_EXTRAS 에 lineHeight/tnum 등록
+ * 마이페이지 자산 섹션 합성 토큰(`asset-hero`/`holdings-table-*`/도넛)은 기존 색만 참조하므로
+ * `app/components.css` 의 `@layer components` 로 흡수(색 신규 0). 공포·탐욕(`fng-*`)·공시·검색·nav
+ * 준비중 토큰은 PR2 영역이라 본 PR 에서 주입하지 않는다.
  */
 
 import type { Config } from "tailwindcss";
@@ -56,6 +66,8 @@ const TYPOGRAPHY_EXTRAS: Record<
   "sidebar-section": { lineHeight: "1.2", letterSpacing: "0.04em" },
   "label-sm": { lineHeight: "1.25" },
   "input-suffix": { lineHeight: "1.2", fontFeature: '"tnum"' },
+  // home-market-redesign v9 (PR1) — 보유종목 테이블 숫자 셀 (14px / 700 / tnum).
+  "table-cell-numeric": { lineHeight: "1.3", fontFeature: '"tnum"' },
 };
 
 type RawFontSizeEntry = [
