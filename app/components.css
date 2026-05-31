@@ -324,16 +324,22 @@
 
   /* ===== v8 (finsight-redesign) PR3 신규 — 글로벌 셸 합성 토큰 ===== */
 
-  /* ---------- Header (글래스) ----------
-   * PRD §5.3 AC-L-2 — backdrop-blur + 반투명 surface + border-b.
+  /* ---------- Header ----------
+   * PRD §5.3 AC-L-2 (원안: 반투명 글래스) → PWA 상태바 경계선 대응으로 **불투명 surface** 전환.
    * 콘텐츠 행 = navbar-h (60px) v4 무회귀.
-   * safe-area: 설치형 PWA(standalone)에서 글래스를 상태바 영역까지 확장(padding-top)해
-   *   `순백 상태바(theme_color #fff) ↔ 반투명 글래스` 사이의 색 경계선(seam)을 제거한다.
-   *   상태바 텍스트가 같은 글래스 면 위에 떠 있게 되어 맞닿는 경계 자체가 사라진다.
-   *   `h-navbar-h`(고정) → `min-h-navbar-h` 로 바꿔야 safe-area 패딩이 60px 콘텐츠 행을
-   *   깎지 않고 위에 얹힌다. 일반 브라우저·데스크탑은 인셋 0 → 무회귀. */
+   *
+   * 상태바 경계선(seam) 제거 — iOS·Android 공통:
+   *   원인은 `순백 상태바(theme_color #ffffff) ↔ 반투명 글래스(bg-surface/80, 뒤 surface-muted 회색이
+   *   비쳐 미세 off-white + backdrop-filter 합성 경계)` 의 색/경계 불일치였다. 특히 Android 는 상태바를
+   *   별도 시스템 띠로 theme_color 로 칠하고 `safe-area-inset-top` 이 0이라 글래스 확장 방식이 무효 →
+   *   양 플랫폼 공통 해법으로 navbar 를 **불투명 `bg-surface`(#ffffff)** 로 만들어 상태바 흰색과 100%
+   *   동일화한다(반투명·blur 제거 → 합성 경계도 소거). 정지 상태 색은 기존 글래스(≈#fdfdfe)와 사실상 동일.
+   *
+   * safe-area(iOS): `padding-top: env(safe-area-inset-top)` + `min-h-navbar-h` 로 navbar 흰 배경이
+   *   노치/상태바 영역까지 채워, 상태바 텍스트가 같은 흰 면 위에 뜬다(60px 콘텐츠 행은 그대로 유지).
+   *   Android·데스크탑은 인셋 0 → 무회귀. */
   .header-glass {
-    @apply flex items-center justify-between min-h-navbar-h bg-surface/80 backdrop-blur-md border-b border-border-line px-lg lg:px-2xl;
+    @apply flex items-center justify-between min-h-navbar-h bg-surface border-b border-border-line px-lg lg:px-2xl;
     padding-top: env(safe-area-inset-top);
   }
   /* header-brand — 좌측 wordmark (Activity 아이콘 + 텍스트). text-decoration: none 강제 (Link). */

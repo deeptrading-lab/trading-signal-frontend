@@ -2593,3 +2593,45 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 배포 후 iOS/Android 설치형 PWA에서 상단 경계선 제거 + 상·하 safe-area 정렬 실측 확인.
   - (관찰 시) 가로 모드(landscape)에서 좌우 노치 인셋 영향 점검 — 현재 좌우 인셋 패딩은 미적용.
+
+### 2026-05-31 — fix(pwa): navbar 불투명 흰색 전환 — iOS·Android 상태바 경계선 제거 (#61)
+
+- **slug**: `pwa-navbar-opaque-seam` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/61
+- **요약**: fix(pwa): navbar 불투명 흰색 전환 — iOS·Android 상태바 경계선 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경 (follow-up of #60)
+  > 
+  > #60에서 상단 navbar 상태바 경계선(seam)을 `viewport-fit=cover` + `env(safe-area-inset-top)` 글래스 확장으로 잡으려 했으나, **이는 iOS 중심 메커니즘**이라 **Android(갤럭시 S25/One UI 7)에선 무효**였다. Android는 상태바를 별도 시스템 띠로 `theme_color`(#ffffff)로 칠하고 `safe-area-inset-top`이 0이라 글래스 확장이 적용되지 않는다 → 회색 경계선 잔존.
+  > 
+  > ## 변경 — iOS·Android 공통 해법
+  > 
+  > navbar를 **반투명 글래스 → 불투명 흰색**으로 전환해 상태바 흰색(`theme_color #ffffff`)과 **100% 동일화**. 반투명(`/80`)으로 인한 미세 off-white + `backdrop-filter` 합성 경계까지 함께 제거된다.
+  > 
+  > | 파일 | 변경 |
+  > |---|---|
+  > | `app/components.css` `.header-glass` | `bg-surface/80 backdrop-blur-md` → `bg-surface` (#ffffff 불투명) |
+  > 
+  > 유지 항목 (#60에서 도입, 회귀 없음):
+  > - `padding-top: env(safe-area-inset-top)` + `min-h-navbar-h` — iOS 노치/상태바 영역을 navbar 흰색으로 채움. Android·데스크탑은 인셋 0 → 무회귀.
+  > - `viewport-fit=cover`(app/layout.tsx), BottomNav `env(safe-area-inset-bottom)` — 그대로.
+  > - **BottomNav 글래스(`bg-surface/80 backdrop-blur`)는 유지** — 콘텐츠 위 스크롤 블러 효과(상태바와 무관).
+  > 
+  > 정지 상태 navbar 색은 기존 글래스(≈#fdfdfe)와 사실상 동일 → 톤 무변경.
+  > 
+  > ## 검증
+  > 
+  > - `npm run build` ✓ Compiled successfully
+  > - 컴파일 CSS: `.header-glass { background-color:#fff; min-height:60px; ... }` (backdrop-filter 제거 확인), `safe-area-inset-top/bottom` 유지
+  > - ⚠️ **배포 후 실기기 검증 필수 (iOS + Android 둘 다)**:
+  >   - 상단 상태바 ↔ navbar 경계선 제거 (핵심, 양 플랫폼)
+  >   - 헤더 로고/프로필 정렬, 하단 BottomNav 홈인디케이터 비가림
+  > 
+  > ## 다음 작업
+  > 
+  > - 배포 후 iOS/Android 설치형 PWA 둘 다에서 상태바 경계선 제거 실측.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 iOS/Android 설치형 PWA 둘 다에서 상태바 경계선 제거 실측.
+  - (잔존 시) 회색 선이 색 차이가 아니라 Android 시스템 status bar elevation 그림자일 가능성 → edge-to-edge(콘텐츠를 상태바 밑까지) 방식 별도 검토.
+  - landscape 좌우 노치 인셋(`env(safe-area-inset-left/right)`) 미적용 — KNOWN-GAP 유지.
