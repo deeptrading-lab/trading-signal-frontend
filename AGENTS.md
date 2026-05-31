@@ -58,7 +58,7 @@ QA — 같은 브랜치에 QA 리포트 push
 Reviewer
   ↓ review-approved 라벨 (자가 PR 차단 시 --comment + 라벨 fallback)
 DevOps
-  ↓ gh pr merge --merge --delete-branch
+  ↓ gh pr merge --squash --delete-branch
 main 반영 + 브랜치 정리
 ```
 
@@ -72,7 +72,7 @@ main 반영 + 브랜치 정리
 - PRD: `docs/prd/<slug>.md` (양식 1~7 + §8 영향 분석 + §9 OPEN QUESTION)
 - 디자인: `docs/design/<slug>.md` (DESIGN.md 포맷, `npx @google/design.md lint` errors=0)
 - QA: `docs/qa/<slug>.md` (AC 별 재현·기대·실측 표 + 라운드트립 + 에지 케이스)
-- 에이전트 정의: `.claude/agents/*.md`, `docs/agents/*.md`
+- 에이전트 정의: `.claude/agents/*.md`
 - 코드 컨벤션: `docs/rules/frontend.md` (8개 절)
 - 인수인계 로그: `docs/HANDOFF.md` (qa-passed 자동 append)
 

@@ -35,6 +35,13 @@ model: inherit
 - BE 가 `Authorization: Bearer <key>` 같은 인증을 요구할 경우 route handler 가 서버 측 env (예: `WORKBENCH_API_KEYS`) 에서 꺼내 헤더에 주입. **브라우저에 노출 0건**.
 - Supabase: server-side client (cookies 기반 세션) + RLS 경계 검증.
 
+## 작업 흐름 (한 브랜치 한 PR)
+
+- frontend-dev 와 **같은 `feature/<slug>` 브랜치**를 공유한다 (UI+BFF 동시 작업 시 pipeline 이 둘을 병렬 호출). route handler commit 을 그 브랜치에 누적한다.
+- BFF 단독 변경(UI 없음)이면 본인이 `feature/<slug>` 브랜치 생성 → 구현 commit → **PR 1회 생성 + `impl-ready` 라벨** (`gh pr create --assignee @me`).
+- UI 와 함께면 PR 생성·`impl-ready` 라벨은 frontend-dev 가 일괄 처리 — 별도 PR 을 만들지 않는다.
+- 커밋 메시지는 한글 요약. 자세한 흐름은 [`AGENTS.md`](../../AGENTS.md) **작업 흐름 — 한 브랜치 한 PR** 절.
+
 ## 하지 않는 일
 - 브라우저에 secret 노출.
 - FastAPI 분석 엔진 계산식 임의 변경.
@@ -46,4 +53,3 @@ model: inherit
 - `lib/api/client.ts` — axios 인스턴스 (`baseURL: "/api"`, `timeout: 30_000`, ApiError 인터셉터)
 - `lib/api/errors.ts` — `ApiError` 분류 (`validation` / `whitelist_miss` / `network` / `server`)
 - `lib/api/<domain>/*.ts` — 도메인 클라이언트 함수 (PRD `fe-conventions` 의 도메인 한 뎁스)
-- `docs/agents/api-integration-dev.md` — 공용 역할 문서

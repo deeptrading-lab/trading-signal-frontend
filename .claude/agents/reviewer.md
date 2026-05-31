@@ -55,4 +55,3 @@ model: inherit
 - [`AGENTS.md`](../../AGENTS.md) — 작업 원칙·라벨 게이트
 - [`docs/rules/frontend.md`](../../docs/rules/frontend.md) — FE 컨벤션 (reviewer 의 1차 근거)
 - [`docs/rules/review.md`](../../docs/rules/review.md)
-- `docs/agents/reviewer.md` — 공용 역할 문서

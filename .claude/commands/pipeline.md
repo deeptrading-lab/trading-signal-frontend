@@ -7,7 +7,7 @@ argument-hint: <slug> [from=<role>] [idea="..."]
 
 ## 0. 인자 파싱
 - 첫 번째 토큰: **slug** (kebab-case). 없으면 사용자에게 되묻고 중단.
-- `from=<role>`: 지정된 역할부터 시작 (`pm|ux-designer|backend-dev|frontend-dev|qa|reviewer|devops`).
+- `from=<role>`: 지정된 역할부터 시작 (`pm|ux-designer|api-integration-dev|frontend-dev|qa|reviewer|devops`).
 - `idea="..."`: PM 단계에 넘길 아이디어 원문. `from=pm`일 때만 의미 있음.
 
 ## 1. 현재 단계 판별
@@ -17,7 +17,7 @@ argument-hint: <slug> [from=<role>] [idea="..."]
 |------|-----------|
 | `docs/prd/<slug>.md` 없음 | `pm` |
 | PRD에 UI 포함 **and** `docs/design/<slug>.md` 없음 | `ux-designer` |
-| `gh pr list --search "feature/<slug>"` 비어 있음 | `backend-dev` (+ UI 있으면 `frontend-dev` 병렬) |
+| `gh pr list --search "feature/<slug>"` 비어 있음 | `api-integration-dev` (+ UI 있으면 `frontend-dev` 병렬) |
 | 해당 PR에 `impl-ready` 라벨 있음 | `qa` |
 | PR에 `qa-passed` 라벨 있음 | `reviewer` |
 | PR에 `review-approved` 라벨 있음 | `devops` (사용자 확인 필수) |
@@ -40,7 +40,7 @@ slug: <slug>
 
 - **pm**: `Agent(subagent_type="pm", prompt="slug=<slug>, 아이디어=<idea>, 출력=docs/prd/<slug>.md")`. 완료 후 PRD 읽고 `UI 포함 여부` 확인.
 - **ux-designer**: PRD에 UI 있을 때만. `Agent(subagent_type="ux-designer", prompt="PRD=docs/prd/<slug>.md, 출력=docs/design/<slug>.md")`.
-- **backend-dev / frontend-dev**: PRD·디자인 문서 경로 전달. UI·백엔드가 모두 필요하면 **한 메시지에 두 Agent 호출을 병렬**로. PR URL·번호 회수.
+- **api-integration-dev / frontend-dev**: PRD·디자인 문서 경로 전달. UI·백엔드가 모두 필요하면 **한 메시지에 두 Agent 호출을 병렬**로. PR URL·번호 회수.
 - **qa**: `Agent(subagent_type="qa", prompt="PRD=docs/prd/<slug>.md, PR=#<N>, 출력=docs/qa/<slug>.md")`. 판정이 `qa-failed`면 개발자에게 돌리고 **루프 중단 + 사용자 보고**.
 - **reviewer**: `Agent(subagent_type="reviewer", prompt="PR=#<N>, QA=docs/qa/<slug>.md")`. `changes-requested`면 루프 중단 + 사용자 보고.
 - **devops**: 실행 **전 사용자에게 명시적 승인**을 받는다("PR #N을 머지·push 해도 될까요?"). 승인 후에만 `Agent(subagent_type="devops", prompt="PR=#<N>")`.

@@ -53,5 +53,4 @@ model: inherit
 - [`AGENTS.md`](../../AGENTS.md) — 작업 흐름·라벨 게이트
 - [`docs/rules/frontend.md`](../../docs/rules/frontend.md) — FE 컨벤션 (QA 가 점검하는 1차 근거)
 - [`docs/rules/test.md`](../../docs/rules/test.md)
-- `docs/agents/qa.md` — 공용 역할 문서
 - 직전 QA 리포트 (`docs/qa/<직전 슬러그>.md`) — 양식·검증 패턴 참고

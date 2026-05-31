@@ -17,8 +17,8 @@ model: inherit
 하나라도 빠지면 push 하지 않고 이유를 보고한다.
 
 ## 하는 일
-- `gh pr merge <N> --merge --delete-branch` (사용자 승인 후) — `--merge` 로 merge commit 보존, `--delete-branch` 로 원격 feature 브랜치 자동 삭제.
-- 머지 후 라벨 `devops-ready` 추가, 상위 단계 라벨 정리
+- `gh pr merge <N> --squash --delete-branch` (사용자 승인 후) — `--squash` 로 PR 을 커밋 1개로 압축, `--delete-branch` 로 **원격** feature 브랜치 자동 삭제. **이 시점에 원격 정리는 끝** — 이후 `git push origin --delete` 같은 원격 삭제를 다시 시도하지 않는다.
+- 머지 자체가 단계 종료다 — **별도 완료 라벨(`devops-ready` 등)을 두지 않는다.** 머지 후 `gh pr edit` 로 라벨을 손대지 않는다 (과거 분류기 차단·중복 시도의 원인).
 - **머지 후 브랜치 정리** (아래 절 참조)
 - CI/CD 파이프라인 상태 확인, 실패 시 원인 보고
 - Vercel 배포(preview/production) 상태 확인, 환경변수(`FASTAPI_BASE_URL` 등) 동기화
@@ -33,29 +33,37 @@ impl-ready (FE Dev 가 부여) → qa-passed (QA) → review-approved (Reviewer)
 - 자가 PR 의 경우 reviewer 가 `--comment` + 라벨로 승인 상태 표시 — 라벨만 확인.
 - `qa-passed` 라벨 부여 시 `handoff-append.yml` workflow 가 PR 브랜치에 `docs(handoff): #<N> ...` commit 을 자동 추가한다. 그 commit 까지 머지 대상에 포함된다.
 
-## 머지 후 정리
+## 머지 후 정리 (순서 고정 · 각 단계 정확히 1회)
 
-머지가 끝나면 **반드시** 다음 순서로 로컬·원격 상태를 정리한다.
+`--squash --delete-branch` 머지 시점에 **원격 feature 브랜치는 이미 삭제**됐다. 따라서 정리할 대상은 로컬 `feature/<slug>` 와 로컬 `pr-<N>` ref 뿐이다. 아래 블록을 **위→아래로 딱 한 번만** 실행한다. 한 번 끝낸 단계(특히 main checkout/pull)를 **절대 다시 실행하지 않는다** — 중복 실행이 시간 낭비의 주원인이다.
 
-1. `git checkout main && git pull --ff-only origin main` — 로컬 main 최신화
-2. `git branch -d feature/<slug>` — 머지된 로컬 feature 브랜치 삭제
-3. `git push origin --delete feature/<slug>` — 원격 feature 브랜치 삭제
-4. `git branch -D pr-<N>` — QA/Reviewer가 PR 체크아웃용으로 만든 `pr-<N>` ref 삭제
-5. `git fetch --prune` — 원격에서 삭제된 브랜치의 로컬 tracking ref 정리
+**라벨은 손대지 않는다.** 머지로 PR 이 닫히는 것 자체가 단계 종료다. 머지된 PR 의 `qa-passed`/`review-approved` 는 이력으로 남긴다 (별도 완료 라벨 없음).
 
-### 일괄 정리 스크립트
-
-위 2~5를 한 번에 처리하는 헬퍼가 있다.
+### 로컬 정리 (한 블록, 1회)
 
 ```bash
-scripts/cleanup-merged-branches.sh            # 대화형 확인 후 삭제
-scripts/cleanup-merged-branches.sh --yes      # 확인 없이 바로 삭제
-scripts/cleanup-merged-branches.sh --dry-run  # 삭제 대상만 표시
+git checkout main && git pull --ff-only origin main
+git branch -D feature/<slug>              # squash 머지는 git 이 "not merged" 로 본다 → -D 필수 (-d 는 항상 실패)
+git branch -D pr-<N> 2>/dev/null || true  # QA/Reviewer 체크아웃 ref. 없으면 무시
+git fetch --prune                         # 원격에서 사라진 tracking ref 정리
 ```
 
-이 스크립트는 현재 브랜치가 `main`일 때만 동작하여, 실수로 feature 브랜치 위에서 자기 자신을 지우는 사고를 막는다.
+**금지 사항 (반복 낭비 차단):**
+- 원격 삭제(`git push origin --delete ...`) — 머지 단계에서 이미 끝났다. 다시 하지 않는다.
+- `git branch -d`(소문자) — squash 머지에선 항상 실패하니 처음부터 `-D` 만 쓴다.
+- 이미 main 이고 최신이어도 무방하나, **정리 블록 전체를 두 번 돌리지 않는다.**
+- `scripts/cleanup-merged-branches.sh --yes` — per-merge 흐름에서 호출하지 않는다 (아래 참조).
 
-**GitHub UI(Squash & merge 등)로 직접 머지한 경우**에도 로컬 feature 브랜치·`pr-<N>` ref는 자동 삭제되지 않으므로, 사용자 또는 DevOps 에이전트가 이 스크립트를 실행하도록 안내한다.
+### 일괄 정리 스크립트 (per-merge 아님 · 가끔 bulk 정리용)
+
+머지 1건당 정리는 위 로컬 정리 블록으로 충분하다. `scripts/cleanup-merged-branches.sh` 는 **로컬에 머지된 브랜치가 여러 개 쌓였을 때만** 쓰는 보조 도구이며, per-merge 흐름에서 자동 실행하지 않는다.
+
+```bash
+scripts/cleanup-merged-branches.sh --dry-run  # 삭제 대상만 표시 (안전)
+scripts/cleanup-merged-branches.sh            # 대화형 확인 후 삭제
+```
+
+- `--yes` 는 "확인 없이 브랜치 묶음 삭제"라 권한 분류기가 **매번 차단**한다. bulk 정리가 필요하면 `--dry-run` 으로 대상을 확인한 뒤 사용자에게 실행 여부를 묻는다.
 
 ## 하지 않는 일
 - 테스트 스킵·훅 bypass (`--no-verify` 등) 불가.

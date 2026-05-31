@@ -50,6 +50,5 @@ model: inherit
 ## 참고
 - [`AGENTS.md`](../../AGENTS.md) — 작업 원칙·라벨 흐름·도메인 폴더 표준
 - [`docs/rules/frontend.md`](../../docs/rules/frontend.md) — FE 컨벤션 (PRD 가 이 룰 안에서 짜져야 함)
-- `docs/agents/pm.md` — 공용 역할 문서
 - `docs/HANDOFF.md` 최신 5건 + `docs/SESSION_NOTES.md` 최신 1~2건 — PRD 작성 전 필수 read
 - `docs/prd/<직전 슬러그>.md` — 양식·분량 참고

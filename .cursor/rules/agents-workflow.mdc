@@ -5,7 +5,11 @@ alwaysApply: true
 
 # 에이전트 워크플로 (7인 체제)
 
-상세·PRD 템플릿·커밋 규칙은 저장소 루트의 **[AGENTS.md](../../AGENTS.md)** 를 따른다. 요약만 아래에 둔다.
+## 단일 진실원천 (SSOT)
+
+- **워크플로·라벨·커밋 규칙: 루트 [AGENTS.md](../../AGENTS.md)** — Cursor·Claude Code 가 **공용으로** 읽는 SSOT. 아래는 요약일 뿐, 상충 시 AGENTS.md 가 우선.
+- **에이전트별 운영 정본은 [`.claude/agents/<role>.md`](../../.claude/agents/)** (Claude Code 서브에이전트 실행 정의). Cursor 는 이 포맷을 직접 읽지 못하므로, 본 mdc 가 AGENTS.md 요약으로 동등한 맥락을 제공한다.
+- 컨벤션 상세: [`docs/rules/frontend.md`](../../docs/rules/frontend.md) · [`test.md`](../../docs/rules/test.md) · [`review.md`](../../docs/rules/review.md).
 
 ## 역할 (순서)
 
@@ -19,12 +23,18 @@ alwaysApply: true
 
 > 7개 역할은 항상 열려 있으며, PRD 범위에 따라 필요한 역할이 합류한다.
 
-## 도메인·품질 규칙 (경로별)
+## 머지 (DevOps)
 
-- `app/**` → `frontend.mdc` · 공용 역할 문서: `docs/agents/dev-frontend.md`
-- `**/test/**` → `test.mdc` · 공용 역할 문서: `docs/agents/qa.md`
-- 리뷰 최소 체크 → `review.mdc` · 공용 역할 문서: `docs/agents/reviewer.md`
+- `gh pr merge <N> --squash --delete-branch` (사용자 승인 후). 원격 브랜치는 이 시점에 정리 완료.
+- 머지 후 라벨을 손대지 않는다 — 머지로 PR 이 닫히는 것 자체가 단계 종료. 별도 완료 라벨 없음.
+- 라벨 흐름: `impl-ready` → `qa-passed` → `review-approved` → 머지. (실재 GH 라벨만 사용)
+
+## 도메인·품질 규칙 (경로별 — Cursor glob 자동첨부)
+
+- `app/**`·`components/**`·`hooks/**`·`lib/**` → `frontend.mdc` (상세 `docs/rules/frontend.md`)
+- `**/test/**` → `test.mdc` (상세 `docs/rules/test.md`)
+- 리뷰 최소 체크 → `review.mdc` (상세 `docs/rules/review.md`)
 
 ## 이 규칙 파일을 고칠 때
 
-- 절차·역할 정의를 바꿀 때는 **AGENTS.md를 먼저 수정**하고, 이 파일은 한 줄이라도 벗어나면 요약만 맞춘다.
+- 절차·역할 정의를 바꿀 때는 **AGENTS.md(SSOT)를 먼저 수정**하고, 이 파일과 `.claude/agents/*` 는 그 요약/실행정의로 맞춘다. 내용을 복제하지 말고 항상 AGENTS.md 를 가리킨다.

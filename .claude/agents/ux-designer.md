@@ -51,4 +51,4 @@ model: inherit
 ## 참고
 - 포맷 가이드: [`docs/rules/design-md.md`](../../docs/rules/design-md.md)
 - 스펙 원문: <https://github.com/google-labs-code/design.md>
-- `docs/agents/ux-designer.md`, `AGENTS.md`의 **UX/UI 디자이너 산출물** 절.
+- `AGENTS.md`의 **UX/UI 디자이너 산출물** 절.
