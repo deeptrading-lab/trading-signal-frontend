@@ -25,7 +25,7 @@ model: inherit
 
 ## PRD 작성 컨텍스트 (필수 인지)
 
-- 본 저장소는 **Next.js App Router + Tailwind v3 + TanStack Query v5 + axios + BFF (route handler)** 스택.
+- 본 저장소는 **Next.js App Router + Tailwind v4 + TanStack Query v5 + axios + BFF (route handler)** 스택.
 - 코드 컨벤션은 [`docs/rules/frontend.md`](../../docs/rules/frontend.md) 의 8개 절 (네이밍/커스텀훅/도메인 한 뎁스/cn/layout/copy/queryKeys/반응형) 에 정착. PRD 가 이 룰을 위반하지 않게 §3 범위와 §5 AC 를 짜야 한다.
 - 디자인은 DESIGN.md (Google Labs 포맷) 가 단일 진실 원천. `npm run design:sync` 가 토큰을 Tailwind theme 으로 흘려보낸다.
 - 라벨 흐름: `impl-ready` → `qa-passed` → `review-approved` → 머지. `qa-passed` 시 `handoff-append.yml` 가 자동 발동.

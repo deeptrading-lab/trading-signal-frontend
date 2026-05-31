@@ -4,8 +4,8 @@
 
 ## 제품 구조
 
-- UI: Next.js App Router, TypeScript, React 19
-- 스타일링: Tailwind v3 + DESIGN.md (Google Labs 포맷) → `tailwind.theme.json` 자동 동기화
+- UI: Next.js App Router (v16), TypeScript, React 19
+- 스타일링: Tailwind v4 + DESIGN.md (Google Labs 포맷) → `tailwind.theme.json` 자동 동기화
 - 데이터 페칭: TanStack Query v5 + axios (BFF 경유)
 - 배포: Vercel
 - BFF: Next.js route handler (`app/api/**/route.ts`) — 브라우저는 FastAPI를 직접 호출하지 않는다
@@ -30,7 +30,7 @@
 |---|---|
 | PM | PRD, 스펙 변경, MVP 범위 관리. PRD 양식 1~7 + §8 영향 분석 + §9 OPEN QUESTION (PM 권고 동봉) 패턴 |
 | UX/UI Designer | 토스톤 디자인 시스템, 화면 흐름, 상태/오류 UX. DESIGN.md 포맷 (`docs/rules/design-md.md`) + `design:sync` 파이프라인 |
-| Frontend Dev | Next.js App Router, React, TypeScript, Tailwind 구현. `docs/rules/frontend.md` 컨벤션 8개 절 준수 |
+| Frontend Dev | Next.js App Router, React, TypeScript, Tailwind v4 구현. `docs/rules/frontend.md` 컨벤션 8개 절 준수 |
 | API Integration Dev | Next route handler (BFF), FastAPI contract, Supabase 연동 준비. `FASTAPI_BASE_URL` 단일 진입 |
 | QA | 브라우저 플로우, 반응형 (두 뷰포트), API 실패 상태, DESIGN.md 토큰 라이브 동기화 검증 |
 | Reviewer | 접근성, 타입 안정성, 보안, Tailwind 토큰 정합, BFF 패턴, HANDOFF 점검, Vercel 배포 리스크 |
@@ -76,36 +76,43 @@ main 반영 + 브랜치 정리
 - 코드 컨벤션: `docs/rules/frontend.md` (8개 절)
 - 인수인계 로그: `docs/HANDOFF.md` (qa-passed 자동 append)
 
-## 현재 MVP 호출 구조
+## 호출 구조 (도메인 공통 패턴)
+
+라우트는 `app/(main)/` 그룹 아래 도메인별로 나뉜다 (`home`·`market`·`stock`·`profile`·`watchlist`·`dashboard`·`analyze`). 각 도메인은 아래 동일 계층을 따른다.
 
 ```text
 Browser
-↓ axios (same-origin, baseURL "/")
-React 컴포넌트 (app/page.tsx, components/workbench/*)
-↓ hooks/workbench/use* (도메인 훅)
+↓ axios (same-origin, baseURL "/api" — lib/api/client.ts)
+React 컴포넌트 (app/(main)/<route>/page.tsx, components/<domain>/*)
+↓ hooks/<domain>/use* (도메인 훅)
 ↓ hooks/query/useQuery~ / useMutation~ (TanStack Query)
-↓ lib/api/workbench/*.ts (axios 클라이언트 함수)
+↓ lib/api/<domain>/*.ts (axios 클라이언트 함수)
 ↓ HTTP /api/*
 Next.js route handler (app/api/**/route.ts) ← BFF 계층
-↓ FASTAPI_BASE_URL (env)
-trading-signal-engine FastAPI
-↓
-ai.stock_signal.workbench.analyze_workbench()
+↓ FASTAPI_BASE_URL (env) · 외부 시세 API (KIS·DART·CoinGecko 등)
+trading-signal-engine FastAPI / 외부 데이터 소스
 ```
+
+- 예: `workbench` 도메인은 `app/(main)/analyze/page.tsx` → `hooks/workbench/*` → `lib/api/workbench/*` → `app/api/workbench/analyze/route.ts` → FastAPI `analyze_workbench()`.
+- 시세·공시 도메인(`market`·`stock`·`disclosure`)은 FastAPI 대신 외부 API(KIS·OpenDART·CoinGecko)를 route handler 가 프록시한다.
 
 ## 도메인·폴더 표준
 
 ```text
-app/                  Next.js App Router 진입 (page/layout/providers + api/ BFF)
-components/<domain>/  화면별 컴포넌트 (현재 workbench/)
-components/layout/    (예정, 두 번째 화면 도입 시) 재사용 layout 컴포넌트
-components/ui/        (예정) 도메인 무관 원자 컴포넌트
-hooks/<domain>/       도메인 커스텀훅
-hooks/query/          TanStack Query 페칭 훅 + queryKeys
-hooks/utils/          도메인 무관 React 훅 (useBreakpoint 등)
-lib/api/              client.ts·errors.ts (인프라) + <domain>/ (도메인 클라이언트)
-lib/copy/<domain>/    UI 노출 한글 카피 (i18n 여지)
-lib/types/<domain>/   BE 응답·요청 타입
+app/                  Next.js App Router 진입 (layout/providers + api/ BFF + login 등)
+app/(main)/<route>/   라우트 그룹 + 도메인별 page (home·market·stock·profile·watchlist·dashboard·analyze)
+components/<domain>/   화면별 컴포넌트 (home·market·profile·watchlist·dashboard·workbench 등)
+components/layout/     재사용 layout 컴포넌트 (Sidebar·BottomNav·HeaderMarketTicker 등)
+components/ui/         (예정) 도메인 무관 원자 컴포넌트
+hooks/<domain>/        도메인 커스텀훅 (auth·disclosure·market·profile·stock·watchlist·workbench)
+hooks/query/           TanStack Query 페칭 훅 + queryKeys
+hooks/utils/           도메인 무관 React 훅 (useBreakpoint 등)
+lib/api/               client.ts·errors.ts (인프라) + <domain>/ (도메인 클라이언트: kis·dart·coingecko·market·stock·workbench 등)
+lib/auth/              앱 비밀번호 게이트 세션 유틸
+lib/copy/<domain>/     UI 노출 한글 카피 (i18n 여지)
+lib/types/<domain>/    BE 응답·요청 타입
 lib/validation/<domain>/  입력 사전 차단
-lib/utils/            도메인 무관 헬퍼 (cn, formatMoney, formatPct)
+lib/mock/<domain>/     로컬/폴백용 목 데이터
+lib/query/             TanStack Query 인프라 (클라이언트 설정 등)
+lib/utils/             도메인 무관 헬퍼 (cn, formatMoney, formatPct 등)
 ```
