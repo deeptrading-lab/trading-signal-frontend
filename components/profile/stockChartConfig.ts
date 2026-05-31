@@ -56,3 +56,13 @@ export const DEFAULT_DAYS = RANGES["D"][1].days;
 export function defaultDaysForPeriod(p: ChartPeriod): number {
   return RANGES[p][0].days;
 }
+
+/**
+ * 봉 단위 라벨 — 보조지표 "데이터 부족 (최소 N{단위})" 안내에서 단위를 봉 종류에 맞춰 표기.
+ * 일봉→"일", 주봉→"주", 월봉→"월".
+ */
+export const PERIOD_UNIT: Record<ChartPeriod, string> = {
+  D: "일",
+  W: "주",
+  M: "월",
+};

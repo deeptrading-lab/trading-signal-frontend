@@ -48,6 +48,7 @@ import { ChartRangeDropdown } from "./ChartRangeDropdown";
 import {
   CHART_TYPES,
   PERIODS,
+  PERIOD_UNIT,
   RANGES,
   type ChartType,
 } from "./stockChartConfig";
@@ -251,6 +252,9 @@ export function StockDailyChart({
 
   const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange };
 
+  // 데이터 부족 안내의 봉 단위(일/주/월) — 선택된 봉 종류에 따라 표기 변경.
+  const periodUnit = PERIOD_UNIT[period];
+
   if (isLoading) {
     return (
       <ChartShell {...shellProps}>
@@ -354,7 +358,7 @@ export function StockDailyChart({
           </div>
         </>
       ) : (
-        <SubLabel label="MACD — 봉 수 부족 (최소 26봉 필요)" />
+        <SubLabel label={`MACD — 데이터 부족 (최소 26${periodUnit})`} />
       )}
 
       {/* ④ RSI — 15봉(14+1) 이상이어야 유효. 부족 시 안내 표시 */}
@@ -377,7 +381,7 @@ export function StockDailyChart({
           </div>
         </>
       ) : (
-        <SubLabel label="RSI — 봉 수 부족 (최소 15봉 필요)" />
+        <SubLabel label={`RSI — 데이터 부족 (최소 15${periodUnit})`} />
       )}
     </ChartShell>
   );
