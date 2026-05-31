@@ -88,19 +88,22 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
           </div>
         </div>
       ) : (
-        /* 기본: 데스크탑 2-col (좌=기업정보, 우=차트) / 모바일 1-col 스택 */
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-lg items-start">
-          <div className="flex flex-col gap-lg">
-            <StockHeader ticker={ticker} />
-            <CompanyOverview ticker={ticker} />
-            <DisclosureList ticker={ticker} count={5} />
-          </div>
-          <div className="lg:sticky lg:top-4">
-            <StockDailyChart
-              ticker={ticker}
-              onExpand={() => transition(true)}
-              {...chartControls}
-            />
+        /* 기본: 헤더(전폭) → 데스크탑 2-col (좌=기업정보, 우=차트) / 모바일 1-col 스택.
+         *   헤더를 그리드 밖 전폭으로 올려 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다. */
+        <div className="flex flex-col gap-lg">
+          <StockHeader ticker={ticker} />
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-lg items-start">
+            <div className="flex flex-col gap-lg">
+              <CompanyOverview ticker={ticker} />
+              <DisclosureList ticker={ticker} count={5} />
+            </div>
+            <div className="lg:sticky lg:top-4">
+              <StockDailyChart
+                ticker={ticker}
+                onExpand={() => transition(true)}
+                {...chartControls}
+              />
+            </div>
           </div>
         </div>
       )}
