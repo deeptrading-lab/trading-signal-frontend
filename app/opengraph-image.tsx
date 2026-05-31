@@ -36,6 +36,7 @@ export default function OpengraphImage() {
             height: 180,
             borderRadius: 36,
             background: "rgba(255,255,255,0.12)",
+            border: "6px solid rgba(255,255,255,0.9)", // 배지 흰색 테두리(브랜드 타일 강조)
           }}
         >
           <svg
