@@ -124,7 +124,12 @@ export async function middleware(request: NextRequest) {
 
   // OG 크롤러 예외(옵션 B) — 페이지(+`/opengraph-image`) 한정으로 게이트 통과(노출되는 건 빈 UI 셸 + OG <meta> 뿐).
   // `/api/*` 는 위에서 이미 401 처리되므로 본 분기는 페이지 요청만 통과시킨다(데이터 보호 유지). 상세 근거는 CRAWLER_USER_AGENTS 주석.
-  if (isCrawlerUserAgent(request)) {
+  // 크롤러는 GET/HEAD 로만 OG 를 읽는다 — 그 외 메서드는 통과 불허(PRD §9 q1(2) 'GET 페이지 한정' 정합).
+  // HEAD 도 허용: 일부 크롤러·`curl -sI`(OG content-type 검증) 가 HEAD 를 보내므로 GET 만 허용하면 /login 으로 샌다.
+  if (
+    ["GET", "HEAD"].includes(request.method) &&
+    isCrawlerUserAgent(request)
+  ) {
     return NextResponse.next();
   }
 
