@@ -25,15 +25,37 @@ import { cn } from "@/lib/utils/cn";
  *   - load 지연/실패 대비 4s 하드 백스톱.
  *   - opacity transition 종료 후 언마운트(`gone`).
  *   - 클라이언트 SPA 네비게이션 시엔 레이아웃이 유지돼 재등장하지 않음(콜드 로드 1회 한정).
+ *
+ * 로고 수직 정렬(네이티브 매칭):
+ *   네이티브 스플래시는 로고를 **화면 전체 중앙**에 둔다. 그런데 Android(예: One UI)는 상태바가
+ *   별도 띠라 `env(safe-area-inset-top)=0` 이고 web 뷰포트가 상태바 아래에서 시작 → `fixed inset-0`
+ *   중앙이 화면 전체 중앙보다 (상태바/2)만큼 아래에 찍혀 로고가 살짝 내려와 보인다(기기 실측 확인).
+ *   보정: `(screen.height - innerHeight)/2`(=상단 상태바의 절반)만큼 로고를 위로 올린다.
+ *   iOS 는 viewport-fit=cover 로 콘텐츠가 상태바 밑까지 가 innerHeight≈screen.height → 보정≈0(무영향).
+ *   하단 고정바가 innerHeight 를 깎는 기기(availHeight<height)에선 과보정 위험 → 그 경우 0(미보정).
  */
 const MIN_VISIBLE_MS = 1200; // 최소 표시시간 — 네이티브 스플래시 직후 인앱이 또렷이 보일 시간
 const BACKSTOP_MS = 4000; // load 미발화 대비 하드 상한
+const MAX_STATUS_BAR_PX = 120; // 상단 chrome 추정 상한(이상치 과보정 가드)
+
+/** 로고를 화면 전체 중앙에 맞추기 위한 위쪽 보정량(px). 위 주석 참고. */
+function measureLogoLift(): number {
+  const topChrome = window.screen.height - window.innerHeight;
+  const noPersistentBottomBar = window.screen.availHeight >= window.screen.height;
+  if (noPersistentBottomBar && topChrome > 0 && topChrome < MAX_STATUS_BAR_PX) {
+    return Math.round(topChrome / 2);
+  }
+  return 0;
+}
 
 export function SplashScreen() {
   const [leaving, setLeaving] = useState(false);
   const [gone, setGone] = useState(false);
+  const [logoLiftPx, setLogoLiftPx] = useState(0);
 
   useEffect(() => {
+    setLogoLiftPx(measureLogoLift());
+
     let loaded = document.readyState === "complete";
     let minElapsed = false;
     const leaveWhenReady = () => {
@@ -68,7 +90,13 @@ export function SplashScreen() {
         if (leaving) setGone(true);
       }}
     >
-      <BrandPulseIcon className="splash-icon" gradientId="splashPulse" />
+      {/* 런타임 측정값(상태바/2)만큼 로고를 위로 올려 네이티브 화면-전체-중앙과 일치 — 동적 값이라 inline transform. */}
+      <span
+        className="splash-icon-wrap"
+        style={logoLiftPx ? { transform: `translateY(-${logoLiftPx}px)` } : undefined}
+      >
+        <BrandPulseIcon className="splash-icon" gradientId="splashPulse" />
+      </span>
       <span className="splash-wordmark">{NAV_BRAND_LABEL}</span>
     </div>
   );

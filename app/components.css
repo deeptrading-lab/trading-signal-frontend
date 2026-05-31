@@ -595,6 +595,10 @@
   .splash-icon {
     @apply h-40 w-40;
   }
+  /* 로고 래퍼 — 런타임 수직 보정(translateY)을 거는 inline-flex 컨테이너(SplashScreen.tsx). */
+  .splash-icon-wrap {
+    @apply inline-flex;
+  }
   /* 워드마크 — 화면 하단 중앙(safe-area + 여백). 사이드바 brand 와 동일 그라데이션, font-display(36px/800). */
   .splash-wordmark {
     @apply absolute left-1/2 -translate-x-1/2 text-font-display bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
