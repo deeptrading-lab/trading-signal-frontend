@@ -41,12 +41,13 @@ export function GET(request: Request) {
   const url = new URL(request.url);
   const width = clampDim(url.searchParams.get("w"), DEFAULT_W);
   const height = clampDim(url.searchParams.get("h"), DEFAULT_H);
-  // 로고·워드마크·간격은 **인앱 스플래시와 동일한 고정 dp**(160 / 36 / 24)에 기기 ratio 를 곱해 렌더 →
-  // iOS 시작화면(본 이미지) → 인앱 스플래시 전환 시 로고 크기 점프 없음. `.splash-icon`/`.splash-wordmark` 와 정합.
+  // 인앱 스플래시(`.splash-icon`/`.splash-wordmark`)와 동일 레이아웃 — **로고 정중앙 + 워드마크 하단**.
+  // 고정 dp(로고 160 / 폰트 36)에 기기 ratio 를 곱해, iOS 시작화면(본 이미지)→인앱 전환 시 위치·크기 점프 없음.
   const ratio = clampRatio(url.searchParams.get("r"));
   const glyph = Math.round(160 * ratio);
   const fontSize = Math.round(36 * ratio);
-  const gap = Math.round(24 * ratio);
+  // 워드마크 하단 위치 — 인앱 `.splash-wordmark` bottom(safe-area-inset-bottom ~34dp + 48px ≈ 82dp) 매칭.
+  const textBottom = Math.round(82 * ratio);
 
   return new ImageResponse(
     (
@@ -54,11 +55,10 @@ export function GET(request: Request) {
         style={{
           width: "100%",
           height: "100%",
+          position: "relative",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          alignItems: "center", // 로고 정중앙
           justifyContent: "center",
-          gap,
           background: BRAND_MARK_BG,
         }}
       >
@@ -77,6 +77,12 @@ export function GET(request: Request) {
         </svg>
         <div
           style={{
+            position: "absolute", // 워드마크는 화면 하단(여백)
+            bottom: textBottom,
+            left: 0,
+            right: 0,
+            display: "flex",
+            justifyContent: "center",
             fontSize,
             fontWeight: 800,
             letterSpacing: -2,

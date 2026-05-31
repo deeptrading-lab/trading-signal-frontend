@@ -558,14 +558,15 @@
   }
 
   /* ---------- PWA 인앱 스플래시 (components/pwa/SplashScreen.tsx) ----------
-   * 앱 콜드 로드 직후 풀스크린 흰 화면 + 중앙 글리프 + 하단 FinSight 워드마크.
-   * 네이티브 OS 스플래시(Android manifest 자동 생성 = 흰 배경 + 그래프 글리프)와 배경(#ffffff)·
-   * 글리프를 맞춰, "중복 2회" 가 아니라 "로고 아래 텍스트가 이어 나타나는" 연속 화면으로 보이게 한다.
+   * 앱 콜드 로드 직후 풀스크린 흰 화면 — **로고는 화면 정중앙, 워드마크는 하단(여백)**.
+   * 네이티브 OS 스플래시(Android manifest 자동 생성 = 흰 배경 + 정중앙 그래프 글리프)와 **로고 위치·크기**를
+   * 맞춰, 네이티브→인앱 전환 시 로고가 점프하지 않게 한다(워드마크는 하단에서 이어 나타남).
    * z-[100] — 헤더/바텀nav/오버레이(50~55) 위. 로드 완료 시 opacity fade → 언마운트(SplashScreen.tsx).
    * **설치형 PWA(standalone)에서만 노출** — 일반 브라우저 탭(데스크탑·모바일)에선 콜드 로드마다 번쩍이지
    * 않도록 `display:none` 기본, `(display-mode: standalone)` 에서만 `flex`. (iOS 16+/Android 모두 지원) */
   .splash-screen {
-    @apply fixed inset-0 z-[100] flex-col items-center justify-center gap-2xl bg-surface;
+    /* 로고(유일한 in-flow 자식)를 정중앙 배치 — 워드마크는 absolute 라 flow 밖. */
+    @apply fixed inset-0 z-[100] items-center justify-center bg-surface;
     display: none;
     transition: opacity 320ms ease;
   }
@@ -578,12 +579,13 @@
     @apply opacity-0 pointer-events-none;
   }
   /* 글리프 160px(=160dp) — Android 12+ 네이티브 스플래시 로고(192dp 원 안 ~158dp)와 시각 크기 매칭.
-   * brandMark 글리프는 캔버스의 55% → 네이티브 ~158dp 와 동급. 인앱↔네이티브 로고 점프 최소화. */
+   * brandMark 글리프는 캔버스의 55% → 네이티브 ~158dp 와 동급. 정중앙 배치로 네이티브와 위치 일치. */
   .splash-icon {
     @apply h-40 w-40;
   }
-  /* 워드마크 — 사이드바 brand 와 동일 다크→미드 그레이 그라데이션, font-display(36px/800). */
+  /* 워드마크 — 화면 하단 중앙(safe-area + 여백). 사이드바 brand 와 동일 그라데이션, font-display(36px/800). */
   .splash-wordmark {
-    @apply text-font-display bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
+    @apply absolute left-1/2 -translate-x-1/2 text-font-display bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
+    bottom: calc(env(safe-area-inset-bottom) + 3rem);
   }
 }
