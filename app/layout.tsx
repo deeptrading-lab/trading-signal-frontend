@@ -28,7 +28,9 @@ const IOS_SPLASH_DEVICES: ReadonlyArray<[number, number, number]> = [
 ];
 
 const APPLE_STARTUP_IMAGES = IOS_SPLASH_DEVICES.map(([w, h, r]) => ({
-  url: `/splash-ios?w=${w * r}&h=${h * r}`,
+  // `r`(devicePixelRatio) 도 넘겨, 라우트가 로고/워드마크를 인앱 스플래시와 동일한 고정 dp×r 로 굽게 한다
+  // (시작화면 → 인앱 스플래시 로고 점프 방지).
+  url: `/splash-ios?w=${w * r}&h=${h * r}&r=${r}`,
   media: `screen and (device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
 }));
 

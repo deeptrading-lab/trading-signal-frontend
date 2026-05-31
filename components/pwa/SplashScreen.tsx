@@ -20,28 +20,40 @@ import { cn } from "@/lib/utils/cn";
  *
  * 표시/제거:
  *   - SSR 초기 상태가 `보임` 이므로 하이드레이션 이전에도 즉시 렌더(콜드 로드 흰 화면 공백 제거).
- *   - `load` 이벤트(또는 이미 complete) 시 fade-out. JS 지연/실패 대비 2.5s 하드 백스톱.
+ *   - **최소 표시시간(1.2s)** 과 `load` 를 **둘 다** 충족해야 fade-out — 캐시된 PWA 에서 너무 빨리
+ *     사라져 안 보이던 문제 해결(콜드 로드 시 로고+FinSight 를 명확히 인지할 시간 확보).
+ *   - load 지연/실패 대비 4s 하드 백스톱.
  *   - opacity transition 종료 후 언마운트(`gone`).
  *   - 클라이언트 SPA 네비게이션 시엔 레이아웃이 유지돼 재등장하지 않음(콜드 로드 1회 한정).
  */
+const MIN_VISIBLE_MS = 1200; // 최소 표시시간 — 네이티브 스플래시 직후 인앱이 또렷이 보일 시간
+const BACKSTOP_MS = 4000; // load 미발화 대비 하드 상한
+
 export function SplashScreen() {
   const [leaving, setLeaving] = useState(false);
   const [gone, setGone] = useState(false);
 
   useEffect(() => {
-    const hide = () => setLeaving(true);
-    let backstop: number;
+    let loaded = document.readyState === "complete";
+    let minElapsed = false;
+    const leaveWhenReady = () => {
+      if (loaded && minElapsed) setLeaving(true);
+    };
 
-    if (document.readyState === "complete") {
-      // 이미 로드 완료 — 깜빡임 없이 아주 짧게 보여주고 내린다.
-      backstop = window.setTimeout(hide, 180);
-      return () => window.clearTimeout(backstop);
-    }
+    const minTimer = window.setTimeout(() => {
+      minElapsed = true;
+      leaveWhenReady();
+    }, MIN_VISIBLE_MS);
+    const onLoad = () => {
+      loaded = true;
+      leaveWhenReady();
+    };
+    if (!loaded) window.addEventListener("load", onLoad, { once: true });
+    const backstop = window.setTimeout(() => setLeaving(true), BACKSTOP_MS);
 
-    window.addEventListener("load", hide, { once: true });
-    backstop = window.setTimeout(hide, 2500); // load 지연/실패 대비 하드 백스톱
     return () => {
-      window.removeEventListener("load", hide);
+      window.removeEventListener("load", onLoad);
+      window.clearTimeout(minTimer);
       window.clearTimeout(backstop);
     };
   }, []);

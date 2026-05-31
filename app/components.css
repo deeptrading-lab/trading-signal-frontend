@@ -565,7 +565,7 @@
    * **설치형 PWA(standalone)에서만 노출** — 일반 브라우저 탭(데스크탑·모바일)에선 콜드 로드마다 번쩍이지
    * 않도록 `display:none` 기본, `(display-mode: standalone)` 에서만 `flex`. (iOS 16+/Android 모두 지원) */
   .splash-screen {
-    @apply fixed inset-0 z-[100] flex-col items-center justify-center gap-lg bg-surface;
+    @apply fixed inset-0 z-[100] flex-col items-center justify-center gap-2xl bg-surface;
     display: none;
     transition: opacity 320ms ease;
   }
@@ -577,9 +577,10 @@
   .splash-screen-leaving {
     @apply opacity-0 pointer-events-none;
   }
-  /* 글리프 96px — viewBox 24 stroke 2.5 가 큰 흰 화면에서도 또렷(사이드바 24px 대비 splash 비중). */
+  /* 글리프 160px(=160dp) — Android 12+ 네이티브 스플래시 로고(192dp 원 안 ~158dp)와 시각 크기 매칭.
+   * brandMark 글리프는 캔버스의 55% → 네이티브 ~158dp 와 동급. 인앱↔네이티브 로고 점프 최소화. */
   .splash-icon {
-    @apply h-24 w-24;
+    @apply h-40 w-40;
   }
   /* 워드마크 — 사이드바 brand 와 동일 다크→미드 그레이 그라데이션, font-display(36px/800). */
   .splash-wordmark {

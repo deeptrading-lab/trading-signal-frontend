@@ -25,20 +25,28 @@ const MAX_DIM = 3000;
 const DEFAULT_W = 1170; // iPhone 12~14 (390pt @3x)
 const DEFAULT_H = 2532;
 
+const DEFAULT_RATIO = 3; // 최신 iPhone 대부분 @3x
+
 function clampDim(raw: string | null, fallback: number): number {
   const n = Number(raw);
   return Number.isFinite(n) && n >= MIN_DIM && n <= MAX_DIM ? n : fallback;
+}
+
+function clampRatio(raw: string | null): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 && n <= 4 ? n : DEFAULT_RATIO;
 }
 
 export function GET(request: Request) {
   const url = new URL(request.url);
   const width = clampDim(url.searchParams.get("w"), DEFAULT_W);
   const height = clampDim(url.searchParams.get("h"), DEFAULT_H);
-  // 글리프·워드마크는 짧은 변 기준 스케일(세로/가로 균형) — 인앱 스플래시 비율과 근사.
-  const base = Math.min(width, height);
-  const glyph = Math.round(base * 0.26);
-  const fontSize = Math.round(base * 0.11);
-  const gap = Math.round(base * 0.06);
+  // 로고·워드마크·간격은 **인앱 스플래시와 동일한 고정 dp**(160 / 36 / 24)에 기기 ratio 를 곱해 렌더 →
+  // iOS 시작화면(본 이미지) → 인앱 스플래시 전환 시 로고 크기 점프 없음. `.splash-icon`/`.splash-wordmark` 와 정합.
+  const ratio = clampRatio(url.searchParams.get("r"));
+  const glyph = Math.round(160 * ratio);
+  const fontSize = Math.round(36 * ratio);
+  const gap = Math.round(24 * ratio);
 
   return new ImageResponse(
     (
