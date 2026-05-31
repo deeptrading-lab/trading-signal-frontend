@@ -29,7 +29,6 @@ export const PERIODS: PeriodConfig[] = [
 
 export const RANGES: Record<ChartPeriod, RangeConfig[]> = {
   D: [
-    { label: "1주", days: 7 },
     { label: "1개월", days: 40 },
     { label: "3개월", days: 100 },
     { label: "6개월", days: 200 },
@@ -50,22 +49,12 @@ export const RANGES: Record<ChartPeriod, RangeConfig[]> = {
 // ── 기본값 ──────────────────────────────────────────────
 export const DEFAULT_CHART_TYPE: ChartType = "candle";
 export const DEFAULT_PERIOD: ChartPeriod = "D";
+/** 일봉 기준 두 번째 범위(3개월) — 기존 기본값 유지. */
+export const DEFAULT_DAYS = RANGES["D"][1].days;
 
-/**
- * 봉별 기본 선택 범위 — "1주"는 단축 보기용 옵션이라 기본값에서 제외(일봉 기본 3개월).
- * (RANGES 배열 인덱스에 의존하지 않도록 명시값으로 둔다 — 범위 추가/순서 변경에 안전.)
- */
-export const DEFAULT_DAYS_BY_PERIOD: Record<ChartPeriod, number> = {
-  D: 100, // 3개월
-  W: 100, // 3개월
-  M: 400, // 1년
-};
-
-export const DEFAULT_DAYS = DEFAULT_DAYS_BY_PERIOD["D"];
-
-/** 봉 종류 변경 시 기본으로 잡는 범위. */
+/** 봉 종류 변경 시 기본으로 잡는 범위(각 봉의 첫 범위). */
 export function defaultDaysForPeriod(p: ChartPeriod): number {
-  return DEFAULT_DAYS_BY_PERIOD[p];
+  return RANGES[p][0].days;
 }
 
 /**
