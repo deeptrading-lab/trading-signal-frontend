@@ -41,7 +41,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        className="flex items-center gap-xs px-sm py-[3px] rounded-sm text-caption font-medium bg-surface-muted text-text-strong cursor-pointer"
+        className="flex items-center gap-sm px-md py-[6px] rounded-sm text-body-sm-strong bg-surface-muted text-text-strong border border-border-line cursor-pointer"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -49,7 +49,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
         {current.label}
         <ChevronDown
           className={cn(
-            "h-sm w-sm text-text-muted transition-transform duration-200",
+            "h-4 w-4 shrink-0 text-text-muted transition-transform duration-200",
             open && "rotate-180",
           )}
           aria-hidden="true"
@@ -58,7 +58,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
 
       {open && (
         <div
-          className="dropdown-panel absolute right-0 top-full z-[40] mt-xs min-w-[88px]"
+          className="dropdown-panel absolute right-0 top-full z-[40] mt-xs min-w-[112px]"
           role="listbox"
           aria-label="기간 선택"
         >
@@ -73,7 +73,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full items-center px-sm py-xs rounded-sm text-caption font-medium cursor-pointer text-left",
+                "flex w-full items-center px-md py-[6px] rounded-sm text-body-sm-strong cursor-pointer text-left",
                 r.days === value
                   ? "bg-surface-muted text-text-strong"
                   : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
