@@ -4,7 +4,7 @@
  * `inquire-daily-itemchartprice`(FHKST03010100) 경유.
  *
  * GET ?ticker=005930&days=100&period=D|W|M
- *   - days  : 오늘 기준 과거 N 캘린더일 (기본 100, 최대 1500)
+ *   - days  : 오늘 기준 과거 N 캘린더일 (기본 100, 최대 3000)
  *   - period: D(일봉) / W(주봉) / M(월봉), 기본 D
  *   - 응답  : StockDailyCandle[] 오름차순(오래된 날 먼저)
  *
@@ -25,7 +25,7 @@ const CHUNK_DELAY_MS = 150;
 /** 일봉 1년 = ~3콜, 타임아웃을 넉넉히. */
 const BFF_TIMEOUT_MS = 12_000;
 const DEFAULT_DAYS = 100;
-const MAX_DAYS = 1_500;
+const MAX_DAYS = 3_000;
 
 const VALID_PERIODS = new Set(["D", "W", "M"]);
 type KisPeriod = "D" | "W" | "M";
