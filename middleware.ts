@@ -61,11 +61,19 @@ function isPublicPath(pathname: string): boolean {
   // Next 정적/이미지 자원.
   if (pathname.startsWith("/_next/static")) return true;
   if (pathname.startsWith("/_next/image")) return true;
-  // favicon / app icon / 메타 라우트.
+  // favicon / app icon / OG 이미지 / 메타 라우트.
+  // ⚠️ `/opengraph-image` 는 UA 무관 완전 공개(`/icon` 과 동일 취급) — 크롤러 UA 화이트리스트로 가두면 안 된다.
+  //    카카오·페북·슬랙 등은 HTML 은 스크랩 UA(`kakaotalk-scrap` 등)로 읽지만, og:image 다운로드는
+  //    별도 컴포넌트가 다른/빈 UA 로 가져가므로 UA 게이트에 막혀 미리보기 이미지가 빈 카드가 된다.
+  //    본 이미지는 브랜드 카드(파란 배경 + Activity + "FinSight")로 민감 데이터 0 → favicon 과 동일 민감도라 공개 안전.
   if (
     pathname === "/favicon.ico" ||
     pathname === "/icon" ||
     pathname.startsWith("/icon") ||
+    pathname === "/opengraph-image" ||
+    pathname.startsWith("/opengraph-image") ||
+    pathname === "/twitter-image" ||
+    pathname.startsWith("/twitter-image") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/manifest.webmanifest"
@@ -141,11 +149,13 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * 1차 성능 제외(부하 절감) — 정적/이미지/favicon/icon/fonts.
+ * 1차 성능 제외(부하 절감) — 정적/이미지/favicon/icon/opengraph-image/twitter-image/fonts.
  * ⚠️ 보안 경계는 위 미들웨어 함수 내부 `isPublicPath` 가 단일 진실(matcher 는 최적화일 뿐).
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon|fonts).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon|opengraph-image|twitter-image|fonts).*)",
+  ],
 };
 
 /* 프로덕션 + 비밀번호 미설정 경고 — 모듈 로드 시 1회(요청마다 스팸 금지, AC-13). */
