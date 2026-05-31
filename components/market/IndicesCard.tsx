@@ -4,7 +4,7 @@
  * PR8 (finsight-redesign) 신규.
  *
  * 시안 `MarketTrends.tsx` L42~L67 정합 — 카드 헤더 (TrendingUp 아이콘 + 타이틀) + 6 지수 2-col grid.
- * 각 항목: 지수명 (text-caption) + 값 (text-h2 tabular-nums) + 변동률 (한국식 + TrendingUp/Down 아이콘).
+ * 각 항목: 2줄 — 1줄 지수명 (text-body-sm text-strong) / 2줄 값 (text-h2 tabular-nums, 좌) + 변동률 (한국식 + TrendingUp/Down 아이콘, 우, 밑선 정렬).
  *
  * v8 토큰:
  *   - 카드 셸 = `card` 합성 토큰 (rounded.lg + card padding).
@@ -49,13 +49,20 @@ function IndexCell({ index }: { index: MarketIndex }) {
   const Icon = index.isUp ? TrendingUp : TrendingDown;
   return (
     <li className="rounded-md bg-surface-muted p-md">
-      <p className="mb-xs text-caption text-text-muted">{index.name}</p>
-      <p className="mb-xs text-h2 text-text-strong tabular-nums">
-        {index.value}
-      </p>
-      <div className={cn("inline-flex items-center gap-xs text-body-sm", signalClass)}>
-        <Icon className="h-md w-md" aria-hidden="true" />
-        {index.changeDisplay}
+      <p className="mb-xs text-body-sm text-text-strong">{index.name}</p>
+      <div className="flex items-baseline justify-between gap-sm">
+        <span className="text-h2 text-text-strong tabular-nums">
+          {index.value}
+        </span>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-xs text-body-sm whitespace-nowrap",
+            signalClass,
+          )}
+        >
+          <Icon className="h-md w-md" aria-hidden="true" />
+          {index.changeDisplay}
+        </span>
       </div>
     </li>
   );
