@@ -2,35 +2,30 @@
  * Sidebar — finsight 글로벌 셸 데스크탑(`>= lg`) 좌측 사이드바.
  *
  * PR3 (finsight-redesign) 갱신. PRD §3.3 / §5.3 AC-L-1.
- * home-market-redesign PR2 — 메뉴 3개(홈/관심종목/마이페이지) + AI분석 하단 "준비 중".
+ * home-market-redesign PR2 — 메뉴 4개(홈/관심종목/종목분석/마이페이지) + AI분석 하단 "준비 중".
  *
  * 구조:
  *   - 상단: FinSight 브랜드 wordmark
- *   - 중단: NAV_ITEMS 3개 링크 (/, /watchlist, /profile)
- *   - 하단(mt-auto): AI 분석 "준비 중" 비활성 버튼 (`sidebar-nav-item-coming-soon` + `badge-coming-soon`)
+ *   - 중단: NAV_ITEMS 4개 링크 (/, /watchlist, /stock, /profile)
+ *   - 하단(mt-auto): AI 분석 "준비 중" 비활성 항목 (`ComingSoonNavItem` — 말풍선 포함)
+ *
+ * "종목 분석" 클릭은 BottomNav 와 공유하는 `useStockNavClick` 훅으로 일원화(중복 제거 + 폴백 교정).
  */
 
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
-import { NAV_ITEMS, NAV_ITEM_ANALYZE, isNavItemActive } from "@/components/layout/navItems";
-import { NAV_BRAND_LABEL, NAV_MENU_COMING_SOON_BADGE } from "@/lib/copy/layout/navCopy";
-import { readRecentSearches } from "@/lib/utils/recentSearch";
+import { ComingSoonNavItem } from "@/components/layout/ComingSoonNavItem";
+import { NAV_ITEMS, isNavItemActive } from "@/components/layout/navItems";
+import { NAV_BRAND_LABEL } from "@/lib/copy/layout/navCopy";
+import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
 import { cn } from "@/lib/utils/cn";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const ComingSoonIcon = NAV_ITEM_ANALYZE.icon;
-
-  function handleStockNavClick(e: React.MouseEvent, active: boolean) {
-    e.preventDefault();
-    if (active) return; // 이미 종목 상세 페이지 — 그대로 유지
-    const recent = readRecentSearches();
-    router.push(recent.length > 0 ? `/stock/${recent[0].ticker}` : "/");
-  }
+  const handleStockNavClick = useStockNavClick();
 
   return (
     <aside
@@ -69,18 +64,9 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* AI 분석 "준비 중" — 하단 고정, 클릭 불가 */}
+      {/* AI 분석 "준비 중" — 하단 고정, 클릭 불가 + 안내 말풍선 */}
       <div className="mt-auto pt-lg">
-        <div
-          className="sidebar-nav-item-coming-soon"
-          aria-disabled="true"
-          role="menuitem"
-          aria-label={`${NAV_ITEM_ANALYZE.label} (${NAV_MENU_COMING_SOON_BADGE})`}
-        >
-          <ComingSoonIcon className="sidebar-nav-item-icon" aria-hidden="true" />
-          <span className="sidebar-nav-item-label">{NAV_ITEM_ANALYZE.label}</span>
-          <span className="ml-auto badge-coming-soon">{NAV_MENU_COMING_SOON_BADGE}</span>
-        </div>
+        <ComingSoonNavItem variant="sidebar" />
       </div>
     </aside>
   );

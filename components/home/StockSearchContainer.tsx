@@ -34,8 +34,13 @@ const SEARCH_ARIA = "종목 검색";
 
 type Tab = "recent" | "watchlist";
 
-export function StockSearchContainer() {
-  const [keyword, setKeyword] = useState("");
+export interface StockSearchContainerProps {
+  /** 검색 입력 초기값 — 종목 상세 진입 시 현재 종목명을 미리 채운다(드롭다운은 닫힌 채 표시). */
+  initialKeyword?: string;
+}
+
+export function StockSearchContainer({ initialKeyword = "" }: StockSearchContainerProps = {}) {
+  const [keyword, setKeyword] = useState(initialKeyword);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("recent");
   const [recentSearches, setRecentSearches] = useState<RecentSearchEntry[]>([]);
@@ -141,7 +146,7 @@ export function StockSearchContainer() {
           {/* 검색 결과 */}
           {showSearchResults && (
             <div
-              className="max-h-[260px] overflow-y-auto"
+              className="max-h-[260px] overflow-y-auto scrollbar-hide-mobile"
               role="listbox"
               aria-label="종목 검색 결과"
             >
@@ -192,7 +197,7 @@ export function StockSearchContainer() {
 
               {/* 탭 내용 */}
               <div
-                className="max-h-[260px] overflow-y-auto"
+                className="max-h-[260px] overflow-y-auto scrollbar-hide-mobile"
                 role="listbox"
                 aria-label={activeTab === "recent" ? "최근 검색 종목" : "관심 종목"}
               >

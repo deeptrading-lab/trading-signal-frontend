@@ -21,6 +21,9 @@ export const NAV_MENU_PROFILE = "마이페이지";
 /** v9 (home-market-redesign) PR2 — AI 분석 "준비 중" 배지 카피. */
 export const NAV_MENU_COMING_SOON_BADGE = "준비 중";
 
+/** AI 분석 비활성 항목 호버/탭 시 노출하는 안내 말풍선 카피. */
+export const NAV_MENU_COMING_SOON_TOOLTIP = "AI 분석 기능은 준비 중이에요";
+
 export const HEADER_PROFILE_ARIA = "프로필 메뉴";
 
 export const HEADER_MARKET_TICKER_ARIA = "글로벌 마켓 시세";

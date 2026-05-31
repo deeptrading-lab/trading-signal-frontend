@@ -515,6 +515,18 @@
     @apply flex flex-col items-center justify-center gap-1 flex-1 text-caption text-text-muted opacity-60 cursor-not-allowed;
   }
 
+  /* nav-tooltip: "준비 중" 안내 말풍선 — 다크 배경 + 아래쪽 꼬리(▼).
+   * 트리거(coming-soon 항목) 위에 absolute 배치(`bottom-full`)는 호출 측에서 지정.
+   * Sidebar(데스크탑 좌하단)·BottomNav(모바일 하단) 모두 "위로 뜨고 아래 꼬리" 로 통일. */
+  .nav-tooltip {
+    @apply absolute z-[60] px-md py-sm rounded-md bg-text-strong text-surface text-caption
+           whitespace-nowrap shadow-md pointer-events-none;
+  }
+  .nav-tooltip::after {
+    content: "";
+    @apply absolute left-1/2 -bottom-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-text-strong;
+  }
+
   /* fng-band-* 배지 — 공포·탐욕 구간 라벨 배지. DESIGN.md v9 `fng-band-*` 합성 토큰 정합.
    * 5구간 의미축: 극공포(청색) / 공포(청록) / 중립(회색) / 탐욕(황토) / 극탐욕(와인).
    * WCAG AA 4.5:1 모두 통과 (design.md §Colors WCAG 표). */
@@ -584,5 +596,21 @@
   /* 워드마크 — 사이드바 brand 와 동일 다크→미드 그레이 그라데이션, font-display(36px/800). */
   .splash-wordmark {
     @apply text-font-display bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
+  }
+}
+
+/* ---------- 유틸리티 ----------
+ * scrollbar-hide-mobile: 모바일(`< md` = 768px)에서만 스크롤바를 숨긴다.
+ *   `::-webkit-scrollbar` 의사요소는 Tailwind 반응형 prefix 로 다룰 수 없어 CSS 미디어쿼리로 처리.
+ *   데스크탑은 인셋/스크롤바 그대로 유지(무회귀). 주 스크롤 컨테이너(`.main-area`)·검색 드롭다운에 적용. */
+@layer utilities {
+  @media (max-width: 767px) {
+    .scrollbar-hide-mobile {
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/legacy Edge */
+    }
+    .scrollbar-hide-mobile::-webkit-scrollbar {
+      display: none; /* Chrome/Safari */
+    }
   }
 }

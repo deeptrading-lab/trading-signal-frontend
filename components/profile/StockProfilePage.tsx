@@ -24,16 +24,18 @@ import { NAV_MENU_STOCK } from "@/lib/copy/layout/navCopy";
 
 export interface StockProfilePageProps {
   ticker: string;
+  /** 검색창 초기값 — "종목 분석" 메뉴로 진입(useStockNavClick) 시 현재 종목명을 미리 채운다. */
+  initialKeyword?: string;
 }
 
-export function StockProfilePage({ ticker }: StockProfilePageProps) {
+export function StockProfilePage({ ticker, initialKeyword }: StockProfilePageProps) {
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
       <header className="flex items-center gap-sm">
         <BarChart2 className="h-2xl w-2xl text-accent-vivid" aria-hidden="true" />
         <h1 className="text-h1 text-text-strong">{NAV_MENU_STOCK}</h1>
       </header>
-      <StockSearchContainer />
+      <StockSearchContainer initialKeyword={initialKeyword} />
       <StockPageLayout ticker={ticker} />
     </div>
   );
