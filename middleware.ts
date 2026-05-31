@@ -50,43 +50,39 @@ function isCrawlerUserAgent(request: NextRequest): boolean {
 }
 
 /**
- * 인증 없이 항상 통과하는 예외 경로 판별(코드 가드 — matcher 와 이중 방어).
- * matcher 가 1차 제외하더라도 보안 경계는 본 함수가 단일 진실.
+ * 인증 없이 항상 통과하는 **플랫 공개 경로** — 정확 일치 화이트리스트.
+ * - 이전엔 `startsWith("/icon")` 등 접두 매칭이라 `/iconography`·`/apple-icon-admin` 같은 미래 경로를
+ *   의도치 않게 공개할 미세 표면이 있었음 → 하위 경로가 없는 플랫 라우트는 정확 일치로 전환.
+ * - 아이콘/메타 라우트(`/icon`·`/apple-icon`·`/opengraph-image` 등)는 Next 가 버전 해시를 쿼리
+ *   (`?<hash>`)로 붙일 뿐 pathname 은 bare 경로라 정확 일치로 충분. `/icon-pwa?size=…` 도 동일.
+ * - ⚠️ `/opengraph-image` 는 UA 무관 완전 공개(`/icon` 과 동일 취급) — 크롤러 UA 화이트리스트로 가두면 안 된다.
+ *    카카오·페북·슬랙 등은 HTML 은 스크랩 UA 로 읽지만 og:image 다운로드는 다른/빈 UA 라 UA 게이트에
+ *    막히면 미리보기가 빈 카드가 된다. 본 이미지는 브랜드 카드(민감 데이터 0)라 favicon 과 동일 민감도 → 공개 안전.
+ */
+const PUBLIC_EXACT_PATHS = new Set<string>([
+  "/login", // 로그인 화면 자체 — 루프 가드의 핵심
+  "/favicon.ico",
+  "/icon", // 파비콘 (app/icon.tsx)
+  "/icon-pwa", // PWA manifest 아이콘 (app/icon-pwa) — `?size=192|512` 쿼리는 pathname 과 무관
+  "/apple-icon", // iOS 홈 아이콘 (app/apple-icon.tsx)
+  "/opengraph-image", // OG 이미지 (위 ⚠️ — UA 무관 공개)
+  "/twitter-image", // twitter-image.tsx 미생성이나 방어적 유지
+  "/robots.txt",
+  "/sitemap.xml",
+  "/manifest.webmanifest", // PWA 매니페스트
+  "/sw.js", // PWA 서비스워커(no-op) — JS 로 서빙돼야 등록 성공
+]);
+
+/**
+ * 인증 없이 항상 통과하는 예외 경로 판별 — **보안 경계의 단일 진실**.
+ * matcher 는 `_next` 내부 자산만 성능 제외하므로, 그 외 경로의 공개 여부는 전적으로 본 함수가 정한다.
  */
 function isPublicPath(pathname: string): boolean {
-  // 로그인 화면 자체 — 루프 가드의 핵심.
-  if (pathname === "/login") return true;
-  // 인증 API(login/logout) — 미인증 상태에서 호출 가능해야 한다.
-  if (pathname.startsWith("/api/auth/")) return true;
-  // Next 정적/이미지 자원.
-  if (pathname.startsWith("/_next/static")) return true;
-  if (pathname.startsWith("/_next/image")) return true;
-  // favicon / app icon / OG 이미지 / 메타 라우트.
-  // ⚠️ `/opengraph-image` 는 UA 무관 완전 공개(`/icon` 과 동일 취급) — 크롤러 UA 화이트리스트로 가두면 안 된다.
-  //    카카오·페북·슬랙 등은 HTML 은 스크랩 UA(`kakaotalk-scrap` 등)로 읽지만, og:image 다운로드는
-  //    별도 컴포넌트가 다른/빈 UA 로 가져가므로 UA 게이트에 막혀 미리보기 이미지가 빈 카드가 된다.
-  //    본 이미지는 브랜드 카드(파란 배경 + Activity + "FinSight")로 민감 데이터 0 → favicon 과 동일 민감도라 공개 안전.
-  if (
-    pathname === "/favicon.ico" ||
-    pathname === "/icon" ||
-    pathname.startsWith("/icon") || // 파비콘 + PWA manifest 아이콘(`/icon-pwa`)
-    // iOS 홈 아이콘(apple-touch-icon). 경로가 `apple` 로 시작 → 위 `/icon` 에 안 걸리므로 별도 예외.
-    // 미등록 시 iOS 가 쿠키 없이 가져갈 때 게이트가 로그인 HTML 을 줘 홈 아이콘이 깨진다.
-    pathname === "/apple-icon" ||
-    pathname.startsWith("/apple-icon") ||
-    pathname === "/opengraph-image" ||
-    pathname.startsWith("/opengraph-image") ||
-    pathname === "/twitter-image" ||
-    pathname.startsWith("/twitter-image") ||
-    pathname === "/robots.txt" ||
-    pathname === "/sitemap.xml" ||
-    pathname === "/manifest.webmanifest" ||
-    pathname === "/sw.js" // PWA 서비스워커(no-op). JS 로 서빙돼야 등록 성공 → 게이트 통과 필수.
-  ) {
-    return true;
-  }
-  // public/ 공개 에셋(폰트 등).
-  if (pathname.startsWith("/fonts/")) return true;
+  // 1) 플랫 공개 경로 — 정확 일치(로그인·파비콘·아이콘·메타·PWA 에셋).
+  if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
+  // 2) 하위 경로가 있는 공개 트리 — 접두 매칭이 타당한 것만(인증 API·공개 폰트).
+  if (pathname.startsWith("/api/auth/")) return true; // 인증 API(login/logout) — 미인증 호출 가능
+  if (pathname.startsWith("/fonts/")) return true; // public/fonts/ 공개 에셋
   return false;
 }
 
@@ -154,13 +150,15 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * 1차 성능 제외(부하 절감) — 정적/이미지/favicon/icon/opengraph-image/twitter-image/fonts.
- * ⚠️ 보안 경계는 위 미들웨어 함수 내부 `isPublicPath` 가 단일 진실(matcher 는 최적화일 뿐).
+ * matcher 는 Next 내부 자산 트리(`_next/static`·`_next/image`)만 1차 제외 — 미들웨어가 모든 빌드
+ * 청크/최적화 이미지마다 도는 것을 막는 순수 성능 가드.
+ * 그 외 경로(favicon·아이콘·OG·매니페스트·sw·폰트·페이지·API)는 전부 미들웨어를 거치고
+ * `isPublicPath` 가 공개 여부를 **정확 일치**로 단일 판정한다(= 보안 경계의 진짜 단일 진실).
+ * (이전엔 matcher 가 `icon` 등 접두로 폭넓게 제외해 `/iconography` 같은 미래 경로가 게이트를
+ *  통째로 건너뛸 미세 표면이 있었음 → 정확 매칭으로 전환.)
  */
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|opengraph-image|twitter-image|sw.js|fonts).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
 
 /* 프로덕션 + 비밀번호 미설정 경고 — 모듈 로드 시 1회(요청마다 스팸 금지, AC-13). */
