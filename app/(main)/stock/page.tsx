@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+import { StockSearchLanding } from "@/components/profile/StockSearchLanding";
 
-/** `/stock` 직접 진입 시 홈으로 이동 — 종목 분석은 검색·관심종목에서 진입. */
+/** `/stock` — 종목 검색 랜딩. "종목 분석" 메뉴(최근 종목 없음) 진입점. */
 export default function StockIndexPage() {
-  redirect("/");
+  return <StockSearchLanding />;
 }

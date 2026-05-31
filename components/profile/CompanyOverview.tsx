@@ -34,10 +34,13 @@ import {
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { useQueryDisclosureCompany } from "@/hooks/disclosure/useQueryDisclosureCompany";
+import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import type { CompanyProfile } from "@/lib/api/dart/types";
 
 export interface CompanyOverviewProps {
   ticker: string;
+  /** 모바일 — 접기/펼치기 카드로 렌더(기본 접힘). 미지정 시 기존 항상 펼친 카드. */
+  collapsible?: boolean;
 }
 
 function marketLabel(market: CompanyProfile["market"]): string {
@@ -53,8 +56,62 @@ function marketLabel(market: CompanyProfile["market"]): string {
   }
 }
 
-export function CompanyOverview({ ticker }: CompanyOverviewProps) {
+export function CompanyOverview({ ticker, collapsible = false }: CompanyOverviewProps) {
   const { data, isLoading, isError, error } = useQueryDisclosureCompany(ticker);
+
+  const body = isLoading ? (
+    <p className="text-body-md text-text-muted" aria-busy="true">
+      {STOCK_DETAIL_LOADING}
+    </p>
+  ) : isError ? (
+    <div className="card-critical" role="alert">
+      <p className="text-body-strong">
+        {error?.message ?? STOCK_DETAIL_NOT_FOUND}
+      </p>
+    </div>
+  ) : !data ? (
+    <p className="text-body-md text-text-muted">{STOCK_DETAIL_NOT_FOUND}</p>
+  ) : (
+    <>
+      <h3 className="text-h2 text-text-strong mb-md">{data.corpName}</h3>
+      <dl className="grid grid-cols-1 md:grid-cols-2 gap-md">
+        <OverviewRow label={COMPANY_LABEL_CEO} value={data.ceoName} />
+        <OverviewRow
+          label={COMPANY_LABEL_MARKET}
+          value={marketLabel(data.market)}
+        />
+        <OverviewRow
+          label={COMPANY_LABEL_ESTABLISHED}
+          value={data.establishedDate}
+        />
+        <OverviewRow label={COMPANY_LABEL_INDUSTRY} value={data.industry} />
+        <OverviewRow
+          label={COMPANY_LABEL_HOMEPAGE}
+          value={
+            data.homepage ? (
+              <a
+                href={data.homepage}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-accent-vivid hover:underline break-all"
+              >
+                {data.homepage}
+              </a>
+            ) : undefined
+          }
+        />
+        <OverviewRow label={COMPANY_LABEL_ADDRESS} value={data.address} />
+      </dl>
+    </>
+  );
+
+  if (collapsible) {
+    return (
+      <CollapsibleCard title={STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}>
+        {body}
+      </CollapsibleCard>
+    );
+  }
 
   return (
     <section className="card" aria-label={STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}>
@@ -63,55 +120,7 @@ export function CompanyOverview({ ticker }: CompanyOverviewProps) {
           {STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}
         </h2>
       </header>
-
-      {isLoading ? (
-        <p className="text-body-md text-text-muted" aria-busy="true">
-          {STOCK_DETAIL_LOADING}
-        </p>
-      ) : isError ? (
-        <div className="card-critical" role="alert">
-          <p className="text-body-strong">
-            {error?.message ?? STOCK_DETAIL_NOT_FOUND}
-          </p>
-        </div>
-      ) : !data ? (
-        <p className="text-body-md text-text-muted">{STOCK_DETAIL_NOT_FOUND}</p>
-      ) : (
-        <>
-          <h3 className="text-h2 text-text-strong mb-md">{data.corpName}</h3>
-          <dl className="grid grid-cols-1 md:grid-cols-2 gap-md">
-            <OverviewRow label={COMPANY_LABEL_CEO} value={data.ceoName} />
-            <OverviewRow
-              label={COMPANY_LABEL_MARKET}
-              value={marketLabel(data.market)}
-            />
-            <OverviewRow
-              label={COMPANY_LABEL_ESTABLISHED}
-              value={data.establishedDate}
-            />
-            <OverviewRow
-              label={COMPANY_LABEL_INDUSTRY}
-              value={data.industry}
-            />
-            <OverviewRow
-              label={COMPANY_LABEL_HOMEPAGE}
-              value={
-                data.homepage ? (
-                  <a
-                    href={data.homepage}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-accent-vivid hover:underline break-all"
-                  >
-                    {data.homepage}
-                  </a>
-                ) : undefined
-              }
-            />
-            <OverviewRow label={COMPANY_LABEL_ADDRESS} value={data.address} />
-          </dl>
-        </>
-      )}
+      {body}
     </section>
   );
 }

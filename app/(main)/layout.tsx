@@ -45,8 +45,10 @@ export default function MainLayout({
           <Header />
           {/* main 영역 — 모바일에서 BottomNav (fixed bottom-0, h=navbar-h + safe-area-bottom) 가
            *  콘텐츠 위에 올라가지 않도록 하단 padding 으로 spacer 확보. PWA(cover)에서 BottomNav 가
-           *  홈 인디케이터만큼 더 커지므로 spacer 도 `+ env(safe-area-inset-bottom)`. md+ 에서는 BottomNav 미렌더. */}
-          <main className="flex-1 overflow-y-auto pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom))] md:pb-0 main-area">
+           *  홈 인디케이터만큼 더 커지므로 spacer 도 `+ env(safe-area-inset-bottom)`.
+           *  추가로 `+ spacing.lg`(14px) — 마지막 카드와 BottomNav 사이 숨 쉴 여백(카드 간 gap-lg 와 동일 리듬).
+           *  md+ 에서는 BottomNav 미렌더 → `md:pb-0`. */}
+          <main className="flex-1 overflow-y-auto pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom)+theme(spacing.lg))] md:pb-0 main-area scrollbar-hide-mobile">
             {children}
           </main>
         </div>
