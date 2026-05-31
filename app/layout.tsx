@@ -4,7 +4,33 @@ import "./globals.css";
 import "./components.css";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { SplashScreen } from "@/components/pwa/SplashScreen";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/copy/site";
+
+/**
+ * iOS PWA 시작 화면(`apple-touch-startup-image`) — iOS 는 manifest 로 스플래시를 자동 생성하지
+ * 않으므로(기본 빈 흰 화면), 기기 해상도별로 `/splash-ios?w=&h=`(흰 배경+글리프+FinSight)를 연결한다.
+ * 표는 [CSS pt 폭, 높이, devicePixelRatio] — 이미지 px = pt × ratio. 세로(portrait) 한정.
+ * 최근 ~6년 iPhone(SE2 ~ 16 Pro Max) 커버. Android 는 네이티브 스플래시가 있어 불필요.
+ */
+const IOS_SPLASH_DEVICES: ReadonlyArray<[number, number, number]> = [
+  [375, 667, 2], // SE 2·3 / 8 / 7 / 6s
+  [414, 736, 3], // 8·7·6s Plus
+  [375, 812, 3], // X / XS / 11 Pro
+  [414, 896, 2], // XR / 11
+  [414, 896, 3], // XS Max / 11 Pro Max
+  [360, 780, 3], // 12 mini / 13 mini
+  [390, 844, 3], // 12 / 12 Pro / 13 / 13 Pro / 14
+  [428, 926, 3], // 12·13 Pro Max / 14 Plus
+  [393, 852, 3], // 14 Pro / 15 / 15 Pro / 16
+  [430, 932, 3], // 14 Pro Max / 15 Plus·Pro Max / 16 Plus·Pro Max
+  [402, 874, 3], // 16 Pro
+];
+
+const APPLE_STARTUP_IMAGES = IOS_SPLASH_DEVICES.map(([w, h, r]) => ({
+  url: `/splash-ios?w=${w * r}&h=${h * r}`,
+  media: `screen and (device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
+}));
 
 /**
  * Pretendard (Korean-Hangul + Latin subset) — `next/font/local` 로 self-host.
@@ -67,6 +93,7 @@ export const metadata: Metadata = {
     capable: true,
     title: SITE_NAME,
     statusBarStyle: "default", // light 고정 디자인 → 흰 상태바 + 어두운 텍스트.
+    startupImage: APPLE_STARTUP_IMAGES, // iOS 시작 화면(흰 배경+글리프+FinSight) — Android 는 네이티브.
   },
   // OG 이미지(`/opengraph-image`)는 `app/opengraph-image.tsx` 파일 컨벤션으로 Next 가 자동 주입한다(Next 16).
   // → openGraph.images / twitter.images 명시 불필요. metadataBase 가 절대 URL 해석을 담당.
@@ -109,6 +136,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />
+        {/* 콜드 로드 직후 풀스크린 브랜드 스플래시(로고+FinSight) → 로드되면 fade-out.
+         *  네이티브 OS 스플래시(Android 아이콘 / iOS startupImage)를 이어받아 연속 화면처럼 보인다. */}
+        <SplashScreen />
       </body>
     </html>
   );

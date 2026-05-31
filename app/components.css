@@ -556,4 +556,33 @@
     @apply inline-flex items-center h-[24px] px-sm rounded-pill text-badge
            bg-accent-soft text-primary whitespace-nowrap shrink-0;
   }
+
+  /* ---------- PWA 인앱 스플래시 (components/pwa/SplashScreen.tsx) ----------
+   * 앱 콜드 로드 직후 풀스크린 흰 화면 + 중앙 글리프 + 하단 FinSight 워드마크.
+   * 네이티브 OS 스플래시(Android manifest 자동 생성 = 흰 배경 + 그래프 글리프)와 배경(#ffffff)·
+   * 글리프를 맞춰, "중복 2회" 가 아니라 "로고 아래 텍스트가 이어 나타나는" 연속 화면으로 보이게 한다.
+   * z-[100] — 헤더/바텀nav/오버레이(50~55) 위. 로드 완료 시 opacity fade → 언마운트(SplashScreen.tsx).
+   * **설치형 PWA(standalone)에서만 노출** — 일반 브라우저 탭(데스크탑·모바일)에선 콜드 로드마다 번쩍이지
+   * 않도록 `display:none` 기본, `(display-mode: standalone)` 에서만 `flex`. (iOS 16+/Android 모두 지원) */
+  .splash-screen {
+    @apply fixed inset-0 z-[100] flex-col items-center justify-center gap-lg bg-surface;
+    display: none;
+    transition: opacity 320ms ease;
+  }
+  @media (display-mode: standalone) {
+    .splash-screen {
+      display: flex;
+    }
+  }
+  .splash-screen-leaving {
+    @apply opacity-0 pointer-events-none;
+  }
+  /* 글리프 96px — viewBox 24 stroke 2.5 가 큰 흰 화면에서도 또렷(사이드바 24px 대비 splash 비중). */
+  .splash-icon {
+    @apply h-24 w-24;
+  }
+  /* 워드마크 — 사이드바 brand 와 동일 다크→미드 그레이 그라데이션, font-display(36px/800). */
+  .splash-wordmark {
+    @apply text-font-display bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
+  }
 }

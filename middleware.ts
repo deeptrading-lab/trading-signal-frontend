@@ -65,6 +65,7 @@ const PUBLIC_EXACT_PATHS = new Set<string>([
   "/icon", // 파비콘 (app/icon.tsx)
   "/icon-pwa", // PWA manifest 아이콘 (app/icon-pwa) — `?size=192|512` 쿼리는 pathname 과 무관
   "/apple-icon", // iOS 홈 아이콘 (app/apple-icon.tsx)
+  "/splash-ios", // iOS PWA 시작 화면 (app/splash-ios) — `?w=&h=` 쿼리는 pathname 과 무관
   "/opengraph-image", // OG 이미지 (위 ⚠️ — UA 무관 공개)
   "/twitter-image", // twitter-image.tsx 미생성이나 방어적 유지
   "/robots.txt",
