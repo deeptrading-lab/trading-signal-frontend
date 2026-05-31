@@ -2678,3 +2678,46 @@
   - (관찰 시) 인앱 스플래시 최소 표시시간/페이드 타이밍 미세조정.
   - iOS landscape 시작 화면(현재 portrait 한정), iPad 해상도는 KNOWN-GAP.
   - 별도 트랙: Android 상태바 1px 시스템 그림자 edge-to-edge 후속(직전 논의).
+
+### 2026-05-31 — feat(stock-ux): 모바일 종목분석 UX 개선 — 스크롤바·네비·접기카드 (#63)
+
+- **slug**: `mobile-stock-ux-polish` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/63
+- **요약**: feat(stock-ux): 모바일 종목분석 UX 개선 — 스크롤바·네비·접기카드
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 모바일 사용 중 발견된 4가지 UX 이슈를 한 묶음으로 개선한다.
+  > 
+  > ## 변경 사항
+  > ### 1. 모바일 스크롤바 숨김
+  > - `app/components.css` `@layer utilities`에 `.scrollbar-hide-mobile`(미디어쿼리 `< 768px`) 추가.
+  > - 주 스크롤 컨테이너(`.main-area`)와 검색 드롭다운 내부 스크롤에 적용. 데스크탑은 무회귀.
+  > 
+  > ### 2. 네비 정합성 + 종목분석 버그 + AI분석 말풍선
+  > - `hooks/layout/useStockNavClick.ts` 신규 — Sidebar/BottomNav가 byte-for-byte 복제하던 핸들러를 일원화.
+  > - **버그 수정**: 최근 본 종목이 없을 때 홈(`/`)으로 튕겨 홈 메뉴가 활성화되던 문제 → `/stock` 검색 랜딩으로 교정.
+  >   - 최근 종목 있으면 `/stock/<ticker>?q=<종목명>`으로 이동(검색창 프리필 + 하단 상세).
+  > - `/stock`: `redirect('/')` 제거 → `StockSearchLanding` 검색 랜딩 페이지로.
+  > - `StockSearchContainer`에 `initialKeyword` prop 추가(상세 진입 시 종목명 프리필, 드롭다운은 닫힌 채).
+  > - `ComingSoonNavItem` 신규 — AI분석 "준비 중" 항목을 Sidebar/BottomNav 공유로 통일(BottomNav 하드코딩 "준비 중"·라벨 불일치 해소) + 호버/탭 안내 **말풍선**(2.5s 자동 닫힘·외부 클릭 닫힘).
+  > 
+  > ### 3 & 4. 종목 페이지 모바일 재구성
+  > - `StockPageLayout`에 `useBreakpoint().isMobile` 분기 추가. 모바일 순서: 종목명·현재가 → 차트 → 기업개황 → 최근공시. (제목·검색은 상위 `StockProfilePage` 유지 → 전체: 제목→검색→…)
+  > - **차트**: 모바일은 `onExpand` 미전달 → 확대 버튼 미렌더(축소 고정). 데스크탑은 확대/축소 유지.
+  > - **접기/펼치기**: `components/ui/CollapsibleCard` 신규(첫 `components/ui/` 원자). 기업개황·최근공시를 모바일에서 기본 접힘 카드로(`collapsible` prop). 우측 chevron이 클릭 시 `transition-transform`으로 180° 회전(아래↔위).
+  > 
+  > ## 검증
+  > - `npm run typecheck` ✅ / `npm run lint` ✅(기존 StockDailyChart 경고 1건 무관) / `npm run build` ✅
+  > - 데스크탑 무회귀: Sidebar 동작·차트 확대축소·2단 그리드 항상 펼침·스크롤바 정상.
+  > - 모바일: 스크롤바 숨김, 종목분석 폴백 교정, AI분석 말풍선, 순서/접기 카드 동작.
+  > - (수동/프리뷰) 모바일 뷰포트에서 종목분석 클릭 플로우·말풍선·접기 애니메이션 시각 확인 권장.
+  > 
+  > ## 다음 작업
+  > - 접기/펼치기 콘텐츠 높이 트랜지션(grid-rows 0fr↔1fr) 폴리시 — 현재는 chevron 회전 + 즉시 토글.
+  > - `/stock` 랜딩에 최근 검색·관심 종목 인라인 노출(현재는 검색창 포커스 시 드롭다운).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 접기/펼치기 콘텐츠 높이 트랜지션(grid-rows 0fr↔1fr) 폴리시 — 현재는 chevron 회전 + 즉시 토글.
+  - `/stock` 랜딩에 최근 검색·관심 종목 인라인 노출(현재는 검색창 포커스 시 드롭다운).
+  - 데스크탑에도 접기/펼치기 옵션 확장 여부 검토(현재 모바일 전용).
+  - StockDailyChart 기존 lint 경고(`candleSeries` 미사용 `i`) 정리 — 별도 후속.
