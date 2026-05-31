@@ -13,15 +13,24 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Activity } from "lucide-react";
 import { NAV_ITEMS, NAV_ITEM_ANALYZE, isNavItemActive } from "@/components/layout/navItems";
 import { NAV_BRAND_LABEL, NAV_MENU_COMING_SOON_BADGE } from "@/lib/copy/layout/navCopy";
+import { readRecentSearches } from "@/lib/utils/recentSearch";
 import { cn } from "@/lib/utils/cn";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const ComingSoonIcon = NAV_ITEM_ANALYZE.icon;
+
+  function handleStockNavClick(e: React.MouseEvent, active: boolean) {
+    e.preventDefault();
+    if (active) return; // 이미 종목 상세 페이지 — 그대로 유지
+    const recent = readRecentSearches();
+    router.push(recent.length > 0 ? `/stock/${recent[0].ticker}` : "/");
+  }
 
   return (
     <aside
@@ -51,6 +60,7 @@ export function Sidebar() {
                 active && "sidebar-nav-item-active",
               )}
               aria-current={active ? "page" : undefined}
+              onClick={item.path === "/stock" ? (e) => handleStockNavClick(e, active) : undefined}
             >
               <Icon className="sidebar-nav-item-icon" aria-hidden="true" />
               <span className="sidebar-nav-item-label">{item.label}</span>

@@ -135,3 +135,69 @@ export async function fetchStockDaily(
 
   return data.output.map(mapDailyCandle);
 }
+
+/**
+ * 기간별 차트 시세 조회 — `inquire-daily-itemchartprice` (TR_ID `FHKST03010100`).
+ *
+ * `inquire-daily-price`(최근 30건)와 달리 날짜 범위 지정으로 **최대 100건** 조회 가능.
+ * MACD(26+9) 등 보조지표 계산에 충분한 봉을 확보하기 위해 사용한다.
+ *
+ * @param ticker 종목코드 6자리.
+ * @param fromDate 조회 시작일자 YYYYMMDD.
+ * @param toDate   조회 종료일자 YYYYMMDD.
+ */
+export async function fetchStockDailyChart(
+  ticker: string,
+  fromDate: string,
+  toDate: string,
+  period: "D" | "W" | "M" = "D",
+): Promise<StockDailyCandle[]> {
+  const client = getKisClient();
+  const headers = await buildAuthHeaders("FHKST03010100");
+
+  type ItemChartResponse = {
+    rt_cd: string;
+    msg_cd: string;
+    msg1: string;
+    output1: Record<string, unknown>;
+    output2: KisInquireDailyPriceItem[];
+  };
+
+  let response;
+  try {
+    response = await client.get<ItemChartResponse>(
+      "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+      {
+        headers,
+        params: {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_DATE_1: fromDate,
+          FID_INPUT_DATE_2: toDate,
+          FID_PERIOD_DIV_CODE: period,
+          FID_ORG_ADJ_PRC: "0",
+        },
+      },
+    );
+  } catch (error) {
+    const status =
+      typeof (error as { response?: { status?: number } }).response?.status ===
+      "number"
+        ? (error as { response: { status: number } }).response.status
+        : undefined;
+    throw makeKisTransportError({
+      status,
+      message:
+        error instanceof Error
+          ? error.message
+          : "KIS 차트 시세 조회 중 네트워크 오류가 발생했어요.",
+    });
+  }
+
+  const data = response.data;
+  if (data.rt_cd !== "0") {
+    throw makeKisBusinessError(data.msg1, data.msg_cd);
+  }
+
+  return (data.output2 ?? []).map(mapDailyCandle);
+}

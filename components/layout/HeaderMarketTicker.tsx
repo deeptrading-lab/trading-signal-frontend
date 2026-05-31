@@ -66,7 +66,15 @@ export function HeaderMarketTicker() {
       {tickers.map((t, i) => (
         <Fragment key={t.code}>
           {i > 0 && (
-            <span className="w-px h-3 bg-border-line" aria-hidden="true" />
+            <span
+              className={cn(
+                "h-3",
+                t.code === "S&P 500" || t.code === "BTC"
+                  ? "w-0.5 bg-text-muted"
+                  : "w-px bg-border-line",
+              )}
+              aria-hidden="true"
+            />
           )}
           <div className="flex items-center gap-sm">
             <span className="text-text-muted">{t.code}</span>

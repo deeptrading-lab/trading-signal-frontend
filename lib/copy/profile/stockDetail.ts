@@ -1,5 +1,5 @@
 /**
- * `/profile/[ticker]` (종목 상세) 화면의 한글 라벨 카피.
+ * `/stock/[ticker]` (종목 상세) 화면의 한글 라벨 카피.
  *
  * PRD `stock-api-integration` (PR-B) §3.6 로딩·에러·빈 상태 카피 + 섹션 타이틀.
  *

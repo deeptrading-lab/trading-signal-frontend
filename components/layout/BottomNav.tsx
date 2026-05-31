@@ -16,19 +16,28 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { NAV_ITEMS, NAV_ITEM_ANALYZE, isNavItemActive } from "@/components/layout/navItems";
 import { NAV_MENU_ANALYZE } from "@/lib/copy/layout/navCopy";
+import { readRecentSearches } from "@/lib/utils/recentSearch";
 import { cn } from "@/lib/utils/cn";
 
 export function BottomNav() {
   const { isMobile } = useBreakpoint();
   const pathname = usePathname();
+  const router = useRouter();
 
   if (!isMobile) return null;
 
   const ComingSoonIcon = NAV_ITEM_ANALYZE.icon;
+
+  function handleStockNavClick(e: React.MouseEvent, active: boolean) {
+    e.preventDefault();
+    if (active) return;
+    const recent = readRecentSearches();
+    router.push(recent.length > 0 ? `/stock/${recent[0].ticker}` : "/");
+  }
 
   return (
     <nav
@@ -47,6 +56,7 @@ export function BottomNav() {
               active && "bottom-nav-item-active",
             )}
             aria-current={active ? "page" : undefined}
+            onClick={item.path === "/stock" ? (e) => handleStockNavClick(e, active) : undefined}
           >
             <Icon className="bottom-nav-item-icon" aria-hidden="true" />
             <span className="bottom-nav-item-label">{item.label}</span>

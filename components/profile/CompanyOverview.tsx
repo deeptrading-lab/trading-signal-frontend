@@ -1,5 +1,5 @@
 /**
- * CompanyOverview — `/profile/[ticker]` 기업개황 (DART).
+ * CompanyOverview — `/stock/[ticker]` 기업개황 (DART).
  *
  * PRD `stock-api-integration` (PR-B) §3.5 — `useQueryDisclosureCompany(ticker)` 호출.
  *

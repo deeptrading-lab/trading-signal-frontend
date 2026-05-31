@@ -28,10 +28,10 @@
  *   - `isKisConfigured()` — 환경변수 설정 여부 (BFF fallback 분기)
  */
 
-export { fetchStockPrice, fetchStockDaily } from "./price";
+export { fetchStockPrice, fetchStockDaily, fetchStockDailyChart } from "./price";
 export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
-export { fetchIndexPriceShared, isSharedIndexCode } from "./index-store";
+export { fetchIndexPriceShared, fetchOverseasIndexShared, isSharedIndexCode } from "./index-store";
 export { fetchOverseasIndex } from "./overseas-index";
 export {
   fetchIntstockMultprice,

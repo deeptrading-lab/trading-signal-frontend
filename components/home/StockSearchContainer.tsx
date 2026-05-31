@@ -1,48 +1,75 @@
 /**
- * StockSearchContainer — 홈 시장 종합 종목 검색 컨테이너.
+ * StockSearchContainer — 홈 종목 검색 + 포커스 드롭다운.
  *
- * home-market-redesign PR2 신규.
- *
- * 책임:
- *   - 검색어 상태(useState) 보유.
- *   - `useQueryStockSearch` 도메인 훅으로 `/api/stock/search?keyword=<q>` 호출.
- *   - 결과 드롭다운 렌더 — 클릭 시 `/profile/<ticker>` 로 이동.
- *   - 검색어 없으면 드롭다운 미표시.
+ * 기능:
+ *   - 키워드 입력 중: 검색 결과 드롭다운 (기존).
+ *   - 포커스 + 키워드 없음: 2탭 패널
+ *       ① 최근 검색 — localStorage(`finsight:recent-searches`) 최신 5건
+ *       ② 관심 종목 — watchlist store 종목명 + `useQueryWatchlist` 등락%
+ *   - 종목 선택 시: 최근 검색에 저장 → `/stock/<ticker>` 이동.
  *
  * 컨벤션 (`docs/rules/frontend.md` §1):
- *   - useQuery 직접 import 금지 → `useQueryStockSearch` 도메인 훅만 소비.
- *   - fetch 직접 호출 금지 → 훅 경유 BFF 호출만.
+ *   - useQuery 직접 import 금지 → 도메인 훅(`useQueryStockSearch`, `useQueryWatchlist`) 경유.
+ *   - fetch 직접 호출 금지 → BFF 경유.
  */
 
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { Clock, Search, Star } from "lucide-react";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
+import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
+import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
+import { formatPct } from "@/lib/utils/formatPct";
+import {
+  addRecentSearch,
+  readRecentSearches,
+  type RecentSearchEntry,
+} from "@/lib/utils/recentSearch";
 import { cn } from "@/lib/utils/cn";
 
 const PLACEHOLDER = "종목명·코드로 검색… (예: 삼성전자, 005930)";
 const SEARCH_ARIA = "종목 검색";
-const RESULT_ARIA = "종목 검색 결과";
+
+type Tab = "recent" | "watchlist";
 
 export function StockSearchContainer() {
   const [keyword, setKeyword] = useState("");
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("recent");
+  const [recentSearches, setRecentSearches] = useState<RecentSearchEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const { data: results, isLoading } = useQueryStockSearch(keyword, {
+  // 검색 결과 — keyword 있을 때만 활성
+  const { data: searchResults, isLoading: searchLoading } = useQueryStockSearch(keyword, {
     enabled: keyword.length > 0,
   });
 
-  // 외부 클릭 시 드롭다운 닫기
+  // 관심 종목 — 이름은 store, 가격은 배치 쿼리
+  const { tickers: watchlistTickers, getName } = useWatchlistTickers();
+  const { data: watchlistQuotes } = useQueryWatchlist(watchlistTickers, {
+    enabled: open && keyword.length === 0,
+  });
+
+  // 최근 검색 가격 — 탭 드롭다운 열릴 때 배치 조회
+  const recentTickers = recentSearches.map((e) => e.ticker);
+  const { data: recentQuotes } = useQueryWatchlist(recentTickers, {
+    enabled: open && keyword.length === 0 && recentTickers.length > 0,
+  });
+
+  // 드롭다운이 열릴 때 최근 검색 목록을 localStorage에서 갱신
+  useEffect(() => {
+    if (open && keyword.length === 0) {
+      setRecentSearches(readRecentSearches());
+    }
+  }, [open, keyword.length]);
+
+  // 외부 클릭 시 닫기
   useEffect(() => {
     function handleOutsideClick(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
@@ -50,23 +77,47 @@ export function StockSearchContainer() {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
-  const showDropdown = open && keyword.length > 0 && (isLoading || (results && results.length > 0));
+  const showSearchResults = open && keyword.length > 0;
+  const showTabs = open && keyword.length === 0;
+  const showDropdown = showSearchResults || showTabs;
 
-  function handleSelect(ticker: string) {
+  function handleSelect(ticker: string, name: string) {
+    addRecentSearch({ ticker, name });
     setKeyword("");
     setOpen(false);
-    router.push(`/profile/${ticker}`);
+    router.push(`/stock/${ticker}`);
   }
+
+  // 탭별 항목 조합 (이름 우선순위: store → quote.name → ticker)
+  const watchlistItems = watchlistTickers.map((ticker) => {
+    const quote = watchlistQuotes?.find((q) => q.ticker === ticker);
+    return {
+      ticker,
+      name: getName(ticker) ?? quote?.name ?? ticker,
+      changePercent: quote?.changePercent,
+      direction: quote?.direction,
+    };
+  });
+
+  const recentItems = recentSearches.map((entry) => {
+    const quote = recentQuotes?.find((q) => q.ticker === entry.ticker);
+    return {
+      ticker: entry.ticker,
+      name: entry.name,
+      changePercent: quote?.changePercent,
+      direction: quote?.direction,
+    };
+  });
 
   return (
     <div ref={containerRef} className="relative w-full">
-      {/* 검색 입력 */}
-      <div className="relative">
+      {/* 검색 입력 — wrapper ring으로 시인성 확보, input 자체 border 제거해 단일 경계 */}
+      <div className="relative rounded-md shadow-sm ring-1 ring-border-line focus-within:ring-2 focus-within:ring-accent-vivid transition-all duration-150">
         <span
           className="absolute inset-y-0 left-0 pl-md flex items-center pointer-events-none text-text-muted"
           aria-hidden="true"
         >
-          <Search className="h-md w-md" />
+          <Search className="h-5 w-5" />
         </span>
         <input
           type="text"
@@ -75,8 +126,8 @@ export function StockSearchContainer() {
             setKeyword(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => keyword.length > 0 && setOpen(true)}
-          className="input pl-2xl"
+          onFocus={() => setOpen(true)}
+          className="input !pl-10 !h-14 !text-base !border-0 !shadow-none focus:!shadow-none !outline-none !bg-white w-full !rounded-md"
           placeholder={PLACEHOLDER}
           aria-label={SEARCH_ARIA}
           aria-haspopup="listbox"
@@ -84,40 +135,176 @@ export function StockSearchContainer() {
         />
       </div>
 
-      {/* 검색 결과 드롭다운 */}
+      {/* 드롭다운 */}
       {showDropdown && (
-        <div
-          className={cn(
-            "dropdown-panel absolute left-0 right-0 top-full z-[40] mt-xs",
-            "max-h-[260px] overflow-y-auto",
-          )}
-          role="listbox"
-          aria-label={RESULT_ARIA}
-        >
-          {isLoading && (
-            <div className="search-result-item text-text-muted" aria-live="polite">
-              검색 중…
+        <div className="dropdown-panel absolute left-0 right-0 top-full z-[40] mt-xs overflow-hidden">
+          {/* 검색 결과 */}
+          {showSearchResults && (
+            <div
+              className="max-h-[260px] overflow-y-auto"
+              role="listbox"
+              aria-label="종목 검색 결과"
+            >
+              {searchLoading && (
+                <div className="search-result-item text-text-muted" aria-live="polite">
+                  검색 중…
+                </div>
+              )}
+              {!searchLoading &&
+                searchResults?.map((item) => (
+                  <button
+                    key={item.ticker}
+                    type="button"
+                    className="search-result-item w-full text-left"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => handleSelect(item.ticker, item.name)}
+                  >
+                    <span className="text-body-sm-strong text-text-strong">
+                      {item.name}
+                    </span>
+                    <span className="search-result-item-meta">
+                      {item.ticker} · {item.market}
+                    </span>
+                  </button>
+                ))}
             </div>
           )}
-          {!isLoading && results && results.map((item) => (
-            <button
-              key={item.ticker}
-              type="button"
-              className="search-result-item w-full text-left"
-              role="option"
-              aria-selected={false}
-              onClick={() => handleSelect(item.ticker)}
-            >
-              <span className="text-body-sm-strong text-text-strong">
-                {item.name}
-              </span>
-              <span className="search-result-item-meta">
-                {item.ticker} · {item.market}
-              </span>
-            </button>
-          ))}
+
+          {/* 탭 패널 */}
+          {showTabs && (
+            <>
+              {/* 탭 바 */}
+              <div className="flex border-b border-border-line">
+                <TabButton
+                  active={activeTab === "recent"}
+                  onClick={() => setActiveTab("recent")}
+                  icon={<Clock className="h-sm w-sm" aria-hidden="true" />}
+                  label="최근 검색"
+                />
+                <TabButton
+                  active={activeTab === "watchlist"}
+                  onClick={() => setActiveTab("watchlist")}
+                  icon={<Star className="h-sm w-sm" aria-hidden="true" />}
+                  label="관심 종목"
+                />
+              </div>
+
+              {/* 탭 내용 */}
+              <div
+                className="max-h-[260px] overflow-y-auto"
+                role="listbox"
+                aria-label={activeTab === "recent" ? "최근 검색 종목" : "관심 종목"}
+              >
+                {activeTab === "recent" &&
+                  (recentItems.length === 0 ? (
+                    <div className="search-result-item text-text-muted">
+                      최근 검색 종목이 없어요
+                    </div>
+                  ) : (
+                    recentItems.map((item) => (
+                      <TabResultItem
+                        key={item.ticker}
+                        ticker={item.ticker}
+                        name={item.name}
+                        changePercent={item.changePercent}
+                        direction={item.direction}
+                        onSelect={handleSelect}
+                      />
+                    ))
+                  ))}
+
+                {activeTab === "watchlist" &&
+                  (watchlistItems.length === 0 ? (
+                    <div className="search-result-item text-text-muted">
+                      관심 종목이 없어요
+                    </div>
+                  ) : (
+                    watchlistItems.map((item) => (
+                      <TabResultItem
+                        key={item.ticker}
+                        ticker={item.ticker}
+                        name={item.name}
+                        changePercent={item.changePercent}
+                        direction={item.direction}
+                        onSelect={handleSelect}
+                      />
+                    ))
+                  ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+// ── 내부 컴포넌트 ──────────────────────────────────────────
+
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}
+
+function TabButton({ active, onClick, icon, label }: TabButtonProps) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex items-center gap-xs px-md py-sm text-body-sm-strong transition-colors cursor-pointer",
+        active
+          ? "border-b-2 border-accent-vivid text-accent-vivid"
+          : "text-text-muted hover:text-text-strong",
+      )}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+interface TabResultItemProps {
+  ticker: string;
+  name: string;
+  changePercent?: number;
+  direction?: "up" | "down" | "flat";
+  onSelect: (ticker: string, name: string) => void;
+}
+
+function TabResultItem({
+  ticker,
+  name,
+  changePercent,
+  direction,
+  onSelect,
+}: TabResultItemProps) {
+  const hasPrice = changePercent !== undefined && direction !== undefined;
+  const signalClass =
+    hasPrice && direction !== "flat" ? (direction === "up" ? "signal-up-text" : "signal-down-text") : "text-text-muted";
+
+  return (
+    <button
+      type="button"
+      className="search-result-item w-full"
+      role="option"
+      aria-selected={false}
+      onClick={() => onSelect(ticker, name)}
+    >
+      <div className="flex items-center justify-between w-full gap-sm">
+        <div className="flex flex-col min-w-0 text-left">
+          <span className="text-body-sm-strong text-text-strong truncate">{name}</span>
+          <span className="text-caption text-text-muted">{ticker}</span>
+        </div>
+        {hasPrice && (
+          <span className={cn("text-body-sm-strong tabular-nums shrink-0", signalClass)}>
+            {formatPct(changePercent, { sign: true })}
+          </span>
+        )}
+      </div>
+    </button>
   );
 }

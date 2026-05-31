@@ -28,6 +28,8 @@ export const queryKeys = {
     price: (ticker: string) => ["stock", "price", ticker] as const,
     daily: (ticker: string, period: "D" | "W" | "M") =>
       ["stock", "daily", ticker, period] as const,
+    chart: (ticker: string, period: string, days: number) =>
+      ["stock", "chart", ticker, period, days] as const,
     search: (keyword: string) => ["stock", "search", keyword] as const,
   },
   disclosure: {

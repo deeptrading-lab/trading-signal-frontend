@@ -60,7 +60,7 @@ export function WatchlistPage({
           {canRefresh ? (
             <button
               type="button"
-              className="button-secondary inline-flex items-center gap-xs"
+              className="button-secondary h-button-primary-h inline-flex items-center gap-xs"
               onClick={onRefresh}
               disabled={isRefreshing}
               aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}

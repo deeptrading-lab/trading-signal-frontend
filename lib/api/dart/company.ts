@@ -50,10 +50,9 @@ export async function fetchCompanyProfile(
         : undefined;
     throw makeDartTransportError({
       status,
-      message:
-        error instanceof Error
-          ? error.message
-          : "OpenDART 기업개황 조회 중 네트워크 오류가 발생했어요.",
+      message: status
+        ? "OpenDART 서버 오류가 발생했어요. 잠시 후 다시 시도해주세요."
+        : "OpenDART 서버와 연결할 수 없어요. 잠시 후 다시 시도해주세요.",
     });
   }
 
