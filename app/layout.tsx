@@ -5,6 +5,7 @@ import "./components.css";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { SplashScreen } from "@/components/pwa/SplashScreen";
+import { SafeAreaDebug } from "@/components/pwa/SafeAreaDebug"; // ⚠️ 임시 진단 — 측정 후 제거
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/copy/site";
 
 /**
@@ -141,6 +142,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* 콜드 로드 직후 풀스크린 브랜드 스플래시(로고+FinSight) → 로드되면 fade-out.
          *  네이티브 OS 스플래시(Android 아이콘 / iOS startupImage)를 이어받아 연속 화면처럼 보인다. */}
         <SplashScreen />
+        {/* ⚠️ 임시 진단 칩 — safe-area-inset 등 측정용. 보정 후 본 줄 + 컴포넌트 제거. */}
+        <SafeAreaDebug />
       </body>
     </html>
   );
