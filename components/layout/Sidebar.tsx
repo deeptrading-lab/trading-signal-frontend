@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity } from "lucide-react";
+import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
 import { NAV_ITEMS, NAV_ITEM_ANALYZE, isNavItemActive } from "@/components/layout/navItems";
 import { NAV_BRAND_LABEL, NAV_MENU_COMING_SOON_BADGE } from "@/lib/copy/layout/navCopy";
 import { readRecentSearches } from "@/lib/utils/recentSearch";
@@ -40,9 +40,9 @@ export function Sidebar() {
     >
       {/* 상단 브랜드 — Header 의 wordmark 와 시각 중복을 피하기 위해
        *   데스크탑에서는 본 sidebar 가 brand 의 1차 호스트. */}
-      <Link href="/" className="sidebar-brand" aria-label={NAV_BRAND_LABEL}>
+      <Link href="/" className="sidebar-brand group" aria-label={NAV_BRAND_LABEL}>
         <span className="sidebar-brand-badge" aria-hidden="true">
-          <Activity className="sidebar-brand-icon" />
+          <BrandPulseIcon className="sidebar-brand-icon" gradientId="sidebarPulse" />
         </span>
         <span className="sidebar-brand-text">{NAV_BRAND_LABEL}</span>
       </Link>

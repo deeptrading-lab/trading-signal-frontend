@@ -2510,3 +2510,45 @@
   - 배포 후 운영자 작업: Kakao Developers 캐시 삭제(스크랩 갱신) 1회 + 카톡 대화창 실측(AC-10/G5). 페이스북/슬랙 등은 각 플랫폼 디버거로 갱신.
   - 후속 PRD 후보: 페이지별 동적 OG(종목 분석마다 종목명·가격 박힌 og:image — route-segment `opengraph-image`), 한글 태그라인 추가 시 Pretendard subset 폰트 주입(q4 후속), `robots.txt`/`sitemap.xml`·PWA manifest(별도 트랙).
   - 사전 실패 테스트 5건(market ticker/indices NASDAQ·SPX 순서)은 본 PR 무관이나 별도 정리 필요.
+
+### 2026-05-31 — feat(pwa): 홈 화면 설치(PWA) + 브랜드 로고 3색 그라데이션 리프레시 (#57)
+
+- **slug**: `pwa-home-screen` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/57
+- **요약**: feat(pwa): 홈 화면 설치(PWA) + 브랜드 로고 3색 그라데이션 리프레시
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 핸드폰 홈 화면에 "추가"하면 회색 자동 아이콘("F" 글자)으로 떠서 PWA 미설정 문제 발견. 함께 브랜드 로고를 신규 디자인(흰 배지 + 3색 맥박 그라데이션)으로 전 표면 통일.
+  > 
+  > ## 변경
+  > ### 1. PWA — 홈 화면 아이콘 + 전체화면 설치
+  > - `app/apple-icon.tsx`(iOS 180) · `app/icon-pwa`(Android 192·512) · `app/manifest.ts`(standalone) · `public/sw.js`(오프라인 캐싱 없는 no-op SW) + `ServiceWorkerRegister`
+  > - `app/layout.tsx`: `manifest` + `appleWebApp` + `viewport.themeColor`
+  > - `middleware.ts`: `/apple-icon`·`/sw.js` 게이트 공개 예외 추가(+matcher) — 미인증 시 아이콘 깨짐 방지
+  > 
+  > ### 2. 브랜드 로고 리프레시 (5곳 통일)
+  > - 3색 맥박 그라데이션: 상승=빨강 `#ef4444` / 가운데=슬레이트 `#94a3b8` / 하락=파랑 `#3b82f6`
+  > - 색·글리프 단일 소스 `lib/brand-mark.tsx` (`pulseGradientDefs` 는 컴포넌트 아닌 함수 호출 — Satori `<defs>` 누락 회피)
+  > - 파비콘 / 홈아이콘 / OG / 사이드바 / 헤더 전부 흰 배지 기반
+  > - 사이드바·헤더: 배지 36px 원형(`h-9`/`rounded-pill`) · 아이콘 24px(`h-6`) · 텍스트 22px(`text-h1`) · gap 10px
+  > 
+  > ### 3. OG 이미지
+  > - 파란 카드 → 라이트(슬레이트 그라데이션 배경) + 흰 배지 + 다크 워드마크. 흰 채팅 피드에서도 카드 경계 유지.
+  > 
+  > ## 검증
+  > - typecheck · lint · build 통과 (기존 경고 1건 `StockDailyChart.tsx` 무관)
+  > - 게이트 운영조건 런타임: 페이지→307 `/login`, 아이콘·매니페스트·`/sw.js`·OG→200, `/api`→401
+  > - 5개 마크 실제 렌더 + 컴파일 CSS 치수(배지36·아이콘24·텍스트22·gap10·그라데이션 텍스트 색) 확인
+  > 
+  > ## 영향 / 주의
+  > - 조회·분석 전용 스코프 유지 — 데이터/주문 API 무관
+  > - iOS: 기존 홈 바로가기 삭제 후 재추가 필요(아이콘 캐시 갱신 안 됨)
+  > - 다크모드 미적용(앱 light 고정)
+  > 
+  > ## 다음 작업
+  > - (QA) `docs/qa/pwa-home-screen.md` 리포트 — qa 에이전트 진행
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - ✅ QA 완료 — `docs/qa/pwa-home-screen.md` (qa 에이전트, 실패 0) · ✅ 코드 리뷰 승인
+  - 실기기 수동 검증: iOS Safari "홈 화면에 추가" / Android Chrome "앱 설치"
+  - (후속) 모바일 헤더 외 다크모드 대응은 별도 PRD

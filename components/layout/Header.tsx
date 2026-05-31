@@ -27,11 +27,12 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, User } from "lucide-react";
+import { User } from "lucide-react";
 import {
   NAV_BRAND_LABEL,
   HEADER_PROFILE_ARIA,
 } from "@/lib/copy/layout/navCopy";
+import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
 import { HeaderMarketTicker } from "./HeaderMarketTicker";
 
 export function Header() {
@@ -41,10 +42,12 @@ export function Header() {
        *  자리도 차지하지 않도록 `lg:hidden` (이전 `lg:invisible` → 자리 차지 회귀 수정). */}
       <Link
         href="/"
-        className="header-brand lg:hidden"
+        className="header-brand group lg:hidden"
         aria-label={NAV_BRAND_LABEL}
       >
-        <Activity className="header-brand-icon" aria-hidden="true" />
+        <span className="header-brand-badge" aria-hidden="true">
+          <BrandPulseIcon className="header-brand-icon" gradientId="headerPulse" />
+        </span>
         <span className="header-brand-text">{NAV_BRAND_LABEL}</span>
       </Link>
       <div className="flex items-center gap-lg ml-auto">
