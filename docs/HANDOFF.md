@@ -2635,3 +2635,46 @@
   - 배포 후 iOS/Android 설치형 PWA 둘 다에서 상태바 경계선 제거 실측.
   - (잔존 시) 회색 선이 색 차이가 아니라 Android 시스템 status bar elevation 그림자일 가능성 → edge-to-edge(콘텐츠를 상태바 밑까지) 방식 별도 검토.
   - landscape 좌우 노치 인셋(`env(safe-area-inset-left/right)`) 미적용 — KNOWN-GAP 유지.
+
+### 2026-05-31 — feat(pwa): 브랜드 스플래시 — 로고+FinSight (인앱 + iOS 시작화면) (#62)
+
+- **slug**: `pwa-splash-branding` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/62
+- **요약**: feat(pwa): 브랜드 스플래시 — 로고+FinSight (인앱 + iOS 시작화면)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 설치형 PWA 콜드 로드 시 **그래프 로고만** 뜨고 브랜드명이 없었다. 로고 아래에 "FinSight" 워드마크(PC 사이드 메뉴 상단과 동일 톤)를 더해 브랜드 로딩 경험을 완성한다.
+  > 
+  > 플랫폼별 네이티브 스플래시 한계:
+  > - **Android**: manifest 로 스플래시를 자동 생성하지만 **아이콘만** 가능(텍스트 불가).
+  > - **iOS**: manifest 스플래시 자동생성이 없어 기본 **빈 흰 화면**.
+  > 
+  > → 둘 다 **흰 배경 + 글리프 + FinSight** 로 이어받아, 사용자에겐 "로고 아래 텍스트가 나타나는" 하나의 연속 화면으로 보이게 한다(중복 2회 방지).
+  > 
+  > ## 변경
+  > 
+  > | 파일 | 내용 |
+  > |---|---|
+  > | `components/pwa/SplashScreen.tsx` (신규) | 인앱 스플래시. SSR 즉시 렌더 → `load` 시 fade-out → 언마운트. **설치형 PWA(display-mode: standalone)에서만** 노출 → 일반 브라우저 탭 번쩍임 방지. JS 지연/실패 대비 2.5s 백스톱 |
+  > | `app/splash-ios/route.tsx` (신규) | iOS `apple-touch-startup-image` 동적 생성(`/splash-ios?w=&h=` — 흰 배경+글리프+FinSight). Android 네이티브 스플래시의 iOS 대응 |
+  > | `app/layout.tsx` | `<SplashScreen/>` 마운트 + `appleWebApp.startupImage` 11개 기기(iPhone SE2~16 Pro Max, portrait) 미디어쿼리 연결 |
+  > | `app/components.css` | `.splash-*` 합성 토큰(사이드바 brand 톤 워드마크, standalone 가드) |
+  > | `middleware.ts` | `/splash-ios` 공개 경로(미인증 iOS 수신) |
+  > 
+  > 색/글리프는 `lib/brand-mark.tsx` 단일 소스 재사용(파비콘·홈아이콘·OG·사이드바와 정합).
+  > 
+  > ## 검증
+  > 
+  > - `npm run build` ✓ Compiled successfully, 타입 0에러
+  > - `/splash-ios?w=1170&h=2532` → HTTP 200 `image/png` 1170×2532 (흰 배경+3색 글리프+FinSight 렌더 확인)
+  > - `/login` HTML: `apple-touch-startup-image` 링크 11개(미디어쿼리 정상) + 인앱 `.splash-screen` SSR 마운트 확인
+  > - 컴파일 CSS: `.splash-screen{display:none}` + `@media (display-mode:standalone){.splash-screen{display:flex}}` 가드 확인
+  > - ⚠️ **배포 후 실기기(iOS·Android 설치형 PWA) 실측 필요**: 콜드 로드 시 로고+FinSight 연속 표시 / 네이티브→인앱 전환 점프 없는지
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 iOS·Android 설치형 PWA 콜드 로드 실기기 검증(로고+FinSight 연속, 중복 번쩍임 없음).
+  - (관찰 시) 인앱 스플래시 최소 표시시간/페이드 타이밍 미세조정.
+  - iOS landscape 시작 화면(현재 portrait 한정), iPad 해상도는 KNOWN-GAP.
+  - 별도 트랙: Android 상태바 1px 시스템 그림자 edge-to-edge 후속(직전 논의).
