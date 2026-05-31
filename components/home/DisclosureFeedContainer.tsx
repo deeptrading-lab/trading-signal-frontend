@@ -49,10 +49,10 @@ function formatDisplayDate(rceptDate: string): string {
 }
 
 export function DisclosureFeedContainer() {
-  const { tickers } = useWatchlistTickers();
+  const { tickers, getName } = useWatchlistTickers();
   const sliced = tickers.slice(0, MAX_TICKERS);
 
-  const { items, isLoading } = useQueryDisclosures(sliced, DISCLOSURES_PER_TICKER);
+  const { items, isLoading, isError } = useQueryDisclosures(sliced, DISCLOSURES_PER_TICKER);
 
   return (
     <section className="card" aria-label="최신 공시">
@@ -81,41 +81,57 @@ export function DisclosureFeedContainer() {
         </p>
       )}
 
+      {/* 에러 */}
+      {!isLoading && isError && (
+        <p className="text-body-sm text-text-muted py-lg">
+          공시 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
+        </p>
+      )}
+
       {/* 공시 없음 */}
-      {!isLoading && sliced.length > 0 && items.length === 0 && (
+      {!isLoading && !isError && sliced.length > 0 && items.length === 0 && (
         <p className="text-body-sm text-text-muted py-lg">최근 공시가 없어요</p>
       )}
 
-      {/* 공시 목록 */}
-      {!isLoading && items.length > 0 && (
-        <ul className="flex flex-col divide-y divide-border-line" role="list">
-          {items.map((item) => (
-            <li key={`${item.ticker}-${item.rceptNo}`}>
-              <a
-                href={toDisclosureUrl(item.rceptNo)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="disclosure-row block"
-                aria-label={`${item.corpName} — ${item.reportName}`}
-              >
-                <div className="flex items-start justify-between gap-md w-full">
-                  <div className="flex items-start gap-sm min-w-0">
-                    <span className="disclosure-tag mt-[2px]">{item.ticker}</span>
-                    <span className="text-body-sm-strong text-text-strong truncate">
-                      {item.reportName}
-                    </span>
-                  </div>
-                  <span className="text-caption text-text-muted shrink-0 mt-[2px]">
-                    {formatDisplayDate(item.rceptDate)}
-                  </span>
-                </div>
-                <p className="mt-xs text-caption text-text-muted ml-[calc(theme(spacing.sm)*2+60px)]">
-                  {item.corpName}
-                </p>
-              </a>
-            </li>
-          ))}
-        </ul>
+      {/* 공시 목록 — 기업별 그룹핑 (관심종목 추가 순) */}
+      {!isLoading && !isError && items.length > 0 && (
+        <div className="flex flex-col gap-lg">
+          {sliced
+            .map((ticker) => ({
+              ticker,
+              group: items.filter((item) => item.ticker === ticker),
+            }))
+            .filter(({ group }) => group.length > 0)
+            .map(({ ticker, group }) => (
+              <div key={ticker}>
+                <h3 className="text-body-strong text-text-strong mb-xs">
+                  {getName(ticker) ?? (group[0].corpName || ticker)}
+                </h3>
+                <ul className="flex flex-col divide-y divide-border-line" role="list">
+                  {group.map((item) => (
+                    <li key={item.rceptNo}>
+                      <a
+                        href={toDisclosureUrl(item.rceptNo)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="disclosure-row block"
+                        aria-label={item.reportName}
+                      >
+                        <div className="flex items-start justify-between gap-md w-full">
+                          <span className="text-body-sm-strong text-text-strong truncate">
+                            {item.reportName}
+                          </span>
+                          <span className="text-caption text-text-muted shrink-0 mt-[2px]">
+                            {formatDisplayDate(item.rceptDate)}
+                          </span>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+        </div>
       )}
     </section>
   );
