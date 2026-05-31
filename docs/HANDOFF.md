@@ -2549,6 +2549,6 @@
   > ## 다음 작업
   > - (QA) `docs/qa/pwa-home-screen.md` 리포트 — qa 에이전트 진행
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
-  - (QA) `docs/qa/pwa-home-screen.md` 리포트 — qa 에이전트 진행
+  - ✅ QA 완료 — `docs/qa/pwa-home-screen.md` (qa 에이전트, 실패 0) · ✅ 코드 리뷰 승인
   - 실기기 수동 검증: iOS Safari "홈 화면에 추가" / Android Chrome "앱 설치"
   - (후속) 모바일 헤더 외 다크모드 대응은 별도 PRD
