@@ -55,6 +55,15 @@ import {
 
 const SYNC_ID = "stock-chart";
 
+/**
+ * 보조지표 워밍업(캘린더일) — 보기 구간보다 더 과거까지 받아 MACD(시그널 35봉)·RSI(15봉)를
+ *   끊김 없이 계산한 뒤, 표시는 사용자가 고른 구간으로 잘라낸다(아래 useMemo).
+ *   → 주봉 3개월·월봉 1년처럼 짧은 구간이나 최근 며칠만 봐도 지표가 항상 나온다.
+ *   봉당 대략 봉수: 일봉≈영업일, 주봉≈/7, 월봉≈/30. 35봉 확보분 + 여유.
+ */
+const WARMUP_DAYS: Record<ChartPeriod, number> = { D: 60, W: 280, M: 1100 };
+const MAX_FETCH_DAYS = 3000; // 라우트 MAX_DAYS 와 정합(초과 클램프)
+
 const C = {
   stroke: "#c81e1e",    // signal-up (빨강)
   fill: "#c81e1e",
@@ -201,25 +210,34 @@ export function StockDailyChart({
   onDaysChange,
   onChartTypeChange,
 }: StockDailyChartProps) {
-  const { data, isLoading, isError, error } = useQueryStockChart(ticker, { period, days });
+  // 워밍업 포함 fetch — 보기 구간(days)보다 더 과거까지 받아 지표 계산용 데이터 확보.
+  const fetchDays = Math.min(days + WARMUP_DAYS[period], MAX_FETCH_DAYS);
+  const { data, isLoading, isError, error } = useQueryStockChart(ticker, { period, days: fetchDays });
 
   const { priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } = useMemo(() => {
     if (!data || data.length === 0) {
       return { priceSeries: [], candleSeries: [], volSeries: [], macdSeries: [], rsiSeries: [] };
     }
 
+    // 1) 전체(워밍업 포함) 데이터로 지표 계산 — 표준 파라미터(MACD 12/26/9, RSI 14) 유지.
     const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
     const closes = sorted.map((c) => c.close);
     const macd = calcMACD(closes);
     const rsi = calcRSI(closes);
 
-    const priceSeries = sorted.map((c) => ({
-      date: c.date.slice(5),
-      price: c.close,
-    }));
+    // 2) 보기 구간 컷오프 — 마지막 봉 날짜에서 days 캘린더일 이전. 워밍업 구간은 표시에서 잘라낸다.
+    const lastDate = sorted[sorted.length - 1].date; // "YYYY-MM-DD"
+    const [ly, lm, ld] = lastDate.split("-").map(Number);
+    const cutoff = new Date(ly, lm - 1, ld);
+    cutoff.setDate(cutoff.getDate() - days);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const cutoffStr = `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`;
+    let visibleStart = sorted.findIndex((c) => c.date >= cutoffStr);
+    if (visibleStart < 0) visibleStart = 0;
 
-    // 캔들 데이터 — wickRange: [low, high] 를 Bar range dataKey 로 사용
-    const candleSeries = sorted.map((c) => ({
+    // 3) 전체 시리즈 빌드 후 보기 구간으로 슬라이스(지표는 워밍업 덕에 첫 봉부터 값이 있음).
+    const fullPrice = sorted.map((c) => ({ date: c.date.slice(5), price: c.close }));
+    const fullCandle = sorted.map((c) => ({
       date: c.date.slice(5),
       wickRange: [c.low, c.high] as [number, number],
       open: c.open,
@@ -228,27 +246,27 @@ export function StockDailyChart({
       low: c.low,
       isUp: c.close >= c.open,
     }));
-
-    const volSeries = sorted.map((c) => ({
+    const fullVol = sorted.map((c) => ({
       date: c.date.slice(5),
       volume: c.volume,
       isUp: c.close >= c.open,
     }));
-
-    const macdSeries = sorted.map((c, i) => ({
+    const fullMacd = sorted.map((c, i) => ({
       date: c.date.slice(5),
       macd: macd[i].macd,
       signal: macd[i].signal,
       histogram: macd[i].histogram,
     }));
+    const fullRsi = sorted.map((c, i) => ({ date: c.date.slice(5), rsi: rsi[i] }));
 
-    const rsiSeries = sorted.map((c, i) => ({
-      date: c.date.slice(5),
-      rsi: rsi[i],
-    }));
-
-    return { priceSeries, candleSeries, volSeries, macdSeries, rsiSeries };
-  }, [data]);
+    return {
+      priceSeries: fullPrice.slice(visibleStart),
+      candleSeries: fullCandle.slice(visibleStart),
+      volSeries: fullVol.slice(visibleStart),
+      macdSeries: fullMacd.slice(visibleStart),
+      rsiSeries: fullRsi.slice(visibleStart),
+    };
+  }, [data, days]);
 
   const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange };
 
