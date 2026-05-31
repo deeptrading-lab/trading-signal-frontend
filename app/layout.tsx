@@ -5,6 +5,7 @@ import "./components.css";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { SplashScreen } from "@/components/pwa/SplashScreen";
+import { SafeAreaDebug } from "@/components/pwa/SafeAreaDebug"; // ⚠️ 임시 진단 — 측정 후 제거
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/copy/site";
 
 /**
@@ -28,7 +29,9 @@ const IOS_SPLASH_DEVICES: ReadonlyArray<[number, number, number]> = [
 ];
 
 const APPLE_STARTUP_IMAGES = IOS_SPLASH_DEVICES.map(([w, h, r]) => ({
-  url: `/splash-ios?w=${w * r}&h=${h * r}`,
+  // `r`(devicePixelRatio) 도 넘겨, 라우트가 로고/워드마크를 인앱 스플래시와 동일한 고정 dp×r 로 굽게 한다
+  // (시작화면 → 인앱 스플래시 로고 점프 방지).
+  url: `/splash-ios?w=${w * r}&h=${h * r}&r=${r}`,
   media: `screen and (device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
 }));
 
@@ -139,6 +142,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* 콜드 로드 직후 풀스크린 브랜드 스플래시(로고+FinSight) → 로드되면 fade-out.
          *  네이티브 OS 스플래시(Android 아이콘 / iOS startupImage)를 이어받아 연속 화면처럼 보인다. */}
         <SplashScreen />
+        {/* ⚠️ 임시 진단 칩 — safe-area-inset 등 측정용. 보정 후 본 줄 + 컴포넌트 제거. */}
+        <SafeAreaDebug />
       </body>
     </html>
   );
