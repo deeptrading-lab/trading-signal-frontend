@@ -2552,3 +2552,44 @@
   - ✅ QA 완료 — `docs/qa/pwa-home-screen.md` (qa 에이전트, 실패 0) · ✅ 코드 리뷰 승인
   - 실기기 수동 검증: iOS Safari "홈 화면에 추가" / Android Chrome "앱 설치"
   - (후속) 모바일 헤더 외 다크모드 대응은 별도 PRD
+
+### 2026-05-31 — fix(pwa): 상단 navbar 글래스 safe-area 확장 — 상태바 경계선 제거 (#60)
+
+- **slug**: `pwa-safe-area-seam` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/60
+- **요약**: fix(pwa): 상단 navbar 글래스 safe-area 확장 — 상태바 경계선 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 핸드폰에 설치형 PWA(홈 화면 추가)로 띄우면 상단 navbar **위쪽에 가느다란 가로 경계선**이 보였다. 원인은 테두리가 아니라 **색 경계(seam)** — 순백 상태바(`theme_color #ffffff`)와 반투명 글래스 헤더(`bg-surface/80 backdrop-blur-md`, 뒤의 `surface-muted` 회색이 비쳐 살짝 off-white)가 맞닿아 생기는 선이었다. 데스크탑·일반 브라우저 탭에는 상태바가 없어 안 보이고 설치형 PWA에서만 드러난다.
+  > 
+  > ## 변경
+  > 
+  > navbar 글래스 **색/톤은 그대로 두고**, 헤더 글래스를 상태바(safe-area) 영역까지 확장해 상태바가 같은 글래스 면 위에 떠 있게 만들어 맞닿는 경계 자체를 제거했다.
+  > 
+  > | 파일 | 변경 |
+  > |---|---|
+  > | `app/layout.tsx` | `viewport.viewportFit: "cover"` 추가 → `env(safe-area-inset-*)` 활성화 |
+  > | `app/components.css` `.header-glass` | `h-navbar-h` → `min-h-navbar-h` + `padding-top: env(safe-area-inset-top)` |
+  > | `app/components.css` `.bottom-nav` | `padding-bottom: env(safe-area-inset-bottom)` (cover 하단 짝 — 홈 인디케이터 겹침 방지) |
+  > | `app/(main)/layout.tsx` | `main` 하단 스페이서에 `+ env(safe-area-inset-bottom)` |
+  > 
+  > - `viewport-fit=cover`는 상·하 동시에 적용되므로 BottomNav가 홈 인디케이터 밑으로 들어간다 → 하단 safe-area 패딩이 세트로 필요.
+  > - 데스크탑·일반 브라우저 탭은 인셋이 0이라 **무회귀**.
+  > 
+  > ## 검증
+  > 
+  > - `npm run build` ✓ Compiled successfully
+  > - 컴파일된 CSS에 `safe-area-inset-top` / `safe-area-inset-bottom` 포함 확인
+  > - ⚠️ 설치형 PWA에서만 드러나는 변경 → **배포 후 실제 폰 검증 필요**:
+  >   - 상단 경계선 사라짐(핵심)
+  >   - 헤더 로고·프로필 아이콘이 상태바에 안 가리고 60px 행에 정렬
+  >   - 하단 BottomNav가 홈 인디케이터에 안 가림
+  > 
+  > ## 다음 작업
+  > 
+  > - 배포 후 iOS/Android 설치형 PWA에서 상단 경계선 제거 + 상·하 safe-area 정렬 실측 확인.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 iOS/Android 설치형 PWA에서 상단 경계선 제거 + 상·하 safe-area 정렬 실측 확인.
+  - (관찰 시) 가로 모드(landscape)에서 좌우 노치 인셋 영향 점검 — 현재 좌우 인셋 패딩은 미적용.

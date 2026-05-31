@@ -89,9 +89,15 @@ export const metadata: Metadata = {
 /**
  * 브라우저 toolbar/상태바 tint(`<meta name="theme-color">`) — manifest `theme_color` 와 정합.
  * Next 16 은 themeColor 를 metadata 가 아닌 viewport export 에 두기를 권장.
+ *
+ * `viewportFit: "cover"` — 설치형 PWA(standalone)에서 콘텐츠를 화면 가장자리(상태바·홈 인디케이터)
+ *   까지 확장해 `env(safe-area-inset-*)` 를 활성화한다. 헤더 글래스를 상태바 영역까지 끌어올려
+ *   `순백 상태바 ↔ 반투명 글래스` 경계선(seam)을 제거하기 위함(`.header-glass` / `.bottom-nav`
+ *   의 safe-area 패딩과 세트). 데스크탑·일반 브라우저 탭은 인셋이 0이라 무회귀.
  */
 export const viewport: Viewport = {
   themeColor: "#ffffff",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

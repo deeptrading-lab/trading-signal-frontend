@@ -326,9 +326,15 @@
 
   /* ---------- Header (글래스) ----------
    * PRD §5.3 AC-L-2 — backdrop-blur + 반투명 surface + border-b.
-   * height = navbar-h (60px) v4 무회귀. */
+   * 콘텐츠 행 = navbar-h (60px) v4 무회귀.
+   * safe-area: 설치형 PWA(standalone)에서 글래스를 상태바 영역까지 확장(padding-top)해
+   *   `순백 상태바(theme_color #fff) ↔ 반투명 글래스` 사이의 색 경계선(seam)을 제거한다.
+   *   상태바 텍스트가 같은 글래스 면 위에 떠 있게 되어 맞닿는 경계 자체가 사라진다.
+   *   `h-navbar-h`(고정) → `min-h-navbar-h` 로 바꿔야 safe-area 패딩이 60px 콘텐츠 행을
+   *   깎지 않고 위에 얹힌다. 일반 브라우저·데스크탑은 인셋 0 → 무회귀. */
   .header-glass {
-    @apply flex items-center justify-between h-navbar-h bg-surface/80 backdrop-blur-md border-b border-border-line px-lg lg:px-2xl;
+    @apply flex items-center justify-between min-h-navbar-h bg-surface/80 backdrop-blur-md border-b border-border-line px-lg lg:px-2xl;
+    padding-top: env(safe-area-inset-top);
   }
   /* header-brand — 좌측 wordmark (Activity 아이콘 + 텍스트). text-decoration: none 강제 (Link). */
   .header-brand {
@@ -411,9 +417,13 @@
   /* ---------- BottomNav (모바일 < md) ----------
    * PRD §5.3 AC-L-3 + DESIGN.md v8 components.bottom-nav / bottom-nav-item-active.
    * fixed bottom-0 inset-x-0 — useBreakpoint().isMobile 분기로 컴포넌트 측 unmount.
-   * glass 효과 — backdrop-blur + bg-surface/80 + border-t. */
+   * glass 효과 — backdrop-blur + bg-surface/80 + border-t.
+   * safe-area: `viewport-fit=cover` 로 콘텐츠가 홈 인디케이터 밑까지 확장되므로
+   *   하단 인셋만큼 padding-bottom 을 주어 nav 아이템이 인디케이터에 가리지 않게 한다
+   *   (헤더 상단 safe-area 처리의 하단 짝). 일반 브라우저·데스크탑은 인셋 0 → 무회귀. */
   .bottom-nav {
-    @apply flex items-stretch justify-around h-navbar-h bg-surface/80 backdrop-blur-md border-t border-border-line;
+    @apply flex items-stretch justify-around min-h-navbar-h bg-surface/80 backdrop-blur-md border-t border-border-line;
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .bottom-nav-item {
     @apply flex-1 inline-flex flex-col items-center justify-center gap-[2px] text-text-muted text-caption no-underline cursor-pointer;
