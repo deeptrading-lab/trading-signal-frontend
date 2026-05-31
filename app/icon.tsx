@@ -1,10 +1,14 @@
 import { ImageResponse } from "next/og";
+import { PULSE_POLYLINE_POINTS, pulseGradientDefs } from "@/lib/brand-mark";
 
 /**
  * FinSight favicon — App Router `app/icon.tsx` 패턴 + `next/og` ImageResponse 동적 생성.
- * - 시각: 파란 배경 + 흰 lucide `Activity` 아이콘 → 사이드바 brand badge 와 정합.
- * - 색: accent-vivid v8 (#1d4ed8). `ImageResponse` 내부에서는 Tailwind 토큰 직접 호출 불가 → hex 명시.
- *   (디자인 토큰 hex 직타 금지의 합리적 예외 — 토큰 동기화 시 본 파일도 갱신 필요.)
+ * - 시각: **흰 배경(+ 옅은 테두리)** + lucide `Activity` 아이콘(3색 맥박 그라데이션 — 상승=빨강/
+ *   가운데=슬레이트/하락=파랑) → 사이드바·헤더 brand badge · 홈 아이콘 · OG 와 정합(신규 로고).
+ *   그라데이션 색/글리프는 `lib/brand-mark.tsx` 단일 소스.
+ * - `ImageResponse` 내부에서는 Tailwind 토큰 직접 호출 불가 → hex 명시(디자인 토큰 직타의 합리적
+ *   예외). 흰 배경이 브라우저 탭(밝은 영역)에 묻히지 않게 slate-200(#e2e8f0) 테두리.
+ * - ⚠️ 32px 라 그라데이션 효과는 미세함(브랜드 일관성 목적).
  */
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
@@ -19,7 +23,8 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#1d4ed8",
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
           borderRadius: 6,
         }}
       >
@@ -33,8 +38,9 @@ export default function Icon() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          {/* lucide-react Activity icon path */}
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          {pulseGradientDefs("faviconPulse")}
+          {/* lucide-react Activity icon path (맥박 그라데이션 stroke) */}
+          <polyline points={PULSE_POLYLINE_POINTS} stroke="url(#faviconPulse)" />
         </svg>
       </div>
     ),

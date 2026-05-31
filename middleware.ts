@@ -69,14 +69,19 @@ function isPublicPath(pathname: string): boolean {
   if (
     pathname === "/favicon.ico" ||
     pathname === "/icon" ||
-    pathname.startsWith("/icon") ||
+    pathname.startsWith("/icon") || // 파비콘 + PWA manifest 아이콘(`/icon-pwa`)
+    // iOS 홈 아이콘(apple-touch-icon). 경로가 `apple` 로 시작 → 위 `/icon` 에 안 걸리므로 별도 예외.
+    // 미등록 시 iOS 가 쿠키 없이 가져갈 때 게이트가 로그인 HTML 을 줘 홈 아이콘이 깨진다.
+    pathname === "/apple-icon" ||
+    pathname.startsWith("/apple-icon") ||
     pathname === "/opengraph-image" ||
     pathname.startsWith("/opengraph-image") ||
     pathname === "/twitter-image" ||
     pathname.startsWith("/twitter-image") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
-    pathname === "/manifest.webmanifest"
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" // PWA 서비스워커(no-op). JS 로 서빙돼야 등록 성공 → 게이트 통과 필수.
   ) {
     return true;
   }
@@ -154,7 +159,7 @@ export async function middleware(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon|opengraph-image|twitter-image|fonts).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|opengraph-image|twitter-image|sw.js|fonts).*)",
   ],
 };
 

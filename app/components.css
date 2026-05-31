@@ -332,13 +332,20 @@
   }
   /* header-brand — 좌측 wordmark (Activity 아이콘 + 텍스트). text-decoration: none 강제 (Link). */
   .header-brand {
-    @apply inline-flex items-center gap-sm text-accent-vivid no-underline;
+    @apply inline-flex items-center gap-md no-underline;
   }
+  /* header-brand-badge — 흰 카드 배지(신규 로고). bg-surface + 옅은 테두리/그림자 + hover 미세 확대.
+   *   기존 파란 아이콘 직접 노출 → 사이드바와 동일한 흰 배지로 통일. */
+  .header-brand-badge {
+    @apply inline-flex items-center justify-center h-9 w-9 rounded-pill bg-surface border border-border-line shadow-sm transition-transform duration-300 group-hover:scale-105;
+  }
+  /* 배지(36px 원) 대비 아이콘 24px(h-6) — 20px 다음 토큰값. 여백 ~5px. */
   .header-brand-icon {
-    @apply h-2xl w-2xl;
+    @apply h-6 w-6;
   }
+  /* header-brand-text — 22px(h1) 다크→미드 그레이 그라데이션 워드마크. 시안(24px) 근사 + 큰 배지와 균형. */
   .header-brand-text {
-    @apply text-nav-brand;
+    @apply text-h1 font-extrabold tracking-tight bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
   }
   /* header-profile-button — 우측 프로필 아이콘. hit-area 40×40. */
   .header-profile-button {
@@ -358,22 +365,24 @@
    *   .sidebar-brand mb-8 → `mb-2xl` (24px) 근사.
    *   .sidebar-nav-item rounded-xl/px-4/py-3/gap-3 → `rounded-md/px-lg/h-12/gap-md` 근사.
    *   icon size 20px → `h-5 w-5` (시안 `<Icon size={20} />` 정합). */
-  /* 시안 정합 (사용자 dev 실측 2026-05-24):
-   *   - badge = 파란 사각형 (accent-vivid bg) + 흰 아이콘 (text-surface)
-   *   - 텍스트 = text-text-strong (검은색) — 시안 brand 텍스트 본체 색
-   *   - 아이콘 size 20px (h-5 w-5) + badge 32x32 (h-2xl w-2xl) + rounded-sm (8px)
-   *     — 시안 `<div class="w-8 h-8 rounded-lg bg-blue-600"><Activity size={20}/></div>` 정합 */
+  /* 신규 로고(사용자 제공 2026-05-31):
+   *   - badge = 흰 카드 (bg-surface + 옅은 테두리/그림자) + 3색 맥박 글리프(BrandPulseIcon)
+   *   - 텍스트 = 다크→미드 그레이 그라데이션 워드마크 (extrabold, tracking-tight)
+   *   - 아이콘 24px (h-6 w-6) + 텍스트 22px (text-h1) + badge 36px (h-9 w-9) + rounded-pill(원형) — 시안 정합
+   *   - hover 시 배지 미세 확대(group-hover:scale-105). 헤더 브랜드와 동일 규격. */
   .sidebar-brand {
-    @apply inline-flex items-center gap-sm mb-2xl px-sm no-underline;
+    @apply inline-flex items-center gap-md mb-2xl px-sm no-underline;
   }
   .sidebar-brand-badge {
-    @apply inline-flex items-center justify-center h-2xl w-2xl rounded-sm bg-accent-vivid text-surface;
+    @apply inline-flex items-center justify-center h-9 w-9 rounded-pill bg-surface border border-border-line shadow-sm transition-transform duration-300 group-hover:scale-105;
   }
+  /* 배지(36px 원) 대비 아이콘 24px(h-6) — 20px 다음 토큰값. 여백 ~5px. */
   .sidebar-brand-icon {
-    @apply h-5 w-5;
+    @apply h-6 w-6;
   }
+  /* 22px(h1) 다크→미드 그레이 그라데이션 워드마크 — 시안(24px) 근사 + 큰 배지와 균형. */
   .sidebar-brand-text {
-    @apply text-nav-brand text-text-strong;
+    @apply text-h1 font-extrabold tracking-tight bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
   }
   .sidebar-nav {
     @apply flex flex-col gap-xs w-full;
