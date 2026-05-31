@@ -43,9 +43,10 @@ export default function MainLayout({
         {/* 우측 컬럼 — Header (sticky top) + main (overflow-y-auto). */}
         <div className="flex flex-col flex-1 overflow-hidden">
           <Header />
-          {/* main 영역 — 모바일에서 BottomNav (fixed bottom-0, h=navbar-h) 가
-           *  콘텐츠 위에 올라가지 않도록 하단 padding 으로 spacer 확보. md+ 에서는 BottomNav 미렌더. */}
-          <main className="flex-1 overflow-y-auto pb-navbar-h md:pb-0 main-area">
+          {/* main 영역 — 모바일에서 BottomNav (fixed bottom-0, h=navbar-h + safe-area-bottom) 가
+           *  콘텐츠 위에 올라가지 않도록 하단 padding 으로 spacer 확보. PWA(cover)에서 BottomNav 가
+           *  홈 인디케이터만큼 더 커지므로 spacer 도 `+ env(safe-area-inset-bottom)`. md+ 에서는 BottomNav 미렌더. */}
+          <main className="flex-1 overflow-y-auto pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom))] md:pb-0 main-area">
             {children}
           </main>
         </div>
