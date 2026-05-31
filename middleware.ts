@@ -20,6 +20,36 @@ import { verifySession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 
 /**
+ * 알려진 소셜/검색 크롤러 User-Agent 화이트리스트 (소문자, 부분일치).
+ * PRD social-share-metadata §3.4 / §9 q1 = 옵션 B — 게이트가 켜진 prod 에서도 카톡/SNS 크롤러가
+ * OG 메타·이미지를 읽을 수 있게 "미인증 페이지 + OG 이미지 라우트"에 한해 게이트를 통과시킨다.
+ *
+ * ⚠️ OG 크롤러 한정 예외 — `/api/*` 는 본 화이트리스트와 무관하게 항상 차단해 데이터 보호를 유지한다.
+ *    UA 는 위조 가능하나 본 게이트는 강보안이 아니라 "공개 노출 최소화"가 목적(app-password-gate §4 RBAC 비범위).
+ *    UA 위조자가 얻는 건 빈 UI 셸 + OG <meta> 뿐 — 실데이터는 전부 게이트된 `/api/*`(쿠키 없으면 401)로 보호된다.
+ */
+const CRAWLER_USER_AGENTS = [
+  "kakaotalk-scrap", // 카카오톡 링크 스크랩
+  "facebookexternalhit", // 페이스북
+  "facebot", // 페이스북
+  "twitterbot", // X(트위터)
+  "slackbot", // 슬랙
+  "discordbot", // 디스코드
+  "telegrambot", // 텔레그램
+  "linkedinbot", // 링크드인
+  "whatsapp", // 왓츠앱
+  "googlebot", // 구글
+  "bingbot", // 빙
+];
+
+/** 요청 UA 가 알려진 OG 크롤러인지(대소문자 무시 부분일치). */
+function isCrawlerUserAgent(request: NextRequest): boolean {
+  const ua = request.headers.get("user-agent")?.toLowerCase() ?? "";
+  if (!ua) return false;
+  return CRAWLER_USER_AGENTS.some((needle) => ua.includes(needle));
+}
+
+/**
  * 인증 없이 항상 통과하는 예외 경로 판별(코드 가드 — matcher 와 이중 방어).
  * matcher 가 1차 제외하더라도 보안 경계는 본 함수가 단일 진실.
  */
@@ -84,11 +114,23 @@ export async function middleware(request: NextRequest) {
   }
 
   // 미인증 — API 는 401 JSON, 페이지는 /login 리다이렉트.
+  // ⚠️ `/api/*` 는 크롤러 UA 라도 여기서 먼저 401 — 데이터 보호 불변(아래 UA 예외보다 앞).
   if (isApiRequest(pathname)) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
+  }
+
+  // OG 크롤러 예외(옵션 B) — 페이지(+`/opengraph-image`) 한정으로 게이트 통과(노출되는 건 빈 UI 셸 + OG <meta> 뿐).
+  // `/api/*` 는 위에서 이미 401 처리되므로 본 분기는 페이지 요청만 통과시킨다(데이터 보호 유지). 상세 근거는 CRAWLER_USER_AGENTS 주석.
+  // 크롤러는 GET/HEAD 로만 OG 를 읽는다 — 그 외 메서드는 통과 불허(PRD §9 q1(2) 'GET 페이지 한정' 정합).
+  // HEAD 도 허용: 일부 크롤러·`curl -sI`(OG content-type 검증) 가 HEAD 를 보내므로 GET 만 허용하면 /login 으로 샌다.
+  if (
+    ["GET", "HEAD"].includes(request.method) &&
+    isCrawlerUserAgent(request)
+  ) {
+    return NextResponse.next();
   }
 
   const loginUrl = request.nextUrl.clone();

@@ -2468,3 +2468,45 @@
   - W3: CandleBar wickRange Y 좌표 — 다양한 종목·기간 시각 검증
   - W4: `calcMACD` signal null 구간 0 패딩 정확도 개선
   - 홈 공시 피드 기업별 그룹핑 (`DisclosureFeedContainer`) — 별도 PR
+
+### 2026-05-31 — feat(meta): 소셜 공유 OG 메타데이터 + 동적 og:image + 크롤러 게이트 통과 (#54)
+
+- **slug**: `social-share-metadata` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/54
+- **요약**: feat(meta): 소셜 공유 OG 메타데이터 + 동적 og:image + 크롤러 게이트 통과
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇 / 왜
+  > 카톡·SNS 링크 공유 시 풍부한 OG 프리뷰(제목·설명·대표 이미지·사이트명)가 뜨도록 OG/Twitter 메타데이터 + 동적 og:image(1200×630) + 크롤러 게이트 통과를 추가.
+  > 
+  > PRD: `docs/prd/social-share-metadata.md` (§9 OPEN QUESTION 5건 전부 RESOLVED — q1=옵션 B, q2~q5=PM 권고 기본값)
+  > 
+  > ## 변경 (단일 PR, §8.2 커밋 분할)
+  > | 파일 | 내용 |
+  > |---|---|
+  > | `app/layout.tsx` | `metadataBase`(하드코딩 prod + `VERCEL_PROJECT_PRODUCTION_URL` 폴백, q3=A) · `openGraph`(title/description/url/siteName/locale ko_KR/type website) · `twitter`(card summary_large_image). `description` 한 곳에서만 정의(q5 인라인 유지). OG/twitter images 는 파일 컨벤션이 자동 주입(명시 불필요). |
+  > | `app/opengraph-image.tsx` (신규) | `next/og` ImageResponse 1200×630 PNG — 파란 `#1d4ed8` 배경 + 흰 lucide Activity + "FinSight" 라틴 워드마크(q4=라틴만, 폰트 주입 없음). hex 직타는 `app/icon.tsx` 선례 예외 주석. twitter-image 미생성(q2). |
+  > | `middleware.ts` | OG 크롤러 UA 화이트리스트(`kakaotalk-scrap`/`facebookexternalhit`/`Facebot`/`Twitterbot`/`Slackbot`/`Discordbot`/`TelegramBot`/`LinkedInBot`/`WhatsApp`/`Googlebot`/`bingbot`, 소문자 부분일치). 미인증 **페이지** 분기에서 크롤러 UA 면 `/login` 대신 통과. **`/api/*` 는 그 분기보다 앞에서 항상 401** — 데이터 보호 불변(q1=옵션 B). `isPublicPath`·`matcher`·루프/open-redirect 가드 무변경, UA 분기만 추가. |
+  > 
+  > ## 자가검증 (AC)
+  > 
+  > ### 메타데이터 (G1·G3)
+  > - **AC-1** `git grep -nE "openGraph|metadataBase|twitter" app/layout.tsx` → metadataBase + openGraph(title/description/url/siteName/locale/type) + twitter(card summary_large_image) 존재.
+  > - **AC-2** 게이트-off `curl -s localhost/ | grep og:|twitter:` →
+  >   `og:title` `og:description` `og:image` `og:url` `og:type`(website) `og:site_name`(FinSight) `og:locale`(ko_KR) + `twitter:card`(summary_large_image) `twitter:title` `twitter:description` `twitter:image` 모두 출력. `og:image`/`twitter:image` 는 1200×630 image/png 로 Next 자동 주입.
+  > - **AC-3** `og:url` = `https://trading-signal-frontend.vercel.app`(절대). `npm run build` 로그 `metadataBase` 미설정 경고 0건(grep 확인).
+  > 
+  > ### 동적 og:image (G2)
+  > - **AC-4** `app/opengraph-image.tsx` `size={1200,630}`·`contentType="image/png"`. 게이트-off `curl -sI localhost/opengraph-image | grep content-type` → `image/png`. 렌더 파일 `file` → `PNG image data, 1200 x 630`. 시각 확인: 파란 배경 + Activity 아이콘 + FinSight 워드마크 (스크린샷 첨부 예정).
+  > - **AC-4b** `git grep -n "1d4ed8" app/icon.tsx app/opengraph-image.tsx` → 두 파일 동일 `#1d4ed8` + 동일 취지 hex 예외 주석.
+  > 
+  > ### 게이트 정합 (G4, q1=옵션 B) — gate-on(`APP_PASSWORD` 설정) 실측
+  > | 요청 | 결과 |
+  > |---|---|
+  > | 일반 UA `GET /` (쿠키 없음) | `307 → /login?next=%2F` (게이트 intact) |
+  > | 크롤러 UA `kakaotalk-scrap` `GET /` | **200** (리다이렉트 아님) |
+  > | 크롤러 UA `facebookexternalhit` `GET /opengraph-image` | **200 image/png** |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 운영자 작업: Kakao Developers 캐시 삭제(스크랩 갱신) 1회 + 카톡 대화창 실측(AC-10/G5). 페이스북/슬랙 등은 각 플랫폼 디버거로 갱신.
+  - 후속 PRD 후보: 페이지별 동적 OG(종목 분석마다 종목명·가격 박힌 og:image — route-segment `opengraph-image`), 한글 태그라인 추가 시 Pretendard subset 폰트 주입(q4 후속), `robots.txt`/`sitemap.xml`·PWA manifest(별도 트랙).
+  - 사전 실패 테스트 5건(market ticker/indices NASDAQ·SPX 순서)은 본 PR 무관이나 별도 정리 필요.
