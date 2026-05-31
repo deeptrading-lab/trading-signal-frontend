@@ -112,11 +112,11 @@ function WatchlistRowBase({
       role="link"
       tabIndex={0}
       aria-label={`${displayName} 상세 보기`}
-      onClick={() => router.push(`/profile/${quote.ticker}`)}
+      onClick={() => router.push(`/stock/${quote.ticker}`)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          router.push(`/profile/${quote.ticker}`);
+          router.push(`/stock/${quote.ticker}`);
         }
       }}
     >

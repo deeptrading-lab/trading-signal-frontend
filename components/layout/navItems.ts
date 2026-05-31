@@ -14,6 +14,7 @@
 
 import {
   House,
+  BarChart2,
   Compass,
   Star,
   User,
@@ -23,6 +24,7 @@ import {
 import {
   NAV_MENU_HOME,
   NAV_MENU_ANALYZE,
+  NAV_MENU_STOCK,
   NAV_MENU_WATCHLIST,
   NAV_MENU_PROFILE,
 } from "@/lib/copy/layout/navCopy";
@@ -39,6 +41,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { path: "/", label: NAV_MENU_HOME, icon: House },
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, icon: Star },
+  { path: "/stock", label: NAV_MENU_STOCK, icon: BarChart2 },
   { path: "/profile", label: NAV_MENU_PROFILE, icon: User },
 ];
 

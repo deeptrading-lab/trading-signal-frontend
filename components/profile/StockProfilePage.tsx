@@ -1,5 +1,5 @@
 /**
- * StockProfilePage — `/profile/[ticker]` 종목 상세 셸.
+ * StockProfilePage — `/stock/[ticker]` 종목 상세 셸.
  *
  * PRD `stock-api-integration` (PR-B) §3.5 — Profile 도메인 종단 전환의 컴포저.
  *
@@ -17,10 +17,10 @@
  * AC-8 종단 검증의 단일 진입점.
  */
 
-import { StockHeader } from "./StockHeader";
-import { StockDailyChart } from "./StockDailyChart";
-import { CompanyOverview } from "./CompanyOverview";
-import { DisclosureList } from "./DisclosureList";
+import { BarChart2 } from "lucide-react";
+import { StockSearchContainer } from "@/components/home/StockSearchContainer";
+import { StockPageLayout } from "./StockPageLayout";
+import { NAV_MENU_STOCK } from "@/lib/copy/layout/navCopy";
 
 export interface StockProfilePageProps {
   ticker: string;
@@ -29,12 +29,12 @@ export interface StockProfilePageProps {
 export function StockProfilePage({ ticker }: StockProfilePageProps) {
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
-      <StockHeader ticker={ticker} />
-      <StockDailyChart ticker={ticker} />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-        <CompanyOverview ticker={ticker} />
-        <DisclosureList ticker={ticker} count={5} />
-      </div>
+      <header className="flex items-center gap-sm">
+        <BarChart2 className="h-2xl w-2xl text-accent-vivid" aria-hidden="true" />
+        <h1 className="text-h1 text-text-strong">{NAV_MENU_STOCK}</h1>
+      </header>
+      <StockSearchContainer />
+      <StockPageLayout ticker={ticker} />
     </div>
   );
 }

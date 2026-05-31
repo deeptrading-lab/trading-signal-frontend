@@ -30,6 +30,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   fetchIndexPriceShared,
+  fetchOverseasIndexShared,
   isKisConfigured,
   resolveKisEnv,
   type MarketIndexQuote,
@@ -37,15 +38,21 @@ import {
 import { isApiError } from "@/lib/api/errors";
 import { getMockMarketIndices } from "@/lib/mock/market/indices";
 
-/** 국내 지수 기본 3종 — KOSPI / KOSDAQ / KOSPI200. */
-const DEFAULT_INDEX_CODES = ["0001", "1001", "2001"] as const;
+/** 기본 지수 코드 — 국내 2종(KOSPI/KOSDAQ) + 해외 2종(S&P 500/NASDAQ). */
+const DEFAULT_INDEX_CODES = ["0001", "1001", "SPX", "COMP"] as const;
+
+/** 해외 지수 코드 판별 집합. */
+const OVERSEAS_CODES_SET = new Set(["SPX", "COMP"]);
 
 const BFF_TIMEOUT_MS = 5_000;
 const KIS_CHUNK_SIZE = 2; // EGW00201 회피 — 2개씩 청크 (ticker 라우트 정합).
 const KIS_CHUNK_DELAY_MS = 120; // 청크 간 짧은 지연 (ticker 라우트 정합).
 
-/** 국내 지수 서버 TTL 30s — queryConfig.market.indices.staleTime / ticker 국내분과 정합. */
-const CACHE_TTL_MS = 30_000;
+/** 소스별 캐시 TTL — 국내 30s / 해외 10분(ticker 라우트 정합). */
+const CACHE_TTL_MS = {
+  domestic: 30_000,
+  overseas: 10 * 60_000,
+} as const;
 
 const FALLBACK_TIMEOUT_MESSAGE =
   "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
@@ -118,9 +125,13 @@ async function fetchIndices(
   // 2개씩 청크 + 청크 간 짧은 지연.
   for (let i = 0; i < misses.length; i += KIS_CHUNK_SIZE) {
     const chunk = misses.slice(i, i + KIS_CHUNK_SIZE);
-    // L1(라우트 인메모리) miss → L2 공유 store 경유(국내 0001/1001 크로스-라우트 dedup, §3.3).
+    // 국내(0001/1001)는 L2 공유 store 경유로 dedup. 해외(SPX/COMP)는 fetchOverseasIndex 직접.
     const settled = await Promise.allSettled(
-      chunk.map((code) => fetchIndexPriceShared(code)),
+      chunk.map((code) =>
+        OVERSEAS_CODES_SET.has(code)
+          ? fetchOverseasIndexShared(code)
+          : fetchIndexPriceShared(code),
+      ),
     );
     settled.forEach((r, idx) => {
       if (r.status === "fulfilled") {
@@ -152,7 +163,8 @@ function readIndexCache(code: string): MarketIndexQuote | null {
 }
 
 function writeIndexCache(code: string, value: MarketIndexQuote): void {
-  indexCache.set(code, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+  const ttl = OVERSEAS_CODES_SET.has(code) ? CACHE_TTL_MS.overseas : CACHE_TTL_MS.domestic;
+  indexCache.set(code, { value, expiresAt: Date.now() + ttl });
 }
 
 function jsonWithDataSource(

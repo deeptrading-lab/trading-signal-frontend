@@ -32,7 +32,7 @@ export function useQueryDisclosureList(
     enabled: (options?.enabled ?? true) && ticker.length > 0,
     staleTime: queryConfig.disclosure.list.staleTime,
     gcTime: queryConfig.disclosure.list.gcTime,
-    retry: 1,
+    retry: 0,
     refetchOnWindowFocus: false,
   });
 }

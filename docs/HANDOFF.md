@@ -2424,3 +2424,47 @@
   - **운영 관찰 후 튜닝**: 락 TTL 10s / 폴링 50ms×~2s 는 KIS 발급 제한 수치 확인 전 보수값. EGW00133/EGW00201 관찰 시 조정.
   - **지수 store 확대(후속)**: 현재 국내 0001/1001 한정. 해외/BTC 확대 + EGW00201 관찰 시 지수 캐시에도 락 추가(q6).
   - **무료 티어 초과 관찰(후속)**: 429/한도 경고 시 유료 검토.
+
+### 2026-05-31 — feat(stock): 종목 분석 페이지 + 다중 기술지표 차트 (캔들/거래량/MACD/RSI) (#53)
+
+- **slug**: `stock-chart-analysis` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/53
+- **요약**: feat(stock): 종목 분석 페이지 + 다중 기술지표 차트 (캔들/거래량/MACD/RSI)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## Summary
+  > 
+  > - `/stock/[ticker]` 라우트 신설 — 기존 `/profile/[ticker]` 대체, 사이드바·바텀바·관심종목 진입점 통일
+  > - `StockDailyChart` 전면 재작성: 단순 AreaChart → 라인/캔들 전환 + 거래량·MACD·RSI 서브플롯 4단 구성
+  > - `StockPageLayout` 신설: 데스크탑 2-col ↔ 차트 풀너비 확대 전환 (fade 180ms)
+  > - `app/api/stock/chart` BFF: `inquire-daily-itemchartprice` (최대 100봉, D/W/M period)
+  > - `calcMACD` / `calcRSI` 기술지표 유틸 신설
+  > - `StockSearchContainer` 자동완성 + 최근 검색 종목 (localStorage)
+  > - `symbols.json` 전종목 갱신 + `update-symbols.py` 스크립트
+  > - 해외 지수(S&P500/NASDAQ) indices BFF 추가
+  > 
+  > ## Bug fixes (code-review 검출)
+  > 
+  > | 파일 | 수정 |
+  > |---|---|
+  > | `StockDailyChart` | `isUp` 비교를 `close >= open`으로 통일 — day-over-day 비교로 캔들 색 불일치 |
+  > | `StockDailyChart` | MACD 서브플롯 노출 게이트를 `macd !== null`로 변경 — 26-34봉 구간 데이터 숨김 해소 |
+  > | `StockDailyChart` | `CandleBar` `high < low` (strict) — 도지 캔들 렌더링 |
+  > | `StockDailyChart` | 거래량·MACD Bar에 `isAnimationActive={false}` 추가 — 캔들과 애니메이션 일치 |
+  > | `StockDailyChart` | `ResponsiveContainer height` 수치 고정 — Recharts v3 `width(-1)` 경고 제거 |
+  > | `StockPageLayout` | `timerRef`로 이전 setTimeout 취소 — 빠른 연속 클릭 race condition 수정 |
+  > 
+  > ## Test plan
+  > 
+  > - [x] `/stock/005930` 접속 → 가격 차트·거래량·MACD·RSI 정상 렌더, 콘솔 경고 없음 (Playwright 확인)
+  > - [x] 라인 ↔ 캔들 전환, 일봉/주봉/월봉 전환, 기간 범위 전환
+  > - [x] 차트 확대 버튼 → 풀너비 확대, 축소 버튼 → 2-col 복귀
+  > - [x] 빠른 연속 클릭 race condition 없음
+  > - [ ] 종목 검색창 자동완성, 최근 검색 종목 표시
+  > - [ ] 관심종목 페이지 종목 클릭 → `/stock/[ticker]` 이동
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - W1: `StockSearchContainer` input `!` 오버라이드 → `.input-search` variant 분리
+  - W2: `StockDailyChart` 차트 색상 → `tailwind.theme.json` chart.* 토큰 등록
+  - W3: CandleBar wickRange Y 좌표 — 다양한 종목·기간 시각 검증
+  - W4: `calcMACD` signal null 구간 0 패딩 정확도 개선
+  - 홈 공시 피드 기업별 그룹핑 (`DisclosureFeedContainer`) — 별도 PR

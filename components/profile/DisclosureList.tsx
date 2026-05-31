@@ -1,5 +1,5 @@
 /**
- * DisclosureList — `/profile/[ticker]` 최근 공시 5건 (DART).
+ * DisclosureList — `/stock/[ticker]` 최근 공시 5건 (DART).
  *
  * PRD `stock-api-integration` (PR-B) §3.5 — `useQueryDisclosureList(ticker, 5)` 호출.
  *

@@ -30,7 +30,7 @@ export function useQueryDisclosureCompany(
     enabled: (options?.enabled ?? true) && ticker.length > 0,
     staleTime: queryConfig.disclosure.company.staleTime,
     gcTime: queryConfig.disclosure.company.gcTime,
-    retry: 1,
+    retry: 0,
     refetchOnWindowFocus: false,
   });
 }

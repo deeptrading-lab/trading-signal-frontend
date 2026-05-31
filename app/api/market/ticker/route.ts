@@ -24,7 +24,7 @@
 import { NextResponse } from "next/server";
 import {
   fetchIndexPriceShared,
-  fetchOverseasIndex,
+  fetchOverseasIndexShared,
   isKisConfigured,
   resolveKisEnv,
   type MarketIndexQuote,
@@ -151,7 +151,7 @@ async function loadKisIndices(): Promise<Map<string, MarketIndexQuote>> {
         // 국내(0001/1001)는 L2 공유 store 경유로 indices 라우트와 dedup(§3.3). 해외는 현행 직접.
         kind === "domestic"
           ? fetchIndexPriceShared(code)
-          : fetchOverseasIndex(code),
+          : fetchOverseasIndexShared(code),
       ),
     );
     settled.forEach((r, idx) => {

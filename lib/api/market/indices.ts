@@ -21,8 +21,8 @@ import type { MarketIndexQuote } from "@/lib/api/kis/types";
 
 export type { MarketIndexQuote } from "@/lib/api/kis/types";
 
-/** 기본 시장 지수 코드 — 국내 3종 (KOSPI / KOSDAQ / KOSPI200). */
-export const DEFAULT_INDEX_CODES = ["0001", "1001", "2001"] as const;
+/** 기본 시장 지수 코드 — 국내 2종(KOSPI / KOSDAQ) + 해외 2종(S&P 500 / NASDAQ). */
+export const DEFAULT_INDEX_CODES = ["0001", "1001", "SPX", "COMP"] as const;
 
 export async function getMarketIndices(
   codes: readonly string[] = DEFAULT_INDEX_CODES,
