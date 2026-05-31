@@ -2678,3 +2678,45 @@
   - (관찰 시) 인앱 스플래시 최소 표시시간/페이드 타이밍 미세조정.
   - iOS landscape 시작 화면(현재 portrait 한정), iPad 해상도는 KNOWN-GAP.
   - 별도 트랙: Android 상태바 1px 시스템 그림자 edge-to-edge 후속(직전 논의).
+
+### 2026-05-31 — fix(pwa): 스플래시 로고 네이티브 크기 매칭 + 표시시간 연장 (#64)
+
+- **slug**: `pwa-splash-tuning` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/64
+- **요약**: fix(pwa): 스플래시 로고 네이티브 크기 매칭 + 표시시간 연장
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경 (follow-up of #62)
+  > 
+  > 설치형 PWA 콜드 로드 시 인앱 스플래시(로고+FinSight)가 실제로 뜨는 건 확인됐으나, 안드로이드(Galaxy S25) 실측에서:
+  > 1. 로고가 **네이티브 스플래시보다 작음** — Android 12+ 네이티브 로고는 dp 고정(192dp 원 안 **~158dp**). 우리 인앱 글리프는 96px(h-24)라 확연히 작았음.
+  > 2. **너무 짧게 떠서** 잘 안 보임 — 캐시된 PWA에선 `readyState==="complete"` 시 180ms 후 fade.
+  > 
+  > ## 변경
+  > 
+  > | 파일 | 내용 |
+  > |---|---|
+  > | `app/components.css` `.splash-icon` | `h-24`(96px) → **`h-40`(160px)** — 네이티브 ~158dp 매칭. `.splash-screen` gap `gap-lg`→`gap-2xl`(균형) |
+  > | `components/pwa/SplashScreen.tsx` | **최소 표시시간 1.2s + load 동시 충족** 후 fade-out(4s 하드 백스톱) — 즉시 사라지던 문제 해결 |
+  > | `app/splash-ios/route.tsx` + `app/layout.tsx` | iOS startup-image 로고를 인앱과 **동일 고정 dp(160/36/24 × devicePixelRatio)** 로 렌더 → iOS 시작화면 ↔ 인앱 스플래시 로고 점프 제거 (`&r=` 파라미터 전달) |
+  > 
+  > 색/글리프 단일 소스(`lib/brand-mark.tsx`) 무변경.
+  > 
+  > ## 검증
+  > 
+  > - `npm run build` ✓ Compiled successfully, 타입 0
+  > - 컴파일 CSS: `.splash-icon` height=160px, `.splash-screen` gap=24px
+  > - `/splash-ios?w=1170&h=2532&r=3` → 200 image/png, 글리프 480px(=160dp×3)로 확대 — 육안 확인(로고 커짐, FinSight 균형 양호). `&r` 없음/비정상값/r=2 모두 200
+  > - `/login` HTML: startup-image 11개 모두 `&r=` 포함, 인앱 `.splash-screen` SSR 마운트
+  > - ⚠️ **배포 후 실기기**: 콜드 로드 시 로고 네이티브급 크기 + ~1.2초 또렷이 표시, iOS 점프 없음
+  > 
+  > ## 다음 작업
+  > 
+  > - 배포 후 iOS·Android 설치형 PWA 콜드 로드 실기기 검증(로고 크기·표시시간).
+  > - (관찰 시) MIN_VISIBLE_MS(1.2s) 미세조정.
+  > - 별도 트랙: 안드로이드 상태바 1px 선 — 기기 진단(임시 theme-color 변경 + safe-area-inset 확인) 후 fix 결정.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 iOS·Android 설치형 PWA 콜드 로드 실기기 검증(로고 크기·표시시간).
+  - (관찰 시) MIN_VISIBLE_MS(1.2s) 미세조정.
+  - 별도 트랙: 안드로이드 상태바 1px 선 — 기기 진단(임시 theme-color 변경 + safe-area-inset 확인) 후 fix 결정.
