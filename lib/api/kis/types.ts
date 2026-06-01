@@ -132,6 +132,8 @@ export type StockPrice = {
   open?: number;
   high?: number;
   low?: number;
+  /** 업종명 (KRX 큰 업종, `bstp_kor_isnm`) — "전기·전자"·"IT 서비스"·"제약" 등. 빈 값이면 undefined. */
+  sector?: string;
 };
 
 export type StockDailyCandle = {
@@ -187,6 +189,8 @@ export type KisSearchStockInfoOutput = {
   admn_item_yn?: string;
   /** 상장주수 (시총 계산용). */
   lstg_stqt?: string;
+  /** 표준산업분류명 (상세 업종) — "반도체 제조업"·"통신 및 방송 장비 제조업" 등. */
+  std_idst_clsf_cd_name?: string;
 };
 
 /**
@@ -208,6 +212,8 @@ export type StockInfo = {
   isAdminItem: boolean;
   /** 코스피200 종목 여부. */
   isKospi200?: boolean;
+  /** 표준산업분류명 (상세 업종) — "반도체 제조업"·"통신 및 방송 장비 제조업" 등. 빈 값이면 undefined. */
+  industryName?: string;
 };
 
 /**

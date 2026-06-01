@@ -17,7 +17,12 @@ import {
   incrementDartCounter,
   peekDartCounter,
 } from "@/lib/api/dart/counter";
-import { getCorpCode } from "@/lib/api/kis";
+import {
+  getCorpCode,
+  fetchStockInfo,
+  isKisConfigured,
+  resolveKisEnv,
+} from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockCompanyProfile } from "@/lib/mock/disclosure/company";
 import {
@@ -91,11 +96,31 @@ export async function GET(request: NextRequest) {
         { status: 404, headers: { "Cache-Control": "no-store" } },
       );
     }
+    // 업종 보강(상세) — DART 의 industry 는 induty_code(코드)뿐. KIS 표준산업분류명("통신 및 방송 장비
+    //   제조업")으로 덮어 읽기 쉽게 한다(실전 전용, best-effort — 실패/미설정 시 DART 코드 유지).
+    //   큰 업종(KRX 섹터 "전기·전자")은 종목 상세 화면이 이미 보유한 price 쿼리(bstp_kor_isnm)에서
+    //   클라이언트가 병기한다 → 중복 inquire-price 호출을 피한다(CompanyOverview).
+    const industryName = await safeIndustryName(ticker);
+    if (industryName) data.industry = industryName;
     const headers: Record<string, string> = { "X-Data-Source": "dart" };
     if (status.isWarn) headers["X-Dart-Quota-Warning"] = "true";
     return jsonWithDataSource(data, "dart", headers);
   } catch (error) {
     return mapErrorToResponse(error, ticker);
+  }
+}
+
+/**
+ * 업종명(표준산업분류명, 상세) best-effort 조회 — KIS `search-stock-info`(실전 전용).
+ * 미설정·비-prod·실패·타임아웃이면 undefined(호출 측이 DART induty_code 유지). 기업개황 본 응답을 막지 않는다.
+ */
+async function safeIndustryName(ticker: string): Promise<string | undefined> {
+  if (!isKisConfigured() || resolveKisEnv() !== "prod") return undefined;
+  try {
+    const info = await withTimeout(fetchStockInfo(ticker), 3_000);
+    return info.industryName;
+  } catch {
+    return undefined;
   }
 }
 
