@@ -25,13 +25,17 @@ import type { StockPrice, WatchlistQuote } from "@/lib/api/kis/types";
  *   - `["stock","price",ticker]`  → 단건
  *   - `["watchlist","list",norm]` → 배열
  */
+// 스토어로 라우팅하는 쿼리 키 prefix (`hooks/query/queryKeys.ts` 구조와 정합 — 인라인 매직 스트링 제거).
+const KEY_STOCK_PRICE = ["stock", "price"] as const;
+const KEY_WATCHLIST_LIST = ["watchlist", "list"] as const;
+
 function routeQuoteToStore(data: unknown, query: Query<unknown, unknown>): void {
-  const key = query.queryKey as readonly unknown[];
-  const upsert = useStockMetaStore.getState().upsertQuotes;
-  if (key[0] === "stock" && key[1] === "price") {
-    upsert([data as StockPrice]);
-  } else if (key[0] === "watchlist" && key[1] === "list") {
-    upsert(data as WatchlistQuote[]);
+  const [root, sub] = query.queryKey as readonly unknown[];
+  // getState() 조회는 매칭 분기 안에서만 — 무관 쿼리 성공마다 불필요 조회 회피.
+  if (root === KEY_STOCK_PRICE[0] && sub === KEY_STOCK_PRICE[1]) {
+    useStockMetaStore.getState().upsertQuotes([data as StockPrice]);
+  } else if (root === KEY_WATCHLIST_LIST[0] && sub === KEY_WATCHLIST_LIST[1]) {
+    useStockMetaStore.getState().upsertQuotes(data as WatchlistQuote[]);
   }
 }
 

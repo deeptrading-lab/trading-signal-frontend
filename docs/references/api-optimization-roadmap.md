@@ -79,7 +79,7 @@
 
 | 우선 | 항목 | 문제 | 해결 | 기대효과 | 규모 |
 |---|---|---|---|---|---|
-| **P0** | zustand 도입 + `useStockMetaStore` | 목록→상세 시세 재호출 · 이름 3중 해석 | 패칭 응답을 store에 upsert, 상세는 즉시 페인트 + 백그라운드 재검증 | KIS `inquire-price` 호출 절감, 체감 즉시 렌더, 이름 단일 경로 | 중 |
+| **P0** ✅완료(#76) | zustand 도입 + `useStockMetaStore` | 목록→상세 시세 재호출 · 이름 3중 해석 | 패칭 응답을 store에 upsert, 상세는 즉시 페인트 + 백그라운드 재검증 | KIS `inquire-price` 호출 절감, 체감 즉시 렌더, 이름 단일 경로 | 중 |
 | **P1** | symbols 검색 클라이언트화 | 정적 seed가 매 검색 BFF 왕복 | 번들 직검색 또는 장기 캐시 헤더 | 검색 API 호출 0~최소화 | 소~중 |
 | **P1** | 의도 기반 prefetch | 상세 진입 첫 페치 콜드 | 검색결과/관심행 hover·click 시 `queryClient.prefetchQuery`(price/company) | 상세 첫 렌더 지연↓ | 소 |
 | **P1** | 접힌 카드 쿼리 지연(#63) | 모바일 접기카드가 접혀 있어도 company/list 즉시 호출 | 접힘 상태를 카드→자식에 전달해 훅 `enabled: open`(또는 펼침 전까지 마운트 보류) | 모바일 진입 4콜→2콜(price+chart), 나머지 온디맨드 | 소 |
@@ -103,8 +103,8 @@
 
 ## 6. 비고 / Open
 
-- zustand 실제 도입은 P0 후속 PR에서. 스토어 슬라이스 네이밍·`upsertQuotes` 시그니처·`placeholderData` 연결 방식은 구현 PR PRD에서 확정.
+- ✅ **P0 완료(#76, 2026-06-01)** — `lib/store/stockMetaStore.ts`(zustand, 휘발성) + 전역 `QueryCache.onSuccess` 라우팅 + `useQueryStockPrice` `placeholderData` 즉시 페인트 + `pickStockName` 스토어 후보(이름 일원화). PRD: `docs/prd/stock-meta-store.md`. 다음은 P1.
 - 계정/로그인 도입 시 localStorage 3종(관심종목·최근검색·즐겨찾기) 서버 이전 — 별도 트랙.
 - 미연결 영역: `profile.holdings`(보유종목 실데이터, TTL 예약됨), `FearGreed`는 현재 지수 파생값으로 표시.
 - **PR 재검토(2026-05-30~06-01, #51~#68 + `7c7b4b8`):** §1 발견 모두 유효. #51이 홈 지수 dedup(서버 index-store)을 이미 적용 → 로드맵 항목 아님. #53이 도입한 `recentSearch`/이름 3중 해석이 P0(zustand 일원화)의 직접 대상. **#63(모바일 종목 UX)**이 차트 days 동적화(40~3000)와 접기카드를 도입 → 발견 7·8 및 P1(접힌 카드 쿼리 지연)·P2(차트 큰 범위 관측) 신규 추가. #60~#68의 나머지는 PWA 스플래시/navbar UI 전용(데이터 무관). (상세 검토표는 [page-api-map.md §5](./page-api-map.md#5-검토한-pr-범위-2026-05-30--06-01).)
-- **FE 퀵윈 트랙(별도, #71~#74, 2026-06-01):** 본 로드맵(데이터레이어 P0~P2)과 **다른 트랙**으로 FE 코드품질 퀵윈을 머지 — 스테일 테스트 복구(#71) · 관심모달 `next/dynamic` lazy(#72) · 파생 state 제거(#74). 특히 **종목 표시명 단일화 `lib/utils/resolveStockName.pickStockName`(#73)** 은 P0(zustand stock-meta 이름해석 일원화)의 **선작업** — Phase 2 에서 store 의 last-known name 을 candidate 로 추가하면 자연 확장된다. (P0/P1/P2 자체는 아직 미착수.)
+- **FE 퀵윈 트랙(별도, #71~#74, 2026-06-01):** 본 로드맵(데이터레이어 P0~P2)과 **다른 트랙**으로 FE 코드품질 퀵윈을 머지 — 스테일 테스트 복구(#71) · 관심모달 `next/dynamic` lazy(#72) · 파생 state 제거(#74). 특히 **종목 표시명 단일화 `lib/utils/resolveStockName.pickStockName`(#73)** 은 P0(zustand stock-meta 이름해석 일원화)의 **선작업** — Phase 2 에서 store 의 last-known name 을 candidate 로 추가하면 자연 확장된다. (**P0 는 #76 으로 완료**, P1/P2 미착수.)
