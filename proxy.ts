@@ -1,5 +1,8 @@
 /**
- * 루트 middleware — 앱 전체 단일 공유 비밀번호 게이트 (Edge 런타임).
+ * 루트 proxy — 앱 전체 단일 공유 비밀번호 게이트 (Edge 런타임).
+ *
+ * Next 16: `middleware` 파일 컨벤션이 `proxy` 로 리네임됨(동작·Edge 런타임 동일).
+ * 파일명 `proxy.ts` + named export `proxy` + `config` matcher 유지.
  *
  * PRD `app-password-gate` §3.1 / AC-1~4 / AC-13:
  *   - 게이트 활성 조건: `process.env.APP_PASSWORD` truthy 일 때만. 미설정이면 통과(앱 공개).
@@ -103,7 +106,7 @@ function safeNextPath(pathname: string, search: string): string {
   return candidate;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // 게이트 비활성(비밀번호 미설정) → 즉시 통과(앱 공개). 로컬/CI 마찰 0.
   if (!process.env.APP_PASSWORD) {
     return NextResponse.next();
