@@ -27,6 +27,7 @@
 import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -57,6 +58,7 @@ function WatchlistRowBase({
   onRemove,
 }: WatchlistRowProps) {
   const router = useRouter();
+  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
 
   if (!quote) {
     // 디그레이드 행 — 담은 종목은 사라지지 않는다. 종목명(가능 시) + 안내 + 삭제.
@@ -112,13 +114,21 @@ function WatchlistRowBase({
       role="link"
       tabIndex={0}
       aria-label={`${displayName} 상세 보기`}
-      onClick={() => router.push(`/stock/${quote.ticker}`)}
+      onClick={() => {
+        prefetch(quote.ticker);
+        router.push(`/stock/${quote.ticker}`);
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
+          prefetch(quote.ticker);
           router.push(`/stock/${quote.ticker}`);
         }
       }}
+      onMouseEnter={() => onIntent(quote.ticker)}
+      onMouseLeave={cancelIntent}
+      onFocus={() => onIntent(quote.ticker)}
+      onBlur={cancelIntent}
     >
       <div className="col-span-4 flex items-center gap-sm min-w-0">
         <div className="min-w-0">
