@@ -2989,3 +2989,45 @@
   - **Wave 3a**: `StockDailyChart`(558줄) 구조 분리 — CandleBar/CandleTooltip/ChartShell/포맷터/useChartData를 책임별 파일로(behavior-preserving). 동작·시각 무변경 → tsc/build + 시각 비교 QA.
   - **Wave 3b**: 차트 토큰화 W2(ux-designer 위임, `chart-*` 토큰 11개 + 기존 5색 매핑) + W5 px 토큰 + W3 캔들 검증. 시각 변경 → 수동 2뷰포트 QA.
   - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md), 계획 `wise-giggling-sunrise.md`.
+
+### 2026-06-01 — refactor(chart): StockDailyChart 책임별 구조 분리 (Wave 3a) (#85)
+
+- **slug**: `stock-chart-split` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/85
+- **요약**: refactor(chart): StockDailyChart 책임별 구조 분리 (Wave 3a)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > Phase 3 순서계획 **Wave 3a** — `StockDailyChart`(558줄) 책임별 구조 분리. **behavior-preserving**(동작·시각 무변경)이 절대 원칙.
+  > 
+  > 558줄 → **223줄**. 추출 7개 파일:
+  > 
+  > | 파일 | 책임 |
+  > |---|---|
+  > | `hooks/stock/useChartData.ts` | fetch(워밍업)+지표계산(MACD/RSI)+보기구간 슬라이스 |
+  > | `components/profile/chart/chartTheme.ts` | `C` 색상·`tooltipStyle`·`labelStyle`·`axisProps`·`SYNC_ID` |
+  > | `chart/CandleBar.tsx` | 캔들 커스텀 shape |
+  > | `chart/CandleTooltip.tsx` | 캔들 OHLC 툴팁 |
+  > | `chart/ChartShell.tsx` | 카드 셸 + 차트타입/봉/기간 컨트롤 |
+  > | `chart/SubLabel.tsx` | 보조지표 섹션 헤더 |
+  > | `lib/utils/chartFormat.ts` | 축·툴팁 포맷터 6종 |
+  > 
+  > `StockDailyChart.tsx`는 조각 조립 + 서브플롯 레이아웃만 담당.
+  > 
+  > ## behavior-preserving 보장
+  > - **차트 본문 subplot JSX 99줄**은 verbatim 이동 — 원본과 **byte-identical 확인**(diff 0):
+  >   ```
+  >   git show HEAD~:...StockDailyChart.tsx | sed -n '/① 가격/,/<\/ChartShell>/p'  vs 현재 → IDENTICAL
+  >   ```
+  > - 추출 조각(CandleBar 캔들 수학·CandleTooltip·ChartShell 컨트롤·useChartData transform)은 로직 그대로 이동, recharts prop 무변경.
+  > - **const C 색상·px(`py-[3px]`) 직타는 이 PR에서 건드리지 않음** — 시각 변경 없는 순수 구조 분리(W2 토큰화/W5 px = Wave 3b로 분리해 QA 귀속 명확화).
+  > 
+  > ## 검증
+  > - `npx tsc --noEmit` exit 0
+  > - `eslint` 신규 7 + 변경 1파일 clean
+  > - `npm run build` exit 0
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Wave 3b**: 차트 토큰화 W2(ux-designer 정식 위임 — `chart-*` 토큰 11개 신규 + 기존 5색 매핑[stroke/fill=signal-up·axisTick=text-muted·grid=border-line·tooltipText=text-strong], DESIGN.md→`design:sync`→`chartTheme.ts`의 `C` 마이그레이션) + W5 px토큰(`ChartRangeDropdown`·`ChartShell` `py-[3px]`) + W3 캔들 wick 시각 검증. 시각 변경 → 수동 2뷰포트 QA.
+  - 분리된 `chartTheme.ts`의 `C`가 W2 토큰화의 단일 대상이 됨(이번 분리의 직접 효과).
+  - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md), 계획 `wise-giggling-sunrise.md`.

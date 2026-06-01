@@ -1,8 +1,7 @@
 /**
  * StockDailyChart — 종목 상세 가격 차트 + 보조지표 서브플롯.
  *
- * 데이터 소스: `inquire-daily-itemchartprice`(FHKST03010100, 최대 100봉) — `useQueryStockChart`.
- * 기존 `inquire-daily-price`(최근 30건)보다 많은 봉을 확보해 MACD(26+9), RSI(14) 계산 정밀화.
+ * 데이터 소스: `inquire-daily-itemchartprice`(FHKST03010100, 최대 100봉) — `useChartData`(워밍업 포함).
  *
  * 서브플롯 구성 (syncId="stock-chart" 로 호버 연동):
  *   1. 가격 (240px) — 캔들(기본) 또는 라인. 하단에 날짜축(일정 간격) 표시.
@@ -10,14 +9,16 @@
  *   3. MACD ComposedChart (90px) — 히스토그램(Bar) + MACD·시그널 라인(Line)
  *   4. RSI LineChart (80px) — 14기간 RSI + 과매수(70)/과매도(30) 기준선
  *
- * 차트 컨트롤(차트타입·봉·기간) 상태는 상위 StockPageLayout 가 소유(controlled) — 확대/축소 토글 시
- *   리마운트되어도 선택값 보존. 상수/기본값은 `./stockChartConfig` 단일 소스.
+ * 책임 분리(Wave 3a):
+ *   - 데이터 페치+지표 계산+슬라이스 → `@/hooks/stock/useChartData`
+ *   - 카드 셸/컨트롤 → `./chart/ChartShell`, 보조지표 헤더 → `./chart/SubLabel`
+ *   - 캔들 shape/툴팁 → `./chart/CandleBar`·`./chart/CandleTooltip`
+ *   - 색·스타일 상수 → `./chart/chartTheme`(C/tooltip/axis), 포맷터 → `@/lib/utils/chartFormat`
+ *   본 파일은 위 조각을 조립해 서브플롯 레이아웃만 담당. 차트 컨트롤 상태는 상위 StockPageLayout 소유.
  */
 
 "use client";
 
-import { useMemo } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -34,57 +35,26 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { useQueryStockChart, type ChartPeriod } from "@/hooks/stock/useQueryStockChart";
-import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
-import { cn } from "@/lib/utils/cn";
-import { formatNumber } from "@/lib/utils/formatMoney";
-import { formatPct } from "@/lib/utils/formatPct";
-import { calcMACD, calcRSI } from "@/lib/utils/technicalIndicators";
+import { type ChartPeriod } from "@/hooks/stock/useQueryStockChart";
+import { useChartData } from "@/hooks/stock/useChartData";
+import {
+  fmtYAxis,
+  fmtVolAxis,
+  fmtTooltipPrice,
+  fmtTooltipVol,
+  fmtTooltipMACD,
+  fmtTooltipRSI,
+} from "@/lib/utils/chartFormat";
 import {
   STOCK_DETAIL_LOADING,
   STOCK_DETAIL_NOT_FOUND,
-  STOCK_DETAIL_PRICE_CHART_TITLE,
 } from "@/lib/copy/profile/stockDetail";
-import { ChartRangeDropdown } from "./ChartRangeDropdown";
-import {
-  CHART_TYPES,
-  PERIODS,
-  PERIOD_UNIT,
-  RANGES,
-  type ChartType,
-} from "./stockChartConfig";
-
-const SYNC_ID = "stock-chart";
-
-/**
- * 보조지표 워밍업(캘린더일) — 보기 구간보다 더 과거까지 받아 MACD(시그널 35봉)·RSI(15봉)를
- *   끊김 없이 계산한 뒤, 표시는 사용자가 고른 구간으로 잘라낸다(아래 useMemo).
- *   → 주봉 3개월·월봉 1년처럼 짧은 구간이나 최근 며칠만 봐도 지표가 항상 나온다.
- *   봉당 대략 봉수: 일봉≈영업일, 주봉≈/7, 월봉≈/30. 35봉 확보분 + 여유.
- */
-const WARMUP_DAYS: Record<ChartPeriod, number> = { D: 60, W: 280, M: 1100 };
-const MAX_FETCH_DAYS = 3000; // 라우트 MAX_DAYS 와 정합(초과 클램프)
-
-const C = {
-  stroke: "#c81e1e",    // signal-up (빨강)
-  fill: "#c81e1e",
-  axisTick: "#5b6470",
-  grid: "#eceff3",
-  tooltipBg: "rgba(255,255,255,0.82)", // 반투명 — 뒤 그래프가 어느 정도 비치도록
-  tooltipText: "#0f1419",
-  macdLine: "#2563eb",   // 파랑
-  signalLine: "#f59e0b", // 앰버
-  histUp: "#16a34a",     // 초록
-  histDown: "#dc2626",   // 빨강
-  rsiLine: "#7c3aed",    // 보라
-  refOB: "#dc2626",      // 과매수
-  refOS: "#2563eb",      // 과매도
-  refMid: "#9ca3af",     // 중립
-  volUp: "#fca5a5",
-  volDown: "#93c5fd",
-} as const;
-
-// 차트 타입/봉/기간 상수·타입·기본값은 `./stockChartConfig` 단일 소스. (상태는 StockPageLayout 소유)
+import { PERIOD_UNIT, type ChartType } from "./stockChartConfig";
+import { C, SYNC_ID, tooltipStyle, labelStyle, axisProps } from "./chart/chartTheme";
+import { CandleBar } from "./chart/CandleBar";
+import { CandleTooltip } from "./chart/CandleTooltip";
+import { ChartShell } from "./chart/ChartShell";
+import { SubLabel } from "./chart/SubLabel";
 
 export interface StockDailyChartProps {
   ticker: string;
@@ -100,123 +70,6 @@ export interface StockDailyChartProps {
   onChartTypeChange: (t: ChartType) => void;
 }
 
-function fmtYAxis(v: number): string {
-  return `${formatNumber(v / 10_000, { digits: 0 })}만`;
-}
-function fmtVolAxis(v: number): string {
-  return v >= 1_000_000 ? `${(v / 1_000_000).toFixed(0)}M` : `${v}`;
-}
-function fmtTooltipPrice(value: unknown): [string, string] {
-  const n = typeof value === "number" ? value : Number(value);
-  return [`${formatNumber(Number.isFinite(n) ? n : 0)} 원`, "종가"];
-}
-function fmtTooltipVol(value: unknown): [string, string] {
-  const n = typeof value === "number" ? value : Number(value);
-  return [Number.isFinite(n) ? n.toLocaleString() : "0", "거래량"];
-}
-function fmtTooltipMACD(value: unknown, name: unknown): [string, string] {
-  const n = typeof value === "number" ? value : Number(value);
-  const display = Number.isFinite(n) ? n.toFixed(2) : "-";
-  const label = name === "histogram" ? "히스토그램" : name === "macd" ? "MACD" : "시그널";
-  return [display, label];
-}
-function fmtTooltipRSI(value: unknown): [string, string] {
-  const n = typeof value === "number" ? value : Number(value);
-  return [Number.isFinite(n) ? n.toFixed(1) : "-", "RSI"];
-}
-
-// ── 캔들스틱 커스텀 shape ──────────────────────────────
-// recharts Bar에 wickRange: [low, high] 을 range dataKey로 주면
-// props.y = yScale(high), props.y + props.height = yScale(low).
-// 이 scale 정보를 이용해 open/close body와 wick을 정확히 위치시킨다.
-
-function CandleBar(props: {
-  x?: number; y?: number; width?: number; height?: number;
-  payload?: { open: number; close: number; high: number; low: number; isUp: boolean };
-}) {
-  const { x = 0, y = 0, width = 0, height = 0, payload } = props;
-  if (!payload || width <= 0 || height <= 0) return null;
-  const { open, close, high, low, isUp } = payload;
-  if (high < low) return null;
-
-  const color = isUp ? C.stroke : C.macdLine;
-  const scale = height / (high - low); // px per value unit
-  const bodyTop = y + (high - Math.max(open, close)) * scale;
-  const bodyH = Math.max(Math.abs(open - close) * scale, 1);
-  const wickX = x + width / 2;
-  const barW = Math.max(width - 2, 2);
-
-  return (
-    <g>
-      {/* 위 꼬리 */}
-      <line x1={wickX} y1={y} x2={wickX} y2={bodyTop} stroke={color} strokeWidth={1} />
-      {/* 몸통 */}
-      <rect x={x + 1} y={bodyTop} width={barW} height={bodyH} fill={color} />
-      {/* 아래 꼬리 */}
-      <line x1={wickX} y1={bodyTop + bodyH} x2={wickX} y2={y + height} stroke={color} strokeWidth={1} />
-    </g>
-  );
-}
-
-// 캔들 툴팁
-function CandleTooltip({ active, payload, label }: {
-  active?: boolean;
-  payload?: { payload: {
-    open: number; close: number; high: number; low: number;
-    change: number | null; changePct: number | null;
-  } }[];
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  if (!d) return null;
-  const isUp = d.close >= d.open;
-  const color = isUp ? C.stroke : C.macdLine;
-  // 등락률 색 — 한국식(상승 빨강 / 하락 파랑 / 보합 기본). 직전 봉 종가 대비.
-  const chgColor = d.changePct == null || d.changePct === 0
-    ? C.tooltipText
-    : d.changePct > 0 ? C.stroke : C.macdLine;
-  return (
-    <div style={{ ...tooltipStyle, padding: "8px 12px", minWidth: 130 }}>
-      <p style={{ color: C.axisTick, marginBottom: 6, fontSize: 11 }}>{label}</p>
-      {(["high", "open", "close", "low"] as const).map((k) => (
-        <p key={k} style={{ color: k === "close" ? color : C.tooltipText, fontSize: 12, lineHeight: "1.6" }}>
-          {k === "high" ? "고" : k === "open" ? "시" : k === "close" ? "종" : "저"}&nbsp;
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatNumber(d[k])} 원</span>
-        </p>
-      ))}
-      {d.changePct != null && (
-        <p style={{ color: chgColor, fontSize: 12, lineHeight: "1.6", marginTop: 4, paddingTop: 4, borderTop: "1px solid rgba(15,20,25,0.06)" }}>
-          등락&nbsp;
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {formatPct(d.changePct, { digits: 2, sign: true })}
-            {d.change != null && ` (${d.change > 0 ? "+" : ""}${formatNumber(d.change, { digits: 0 })})`}
-          </span>
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────
-
-const tooltipStyle = {
-  borderRadius: 8,
-  border: "1px solid rgba(15,20,25,0.08)", // 반투명 배경 경계 보강
-  boxShadow: "0 4px 12px rgba(23,32,42,0.1)",
-  backgroundColor: C.tooltipBg,
-  backdropFilter: "blur(3px)",
-  WebkitBackdropFilter: "blur(3px)",
-  color: C.tooltipText,
-  fontSize: 12,
-};
-const labelStyle = { color: C.axisTick, marginBottom: 4 };
-const axisProps = {
-  axisLine: false,
-  tickLine: false,
-  tick: { fontSize: 11, fill: C.axisTick },
-} as const;
-
 export function StockDailyChart({
   ticker,
   expanded,
@@ -229,72 +82,8 @@ export function StockDailyChart({
   onDaysChange,
   onChartTypeChange,
 }: StockDailyChartProps) {
-  // 워밍업 포함 fetch — 보기 구간(days)보다 더 과거까지 받아 지표 계산용 데이터 확보.
-  const fetchDays = Math.min(days + WARMUP_DAYS[period], MAX_FETCH_DAYS);
-  const { data, isLoading, isError, error } = useQueryStockChart(ticker, { period, days: fetchDays });
-
-  const { priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } = useMemo(() => {
-    if (!data || data.length === 0) {
-      return { priceSeries: [], candleSeries: [], volSeries: [], macdSeries: [], rsiSeries: [] };
-    }
-
-    // 1) 전체(워밍업 포함) 데이터로 지표 계산 — 표준 파라미터(MACD 12/26/9, RSI 14) 유지.
-    const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
-    const closes = sorted.map((c) => c.close);
-    const macd = calcMACD(closes);
-    const rsi = calcRSI(closes);
-
-    // 2) 보기 구간 컷오프 — 마지막 봉 날짜에서 days 캘린더일 이전. 워밍업 구간은 표시에서 잘라낸다.
-    const lastDate = sorted[sorted.length - 1].date; // "YYYY-MM-DD"
-    const [ly, lm, ld] = lastDate.split("-").map(Number);
-    const cutoff = new Date(ly, lm - 1, ld);
-    cutoff.setDate(cutoff.getDate() - days);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const cutoffStr = `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`;
-    let visibleStart = sorted.findIndex((c) => c.date >= cutoffStr);
-    if (visibleStart < 0) visibleStart = 0;
-
-    // 3) 전체 시리즈 빌드 후 보기 구간으로 슬라이스(지표는 워밍업 덕에 첫 봉부터 값이 있음).
-    const fullPrice = sorted.map((c) => ({ date: c.date.slice(5), price: c.close }));
-    const fullCandle = sorted.map((c, i) => {
-      // 등락률 — 직전 봉 종가 대비(일봉=전일/주봉=전주/월봉=전월). 워밍업 구간 덕에 첫 표시 봉도 직전값 존재.
-      const prevClose = i > 0 ? sorted[i - 1].close : null;
-      const change = prevClose !== null ? c.close - prevClose : null;
-      const changePct =
-        prevClose !== null && prevClose !== 0 ? ((c.close - prevClose) / prevClose) * 100 : null;
-      return {
-        date: c.date.slice(5),
-        wickRange: [c.low, c.high] as [number, number],
-        open: c.open,
-        close: c.close,
-        high: c.high,
-        low: c.low,
-        isUp: c.close >= c.open,
-        change,
-        changePct,
-      };
-    });
-    const fullVol = sorted.map((c) => ({
-      date: c.date.slice(5),
-      volume: c.volume,
-      isUp: c.close >= c.open,
-    }));
-    const fullMacd = sorted.map((c, i) => ({
-      date: c.date.slice(5),
-      macd: macd[i].macd,
-      signal: macd[i].signal,
-      histogram: macd[i].histogram,
-    }));
-    const fullRsi = sorted.map((c, i) => ({ date: c.date.slice(5), rsi: rsi[i] }));
-
-    return {
-      priceSeries: fullPrice.slice(visibleStart),
-      candleSeries: fullCandle.slice(visibleStart),
-      volSeries: fullVol.slice(visibleStart),
-      macdSeries: fullMacd.slice(visibleStart),
-      rsiSeries: fullRsi.slice(visibleStart),
-    };
-  }, [data, days]);
+  const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } =
+    useChartData(ticker, period, days);
 
   const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange };
 
@@ -430,129 +219,5 @@ export function StockDailyChart({
         <SubLabel label={`RSI — 데이터 부족 (최소 15${periodUnit})`} />
       )}
     </ChartShell>
-  );
-}
-
-function ChartShell({
-  children,
-  expanded,
-  onExpand,
-  onCollapse,
-  period,
-  days,
-  onPeriodChange,
-  onDaysChange,
-  chartType,
-  onChartTypeChange,
-}: {
-  children: React.ReactNode;
-  expanded?: boolean;
-  onExpand?: () => void;
-  onCollapse?: () => void;
-  period: ChartPeriod;
-  days: number;
-  onPeriodChange: (p: ChartPeriod) => void;
-  onDaysChange: (d: number) => void;
-  chartType: ChartType;
-  onChartTypeChange: (t: ChartType) => void;
-}) {
-  const { isMobile } = useBreakpoint();
-  const hasToggle = onExpand || onCollapse;
-  const ranges = RANGES[period];
-
-  return (
-    <section className="card" aria-label={STOCK_DETAIL_PRICE_CHART_TITLE}>
-      {/* 헤더 행 1: 타이틀 + 확대/축소 버튼 */}
-      <header className="flex justify-between items-center mb-sm">
-        <h2 className="text-h2 text-text-strong">{STOCK_DETAIL_PRICE_CHART_TITLE}</h2>
-        {hasToggle && (
-          <button
-            type="button"
-            className="button-icon"
-            aria-label={expanded ? "차트 축소" : "차트 확대"}
-            onClick={expanded ? onCollapse : onExpand}
-          >
-            {expanded
-              ? <Minimize2 className="h-4 w-4" aria-hidden="true" />
-              : <Maximize2 className="h-4 w-4" aria-hidden="true" />
-            }
-          </button>
-        )}
-      </header>
-
-      {/* 헤더 행 2: 차트타입 + 봉 선택 / 기간 선택 */}
-      <div className="flex items-center justify-between mb-md gap-sm flex-wrap">
-        {/* 좌측: 라인/캔들 토글 + 봉 종류 */}
-        <div className="flex items-center gap-sm">
-          <div className="flex items-center rounded-sm overflow-hidden border border-border-line">
-            {CHART_TYPES.map((ct) => (
-              <button
-                key={ct.type}
-                type="button"
-                onClick={() => onChartTypeChange(ct.type)}
-                className={cn(
-                  "px-sm py-[3px] text-caption font-medium transition-colors cursor-pointer",
-                  chartType === ct.type
-                    ? "bg-accent-vivid text-surface"
-                    : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
-                )}
-              >
-                {ct.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-xs">
-            {PERIODS.map((p) => (
-              <button
-                key={p.period}
-                type="button"
-                onClick={() => onPeriodChange(p.period)}
-                className={cn(
-                  "px-sm py-[3px] rounded-sm text-caption font-medium transition-colors cursor-pointer",
-                  period === p.period
-                    ? "bg-accent-vivid text-surface"
-                    : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* 우측: 기간 범위 — 모바일은 드롭다운(줄바꿈 방지), 데스크탑은 버튼 목록 */}
-        {isMobile ? (
-          <ChartRangeDropdown ranges={ranges} value={days} onChange={onDaysChange} />
-        ) : (
-          <div className="flex items-center gap-xs">
-            {ranges.map((r) => (
-              <button
-                key={r.days}
-                type="button"
-                onClick={() => onDaysChange(r.days)}
-                className={cn(
-                  "px-sm py-[3px] rounded-sm text-caption font-medium transition-colors cursor-pointer",
-                  days === r.days
-                    ? "bg-surface-muted text-text-strong"
-                    : "text-text-muted hover:text-text-strong",
-                )}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {children}
-    </section>
-  );
-}
-
-// 보조지표 섹션 헤더 — 상단 구분선 + 진한 타이틀로 메인↔보조, 보조↔보조 경계를 또렷하게.
-function SubLabel({ label }: { label: string }) {
-  return (
-    <div className="mt-md mb-xs pt-md border-t border-border-line">
-      <p className="text-caption font-semibold text-text-strong px-xs">{label}</p>
-    </div>
   );
 }
