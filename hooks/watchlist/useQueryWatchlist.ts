@@ -41,7 +41,10 @@ export function useQueryWatchlist(
     staleTime: queryConfig.watchlist.list.staleTime,
     gcTime: queryConfig.watchlist.list.gcTime,
     placeholderData: keepPreviousData,
-    retry: 1,
+    // retry 0 — BFF(`/api/watchlist`)가 이미 transient(EGW00201/네트워크) 1회 재시도 + mock
+    // graceful degrade 를 하므로, RQ 가 또 재시도하면 실패 시 KIS 일괄콜이 최대 4회로 증폭된다.
+    // BFF 의 degrade 결과를 그대로 수용(이중 재시도 제거).
+    retry: 0,
     refetchOnWindowFocus: false,
   });
 }

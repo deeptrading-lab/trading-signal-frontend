@@ -17,6 +17,7 @@
 
 import { Bell, CreditCard, LogOut, Moon, Shield } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import type {
   ProfileMenuItem,
   ProfileMenuKey,
@@ -67,7 +68,8 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
               <div className="my-sm h-px bg-border-line" />
             </li>
             <li>
-              <MenuButton item={danger} />
+              {/* danger = 로그아웃 — 동작이 필요해 client 컴포넌트로 분리(onClick → 쿠키삭제 → /login). */}
+              <LogoutMenuButton />
             </li>
           </>
         ) : null}
