@@ -21,12 +21,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { WatchlistPage } from "./WatchlistPage";
 import { WatchlistTable } from "./WatchlistTable";
-import { WatchlistAddModal } from "./WatchlistAddModal";
 import {
   WATCHLIST_ERROR_TITLE,
   WATCHLIST_ERROR_HINT,
@@ -35,6 +35,16 @@ import {
   WATCHLIST_EMPTY_HINT,
   WATCHLIST_EMPTY_CTA,
 } from "@/lib/copy/watchlist/labels";
+
+/**
+ * 추가 모달은 "+ 종목 추가" 클릭 시에만 필요 → `next/dynamic` 지연 로드.
+ * `modalOpen` 시에만 렌더해, 첫 오픈 전까지 모달 청크(+`useQueryStockSearch`)를 받지 않는다.
+ * 포털/`document` 사용 client 전용이라 `ssr: false`.
+ */
+const WatchlistAddModal = dynamic(
+  () => import("./WatchlistAddModal").then((m) => m.WatchlistAddModal),
+  { ssr: false },
+);
 
 export function WatchlistContainer() {
   const { tickers, addTicker, removeTicker, hasTicker, getName } =
@@ -113,15 +123,17 @@ export function WatchlistContainer() {
         )}
       </WatchlistPage>
 
-      <WatchlistAddModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onAdd={(ticker, name) => {
-          addTicker(ticker, name);
-          setModalOpen(false);
-        }}
-        hasTicker={hasTicker}
-      />
+      {modalOpen && (
+        <WatchlistAddModal
+          open
+          onClose={() => setModalOpen(false)}
+          onAdd={(ticker, name) => {
+            addTicker(ticker, name);
+            setModalOpen(false);
+          }}
+          hasTicker={hasTicker}
+        />
+      )}
     </>
   );
 }
