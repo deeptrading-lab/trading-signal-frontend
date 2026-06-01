@@ -2904,3 +2904,46 @@
   - **관측 활용**: P2-2 청크 로그로 `X-Data-Source` 분포 + KIS 실호출 수 정량화 후 차트 staleTime·청크 정책 재검토.
   - **차트 후속 W1~W5**: 차트 색상 토큰화(W2) 등 디자이너 합류/차트 리팩터 시 일괄.
   - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md) §4, deferred-followups.
+
+### 2026-06-01 — refactor(bff): route 공통 유틸 bffUtils 추출 + 죽은 라우트 제거 (Wave 1) (#83)
+
+- **slug**: `bff-utils-cleanup` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/83
+- **요약**: refactor(bff): route 공통 유틸 bffUtils 추출 + 죽은 라우트 제거 (Wave 1)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > [Phase 3 리팩터·cleanup 순서 계획](docs/references/api-optimization-roadmap.md)의 **Wave 1**. route handler 계층의 헬퍼 중복을 단일 출처로 추출하고, 죽은 라우트를 제거한다. component 작업과 결합 0인 독립 cleanup이라 가장 먼저 진행.
+  > 
+  > | 항목 | 내용 |
+  > |---|---|
+  > | **공통 유틸 추출** | `withTimeout`(8개 route 동일)·`delay`(5개)·`jsonWithDataSource`(7개)가 동일 구현으로 중복 → `lib/server/bffUtils.ts` 단일화. `__BFF_TIMEOUT__` 센티넬도 `BFF_TIMEOUT_SENTINEL` 상수로 공유 |
+  > | **죽은 라우트 제거** | `/api/stock/search`(클라 호출 0건 — #80에서 클라 직검색 전환) + 전용 mock `lib/mock/stock/search.ts` |
+  > 
+  > 순감 **-200줄**(+100 / -300).
+  > 
+  > ## 의도적 미추출 (과추상 방지)
+  > - `FALLBACK_TIMEOUT_MESSAGE` — KIS("KIS 서버…") vs OpenDART("OpenDART 서버…") 도메인별 문구가 달라 각 route 로컬 유지
+  > - chart route의 `jsonOk`·`toYyyymmdd`·`addDays` — 단일 위치(공유 아님)
+  > - `mapErrorToResponse` — route마다 시그니처(매개변수 3~4)가 달라 통합 시 무리한 제네릭 필요
+  > 
+  > ## 보류 (이번 범위 아님)
+  > - `/api/auth/logout` — `/profile`에 로그아웃 메뉴 항목(mock)이 표시되어 기능이 "예정" 상태 → 제거 보류
+  > - `/api/stock/daily` — 클라(`useQueryStockDaily`)에서 실사용 중 → 유지
+  > 
+  > ## 검증
+  > - `npx tsc --noEmit` exit 0 (빌드 후 .next 타입 재생성 기준)
+  > - `eslint` 변경 10파일 clean
+  > - `npm run build` exit 0
+  > - route 테스트 **36 그린** (`watchlist`·`market/indices`·`market/ticker`·`auth/login` 라우트 + `stock/price`·`stock/daily` 클라). 특히 auth/login의 `~500ms 지연 후 401` 테스트가 import된 `delay`로 정상 통과 — 동작 동일 확인
+  > 
+  > ## 다음 작업
+  > - **Wave 2a**: 공유 `<SearchDropdown>` 추출 + `WatchlistAddModal` 채택 (`useOutsideClick` 재사용, `search-result-item` 합성 클래스 유지). 접근성(키보드 네비) 보존이 핵심.
+  > - **Wave 2b**: `StockSearchContainer` 정리 — W1 `!` 오버라이드 7개 → `.input-search` variant, `useTabPanel` 추출, SearchDropdown 채택.
+  > - **Wave 3a/3b**: `StockDailyChart`(558줄) 구조 분리(behavior-preserving) → 차트 토큰화 W2/W5(ux-designer 위임, visual QA).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Wave 2a**: 공유 `<SearchDropdown>` 추출 + `WatchlistAddModal` 채택 (`useOutsideClick` 재사용, `search-result-item` 합성 클래스 유지). 접근성(키보드 네비) 보존이 핵심.
+  - **Wave 2b**: `StockSearchContainer` 정리 — W1 `!` 오버라이드 7개 → `.input-search` variant, `useTabPanel` 추출, SearchDropdown 채택.
+  - **Wave 3a/3b**: `StockDailyChart`(558줄) 구조 분리(behavior-preserving) → 차트 토큰화 W2/W5(ux-designer 위임, visual QA).
+  - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md), 계획 파일 `wise-giggling-sunrise.md`.
