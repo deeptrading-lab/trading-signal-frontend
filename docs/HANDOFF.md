@@ -2861,3 +2861,46 @@
   > - P1: 접힌 카드 쿼리 지연 → symbols 클라이언트화 → prefetch.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - P1: 접힌 카드 쿼리 지연 → symbols 클라이언트화 → prefetch.
+
+### 2026-06-01 — perf(api): 호출 최적화 P2 — whitelist staleTime + 차트 청크 관측 + dead 이벤트버스 제거 (#82)
+
+- **slug**: `api-optimization-p2` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/82
+- **요약**: perf(api): 호출 최적화 P2 — whitelist staleTime + 차트 청크 관측 + dead 이벤트버스 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > API 호출 최적화 로드맵([api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md)) **P2 트랙 3건**을 한 번에 정리한다. P0(#76)·P1(#79~#81) 머지 이후 남은 미세 정합 + 관측 + dead code 정리.
+  > 
+  > | P2 | 변경 | 효과 |
+  > |---|---|---|
+  > | **P2-1** | 화이트리스트 검색 `staleTime` 30s → 300s(5m) | 정적 seed인데 짧은 캐시였던 정합성 nit. symbols 검색(5m)과 통일, 재검색·재진입 BFF 왕복 제거 |
+  > | **P2-2** | 일봉 청크 분할 경로에 관측 로그 (`chunks=N (= KIS calls)`) | days 3000 등 큰 범위에서 rate-limit 한도 근접 조기 감지 (수치 변경 전 관측 단계) |
+  > | **P2-3** | 죽은 `WORKBENCH_*_EVENT` 이벤트 버스 제거 | dead code 정리, `/analyze` 페이지 -74줄 단순화 |
+  > 
+  > ## P2-3 상세 — 왜 변환이 아니라 제거인가
+  > 
+  > 로드맵의 원안은 "이벤트버스 → `useActiveTickerStore` zustand 변환(결합도↓)"이었으나, 실제 코드 점검 결과 **이벤트 버스의 producer/consumer가 코드베이스에 존재하지 않는 dead code**였다:
+  > 
+  > - `TICKER_CHANGE` **dispatch** → 듣는 곳 0건
+  > - `SELECT_HISTORY`/`SELECT_FAVORITE` **listener** → dispatch 0건
+  > - `useWorkbenchSession`의 `history`/`favorites` 배열은 **어디서도 렌더되지 않음** (finsight-redesign에서 사이드바 목록 제거 → 클릭 producer 소멸)
+  > 
+  > 죽은 코드를 store로 바꿔봤자 죽은 store가 되므로 **제거**가 맞다. 목록 UI가 재도입되면 그때 zustand store로 새로 설계한다.
+  > 
+  > ## 검증
+  > 
+  > - `npx tsc --noEmit` → exit 0
+  > - `eslint` 변경 3파일 → clean
+  > - 순감 **-81줄** (+16 / -97)
+  > - 기능 무회귀: 제거된 이벤트 핸들러는 발화 경로가 없어 동작 영향 0
+  > 
+  > ## 다음 작업
+  > 
+  > - **Phase 3(대형·관망)**: oversized 컴포넌트 분리(`StockDailyChart` CandleBar/Tooltip/useChartData · `WatchlistAddModal` SearchDropdown · `StockSearchContainer` useTabPanel) · `'use client'`/RSC 경계 재설계 · `StockPageLayout` 레이아웃 컴포지션 팩토리.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Phase 3(대형·관망)**: oversized 컴포넌트 분리(`StockDailyChart` CandleBar/Tooltip/useChartData · `WatchlistAddModal` SearchDropdown · `StockSearchContainer` useTabPanel) · `'use client'`/RSC 경계 재설계 · `StockPageLayout` 레이아웃 컴포지션 팩토리.
+  - **관측 활용**: P2-2 청크 로그로 `X-Data-Source` 분포 + KIS 실호출 수 정량화 후 차트 staleTime·청크 정책 재검토.
+  - **차트 후속 W1~W5**: 차트 색상 토큰화(W2) 등 디자이너 합류/차트 리팩터 시 일괄.
+  - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md) §4, deferred-followups.

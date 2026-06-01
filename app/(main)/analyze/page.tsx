@@ -4,8 +4,7 @@
  * PR5 (finsight-redesign): 라우트 이전 `/` → `/analyze`.
  *   - 사이드바 / BottomNav 의 "AI 분석 워크벤치" 메뉴(`/analyze`) 가 본 페이지를 활성화.
  *   - 워크벤치 컴포넌트·훅·API 도메인 폴더명(`workbench`) 유지 (PRD §9 q5 RESOLVED 옵션 A).
- *   - 워크벤치 도메인 부속 파일 2개를 `components/workbench/` 로 동반 이전:
- *       `FavoriteToggle.tsx` / `workbenchEvents.ts`.
+ *   - 워크벤치 도메인 부속 파일 `FavoriteToggle.tsx` 를 `components/workbench/` 로 동반 이전.
  *
  * 구조 (위→아래, DESIGN.md v4 §Layout):
  *   ticker-header (별표 토글 포함)
@@ -29,12 +28,15 @@
  * v4 신규:
  *   - in-session 히스토리·즐겨찾기 — mutation 성공 시 자동 push (R8).
  *   - ticker-header 의 별표 토글 (R6 진입점 1).
- *   - 사이드바 항목 클릭 → CustomEvent 수신 → ticker / 입력값 복원.
+ *
+ * 참고: finsight-redesign 에서 사이드바 히스토리/즐겨찾기 목록이 제거되며
+ * `WORKBENCH_*_EVENT` CustomEvent 버스(목록 클릭 → 본 페이지 복원)의 producer 가
+ * 사라졌다. 남아 있던 dispatch/listener 는 dead code 라 제거(2026-06-01, P2).
+ * history/favorites 목록 UI 가 재도입되면 zustand store 로 새로 설계한다.
  */
 
 "use client";
 
-import { useEffect, useRef } from "react";
 import { SearchPanel } from "@/components/workbench/SearchPanel";
 import { InputPanel } from "@/components/workbench/InputPanel";
 import { ResultGroup } from "@/components/workbench/ResultGroup";
@@ -43,14 +45,6 @@ import { useAnalyzeForm } from "@/hooks/workbench/useAnalyzeForm";
 import { useAnalyzeRun } from "@/hooks/workbench/useAnalyzeRun";
 import { useAnalyzeHistory } from "@/hooks/workbench/useAnalyzeHistory";
 import { useFavorites } from "@/hooks/workbench/useFavorites";
-import {
-  WORKBENCH_SELECT_HISTORY_EVENT,
-  WORKBENCH_SELECT_FAVORITE_EVENT,
-  WORKBENCH_TICKER_CHANGE_EVENT,
-  type WorkbenchSelectHistoryDetail,
-  type WorkbenchSelectFavoriteDetail,
-  type WorkbenchTickerChangeDetail,
-} from "@/components/workbench/workbenchEvents";
 import {
   TICKER_HEADER_EMPTY,
   FOOTER_DISCLAIMER,
@@ -70,62 +64,6 @@ export default function WorkbenchPage() {
   const { submit, isPending, isError, error, data, reset } = useAnalyzeRun();
   const { pushHistory } = useAnalyzeHistory();
   const { isFavorite, toggleFavorite } = useFavorites();
-
-  // v5 (component-compactness) PRD §3.5.3 / AC-8 — ticker-change effect 첫 발화 가드.
-  // 첫 마운트 시 selectedTicker 가 null 이라도 CustomEvent 가 발화되어, 사이드바가
-  // 마운트되기 전 무의미한 dispatch 로그가 남는다. ref 가드로 첫 effect 발화를 skip.
-  // null → 실제 ticker 선택 시점부터만 dispatch.
-  const isFirstTickerEffect = useRef(true);
-  useEffect(() => {
-    if (isFirstTickerEffect.current) {
-      isFirstTickerEffect.current = false;
-      return;
-    }
-    window.dispatchEvent(
-      new CustomEvent<WorkbenchTickerChangeDetail>(WORKBENCH_TICKER_CHANGE_EVENT, {
-        detail: { ticker: selectedTicker?.ticker ?? null },
-      }),
-    );
-  }, [selectedTicker]);
-
-  // 사이드바 클릭 → 메인 영역 복원 이벤트 수신.
-  useEffect(() => {
-    function handleSelectHistory(event: Event) {
-      const detail = (event as CustomEvent<WorkbenchSelectHistoryDetail>).detail;
-      if (!detail?.entry) return;
-      const entry = detail.entry;
-      // 히스토리 항목의 WhitelistItem 재구성 — 토글·active 비교에 ticker / name / currency 만 필요.
-      setSelectedTicker({
-        ticker: entry.ticker,
-        name: entry.name,
-        asset_type: "",
-        exchange: "",
-        currency: entry.currency,
-        sector: "",
-        risk_tier: "",
-        aliases: [],
-      });
-      setField("capital_amount", String(entry.lastInput.capital_amount));
-      setField("target_return_pct", String(entry.lastInput.target_return_pct));
-      setField("target_period_days", String(entry.lastInput.target_period_days));
-      setField("max_loss_pct", String(entry.lastInput.max_loss_pct));
-      // 결과는 자동 재실행하지 않음 — 사용자가 분석 버튼 다시 누르도록 (의도된 마찰).
-      reset();
-    }
-    function handleSelectFavorite(event: Event) {
-      const detail = (event as CustomEvent<WorkbenchSelectFavoriteDetail>).detail;
-      if (!detail?.item) return;
-      setSelectedTicker(detail.item);
-      // 즐겨찾기는 입력값을 함께 갖지 않으므로 ticker 만 복원. 입력값은 사용자가 재입력.
-      reset();
-    }
-    window.addEventListener(WORKBENCH_SELECT_HISTORY_EVENT, handleSelectHistory);
-    window.addEventListener(WORKBENCH_SELECT_FAVORITE_EVENT, handleSelectFavorite);
-    return () => {
-      window.removeEventListener(WORKBENCH_SELECT_HISTORY_EVENT, handleSelectHistory);
-      window.removeEventListener(WORKBENCH_SELECT_FAVORITE_EVENT, handleSelectFavorite);
-    };
-  }, [setSelectedTicker, setField, reset]);
 
   function handleSubmit() {
     const payload = attemptSubmit();

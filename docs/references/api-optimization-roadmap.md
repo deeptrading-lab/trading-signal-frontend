@@ -83,9 +83,9 @@
 | **P1** ✅완료(#80) | symbols 검색 클라이언트화 | 정적 seed가 매 검색 BFF 왕복 | `useQueryStockSearch` queryFn 이 `searchSymbols` 동적 import → 클라 직검색(시드 lazy 청크, 홈 초기 번들 미포함) | 검색 BFF 왕복 0, 즉시 결과 | 소~중 |
 | **P1** ✅완료(#81) | 의도 기반 prefetch | 상세 진입 첫 페치 콜드 | `usePrefetchStockDetail` — 검색결과/관심행 hover(120ms 의도지연)·click 시 price/company `prefetchQuery`(staleTime no-op) | 상세 첫 렌더 지연↓ | 소 |
 | **P1** ✅완료(#79) | 접힌 카드 쿼리 지연(#63) | 모바일 접기카드가 접혀 있어도 company/list 즉시 호출 | 데이터 훅을 `*Content` 로 분리 → 접힘 시 미마운트(펼침 전까지 미호출) | 모바일 진입 4콜→2콜(price+chart), 나머지 온디맨드 | 소 |
-| **P2** | whitelist staleTime 정합 | 정적인데 30s | 5m로 상향 | 미세 | 1줄 |
-| **P2** | 차트 큰 범위 호출 관측(#63) | days 3000 등 대범위는 서버 다중 청크 | `X-Data-Source`·청크 수 로깅으로 rate-limit 여유 모니터링(수치 변경 전 관측) | 한도 근접 조기 감지 | 소 |
-| **P2** | active ticker store화 | 커스텀 이벤트 버스 | `useActiveTickerStore`로 대체 | 결합도↓(호출량 무관) | 소 |
+| **P2** ✅완료(#82) | whitelist staleTime 정합 | 정적인데 30s | 5m로 상향(`useQueryWhitelistSearch`) | 미세 | 1줄 |
+| **P2** ✅완료(#82) | 차트 큰 범위 호출 관측(#63) | days 3000 등 대범위는 서버 다중 청크 | 청크 경로에 `console.info` 로깅(`chunks=N (= KIS calls)`)으로 rate-limit 여유 모니터링(수치 변경 전 관측) | 한도 근접 조기 감지 | 소 |
+| ~~**P2** active ticker store화~~ ✅해소(#82, 제거) | ~~커스텀 이벤트 버스 → `useActiveTickerStore`로 대체~~ | **전제 stale**: 이벤트 버스(`WORKBENCH_*_EVENT`)는 finsight-redesign 에서 사이드바 history/favorite 목록 제거로 producer 가 사라진 dead code 였음 → **store 변환이 아니라 제거**가 정답. 목록 UI 재도입 시 store 신규 설계 | 결합도↓·dead code 정리 | 소 |
 | **관망** | price staleTime(10s) | 네비 churn 시 재호출 | store 즉시페인트로 충분 → 수치 변경 보류, 운영 관측 후 결정 | — | — |
 
 > 실행 순서 권장: **P0(공유 토대) → P1(정적 왕복 제거 + prefetch) → P2(미세 정합)**. P0가 들어가야 "목록↔상세" 왕복 낭비가 근본 해소된다.

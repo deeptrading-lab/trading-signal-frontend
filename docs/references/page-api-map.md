@@ -94,10 +94,12 @@
 
 | 데이터 | 훅 | 엔드포인트 | TTL | 분류 |
 |---|---|---|---|---|
-| 화이트리스트 검색 | `useQueryWhitelistSearch` ([파일](../../hooks/query/useQueryWhitelistSearch.ts)) | `GET /api/whitelist/search?q=` | **inline 30s** | **정적(seed)** |
+| 화이트리스트 검색 | `useQueryWhitelistSearch` ([파일](../../hooks/query/useQueryWhitelistSearch.ts)) | `GET /api/whitelist/search?q=` | **inline 5m** | **정적(seed)** |
 | 분석 실행 | `useMutationAnalyzeWorkbench` | `POST /api/workbench/analyze` (FastAPI) | — (mutation) | — |
 
-> 사이드바 ↔ 폼의 ticker/history/favorite 동기화에 **커스텀 이벤트 버스** 사용 ([components/workbench/workbenchEvents.ts](../../components/workbench/workbenchEvents.ts)): `WORKBENCH_TICKER_CHANGE_EVENT` · `WORKBENCH_SELECT_HISTORY_EVENT` · `WORKBENCH_SELECT_FAVORITE_EVENT`. 즐겨찾기는 localStorage(`workbench:favorites`), history는 in-session(`WorkbenchSessionProvider`).
+> 즐겨찾기는 localStorage(`workbench:favorites`), history는 in-session(`WorkbenchSessionProvider`). 별표 토글은 ticker-header 의 `FavoriteToggle`, history push 는 분석 성공 시 자동.
+>
+> ~~사이드바 ↔ 폼 동기화용 커스텀 이벤트 버스(`workbenchEvents.ts`)~~ 는 finsight-redesign 에서 사이드바 history/favorite 목록이 제거되며 producer 가 사라져 dead code 가 되어 제거됨(PR #82, P2). 목록 UI 재도입 시 zustand store 로 재설계.
 
 ---
 

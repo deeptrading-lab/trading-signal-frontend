@@ -65,6 +65,13 @@ async function fetchDailyChunked(
     chunkTo = addDays(effectiveFrom, -1);
   }
 
+  // rate-limit 관측 — 청크 수 = 순차 KIS 실호출 수. 큰 범위(days 3000 등)에서
+  // 한도 근접을 조기 감지하기 위한 로그(수치 변경 전 관측용, 로드맵 P2).
+  console.info(
+    `[stock/chart] chunked daily ticker=${ticker} range=${fromDate}~${toDate} ` +
+      `chunks=${chunks.length} (= KIS calls)`,
+  );
+
   const all: StockDailyCandle[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const { from: cf, to: ct } = chunks[i];
