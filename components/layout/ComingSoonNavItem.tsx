@@ -83,7 +83,7 @@ export function ComingSoonNavItem({ variant }: ComingSoonNavItemProps) {
       </div>
 
       {show && (
-        <div role="tooltip" className={`nav-tooltip ${tooltipPos}`}>
+        <div role="tooltip" className={`nav-tooltip nav-tooltip-${variant} ${tooltipPos}`}>
           {NAV_MENU_COMING_SOON_TOOLTIP}
         </div>
       )}
