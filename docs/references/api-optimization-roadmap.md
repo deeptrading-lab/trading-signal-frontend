@@ -82,7 +82,7 @@
 | **P0** ✅완료(#76) | zustand 도입 + `useStockMetaStore` | 목록→상세 시세 재호출 · 이름 3중 해석 | 패칭 응답을 store에 upsert, 상세는 즉시 페인트 + 백그라운드 재검증 | KIS `inquire-price` 호출 절감, 체감 즉시 렌더, 이름 단일 경로 | 중 |
 | **P1** | symbols 검색 클라이언트화 | 정적 seed가 매 검색 BFF 왕복 | 번들 직검색 또는 장기 캐시 헤더 | 검색 API 호출 0~최소화 | 소~중 |
 | **P1** | 의도 기반 prefetch | 상세 진입 첫 페치 콜드 | 검색결과/관심행 hover·click 시 `queryClient.prefetchQuery`(price/company) | 상세 첫 렌더 지연↓ | 소 |
-| **P1** | 접힌 카드 쿼리 지연(#63) | 모바일 접기카드가 접혀 있어도 company/list 즉시 호출 | 접힘 상태를 카드→자식에 전달해 훅 `enabled: open`(또는 펼침 전까지 마운트 보류) | 모바일 진입 4콜→2콜(price+chart), 나머지 온디맨드 | 소 |
+| **P1** ✅완료(#79) | 접힌 카드 쿼리 지연(#63) | 모바일 접기카드가 접혀 있어도 company/list 즉시 호출 | 데이터 훅을 `*Content` 로 분리 → 접힘 시 미마운트(펼침 전까지 미호출) | 모바일 진입 4콜→2콜(price+chart), 나머지 온디맨드 | 소 |
 | **P2** | whitelist staleTime 정합 | 정적인데 30s | 5m로 상향 | 미세 | 1줄 |
 | **P2** | 차트 큰 범위 호출 관측(#63) | days 3000 등 대범위는 서버 다중 청크 | `X-Data-Source`·청크 수 로깅으로 rate-limit 여유 모니터링(수치 변경 전 관측) | 한도 근접 조기 감지 | 소 |
 | **P2** | active ticker store화 | 커스텀 이벤트 버스 | `useActiveTickerStore`로 대체 | 결합도↓(호출량 무관) | 소 |
