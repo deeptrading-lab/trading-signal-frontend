@@ -25,7 +25,6 @@ import { formatPct } from "@/lib/utils/formatPct";
 import {
   addRecentSearch,
   readRecentSearches,
-  type RecentSearchEntry,
 } from "@/lib/utils/recentSearch";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { cn } from "@/lib/utils/cn";
@@ -44,7 +43,6 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
   const [keyword, setKeyword] = useState(initialKeyword);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("recent");
-  const [recentSearches, setRecentSearches] = useState<RecentSearchEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -59,18 +57,16 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
     enabled: open && keyword.length === 0,
   });
 
+  // 최근 검색 — 드롭다운 열림(키워드 없음) 시 localStorage 에서 직접 계산(파생 state 제거).
+  //   매 렌더 읽지만 localStorage 읽기는 저렴하고, 닫혀 있으면 빈 배열이라 SSR/초기 렌더와 일치한다.
+  const recentSearches =
+    open && keyword.length === 0 ? readRecentSearches() : [];
+
   // 최근 검색 가격 — 탭 드롭다운 열릴 때 배치 조회
   const recentTickers = recentSearches.map((e) => e.ticker);
   const { data: recentQuotes } = useQueryWatchlist(recentTickers, {
     enabled: open && keyword.length === 0 && recentTickers.length > 0,
   });
-
-  // 드롭다운이 열릴 때 최근 검색 목록을 localStorage에서 갱신
-  useEffect(() => {
-    if (open && keyword.length === 0) {
-      setRecentSearches(readRecentSearches());
-    }
-  }, [open, keyword.length]);
 
   // 외부 클릭 시 닫기
   useEffect(() => {
