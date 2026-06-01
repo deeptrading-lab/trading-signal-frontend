@@ -3191,3 +3191,37 @@
   - **Phase 4 (라이브 prod 검증)**: dev에선 라이브 동작 확인됨. Vercel prod 배포 후 장중 가집계 시각(외국인 09:30~/기관 10:00~)·주말·휴장 빈상태 실측. `FID_INPUT_ISCD=0000` 합산이 KOSPI+KOSDAQ 전체인지 종목 구성 확인.
   - **7일 누적 수급**(후속 트랙): per-stock 풀 합산 or 당일 스냅샷 캐시 적립.
   - nit: 표면 A `0.0억원`→`0억원` 표기, 표면 B 미니차트(현재 표).
+
+### 2026-06-01 — fix(flow): 홈 Top10 외국인/기관 한쪽 빈 컬럼 — EGW00201 재시도 (hotfix) (#90)
+
+- **slug**: `hotfix/flow-foreign-empty` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/90
+- **요약**: fix(flow): 홈 Top10 외국인/기관 한쪽 빈 컬럼 — EGW00201 재시도 (hotfix)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약 (hotfix)
+  > 
+  > 홈 "외국인·기관 순매수 Top10" 카드에서 **한쪽 컬럼(외국인 또는 기관)만 비어 공백으로 뜨는** 문제 수정.
+  > 
+  > ## 원인 (라이브 재현·확정)
+  > - BFF `/api/flow/top10`는 주체 2콜(`fetchForeignInstitutionTotal("frgn")`+`("orgn")`)을 순차 호출. `safeFetch`가 transient 실패를 **빈 배열로 degrade**(부분 성공 허용).
+  > - **홈 진입 시** 지수·티커 등 다른 KIS 위젯과 동시 호출이 겹치면, 주체 콜 하나가 KIS **초당 한도(EGW00201)** 에 걸려 실패 → 빈 컬럼.
+  > - **단독 호출은 항상 정상**(외국인 10/기관 10). 동시 부하에서만 간헐 발생 — 타이밍에 따라 외국인(스샷) 또는 기관(재현 round2: 기관 0)이 빔.
+  > 
+  > ## 수정
+  > 1. **transient 1회 재시도**: `safeFetch`가 EGW00201/네트워크 실패 시 250ms backoff 후 1회 재시도 (`watchlist` route `withRetry` 패턴 정합). BFF 타임아웃 sentinel만 상위 전파.
+  > 2. **빈 컬럼 UX**: 한 주체만 비면 공백 대신 안내 문구(`FLOW_TOP10_COLUMN_EMPTY`) + **'다시 시도' 버튼**(카드 refetch) — 진짜 집계 전(장전)이거나 재시도 후에도 실패 시 사용자 복구.
+  > 
+  > ## 검증 (라이브 동시부하 재현)
+  > - 수정 전: 동시부하 시 빈 컬럼 발생(재현됨).
+  > - 수정 후: **동시부하 8회 → 0/8 빈 컬럼**(외국인/기관 각 10행 정상).
+  > - `tsc --noEmit` 0 · `eslint` clean · `npm run build` 0 · 테스트 189.
+  > - 신규 디자인 토큰 0. 데이터/스키마 변경 0(BFF 재시도 + UI 분기만).
+  > 
+  > ## 다음 작업
+  > - (해소) 동일 패턴 다른 멀티콜 라우트는 이미 retry 보유(watchlist). 신규 멀티콜 KIS 라우트 추가 시 transient 재시도 의무화 — 컨벤션 메모.
+  > - 기존 후속(7일 누적·mock 수량 스케일·표면B 미니차트)은 별도 트랙 유지.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (해소) 동일 패턴 다른 멀티콜 라우트는 이미 retry 보유(watchlist). 신규 멀티콜 KIS 라우트 추가 시 transient 재시도 의무화 — 컨벤션 메모.
+  - 기존 후속(7일 누적·mock 수량 스케일·표면B 미니차트)은 별도 트랙 유지.
