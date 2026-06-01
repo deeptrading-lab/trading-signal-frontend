@@ -28,6 +28,12 @@ import {
 } from "@/lib/api/kis";
 import { isApiError, type ApiError } from "@/lib/api/errors";
 import { getMockWatchlist } from "@/lib/mock/watchlist/quotes";
+import {
+  withTimeout,
+  delay,
+  jsonWithDataSource,
+  BFF_TIMEOUT_SENTINEL,
+} from "@/lib/server/bffUtils";
 
 /** 관심종목 soft cap — 초과분 truncate (§3.2, 1콜 보장). */
 const SOFT_CAP = 30;
@@ -148,37 +154,6 @@ function isRateLimitError(error: ApiError): boolean {
   );
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function jsonWithDataSource(
-  data: unknown,
-  source: "mock" | "kis" | "mock-timeout",
-  extraHeaders?: Record<string, string>,
-): NextResponse {
-  return NextResponse.json(data, {
-    status: 200,
-    headers: {
-      "X-Data-Source": source,
-      "Cache-Control": "no-store",
-      ...(extraHeaders ?? {}),
-    },
-  });
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("__BFF_TIMEOUT__")), ms);
-  });
-  try {
-    return (await Promise.race([promise, timeout])) as T;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 function mapErrorToResponse(
   error: unknown,
   tickers: string[],
@@ -188,7 +163,7 @@ function mapErrorToResponse(
   if (truncated) headers["X-Watchlist-Truncated"] = `soft-cap-${SOFT_CAP}`;
 
   // 타임아웃 → mock fallback (graceful degrade) + 한글 안내.
-  if (error instanceof Error && error.message === "__BFF_TIMEOUT__") {
+  if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
     return jsonWithDataSource(getMockWatchlist(tickers), "mock-timeout", {
       ...headers,
       "X-Error": FALLBACK_TIMEOUT_MESSAGE,

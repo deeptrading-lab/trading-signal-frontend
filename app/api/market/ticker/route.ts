@@ -21,7 +21,6 @@
  * 콤마 포함 문자열로 변환해 응답한다(지수 소수 2자리, BTC 정수).
  */
 
-import { NextResponse } from "next/server";
 import {
   fetchIndexPriceShared,
   fetchOverseasIndexShared,
@@ -34,6 +33,12 @@ import type { BtcQuote } from "@/lib/api/coingecko/types";
 import { HEADER_MARKET_TICKERS } from "@/lib/mock/layout/marketTickers";
 import type { MarketTicker } from "@/lib/types/layout/marketTicker";
 import { formatNumber } from "@/lib/utils/formatMoney";
+import {
+  withTimeout,
+  delay,
+  jsonWithDataSource,
+  BFF_TIMEOUT_SENTINEL,
+} from "@/lib/server/bffUtils";
 
 /** 합성 소스 정의 — 순서 고정 [코스피, 코스닥, S&P 500, NASDAQ, BTC]. */
 const DOMESTIC_CODES = ["0001", "1001"] as const; // 코스피 / 코스닥.
@@ -87,7 +92,7 @@ export async function GET() {
   } catch (error) {
     // 타임아웃·예기치 못한 오류 → mock degrade(헤더 끊김 0).
     const source =
-      error instanceof Error && error.message === "__BFF_TIMEOUT__"
+      error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL
         ? "mock-timeout"
         : "mock";
     return jsonWithDataSource(getMockTickers(), source, {
@@ -257,37 +262,6 @@ function resolveSource(
   if (allKis && btcFulfilled) return "kis";
   const anyLive = (kisLive && kisFulfilled > 0) || btcFulfilled;
   return anyLive ? "mixed" : "mock";
-}
-
-function jsonWithDataSource(
-  data: unknown,
-  source: "kis" | "mixed" | "mock" | "mock-timeout",
-  extraHeaders?: Record<string, string>,
-): NextResponse {
-  return NextResponse.json(data, {
-    status: 200,
-    headers: {
-      "X-Data-Source": source,
-      "Cache-Control": "no-store",
-      ...(extraHeaders ?? {}),
-    },
-  });
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("__BFF_TIMEOUT__")), ms);
-  });
-  try {
-    return (await Promise.race([promise, timeout])) as T;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** 테스트 전용 — 모듈 레벨 캐시 초기화. */

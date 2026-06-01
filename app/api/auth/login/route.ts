@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword } from "@/lib/auth/password";
 import { signSession } from "@/lib/auth/session";
 import { buildSessionCookie } from "@/lib/auth/cookie";
+import { delay } from "@/lib/server/bffUtils";
 
 /** 오답 응답 전 고정 지연 — 온라인 브루트포스 완화(AC-19). */
 const FAILURE_DELAY_MS = 500;
@@ -77,8 +78,4 @@ async function readPassword(request: NextRequest): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -37,6 +37,12 @@ import {
 } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockMarketIndices } from "@/lib/mock/market/indices";
+import {
+  withTimeout,
+  delay,
+  jsonWithDataSource,
+  BFF_TIMEOUT_SENTINEL,
+} from "@/lib/server/bffUtils";
 
 /** 기본 지수 코드 — 국내 2종(KOSPI/KOSDAQ) + 해외 2종(S&P 500/NASDAQ). */
 const DEFAULT_INDEX_CODES = ["0001", "1001", "SPX", "COMP"] as const;
@@ -167,40 +173,9 @@ function writeIndexCache(code: string, value: MarketIndexQuote): void {
   indexCache.set(code, { value, expiresAt: Date.now() + ttl });
 }
 
-function jsonWithDataSource(
-  data: unknown,
-  source: "mock" | "kis" | "mock-timeout",
-  extraHeaders?: Record<string, string>,
-): NextResponse {
-  return NextResponse.json(data, {
-    status: 200,
-    headers: {
-      "X-Data-Source": source,
-      "Cache-Control": "no-store",
-      ...(extraHeaders ?? {}),
-    },
-  });
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("__BFF_TIMEOUT__")), ms);
-  });
-  try {
-    return (await Promise.race([promise, timeout])) as T;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function mapErrorToResponse(error: unknown, codes: string[]): NextResponse {
   // 타임아웃 → mock fallback (graceful degrade) + 한글 안내.
-  if (error instanceof Error && error.message === "__BFF_TIMEOUT__") {
+  if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
     return jsonWithDataSource(getMockMarketIndices(codes), "mock-timeout", {
       "X-Error": FALLBACK_TIMEOUT_MESSAGE,
       "X-KIS-Env": resolveKisEnv(),

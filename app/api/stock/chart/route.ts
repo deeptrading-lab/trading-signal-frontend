@@ -18,6 +18,7 @@ import { fetchStockDailyChart, isKisConfigured, resolveKisEnv } from "@/lib/api/
 import { isApiError } from "@/lib/api/errors";
 import { getMockStockChart } from "@/lib/mock/stock/daily";
 import type { StockDailyCandle } from "@/lib/api/kis/types";
+import { withTimeout, delay, BFF_TIMEOUT_SENTINEL } from "@/lib/server/bffUtils";
 
 /** 일봉 단일 호출 커버 가능 캘린더일 (100 영업봉 ≒ 140일, 여유 10일). */
 const DAILY_CHUNK_DAYS = 130;
@@ -136,24 +137,8 @@ function jsonOk(
   });
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("__BFF_TIMEOUT__")), ms);
-  });
-  try {
-    return (await Promise.race([promise, timeout])) as T;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function mapErrorToResponse(error: unknown, ticker: string): NextResponse {
-  if (error instanceof Error && error.message === "__BFF_TIMEOUT__") {
+  if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
     return jsonOk(getMockStockChart(ticker), "mock-timeout", {
       "X-Error": FALLBACK_TIMEOUT_MESSAGE,
     });
