@@ -13,7 +13,8 @@
  *   - `canRefresh` false(빈 상태 등) 시 버튼 미노출.
  *
  * v8 토큰: 컨테이너 `mx-auto max-w-main-max-w flex flex-col gap-lg` · 타이틀 `text-h1` ·
- *   Star `text-warn fill-warn` · "새로고침" `button-secondary` · "+ 종목 추가" `button-primary`.
+ *   Star `text-warn fill-warn` · "새로고침" = **배경 투명** 아이콘 버튼(RefreshCw 만, 박스 없이 —
+ *   종목추가와 크기 착시 회피, hover 시 아이콘 색만 진해짐, aria-label 로 접근성) · "+ 종목 추가" `button-primary`.
  */
 
 "use client";
@@ -60,16 +61,15 @@ export function WatchlistPage({
           {canRefresh ? (
             <button
               type="button"
-              className="button-secondary h-button-primary-h inline-flex items-center gap-xs"
+              className="inline-flex items-center justify-center h-button-sm-h w-button-sm-h rounded-sm bg-transparent text-text-muted hover:text-text-strong transition-colors cursor-pointer disabled:opacity-[0.65] disabled:cursor-not-allowed"
               onClick={onRefresh}
               disabled={isRefreshing}
               aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
             >
               <RefreshCw
-                className={cn("h-4 w-4", isRefreshing && "animate-spin")}
+                className={cn("h-5 w-5", isRefreshing && "animate-spin")}
                 aria-hidden="true"
               />
-              {WATCHLIST_REFRESH}
             </button>
           ) : null}
           <button type="button" className="button-primary" onClick={onAdd}>
