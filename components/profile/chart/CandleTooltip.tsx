@@ -18,11 +18,11 @@ export function CandleTooltip({ active, payload, label }: {
   const d = payload[0]?.payload;
   if (!d) return null;
   const isUp = d.close >= d.open;
-  const color = isUp ? C.stroke : C.macdLine;
+  const color = isUp ? C.stroke : C.down;
   // 등락률 색 — 한국식(상승 빨강 / 하락 파랑 / 보합 기본). 직전 봉 종가 대비.
   const chgColor = d.changePct == null || d.changePct === 0
     ? C.tooltipText
-    : d.changePct > 0 ? C.stroke : C.macdLine;
+    : d.changePct > 0 ? C.stroke : C.down;
   return (
     <div style={{ ...tooltipStyle, padding: "8px 12px", minWidth: 130 }}>
       <p style={{ color: C.axisTick, marginBottom: 6, fontSize: 11 }}>{label}</p>

@@ -20,7 +20,7 @@ export function CandleBar(props: {
   const { open, close, high, low, isUp } = payload;
   if (high < low) return null;
 
-  const color = isUp ? C.stroke : C.macdLine;
+  const color = isUp ? C.stroke : C.down;
   const scale = height / (high - low); // px per value unit
   const bodyTop = y + (high - Math.max(open, close)) * scale;
   const bodyH = Math.max(Math.abs(open - close) * scale, 1);

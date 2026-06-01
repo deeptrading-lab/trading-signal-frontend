@@ -29,6 +29,17 @@ colors:
   gradient-ai-from: "#4338ca"
   gradient-ai-to: "#1d4ed8"
   gradient-ai-soft: "#eef2ff"
+  chart-macd: "#2563eb"
+  chart-signal: "#f59e0b"
+  chart-hist-up: "#16a34a"
+  chart-hist-down: "#dc2626"
+  chart-rsi: "#7c3aed"
+  chart-ref-ob: "#dc2626"
+  chart-ref-os: "#2563eb"
+  chart-ref-mid: "#9ca3af"
+  chart-vol-up: "#fca5a5"
+  chart-vol-down: "#93c5fd"
+  chart-down: "#2563eb"
 typography:
   display:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial
@@ -589,6 +600,12 @@ v8 신규 토큰이 기존 토큰과 hue 가 겹치는 영역의 사용처 룰 �
 **기존 `accent-vivid` (#1d4ed8) — primary CTA + dropdown focus 한정**:
 
 v7 rev2 가 `accent-vivid` 를 도입했을 때의 사용처는 CTA 버튼 + dropdown focus + focus ring + 가능 시 link 강조 4 영역이었다. v8 은 link 강조 영역을 제거 — 일반 텍스트 link 가 필요하면 `info` 또는 `text-strong` + underline 사용. 강조 link 가 정말 필요하면 디자이너 협의 후 별도 `link` 합성 토큰 도입 (본 v8 미정의). 결과 — `accent-vivid` 의 cascade 는 `button-primary` / `button-primary-disabled` / `search-result-item-focus` / `search-result-item-focus-meta` / `bottom-nav-item-active` 5 합성 토큰 한정. 자산 식별 토큰 (`asset-stock`) 과의 시각 충돌 회피 — `asset-stock` 은 자산 라벨, `accent-vivid` 는 액션 신호.
+
+**차트 지표 색 토큰 (`chart-*` 11 키) — StockDailyChart 가격·거래량·MACD·RSI 서브플롯 전용**:
+
+차트 캔버스의 지표 라인·기준선·거래량 봉 색을 `components/profile/chart/chartTheme.ts` 의 hex 직타에서 토큰 참조로 이관하기 위한 11 키. **값 보존(value-preserving) 등록** — 기존 차트가 쓰던 hex 를 한 자도 바꾸지 않고 그대로 토큰화한다. 팔레트 재설계가 아니라 코드 hex 직타 제거가 목적이므로 시각 회귀 0. 신규 키: `chart-macd` `#2563eb` (MACD 라인 파랑), `chart-signal` `#f59e0b` (MACD 시그널 라인 앰버), `chart-hist-up` `#16a34a` / `chart-hist-down` `#dc2626` (MACD 히스토그램 부호별 초록/빨강), `chart-rsi` `#7c3aed` (RSI 라인 보라), `chart-ref-ob` `#dc2626` / `chart-ref-os` `#2563eb` / `chart-ref-mid` `#9ca3af` (RSI 과매수 70·과매도 30·중립 50 기준선 빨강/파랑/회색), `chart-vol-up` `#fca5a5` / `chart-vol-down` `#93c5fd` (거래량 봉 상승/하락 연빨강/연파랑), `chart-down` `#2563eb` (하락 캔들·라인 파랑).
+
+**의도적 동일 hex 별도 토큰** — `chart-macd` = `chart-ref-os` = `chart-down` = `#2563eb`, `chart-hist-down` = `chart-ref-ob` = `#dc2626` 으로 값이 겹치지만 역할(MACD 라인 / RSI 과매도선 / 하락 캔들, MACD 히스토그램 음수 / RSI 과매수선)이 달라 별도 키로 박는다. v8 의 `gradient-ai-to` = `accent-vivid` = `signal-down` (동일 `#1d4ed8`, 의미 단위 분리) 선례와 동일 철학 — 추후 차트 색 재조정 시 역할별 독립 변경 가능. 차트의 상승색은 기존 `signal-up` `#c81e1e` 재사용, 축 눈금 `text-muted` / 그리드 `border-line` / 툴팁 텍스트 `text-strong` 재사용으로 신규 키 불필요. 툴팁 배경은 rgba 투명색이라 토큰화 제외(코드 리터럴 유지). `chart-*` 토큰은 차트 캔버스(데이터 시각화) 전용 — 본문 텍스트·등락률·배지에는 사용 금지(등락은 `signal-up` / `signal-down`, 자산은 `asset-*` 영역).
 
 ### 신·구 팔레트 비교 표 (v7 rev2 → v8)
 
