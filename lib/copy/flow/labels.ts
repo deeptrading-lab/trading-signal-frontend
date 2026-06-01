@@ -29,3 +29,4 @@ export const FLOW_TOP10_EMPTY =
   "아직 당일 외국인·기관 수급 집계 전이에요 (첫 갱신 09:30~).";
 export const FLOW_TOP10_ERROR =
   "수급 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
+export const FLOW_TOP10_RETRY = "다시 시도";

@@ -27,9 +27,14 @@ export const STOCK_INVESTORS_COL_PERSON = "개인";
 export const STOCK_INVESTORS_COL_FOREIGN = "외국인";
 export const STOCK_INVESTORS_COL_ORG = "기관";
 
+/* 일자별 표 펼치기 토글 — 합계는 항상 노출, 표만 토글 */
+export const STOCK_INVESTORS_TABLE_SHOW = "일자별 수급 보기";
+export const STOCK_INVESTORS_TABLE_HIDE = "일자별 접기";
+
 /* 상태 */
 export const STOCK_INVESTORS_LOADING = "수급 추이를 불러오는 중…";
 export const STOCK_INVESTORS_EMPTY =
   "아직 수급 데이터가 없어요 (미집계·신규 상장).";
 export const STOCK_INVESTORS_ERROR =
   "수급 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
+export const STOCK_INVESTORS_RETRY = "다시 시도";

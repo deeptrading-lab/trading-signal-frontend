@@ -32,6 +32,7 @@ import {
   FLOW_TOP10_FOREIGN_LABEL,
   FLOW_TOP10_INSTITUTION_LABEL,
   FLOW_TOP10_LOADING,
+  FLOW_TOP10_RETRY,
   FLOW_TOP10_SHOW_LESS,
   FLOW_TOP10_SHOW_MORE,
   FLOW_TOP10_TITLE,
@@ -134,10 +135,12 @@ function FlowColumn({
   label,
   rows,
   asOf,
+  className,
 }: {
   label: string;
   rows: InvestorFlowRow[];
   asOf?: string;
+  className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const meta = asOfLabel(asOf);
@@ -145,7 +148,7 @@ function FlowColumn({
   // 모바일에서만 절단(<md). 데스크탑은 항상 Top10 — Tailwind 로 잘린 행을 md 이상에서 노출한다.
 
   return (
-    <section className="flex flex-col gap-sm" aria-label={label}>
+    <section className={cn("flex flex-col gap-sm", className)} aria-label={label}>
       <header className="flex items-baseline justify-between gap-sm">
         <h3 className="text-body-sm-strong text-text-strong">{label}</h3>
         <span className="text-caption text-text-muted">
@@ -201,7 +204,7 @@ function SkeletonColumn() {
 }
 
 export function InvestorFlowTop10Card() {
-  const { data, isLoading, isError } = useQueryFlowTop10();
+  const { data, isLoading, isError, refetch } = useQueryFlowTop10();
 
   const hasRows =
     !!data && (data.foreign.length > 0 || data.institution.length > 0);
@@ -224,7 +227,14 @@ export function InvestorFlowTop10Card() {
         </>
       ) : isError ? (
         <div className="card-critical" role="alert">
-          <p className="text-body-sm">{FLOW_TOP10_ERROR}</p>
+          <p className="text-body-sm mb-md">{FLOW_TOP10_ERROR}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => refetch()}
+          >
+            {FLOW_TOP10_RETRY}
+          </button>
         </div>
       ) : !hasRows ? (
         <p className="text-body-sm text-text-muted">{FLOW_TOP10_EMPTY}</p>
@@ -239,6 +249,7 @@ export function InvestorFlowTop10Card() {
             label={FLOW_TOP10_INSTITUTION_LABEL}
             rows={data.institution}
             asOf={data.asOf}
+            className="lg:border-l lg:border-border-line lg:pl-lg"
           />
         </div>
       )}

@@ -623,12 +623,12 @@
   .flow-date-cell {
     @apply text-caption text-text-muted px-table-cell-px;
   }
-  /* 합계 요약 칸 — surface-muted × rounded-md, 라벨(caption) + 합(부호색). */
+  /* 합계 요약 칸 — surface-muted × rounded-md, 라벨(label-sm 진한톤) + 합(부호색). */
   .flow-summary-cell {
     @apply bg-surface-muted rounded-md p-card-px-mobile;
   }
   .flow-summary-label {
-    @apply text-caption text-text-muted;
+    @apply text-label-sm text-text-muted;
   }
 
   /* ---------- PWA 인앱 스플래시 (components/pwa/SplashScreen.tsx) ----------
