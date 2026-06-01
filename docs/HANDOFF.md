@@ -2836,3 +2836,28 @@
   > - 스택 다음: pickStockName(#73).
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 스택 다음: pickStockName(#73).
+
+### 2026-06-01 — chore(stock): stock-meta 후속 정리 (리뷰 nit + roadmap P0 완료) (#78)
+
+- **slug**: `chore/stock-meta-followups` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/78
+- **요약**: chore(stock): stock-meta 후속 정리 (리뷰 nit + roadmap P0 완료)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > #76(zustand) 리뷰의 **비차단 nit** 반영(동작 동일) + roadmap P0 '완료' 표기. 독립 PR(base main).
+  > 
+  > ## 변경
+  > - `app/providers.tsx` — `getState()` 조회를 매칭 분기 안으로 + 라우팅 키 prefix 명명 상수화.
+  > - `useQueryStockPrice` — placeholderData 시점-스냅샷 주석.
+  > - `api-optimization-roadmap.md` — P0 ✅완료(#76) 표기.
+  > 
+  > ## 검증
+  > - typecheck/lint/test(189)/build 그린.
+  > - nit #2(셀렉터 전체구독)는 현 규모 OK·구독 변경 리스크로 제외(리뷰어 의견 일치).
+  > - npm audit moderate 2건 = transitive postcss(빌드타임), fix 가 next 파괴적 다운그레이드 → 수용·미적용.
+  > 
+  > ## 다음 작업
+  > - P1: 접힌 카드 쿼리 지연 → symbols 클라이언트화 → prefetch.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - P1: 접힌 카드 쿼리 지연 → symbols 클라이언트화 → prefetch.
