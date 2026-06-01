@@ -41,7 +41,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        className="flex items-center gap-sm px-md py-[6px] rounded-sm text-body-sm-strong bg-surface-muted text-text-strong border border-border-line cursor-pointer"
+        className="flex items-center gap-sm px-md py-sm rounded-sm text-body-sm-strong bg-surface-muted text-text-strong border border-border-line cursor-pointer"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -73,7 +73,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full items-center px-md py-[6px] rounded-sm text-body-sm-strong cursor-pointer text-left",
+                "flex w-full items-center px-md py-sm rounded-sm text-body-sm-strong cursor-pointer text-left",
                 r.days === value
                   ? "bg-surface-muted text-text-strong"
                   : "text-text-muted hover:text-text-strong hover:bg-surface-muted",

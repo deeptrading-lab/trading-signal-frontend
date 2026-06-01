@@ -29,6 +29,28 @@ colors:
   gradient-ai-from: "#4338ca"
   gradient-ai-to: "#1d4ed8"
   gradient-ai-soft: "#eef2ff"
+  chart-macd: "#2563eb"
+  chart-signal: "#f59e0b"
+  chart-hist-up: "#16a34a"
+  chart-hist-down: "#dc2626"
+  chart-rsi: "#7c3aed"
+  chart-ref-ob: "#dc2626"
+  chart-ref-os: "#2563eb"
+  chart-ref-mid: "#9ca3af"
+  chart-vol-up: "#fca5a5"
+  chart-vol-down: "#93c5fd"
+  chart-down: "#2563eb"
+  fng-extreme-fear: "#1d6fb8"
+  fng-extreme-fear-soft: "#e3f0fa"
+  fng-fear: "#256353"
+  fng-fear-soft: "#e1f0eb"
+  fng-neutral: "#4b525c"
+  fng-neutral-soft: "#f0f1f3"
+  fng-greed: "#82500c"
+  fng-greed-soft: "#fbf0dc"
+  fng-extreme-greed: "#a83246"
+  fng-extreme-greed-soft: "#fbe4e8"
+  fng-track: "#eceff3"
 typography:
   display:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial
@@ -120,6 +142,13 @@ typography:
     fontWeight: 400
     lineHeight: 1.2
     fontFeature: "tnum"
+  gauge-score:
+    fontSize: 40px
+    fontWeight: 800
+    letterSpacing: -0.02em
+  table-cell-numeric:
+    fontSize: 14px
+    fontWeight: 700
 spacing:
   xs: 4px
   sm: 6px
@@ -150,6 +179,15 @@ spacing:
   card-py-mobile: 16px
   hero-px: 24px
   hero-py: 24px
+  home-grid-gap: 16px
+  gauge-w: 220px
+  gauge-h: 120px
+  gauge-track-w: 14px
+  donut-size: 168px
+  donut-thickness: 22px
+  table-row-h: 48px
+  table-cell-px: 12px
+  disclosure-row-py: 12px
 rounded:
   sm: 8px
   md: 12px
@@ -590,6 +628,16 @@ v8 신규 토큰이 기존 토큰과 hue 가 겹치는 영역의 사용처 룰 �
 
 v7 rev2 가 `accent-vivid` 를 도입했을 때의 사용처는 CTA 버튼 + dropdown focus + focus ring + 가능 시 link 강조 4 영역이었다. v8 은 link 강조 영역을 제거 — 일반 텍스트 link 가 필요하면 `info` 또는 `text-strong` + underline 사용. 강조 link 가 정말 필요하면 디자이너 협의 후 별도 `link` 합성 토큰 도입 (본 v8 미정의). 결과 — `accent-vivid` 의 cascade 는 `button-primary` / `button-primary-disabled` / `search-result-item-focus` / `search-result-item-focus-meta` / `bottom-nav-item-active` 5 합성 토큰 한정. 자산 식별 토큰 (`asset-stock`) 과의 시각 충돌 회피 — `asset-stock` 은 자산 라벨, `accent-vivid` 는 액션 신호.
 
+**차트 지표 색 토큰 (`chart-*` 11 키) — StockDailyChart 가격·거래량·MACD·RSI 서브플롯 전용**:
+
+차트 캔버스의 지표 라인·기준선·거래량 봉 색을 `components/profile/chart/chartTheme.ts` 의 hex 직타에서 토큰 참조로 이관하기 위한 11 키. **값 보존(value-preserving) 등록** — 기존 차트가 쓰던 hex 를 한 자도 바꾸지 않고 그대로 토큰화한다. 팔레트 재설계가 아니라 코드 hex 직타 제거가 목적이므로 시각 회귀 0. 신규 키: `chart-macd` `#2563eb` (MACD 라인 파랑), `chart-signal` `#f59e0b` (MACD 시그널 라인 앰버), `chart-hist-up` `#16a34a` / `chart-hist-down` `#dc2626` (MACD 히스토그램 부호별 초록/빨강), `chart-rsi` `#7c3aed` (RSI 라인 보라), `chart-ref-ob` `#dc2626` / `chart-ref-os` `#2563eb` / `chart-ref-mid` `#9ca3af` (RSI 과매수 70·과매도 30·중립 50 기준선 빨강/파랑/회색), `chart-vol-up` `#fca5a5` / `chart-vol-down` `#93c5fd` (거래량 봉 상승/하락 연빨강/연파랑), `chart-down` `#2563eb` (하락 캔들·라인 파랑).
+
+**의도적 동일 hex 별도 토큰** — `chart-macd` = `chart-ref-os` = `chart-down` = `#2563eb`, `chart-hist-down` = `chart-ref-ob` = `#dc2626` 으로 값이 겹치지만 역할(MACD 라인 / RSI 과매도선 / 하락 캔들, MACD 히스토그램 음수 / RSI 과매수선)이 달라 별도 키로 박는다. v8 의 `gradient-ai-to` = `accent-vivid` = `signal-down` (동일 `#1d4ed8`, 의미 단위 분리) 선례와 동일 철학 — 추후 차트 색 재조정 시 역할별 독립 변경 가능. 차트의 상승색은 기존 `signal-up` `#c81e1e` 재사용, 축 눈금 `text-muted` / 그리드 `border-line` / 툴팁 텍스트 `text-strong` 재사용으로 신규 키 불필요. 툴팁 배경은 rgba 투명색이라 토큰화 제외(코드 리터럴 유지). `chart-*` 토큰은 차트 캔버스(데이터 시각화) 전용 — 본문 텍스트·등락률·배지에는 사용 금지(등락은 `signal-up` / `signal-down`, 자산은 `asset-*` 영역).
+
+**Fear & Greed 게이지 구간색 토큰 (`fng-*` 11 키) — 대시보드 공포·탐욕 지수 게이지 전용**:
+
+대시보드 Fear & Greed 게이지의 5 구간(극단적 공포·공포·중립·탐욕·극단적 탐욕) 채움색 + soft 페어 + 트랙색. **과거 JSON 직접병합분 SSOT 환원(back-port)** — 게이지·도넛·공시 테이블 기능 추가 시 `tailwind.theme.json` 에 DESIGN.md 를 거치지 않고 수동 병합된 토큰을 값 보존(value-preserving)으로 본 SSOT 에 되돌린다. 재설계 아님, 시각 변경 0. 신규 키: `fng-extreme-fear` `#1d6fb8` / `fng-extreme-fear-soft` `#e3f0fa`(극단적 공포 청색), `fng-fear` `#256353` / `fng-fear-soft` `#e1f0eb`(공포 청록), `fng-neutral` `#4b525c` / `fng-neutral-soft` `#f0f1f3`(중립 회색), `fng-greed` `#82500c` / `fng-greed-soft` `#fbf0dc`(탐욕 황갈), `fng-extreme-greed` `#a83246` / `fng-extreme-greed-soft` `#fbe4e8`(극단적 탐욕 적색), `fng-track` `#eceff3`(게이지 미채움 트랙, `border-line` 동일 hex). 사용처는 대시보드 F&G 게이지 캔버스 전용 — 본문 텍스트·등락률·자산 라벨에는 사용 금지(등락 `signal-*`, 자산 `asset-*` 영역).
+
 ### 신·구 팔레트 비교 표 (v7 rev2 → v8)
 
 v7 rev2 의 15 키는 모두 hex 무회귀 (변경 없음). v8 신규 11 키 추가. 표 칼럼은 v7 rev2 hex → v8 hex / 신규 추가 / 사용처 갱신. 총 15 행 (v7 rev2 무회귀 4 행 + v8 신규 11 행).
@@ -684,6 +732,13 @@ export const pretendard = localFont({
 
 `mono-numeric` 의 `fontFeature: tnum` 은 Pretendard 의 OpenType tabular-nums feature 활성 — 등락률·가격·수량 같은 숫자가 자릿수 별 폭 동일로 렌더되어 표·라인 위계 정렬. Pretendard 는 tnum feature 지원.
 
+### 신규 typography 2 키 — 대시보드 게이지 점수·테이블 숫자셀 (back-port)
+
+**과거 JSON 직접병합분 SSOT 환원** — 대시보드 게이지/도넛·공시 테이블 기능 추가 시 수동 병합된 typography 토큰을 값 보존으로 본 SSOT 에 되돌린다.
+
+- **`gauge-score`** (40px / 800 / -0.02em) — 대시보드 Fear & Greed 게이지 중앙의 점수 표시 전용. `font-display` 와 동일 사이즈·굵기·자간이나 의미 단위(게이지 수치 vs hero heading)가 달라 별도 키. `lineHeight`·`fontFamily` 필드 비명시 — 게이지 점수는 단일 라인 수치라 행간 불필요, fontFamily 는 부모(`html` Pretendard variable)에서 cascade.
+- **`table-cell-numeric`** (14px / 700) — 공시·테이블의 숫자셀 전용. `body-sm-strong` 와 사이즈·굵기 동일하나 표 셀 정렬 컨텍스트로 분리. `lineHeight`·`fontFamily` 필드 비명시 — 코드에서 `font-table-cell-numeric` 사용 0건이라 dead `fontFamily.table-cell-numeric` 토큰을 **의도적으로 prune**(fontFamily 필드 생략 → 재생성 시 fontFamily 맵에서 제외).
+
 ## Layout
 
 v7 rev2 의 layout 가이드 전체 무수정 계승 + v8 의 **카드 padding 6 키 신규** + **bottom nav 합성 토큰 2 키 신규** 추가. 3-section shell (navbar 60px + sidebar 264px + main), 데스크탑·태블릿·모바일 정책, drawer slide-in 모두 v7 rev2 그대로.
@@ -697,6 +752,16 @@ v7 rev2 의 layout 가이드 전체 무수정 계승 + v8 의 **카드 padding 6
 - **`hero-px: 24px` / `hero-py: 24px`** — hero 카드 (`card-hero` / `card-ai`) 의 좌우·상하 padding. 시안의 `rounded-3xl p-6 md:p-8` 정합. 화면 최상단의 brand-impact 카드에서 호흡 강화.
 
 frontend-dev 호출 패턴 — `<div className="card-base px-card-px py-card-py">` (또는 `@apply` 합성 토큰 `card`).
+
+### spacing 신규 9 키 — 홈 그리드·대시보드 게이지/도넛·공시 테이블 치수 (back-port)
+
+**과거 JSON 직접병합분 SSOT 환원(back-port)** — 홈 그리드·대시보드 게이지/도넛·공시 테이블 기능 추가 시 `tailwind.theme.json` 에 수동 병합된 치수 토큰을 값 보존으로 본 SSOT 에 되돌린다. 재설계 아님, 시각 변경 0.
+
+- **`home-grid-gap: 16px`** — 홈 카드 그리드 셀 간격.
+- **`gauge-w: 220px` / `gauge-h: 120px` / `gauge-track-w: 14px`** — 대시보드 Fear & Greed 게이지 너비·높이·트랙 두께.
+- **`donut-size: 168px` / `donut-thickness: 22px`** — 대시보드 도넛 차트 지름·링 두께.
+- **`table-row-h: 48px` / `table-cell-px: 12px`** — 테이블 행 높이·셀 좌우 padding.
+- **`disclosure-row-py: 12px`** — 공시 테이블 행 상하 padding.
 
 ### v8 rounded 신규 — `lg` / `xl`
 

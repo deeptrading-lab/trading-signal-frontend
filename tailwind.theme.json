@@ -28,6 +28,17 @@
         "gradient-ai-from": "#4338ca",
         "gradient-ai-to": "#1d4ed8",
         "gradient-ai-soft": "#eef2ff",
+        "chart-macd": "#2563eb",
+        "chart-signal": "#f59e0b",
+        "chart-hist-up": "#16a34a",
+        "chart-hist-down": "#dc2626",
+        "chart-rsi": "#7c3aed",
+        "chart-ref-ob": "#dc2626",
+        "chart-ref-os": "#2563eb",
+        "chart-ref-mid": "#9ca3af",
+        "chart-vol-up": "#fca5a5",
+        "chart-vol-down": "#93c5fd",
+        "chart-down": "#2563eb",
         "fng-extreme-fear": "#1d6fb8",
         "fng-extreme-fear-soft": "#e3f0fa",
         "fng-fear": "#256353",
@@ -90,9 +101,6 @@
           "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ],
         "input-suffix": [
-          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
-        ],
-        "table-cell-numeric": [
           "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ]
       },
@@ -202,17 +210,17 @@
             "fontWeight": "400"
           }
         ],
-        "table-cell-numeric": [
-          "14px",
-          {
-            "fontWeight": "700"
-          }
-        ],
         "gauge-score": [
           "40px",
           {
             "letterSpacing": "-0.02em",
             "fontWeight": "800"
+          }
+        ],
+        "table-cell-numeric": [
+          "14px",
+          {
+            "fontWeight": "700"
           }
         ]
       },

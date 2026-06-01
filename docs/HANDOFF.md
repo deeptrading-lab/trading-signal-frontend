@@ -3031,3 +3031,44 @@
   - **Wave 3b**: 차트 토큰화 W2(ux-designer 정식 위임 — `chart-*` 토큰 11개 신규 + 기존 5색 매핑[stroke/fill=signal-up·axisTick=text-muted·grid=border-line·tooltipText=text-strong], DESIGN.md→`design:sync`→`chartTheme.ts`의 `C` 마이그레이션) + W5 px토큰(`ChartRangeDropdown`·`ChartShell` `py-[3px]`) + W3 캔들 wick 시각 검증. 시각 변경 → 수동 2뷰포트 QA.
   - 분리된 `chartTheme.ts`의 `C`가 W2 토큰화의 단일 대상이 됨(이번 분리의 직접 효과).
   - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md), 계획 `wise-giggling-sunrise.md`.
+
+### 2026-06-01 — refactor(chart): 차트 색 토큰화 W2/W5 + DESIGN.md drift 해소 (Wave 3b) (#86)
+
+- **slug**: `chart-color-tokens` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/86
+- **요약**: refactor(chart): 차트 색 토큰화 W2/W5 + DESIGN.md drift 해소 (Wave 3b)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > Phase 3 순서계획 **Wave 3b (마지막)** — 차트 색 디자인 토큰화. **값 보존(value-preserving)** — 시각 변경 0, 코드의 hex 직타 제거. 추가로, 토큰화가 `design:sync`로 드러낸 **DESIGN.md↔theme.json drift도 함께 해소**(같은 파이프라인 이슈라 동봉).
+  > 
+  > | 항목 | 내용 |
+  > |---|---|
+  > | **W2 색 토큰화** | `chartTheme.ts` hex 16색 → 디자인 토큰 참조. DESIGN.md에 `chart-*` 토큰 11개 등록 |
+  > | **down 의미 분리** | 하락색 `C.macdLine` → `C.down`(chart-down), hex 동일 #2563eb (PR #85 리뷰 후속) |
+  > | **W5 px 토큰** | `ChartRangeDropdown` `py-[6px]` → `py-sm` |
+  > | **drift 해소** | DESIGN.md에 누락됐던 fng/gauge/donut/table 토큰 22개 back-port → `design:sync` lossless 복원 |
+  > 
+  > ## W2 토큰 매핑 (값 보존)
+  > - 기존 토큰 재사용(4): 상승색→`signal-up` · 축눈금→`text-muted` · 그리드→`border-line` · 툴팁텍스트→`text-strong`
+  > - 신규 chart-*(11): macd/signal/hist-up/hist-down/rsi/ref-ob/ref-os/ref-mid/vol-up/vol-down/down — 기존 hex 그대로
+  > - 제외(1): 툴팁 배경 rgba(투명)는 코드 리터럴 유지
+  > - recharts는 색 문자열 필요 → `tailwind.theme.json`(6KB, 이미 layout import) 값 참조
+  > 
+  > ## DESIGN.md drift 해소 (design:sync lossless 복원)
+  > `design:sync`(DESIGN.md→theme.json 전체 재생성)가 **빌드를 깨뜨림**을 발견: 과거 F&G 게이지·대시보드 게이지/도넛·공시테이블 토큰이 DESIGN.md를 거치지 않고 theme.json에 **직접 수동병합**돼 있었고, 재생성이 그것들을 누락(→`px-table-cell-px` unknown utility).
+  > 
+  > **해결**: 누락 토큰을 DESIGN.md(SSOT)에 back-port(값 보존) → `design:sync` 재생성이 lossless가 됨. theme.json은 이제 수동편집 없이 DESIGN.md 단일출처에서 생성.
+  > - colors +11: `fng-*` · spacing +9: `home-grid-gap`·`gauge-*`·`donut-*`·`table-*`·`disclosure-row-py` · typography +2: `gauge-score`·`table-cell-numeric`
+  > - prune: dead `fontFamily.table-cell-numeric`(`font-table-cell-numeric` 사용 0건)
+  > - **HEAD 대비 토큰 값 변경 0건**(검증 스크립트), 손실은 의도한 dead 토큰 1개뿐. theme.json 재정렬은 재생성 산물.
+  > 
+  > ## 검증
+  > - `design:sync` → `npm run build` exit 0 (unknown utility 에러 0) · `tsc --noEmit` 0 · `eslint` clean · 테스트 **189** · `design.md lint` errors=0
+  > - **값 보존 확인**: chart-* 11색 hex가 기존 `C` 리터럴과 전부 일치, drift 토큰 22개 값 일치
+  > - ⚠️ 시각 회귀는 사람 눈 확인 권장: `/stock/[ticker]` 차트 색 + 대시보드 F&G 게이지/도넛/공시테이블이 분리 전과 동일한지. W3(캔들 wick 좌표)도 장대봉/상한가로 확인.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (Phase 3 순서계획 Wave 1~3b 완료) 로드맵 보류 항목만 잔존: middleware→proxy(현상유지)·W4 MACD 0패딩(워밍업으로 시각 차단).
+  - 차후 디자인 토큰 추가 시 **반드시 DESIGN.md 경유**(직접 theme.json 편집 금지 — 이번에 drift 환원으로 design:sync 신뢰성 복원됨).
