@@ -3072,3 +3072,43 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (Phase 3 순서계획 Wave 1~3b 완료) 로드맵 보류 항목만 잔존: middleware→proxy(현상유지)·W4 MACD 0패딩(워밍업으로 시각 차단).
   - 차후 디자인 토큰 추가 시 **반드시 DESIGN.md 경유**(직접 theme.json 편집 금지 — 이번에 drift 환원으로 design:sync 신뢰성 복원됨).
+
+### 2026-06-01 — chore(proxy): middleware → proxy 파일 컨벤션 마이그레이션 (Next 16) (#87)
+
+- **slug**: `middleware-to-proxy` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/87
+- **요약**: chore(proxy): middleware → proxy 파일 컨벤션 마이그레이션 (Next 16)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > Next 16 deprecation 경고 제거 — `middleware` 파일 컨벤션이 `proxy` 로 리네임됨([공식 안내](https://nextjs.org/docs/messages/middleware-to-proxy)). **순수 리네임**(동작·Edge 런타임·로직 무변경).
+  > 
+  > 빌드 경고:
+  > ```
+  > ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+  > ```
+  > 
+  > ## 변경
+  > | 변경 | 내용 |
+  > |---|---|
+  > | `middleware.ts` → `proxy.ts` | `git mv`, export 함수 `middleware` → `proxy` |
+  > | `config`(matcher)·import·로직 | **무변경** (Edge 런타임·비밀번호 게이트 로직 그대로) |
+  > | `__tests__/middleware.test.ts` → `proxy.test.ts` | import·11개 호출·describe·헤더 갱신 |
+  > 
+  > 비밀번호 게이트(`app-password-gate`, PR #48)의 모든 분기(게이트 비활성 통과·세션 검증·`/api/*` 401·페이지 `/login` 리다이렉트·OG 크롤러 예외·open-redirect 차단)는 그대로다.
+  > 
+  > ## 검증
+  > - `npm run build` exit 0 — **deprecation warning 사라짐 확인**(`middleware-to-proxy` grep 0), Proxy 라우트 정상 인식(`ƒ Proxy`)
+  > - `tsc --noEmit` 0 · `eslint` clean
+  > - 테스트 **189 그린** (proxy 게이트 테스트 16건 포함 — import/호출 갱신 후 전부 pass)
+  > 
+  > ## 참고
+  > - 코드모드(`npx @next/codemod middleware-to-proxy .`)도 있으나 변경이 사소해 수동 적용(파일+함수+테스트 리네임).
+  > - 실제 파일 import는 테스트 1곳뿐이라 영향 최소. 나머지 `middleware` 언급은 PRD/QA 문서의 역사적 서술이라 보존.
+  > 
+  > ## 다음 작업
+  > - (로드맵 보류 항목 정리) Phase 3 순서계획 Wave 1~3b + 본 마이그레이션으로 cleanup chore 대부분 소진. 잔존: W4 MACD 0패딩(워밍업으로 시각 차단, 지표 정확도 작업 시)·W3 캔들 wick 수동 시각검증.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (로드맵 보류 항목 정리) Phase 3 순서계획 Wave 1~3b + 본 마이그레이션으로 cleanup chore 대부분 소진. 잔존: W4 MACD 0패딩(워밍업으로 시각 차단, 지표 정확도 작업 시)·W3 캔들 wick 수동 시각검증.
