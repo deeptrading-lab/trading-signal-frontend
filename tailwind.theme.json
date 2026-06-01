@@ -102,9 +102,6 @@
         ],
         "input-suffix": [
           "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
-        ],
-        "table-cell-numeric": [
-          "Pretendard, -apple-system, BlinkMacSystemFont, Arial"
         ]
       },
       "fontSize": {
@@ -213,17 +210,17 @@
             "fontWeight": "400"
           }
         ],
-        "table-cell-numeric": [
-          "14px",
-          {
-            "fontWeight": "700"
-          }
-        ],
         "gauge-score": [
           "40px",
           {
             "letterSpacing": "-0.02em",
             "fontWeight": "800"
+          }
+        ],
+        "table-cell-numeric": [
+          "14px",
+          {
+            "fontWeight": "700"
           }
         ]
       },
