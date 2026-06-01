@@ -2762,3 +2762,34 @@
   - 배포 후 iOS·Android 설치형 PWA 콜드 로드 실기기 검증(로고 크기·표시시간).
   - (관찰 시) MIN_VISIBLE_MS(1.2s) 미세조정.
   - 별도 트랙: 안드로이드 상태바 1px 선 — 기기 진단(임시 theme-color 변경 + safe-area-inset 확인) 후 fix 결정.
+
+### 2026-06-01 — feat(chart): 캔들 툴팁 등락률 표시 + 차트 포커스 아웃라인 제거 (#70)
+
+- **slug**: `feat/chart-tooltip-changepct` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/70
+- **요약**: feat(chart): 캔들 툴팁 등락률 표시 + 차트 포커스 아웃라인 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > 종목 분석 가격 차트 호버/클릭 UX 개선 2건.
+  > 
+  > ## 1. 차트 클릭/탭 시 포커스 아웃라인 제거 (fix)
+  > - **증상**: 차트 내부를 클릭/탭하면 굵은 둥근 테두리가 생김 (PC·모바일 공통).
+  > - **원인**: recharts 가 a11y(accessibilityLayer)용으로 SVG 내부 zIndex 레이어 `<g>` 에 `tabindex` 부여 → 클릭 시 그 `<g>` 가 포커스를 받아 브라우저 기본 포커스 아웃라인이 그려짐.
+  > - **수정**: `app/globals.css` 에 `.recharts-wrapper :focus { outline: none }`(후손 포함) 추가. surface 가 아니라 내부 `<g>` 가 포커스 대상이고 zIndex 값(`_-100`/`_0`/`_100`…)이 가변이라 후손 선택자 사용. 전역 적용 → 앱 내 모든 recharts 차트 동일.
+  > 
+  > ## 2. 캔들 호버 툴팁에 등락률 표시 (feat)
+  > - 고/시/종/저 아래 **등락** 줄 추가: `등락 +14.25% (+1,710)` — 직전 봉 종가 대비(일봉=전일/주봉=전주/월봉=전월) 변동 퍼센트(부호·2자리) + 절대 변동(원).
+  > - 한국식 색: 상승 빨강(`signal-up`) / 하락 파랑 / 보합 기본. OHLC 와 얇은 구분선으로 분리.
+  > - 워밍업 데이터 덕에 첫 표시 봉도 직전값 존재 → 빈칸 없음.
+  > - 라인 모드 툴팁은 종가 단일 표시 유지(요청 범위 외).
+  > 
+  > ## 검증
+  > - `npm run typecheck` 통과
+  > - 사용자 로컬 확인: 포커스 테두리 제거 ✅ / 캔들 등락률 표시 ✅
+  > 
+  > ## 다음 작업
+  > - (선택) 라인 모드 툴팁 등락률 — 이번엔 범위 외. 필요 시 priceSeries 에 prevClose 실어 별도 처리.
+  > - 기존 차트 후속 백로그(W2 차트 색 hex→토큰화 등)는 [project_stock-chart-followups] 참조.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 라인 모드 툴팁 등락률 — 이번엔 범위 외. 필요 시 priceSeries 에 prevClose 실어 별도 처리.
+  - 기존 차트 후속 백로그(W2 차트 색 hex→토큰화 등)는 [project_stock-chart-followups] 참조.
