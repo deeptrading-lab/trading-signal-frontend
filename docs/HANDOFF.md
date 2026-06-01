@@ -3225,3 +3225,29 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (해소) 동일 패턴 다른 멀티콜 라우트는 이미 retry 보유(watchlist). 신규 멀티콜 KIS 라우트 추가 시 transient 재시도 의무화 — 컨벤션 메모.
   - 기존 후속(7일 누적·mock 수량 스케일·표면B 미니차트)은 별도 트랙 유지.
+
+### 2026-06-01 — fix(watchlist): 새로고침을 아이콘 버튼으로 (크기 착시 해소) (#91)
+
+- **slug**: `fix/watchlist-button-size` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/91
+- **요약**: fix(watchlist): 새로고침을 아이콘 버튼으로 (크기 착시 해소)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 관심종목 페이지 "새로고침" 버튼을 **텍스트 없는 아이콘 버튼**(`button-icon`, RefreshCw만)으로 교체.
+  > 
+  > ## 배경
+  > 새로고침(아웃라인 텍스트 버튼)이 "+ 종목 추가"(채움 버튼) 옆에서 **크기가 달라 보이는 착시**(아웃라인 vs 채움). 높이·폰트를 맞춰도 스타일 차이로 남는 시각 불일치를, 새로고침을 아이콘 버튼으로 바꿔 **매칭 고민 자체를 제거**(토스 패턴).
+  > 
+  > ## 변경
+  > - `components/watchlist/WatchlistPage.tsx`: 새로고침 `button-secondary`(텍스트+아이콘) → `button-icon`(아이콘만). `aria-label`로 접근성 유지(텍스트 없어도 스크린리더는 "새로고침"/"새로고침 중"). 스핀 애니메이션·`disabled` 유지. 반응형 분기 없어 PC·모바일 공통.
+  > 
+  > ## 검증
+  > - `tsc --noEmit` 0 · `eslint` clean · `npm run build` 0 · 신규 토큰 0(기존 `button-icon`)
+  > 
+  > ## 다음 작업
+  > - 시각 마이너 폴리시 — 후속 없음.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 시각 마이너 폴리시 — 후속 없음.
