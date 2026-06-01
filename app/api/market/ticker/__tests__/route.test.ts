@@ -28,9 +28,10 @@ vi.mock("@/lib/api/kis", async () => {
     ...actual,
     isKisConfigured: mocks.isKisConfigured,
     resolveKisEnv: mocks.resolveKisEnv,
-    // 국내 실호출 진입점 = fetchIndexPriceShared. 기존 fetchIndexPrice 단언과 호환되게 같은 mock.
+    // 국내/해외 모두 L2 store 경유 shared 진입점으로 호출된다(route.ts). 기존 mock 단언과
+    // 호환되게 shared 익스포트에 같은 mock 을 매핑한다.
     fetchIndexPriceShared: mocks.fetchIndexPrice,
-    fetchOverseasIndex: mocks.fetchOverseasIndex,
+    fetchOverseasIndexShared: mocks.fetchOverseasIndex,
   };
 });
 

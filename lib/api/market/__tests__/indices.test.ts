@@ -4,7 +4,7 @@
  * PRD `market-real-data` §3.4 — 어댑터 재배선 회귀 차단.
  *
  * 검증:
- *   1. 기본 codes 미입력 → 국내 3종(0001/1001/2001)으로 `/market/indices` 단일 호출.
+ *   1. 기본 codes 미입력 → 국내 2종+해외 2종(0001/1001/SPX/COMP)으로 `/market/indices` 단일 호출.
  *   2. codes 명시 입력 → 명시된 codes 로 호출.
  *   3. 빈 배열 입력 → HTTP 호출 없이 즉시 빈 배열 반환.
  *   4. `/api/stock/price` 반복 호출이 아니라 `/market/indices` 단일 BFF 호출.
@@ -41,17 +41,17 @@ describe("getMarketIndices", () => {
     });
   });
 
-  it("기본 codes 미입력 시 국내 3종(0001/1001/2001)으로 /market/indices 단일 호출", async () => {
-    expect(DEFAULT_INDEX_CODES).toEqual(["0001", "1001", "2001"]);
+  it("기본 codes 미입력 시 국내 2종+해외 2종(0001/1001/SPX/COMP)으로 /market/indices 단일 호출", async () => {
+    expect(DEFAULT_INDEX_CODES).toEqual(["0001", "1001", "SPX", "COMP"]);
     const result = await getMarketIndices();
     expect(mockGet).toHaveBeenCalledTimes(1);
     expect(mockGet).toHaveBeenCalledWith(
       "/market/indices",
       expect.objectContaining({
-        params: { codes: ["0001", "1001", "2001"] },
+        params: { codes: ["0001", "1001", "SPX", "COMP"] },
       }),
     );
-    expect(result.map((q) => q.code)).toEqual(["0001", "1001", "2001"]);
+    expect(result.map((q) => q.code)).toEqual(["0001", "1001", "SPX", "COMP"]);
   });
 
   it("codes 명시 입력 시 명시된 codes 로 호출", async () => {
