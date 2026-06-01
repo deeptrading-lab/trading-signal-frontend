@@ -27,6 +27,7 @@ import {
   readRecentSearches,
 } from "@/lib/utils/recentSearch";
 import { pickStockName } from "@/lib/utils/resolveStockName";
+import { useStockMetaStore } from "@/lib/store/stockMetaStore";
 import { cn } from "@/lib/utils/cn";
 
 const PLACEHOLDER = "종목명·코드로 검색… (예: 삼성전자, 005930)";
@@ -56,6 +57,8 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
   const { data: watchlistQuotes } = useQueryWatchlist(watchlistTickers, {
     enabled: open && keyword.length === 0,
   });
+  // 종목 메타 스토어 — 이전에 상세에서 본 실종목명을 목록 표시명 후보로 공유(이름 일원화).
+  const stockQuotes = useStockMetaStore((s) => s.quotes);
 
   // 최근 검색 — 드롭다운 열림(키워드 없음) 시 localStorage 에서 직접 계산(파생 state 제거).
   //   매 렌더 읽지만 localStorage 읽기는 저렴하고, 닫혀 있으면 빈 배열이라 SSR/초기 렌더와 일치한다.
@@ -95,7 +98,12 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
     const quote = watchlistQuotes?.find((q) => q.ticker === ticker);
     return {
       ticker,
-      name: pickStockName(ticker, [getName(ticker), quote?.name]) ?? ticker,
+      name:
+        pickStockName(ticker, [
+          getName(ticker),
+          stockQuotes[ticker]?.name,
+          quote?.name,
+        ]) ?? ticker,
       changePercent: quote?.changePercent,
       direction: quote?.direction,
     };
