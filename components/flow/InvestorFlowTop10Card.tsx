@@ -27,6 +27,7 @@ import { formatNetBuyAmount, formatNetBuyQty } from "@/lib/utils/formatNetBuy";
 import type { InvestorFlowRow } from "@/lib/types/flow/top10";
 import {
   FLOW_TOP10_ASOF_PREFIX,
+  FLOW_TOP10_COLUMN_EMPTY,
   FLOW_TOP10_EMPTY,
   FLOW_TOP10_ERROR,
   FLOW_TOP10_FOREIGN_LABEL,
@@ -136,11 +137,13 @@ function FlowColumn({
   rows,
   asOf,
   className,
+  onRetry,
 }: {
   label: string;
   rows: InvestorFlowRow[];
   asOf?: string;
   className?: string;
+  onRetry?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const meta = asOfLabel(asOf);
@@ -157,22 +160,34 @@ function FlowColumn({
         </span>
       </header>
 
-      <div role="list" className="flex flex-col">
-        {rows.map((row, idx) => {
-          const beyondTruncate = idx >= MOBILE_TRUNCATE;
-          return (
-            <div
-              key={row.ticker}
-              className={cn(
-                // 모바일: 더보기 접힘 상태면 Top5 초과 행 숨김. md 이상은 항상 노출.
-                beyondTruncate && !expanded && "hidden md:block",
-              )}
-            >
-              <FlowRow row={row} rank={idx + 1} />
-            </div>
-          );
-        })}
-      </div>
+      {rows.length === 0 ? (
+        /* 한 주체만 비었을 때 — 공백 대신 안내 + 다시 시도(카드 전체 refetch). */
+        <div className="flex flex-col items-start gap-sm py-md">
+          <p className="text-body-sm text-text-muted">{FLOW_TOP10_COLUMN_EMPTY}</p>
+          {onRetry ? (
+            <button type="button" className="button-secondary" onClick={onRetry}>
+              {FLOW_TOP10_RETRY}
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div role="list" className="flex flex-col">
+          {rows.map((row, idx) => {
+            const beyondTruncate = idx >= MOBILE_TRUNCATE;
+            return (
+              <div
+                key={row.ticker}
+                className={cn(
+                  // 모바일: 더보기 접힘 상태면 Top5 초과 행 숨김. md 이상은 항상 노출.
+                  beyondTruncate && !expanded && "hidden md:block",
+                )}
+              >
+                <FlowRow row={row} rank={idx + 1} />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 더보기 토글 — 모바일 전용(md 이상 숨김), 절단된 경우만 */}
       {truncated && (
@@ -244,12 +259,14 @@ export function InvestorFlowTop10Card() {
             label={FLOW_TOP10_FOREIGN_LABEL}
             rows={data.foreign}
             asOf={data.asOf}
+            onRetry={() => refetch()}
           />
           <FlowColumn
             label={FLOW_TOP10_INSTITUTION_LABEL}
             rows={data.institution}
             asOf={data.asOf}
             className="lg:border-l lg:border-border-line lg:pl-lg"
+            onRetry={() => refetch()}
           />
         </div>
       )}

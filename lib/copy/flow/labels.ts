@@ -30,3 +30,5 @@ export const FLOW_TOP10_EMPTY =
 export const FLOW_TOP10_ERROR =
   "수급 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
 export const FLOW_TOP10_RETRY = "다시 시도";
+/** 한 주체(외국인/기관)만 비었을 때 — 공백 대신 컬럼에 노출. */
+export const FLOW_TOP10_COLUMN_EMPTY = "아직 집계 전이거나 일시적으로 못 불러왔어요.";

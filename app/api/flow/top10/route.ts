@@ -33,8 +33,9 @@ import {
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
-const BFF_TIMEOUT_MS = 8_000; // 주체 2콜 순차 + 지연 여유.
+const BFF_TIMEOUT_MS = 8_000; // 주체 2콜(+재시도) 순차 + 지연 여유.
 const SUBJECT_DELAY_MS = 150; // 주체 간 짧은 지연 — EGW00201 회피(ticker route 정합).
+const RETRY_BACKOFF_MS = 250; // transient(EGW00201/네트워크) 1회 재시도 backoff.
 const TOP_N = 10;
 
 const FALLBACK_TIMEOUT_MESSAGE =
@@ -81,8 +82,12 @@ async function fetchTop10(): Promise<InvestorFlowTop10> {
 }
 
 /**
- * 단일 주체 호출. transport(네트워크/타임아웃)·rate-limit 등 transient 실패는 빈 배열로 degrade
- * (부분 성공 허용). 단 BFF 타임아웃 sentinel 은 상위로 전파해 mock-timeout 분기를 타게 한다.
+ * 단일 주체 호출.
+ * - **transient(EGW00201 rate-limit / 네트워크) → 짧은 backoff 후 1회 재시도.**
+ *   홈 진입 시 다른 KIS 위젯(지수·티커 등)과 동시 호출이 겹치면 주체 콜 하나가 초당 한도(EGW00201)에
+ *   걸려 빈 컬럼이 되던 문제를 방어(watchlist route 패턴 정합).
+ * - 재시도 후에도 실패하거나 비-transient 실패면 빈 배열로 degrade(부분 성공 허용).
+ * - BFF 타임아웃 sentinel 은 상위로 전파해 mock-timeout 분기를 타게 한다.
  */
 async function safeFetch(
   subject: "frgn" | "orgn",
@@ -93,8 +98,33 @@ async function safeFetch(
     if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
       throw error;
     }
+    if (isTransientError(error)) {
+      await delay(RETRY_BACKOFF_MS);
+      try {
+        return await fetchForeignInstitutionTotal(subject);
+      } catch (retryError) {
+        if (
+          retryError instanceof Error &&
+          retryError.message === BFF_TIMEOUT_SENTINEL
+        ) {
+          throw retryError;
+        }
+        return [];
+      }
+    }
     return [];
   }
+}
+
+/** 재시도 가능한 transient 실패 — 네트워크/타임아웃성 또는 KIS rate-limit(EGW00201). */
+function isTransientError(error: unknown): boolean {
+  if (!isApiError(error)) return false;
+  if (error.kind === "network") return true;
+  const detail = error.detail as { msg_cd?: unknown } | undefined;
+  const msgCd =
+    detail && typeof detail.msg_cd === "string" ? detail.msg_cd : undefined;
+  if (msgCd === "EGW00201") return true;
+  return typeof error.message === "string" && error.message.includes("초당 거래건수");
 }
 
 function mapErrorToResponse(error: unknown): NextResponse {
