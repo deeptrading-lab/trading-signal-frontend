@@ -16,6 +16,11 @@ import {
 } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockStockDaily } from "@/lib/mock/stock/daily";
+import {
+  withTimeout,
+  jsonWithDataSource,
+  BFF_TIMEOUT_SENTINEL,
+} from "@/lib/server/bffUtils";
 
 const FALLBACK_TIMEOUT_MESSAGE =
   "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
@@ -49,35 +54,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function jsonWithDataSource(
-  data: unknown,
-  source: "mock" | "kis" | "mock-timeout",
-  extraHeaders?: Record<string, string>,
-): NextResponse {
-  return NextResponse.json(data, {
-    status: 200,
-    headers: {
-      "X-Data-Source": source,
-      "Cache-Control": "no-store",
-      ...(extraHeaders ?? {}),
-    },
-  });
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("__BFF_TIMEOUT__")), ms);
-  });
-  try {
-    return (await Promise.race([promise, timeout])) as T;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 function mapErrorToResponse(error: unknown, ticker: string): NextResponse {
-  if (error instanceof Error && error.message === "__BFF_TIMEOUT__") {
+  if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
     return jsonWithDataSource(getMockStockDaily(ticker), "mock-timeout", {
       "X-Error": FALLBACK_TIMEOUT_MESSAGE,
     });

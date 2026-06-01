@@ -115,4 +115,5 @@ lib/validation/<domain>/  입력 사전 차단
 lib/mock/<domain>/     로컬/폴백용 목 데이터
 lib/query/             TanStack Query 인프라 (클라이언트 설정 등)
 lib/utils/             도메인 무관 헬퍼 (cn, formatMoney, formatPct 등)
+lib/server/            route handler(BFF) 서버 전용 유틸 (withTimeout·delay·jsonWithDataSource 등)
 ```
