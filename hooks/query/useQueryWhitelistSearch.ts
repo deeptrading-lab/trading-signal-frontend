@@ -5,7 +5,8 @@
  * FE Dev 재량으로 채택하고 후속 PRD 화면 설계 단계에서 디자이너와 재검토 가능.
  *
  * 채택값:
- *   - staleTime 30_000ms : 키 입력 흐름에서 짧은 시간 안의 동일 키워드는 캐시.
+ *   - staleTime 300_000ms : 화이트리스트는 사실상 정적(서버 seed)이라 5분 캐시.
+ *     동일 키워드 재검색·재진입 시 BFF 왕복 없이 캐시 히트 (symbols 검색 5m 정합).
  *   - retry 1            : 일시 네트워크 실패에 대한 1회 재시도.
  *   - refetchOnWindowFocus false : 사용자 타이핑 흐름과 무관한 포커스 변화로 다시 치지 않음.
  */
@@ -31,7 +32,7 @@ export function useQueryWhitelistSearch(
     queryKey: queryKeys.whitelist(q),
     queryFn: () => searchWhitelist(q),
     enabled: options?.enabled ?? true,
-    staleTime: 30_000,
+    staleTime: 300_000,
     retry: 1,
     refetchOnWindowFocus: false,
   });
