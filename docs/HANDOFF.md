@@ -3149,3 +3149,45 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (cleanup 소진) 남은 후속: 기능트랙(수급 페이지·내자산 실데이터 — PRD 필요) · 관측(X-Data-Source 분포 정량화) · 보류(W3/W4 차트 시각·wasLastCallDegraded 동시성).
+
+### 2026-06-01 — feat(flow): 수급 — 홈 외국인/기관 Top10 + 종목상세 수급 (2표면) (#89)
+
+- **slug**: `investor-flow` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/89
+- **요약**: feat(flow): 수급 — 홈 외국인/기관 Top10 + 종목상세 수급 (2표면)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 수급 기능 — **2표면 통합** 신규(독립 페이지·nav 없음). 외국인/기관 수급을 두 곳에서 보여준다.
+  > 
+  > | 표면 | 내용 | KIS API |
+  > |---|---|---|
+  > | **A. 홈 Top10 카드** | 외국인·기관 **당일 순매수 거래대금 상위 10**(시장 합산). 2열 병치(모바일 Top5+더보기), 금액(억원)+수량 병기, 등락률 부호색, 행 클릭→`/stock` prefetch, 기준시각 | `foreign_institution_total` (FHPTJ04400000) |
+  > | **B. 종목상세 수급 섹션** | per-stock **개인/외국인/기관 최근 15일** 순매수(합계 3칸+일자별 표, 순매수 빨강/순매도 파랑), collapsible | `inquire_investor` (FHKST01010900, 실전·모의 둘 다) |
+  > 
+  > ## 데이터·게이트
+  > - BFF 단일진입(`/api/flow/top10`·`/api/stock/investors`), KIS 호출은 `lib/api/kis/investor-flow.ts`+route handler에만 격리. 클라 직접 `fetch(` 0.
+  > - **mock-first**: 표면 A = prod 이중게이트(`isKisConfigured()&&resolveKisEnv()==="prod"` 아니면 `X-Data-Source: mock`). 표면 B = inquire_investor가 실전·모의 둘 다라 느슨 게이트.
+  > - `lib/server/bffUtils.ts`(withTimeout·jsonWithDataSource·delay) 재사용. queryKeys/queryConfig 단일위치 추가.
+  > 
+  > ## 라이브 검증 (QA, dev에 KIS prod 키)
+  > - 표면 A `/api/flow/top10` → `x-data-source: kis`, **외국인·기관 각 10행, 거래대금 내림차순 정렬 확인**(FHPTJ04400000 0000 합산 라이브 동작 = q1 해소).
+  > - 표면 B `/api/stock/investors?ticker=005930` → `x-data-source: kis`, 15일 절단, 음수(순매도) 부호 보존.
+  > - 게이트 분기(demo→A mock/B kis), 단위환산(백만원/100=억원), design:sync 멱등, 189 테스트, 빌드 0.
+  > 
+  > ## 범위·결정
+  > - **7일 누적 = 비목표**(본 TR들로 직접 불가 → 후속 트랙). 표면 A="당일", B="최근 N일" 라벨로 오인 방지.
+  > - 신규 디자인 토큰 0(기존 재사용, 24px=`w-6`·520px=`min-w-[520px]` one-off로 design:sync drift 회피).
+  > - 조회·분석 전용 스코프 정합(주문 무관).
+  > 
+  > ## 검증
+  > - `tsc --noEmit` 0 · `eslint` clean · `npm run build` 0(두 라우트 등록) · `vitest` 189 · `design:sync` 멱등 · 라이브 KIS 라운드트립 OK
+  > - 반응형 2뷰포트(A 2열↔모바일 세로/Top5, B 표 가로스크롤), collapsible 접힘 시 쿼리 미실행, 종목 행 키보드 접근
+  > - 비차단 nit 2: 표면 A `0.0억원` 미세표기, mock 수량 환산(사용자영향 0)
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Phase 4 (라이브 prod 검증)**: dev에선 라이브 동작 확인됨. Vercel prod 배포 후 장중 가집계 시각(외국인 09:30~/기관 10:00~)·주말·휴장 빈상태 실측. `FID_INPUT_ISCD=0000` 합산이 KOSPI+KOSDAQ 전체인지 종목 구성 확인.
+  - **7일 누적 수급**(후속 트랙): per-stock 풀 합산 or 당일 스냅샷 캐시 적립.
+  - nit: 표면 A `0.0억원`→`0억원` 표기, 표면 B 미니차트(현재 표).

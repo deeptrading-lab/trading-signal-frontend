@@ -588,6 +588,53 @@
            bg-accent-soft text-primary whitespace-nowrap shrink-0;
   }
 
+  /* ===== investor-flow — 수급 2표면 합성 토큰 =====
+   * DESIGN.md `investor-flow` §Components. 색·spacing 신규 토큰 0(signal-up/down·surface·
+   * text-muted·table-row-h·table-cell-px 등 기존 토큰 재사용). 순위배지 24px=`w-6`,
+   * 표 최소폭 520px=`min-w-[520px]`(일회성 one-off, 토큰 미신설 — design:sync drift 회피). */
+
+  /* 표면 A — 랭킹 행. table-cell-px 패딩 + table-row-h 높이 + hover surface-muted. */
+  .rank-row {
+    @apply bg-surface text-text-strong text-body-sm-strong min-h-table-row-h px-table-cell-px;
+  }
+  .rank-row-hover:hover,
+  .rank-row-hover:focus-visible {
+    @apply bg-surface-muted outline-none;
+  }
+  /* 순매수 거래대금(주 표시, mono-numeric tnum) — 부호색. */
+  .netbuy-amount-up {
+    @apply text-signal-up text-mono-numeric tabular-nums;
+  }
+  .netbuy-amount-down {
+    @apply text-signal-down text-mono-numeric tabular-nums;
+  }
+  /* 보합(0) — muted. 합성 클래스라 cn 사이즈 override 시에도 색이 twMerge 에 드롭되지 않는다. */
+  .netbuy-amount-flat {
+    @apply text-text-muted text-mono-numeric tabular-nums;
+  }
+  /* 순매수 수량 병기(보조 caption). */
+  .netbuy-qty {
+    @apply text-caption text-text-muted tabular-nums;
+  }
+
+  /* 표면 B — 일자별 표. */
+  .flow-table-header {
+    @apply bg-surface-muted text-text-muted text-label-sm px-table-cell-px;
+  }
+  .flow-table-row {
+    @apply bg-surface text-text-strong text-table-cell-numeric tabular-nums px-table-cell-px;
+  }
+  .flow-date-cell {
+    @apply text-caption text-text-muted px-table-cell-px;
+  }
+  /* 합계 요약 칸 — surface-muted × rounded-md, 라벨(label-sm 진한톤) + 합(부호색). */
+  .flow-summary-cell {
+    @apply bg-surface-muted rounded-md p-card-px-mobile;
+  }
+  .flow-summary-label {
+    @apply text-label-sm text-text-muted;
+  }
+
   /* ---------- PWA 인앱 스플래시 (components/pwa/SplashScreen.tsx) ----------
    * 앱 콜드 로드 직후 풀스크린 흰 화면 — **로고는 화면 정중앙, 워드마크는 하단(여백)**.
    * 네이티브 OS 스플래시(Android manifest 자동 생성 = 흰 배경 + 정중앙 그래프 글리프)와 **로고 위치·크기**를

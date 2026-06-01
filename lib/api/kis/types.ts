@@ -424,6 +424,77 @@ export type WatchlistQuote = {
 };
 
 /**
+ * 외국인·기관 매매상위(시장 전체 순매수 랭킹) 응답 1건
+ * (`GET /uapi/domestic-stock/v1/quotations/foreign-institution-total`).
+ *
+ * TR_ID = `FHPTJ04400000`. params `FID_COND_MRKT_DIV_CODE=V`/`FID_COND_SCR_DIV_CODE=16449`/
+ * `FID_INPUT_ISCD=0000`(전체 합산)/`FID_DIV_CLS_CODE=1`(금액 정렬)/`FID_RANK_SORT_CLS_CODE=0`
+ * (순매수 상위)/`FID_ETC_CLS_CODE=1`(외국인)|`2`(기관). output 은 랭킹 배열.
+ *
+ * ## ⚠️ 실전 전용 가능성 + `FID_INPUT_ISCD=0000` 합산동작 미검증 (PRD investor-flow §9 q1)
+ *
+ * 수급 랭킹은 실전(prod) 전용일 가능성이 높고, `0000` 전체 합산 동작도 prod spike 미검증이다.
+ * BFF route(`app/api/flow/top10`)가 `isKisConfigured()` AND `resolveKisEnv()==="prod"` 이중
+ * 게이트 + mock fallback 으로 안전 처리한다.
+ *
+ * 모든 값은 KIS 관례대로 문자열(숫자도 string). 음수(순매도)는 "-" 포함 문자열.
+ */
+export type KisForeignInstitutionTotalItem = {
+  /** 종목 코드(6자리). */
+  mksc_shrn_iscd?: string;
+  /** 종목명. */
+  hts_kor_isnm?: string;
+  /** 현재가. */
+  stck_prpr?: string;
+  /** 전일 대비 부호. "1" 상한 / "2" 상승 / "3" 보합 / "4" 하한 / "5" 하락. */
+  prdy_vrss_sign?: string;
+  /** 전일 대비. 부호 포함 문자열. */
+  prdy_vrss?: string;
+  /** 전일 대비율(%). */
+  prdy_ctrt?: string;
+  /** 외국인 순매수 수량. 음수=순매도. */
+  frgn_ntby_qty?: string;
+  /** 기관 순매수 수량. 음수=순매도. */
+  orgn_ntby_qty?: string;
+  /** 외국인 순매수 거래대금(백만원). 음수=순매도. */
+  frgn_ntby_tr_pbmn?: string;
+  /** 기관 순매수 거래대금(백만원). 음수=순매도. */
+  orgn_ntby_tr_pbmn?: string;
+};
+
+/**
+ * 종목별 투자자(개인·외국인·기관) 일자별 순매수 추이 응답 1건
+ * (`GET /uapi/domestic-stock/v1/quotations/inquire-investor`).
+ *
+ * TR_ID = `FHKST01010900`. ✅ 실전·모의 둘 다 지원(TR_ID 동일). params
+ * `FID_COND_MRKT_DIV_CODE=J`/`FID_INPUT_ISCD=<ticker>`. output 은 최근 N일 일자별 배열.
+ *
+ * 음수(문자열) = 순매도. 모든 값은 KIS 관례대로 문자열(숫자도 string).
+ */
+export type KisInquireInvestorItem = {
+  /** 영업일자(YYYYMMDD). */
+  stck_bsop_date?: string;
+  /** 종가. */
+  stck_clpr?: string;
+  /** 전일 대비. 부호 포함 문자열. */
+  prdy_vrss?: string;
+  /** 전일 대비 부호. "1" 상한 / "2" 상승 / "3" 보합 / "4" 하한 / "5" 하락. */
+  prdy_vrss_sign?: string;
+  /** 개인 순매수 수량. 음수=순매도. */
+  prsn_ntby_qty?: string;
+  /** 외국인 순매수 수량. 음수=순매도. */
+  frgn_ntby_qty?: string;
+  /** 기관 순매수 수량. 음수=순매도. */
+  orgn_ntby_qty?: string;
+  /** 개인 순매수 거래대금(백만원). 음수=순매도. */
+  prsn_ntby_tr_pbmn?: string;
+  /** 외국인 순매수 거래대금(백만원). 음수=순매도. */
+  frgn_ntby_tr_pbmn?: string;
+  /** 기관 순매수 거래대금(백만원). 음수=순매도. */
+  orgn_ntby_tr_pbmn?: string;
+};
+
+/**
  * 클라이언트 친화 지수 스키마 — BFF route 가 응답하는 형태.
  *
  * 화면 컴포넌트가 KIS snake_case 를 직접 다루지 않도록 `mappers.ts` 의 `mapIndexPrice` 가 변환.

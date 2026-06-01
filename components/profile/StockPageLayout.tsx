@@ -7,6 +7,7 @@ import { StockHeader } from "./StockHeader";
 import { StockDailyChart } from "./StockDailyChart";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
+import { StockInvestorTrend } from "./StockInvestorTrend";
 import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
@@ -52,13 +53,15 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     }, 180);
   }
 
-  // 모바일(`< md`): 순서 종목명·현재가 → 차트(축소 고정·확대 버튼 없음) → 기업개황 → 최근공시.
-  //   기업개황·최근공시는 접기/펼치기 카드(기본 접힘). 차트 확대는 데스크탑 전용이라 onExpand 미전달.
+  // 모바일(`< md`): 종목명·현재가 → 차트 → 수급(차트 바로 아래) → 기업개황 → 최근공시.
+  //   수급은 합계 3칸 항상 노출 + 일자별 표 기본 접힘(tableDefaultOpen=false). 기업개황·최근공시는
+  //   접기/펼치기 카드(기본 접힘). 차트 확대는 데스크탑 전용이라 onExpand 미전달.
   if (isMobile) {
     return (
       <div className="flex flex-col gap-lg">
         <StockHeader ticker={ticker} />
         <StockDailyChart ticker={ticker} {...chartControls} />
+        <StockInvestorTrend ticker={ticker} tableDefaultOpen={false} />
         <CompanyOverview ticker={ticker} collapsible />
         <DisclosureList ticker={ticker} count={5} collapsible />
       </div>
@@ -73,8 +76,8 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       }}
     >
       {chartExpanded ? (
-        /* 확대: 헤더 → 차트(풀너비) → 기업정보 */
-        <div className="flex flex-col gap-lg">
+        /* 확대: 헤더 → 차트(풀너비) → 기업정보. lg:pb-2xl — 수급 하단 여백(PC). */
+        <div className="flex flex-col gap-lg lg:pb-2xl">
           <StockHeader ticker={ticker} />
           <StockDailyChart
             ticker={ticker}
@@ -86,16 +89,22 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
             <CompanyOverview ticker={ticker} />
             <DisclosureList ticker={ticker} count={5} />
           </div>
+          <StockInvestorTrend ticker={ticker} />
         </div>
       ) : (
         /* 기본: 헤더(전폭) → 데스크탑 2-col (좌=기업정보, 우=차트) / 모바일 1-col 스택.
-         *   헤더를 그리드 밖 전폭으로 올려 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다. */
-        <div className="flex flex-col gap-lg">
+         *   헤더를 그리드 밖 전폭으로 올려 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다.
+         *   lg:pb-2xl — 수급 하단 여백(PC). */
+        <div className="flex flex-col gap-lg lg:pb-2xl">
           <StockHeader ticker={ticker} />
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-lg items-start">
+          {/* items-start 제거 → 좌측 컬럼이 우측 차트 높이에 stretch. 최근 공시 카드를
+           *   flex-1 grid 로 남는 높이를 채워 좌우 하단선을 맞춘다(빈 공간 제거). */}
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-lg">
             <div className="flex flex-col gap-lg">
               <CompanyOverview ticker={ticker} />
-              <DisclosureList ticker={ticker} count={5} />
+              <div className="flex-1 grid">
+                <DisclosureList ticker={ticker} count={5} />
+              </div>
             </div>
             <div className="lg:sticky lg:top-4">
               <StockDailyChart
@@ -105,6 +114,8 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
               />
             </div>
           </div>
+          {/* 수급 — 표가 넓어(min-w 520px) 2-col 밖 전폭으로 배치 */}
+          <StockInvestorTrend ticker={ticker} />
         </div>
       )}
     </div>

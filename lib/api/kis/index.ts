@@ -34,6 +34,11 @@ export { fetchIndexPrice } from "./index-price";
 export { fetchIndexPriceShared, fetchOverseasIndexShared, isSharedIndexCode } from "./index-store";
 export { fetchOverseasIndex } from "./overseas-index";
 export {
+  fetchForeignInstitutionTotal,
+  fetchInvestorTrend,
+  type ForeignInstitutionSubject,
+} from "./investor-flow";
+export {
   fetchIntstockMultprice,
   MULTPRICE_CHUNK_SIZE,
 } from "./intstock-multprice";
@@ -59,4 +64,6 @@ export type {
   KisOverseasDailyChartOutput1,
   KisOverseasDailyChartItem,
   KisOverseasDailyChartResponse,
+  KisForeignInstitutionTotalItem,
+  KisInquireInvestorItem,
 } from "./types";

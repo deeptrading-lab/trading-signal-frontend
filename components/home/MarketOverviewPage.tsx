@@ -22,6 +22,7 @@
 import { BarChart3 } from "lucide-react";
 import { StockSearchContainer } from "./StockSearchContainer";
 import { IndicesCardContainer } from "@/components/market/IndicesCardContainer";
+import { InvestorFlowTop10Card } from "@/components/flow/InvestorFlowTop10Card";
 import { FearGreedContainer } from "./FearGreedContainer";
 import { DisclosureFeedContainer } from "./DisclosureFeedContainer";
 
@@ -42,6 +43,9 @@ export function MarketOverviewPage() {
 
       {/* 주요 지수 — full-width */}
       <IndicesCardContainer />
+
+      {/* 외국인·기관 순매수 Top10 — 지수 바로 아래(발굴 동선, DESIGN R2) */}
+      <InvestorFlowTop10Card />
 
       {/* 공포·탐욕 + 최신 공시 — 2열 그리드 (모바일: 1열) */}
       <div className="grid grid-cols-1 gap-home-grid-gap lg:grid-cols-2">
