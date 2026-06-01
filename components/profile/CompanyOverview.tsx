@@ -14,6 +14,10 @@
  * 로딩 / 에러 / 빈 상태 카피 (§3.6).
  *
  * 'use client' — `useQueryDisclosureCompany` 호출 (TanStack Query).
+ *
+ * 지연 패칭 (api-optimization-roadmap P1): 데이터 훅을 `CompanyOverviewContent` 로 분리해
+ * `collapsible` 접힘 시에는 마운트되지 않게 한다 → 모바일 종목상세 진입 시 펼치기 전까지
+ * `/api/disclosure/company` 를 호출하지 않는다. 데스크탑(`collapsible=false`)은 즉시 패칭(기존).
  */
 
 "use client";
@@ -56,22 +60,30 @@ function marketLabel(market: CompanyProfile["market"]): string {
   }
 }
 
-export function CompanyOverview({ ticker, collapsible = false }: CompanyOverviewProps) {
+/** 데이터 패칭 + 본문 — 펼침(또는 비접힘) 시에만 마운트되어 `/api/disclosure/company` 를 호출한다. */
+function CompanyOverviewContent({ ticker }: { ticker: string }) {
   const { data, isLoading, isError, error } = useQueryDisclosureCompany(ticker);
 
-  const body = isLoading ? (
-    <p className="text-body-md text-text-muted" aria-busy="true">
-      {STOCK_DETAIL_LOADING}
-    </p>
-  ) : isError ? (
-    <div className="card-critical" role="alert">
-      <p className="text-body-strong">
-        {error?.message ?? STOCK_DETAIL_NOT_FOUND}
+  if (isLoading) {
+    return (
+      <p className="text-body-md text-text-muted" aria-busy="true">
+        {STOCK_DETAIL_LOADING}
       </p>
-    </div>
-  ) : !data ? (
-    <p className="text-body-md text-text-muted">{STOCK_DETAIL_NOT_FOUND}</p>
-  ) : (
+    );
+  }
+  if (isError) {
+    return (
+      <div className="card-critical" role="alert">
+        <p className="text-body-strong">
+          {error?.message ?? STOCK_DETAIL_NOT_FOUND}
+        </p>
+      </div>
+    );
+  }
+  if (!data) {
+    return <p className="text-body-md text-text-muted">{STOCK_DETAIL_NOT_FOUND}</p>;
+  }
+  return (
     <>
       <h3 className="text-h2 text-text-strong mb-md">{data.corpName}</h3>
       <dl className="grid grid-cols-1 md:grid-cols-2 gap-md">
@@ -104,11 +116,13 @@ export function CompanyOverview({ ticker, collapsible = false }: CompanyOverview
       </dl>
     </>
   );
+}
 
+export function CompanyOverview({ ticker, collapsible = false }: CompanyOverviewProps) {
   if (collapsible) {
     return (
       <CollapsibleCard title={STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}>
-        {body}
+        <CompanyOverviewContent ticker={ticker} />
       </CollapsibleCard>
     );
   }
@@ -120,7 +134,7 @@ export function CompanyOverview({ ticker, collapsible = false }: CompanyOverview
           {STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}
         </h2>
       </header>
-      {body}
+      <CompanyOverviewContent ticker={ticker} />
     </section>
   );
 }

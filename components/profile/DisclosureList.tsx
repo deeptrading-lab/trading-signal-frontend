@@ -9,6 +9,11 @@
  *   - rceptNo 클릭 시 DART 공시 원문 (DART 표준 URL) — 후속 PR 자연 확장.
  *
  * 로딩 / 에러 / 빈 상태 카피 (§3.6).
+ *
+ * 지연 패칭 (api-optimization-roadmap P1): 데이터 훅을 `DisclosureListContent` 로 분리해
+ * `collapsible` 접힘 시에는 컨텐츠가 마운트되지 않게 한다(`CollapsibleCard` 가 `{open && children}`).
+ * → 모바일 종목상세 진입 시 접힌 카드는 펼치기 전까지 `/api/disclosure/list` 를 호출하지 않는다.
+ * 데스크탑(`collapsible=false`)은 컨텐츠를 항상 렌더 → 기존대로 즉시 패칭.
  */
 
 "use client";
@@ -31,29 +36,39 @@ export interface DisclosureListProps {
   collapsible?: boolean;
 }
 
-export function DisclosureList({
+/** 데이터 패칭 + 본문 — 펼침(또는 비접힘) 시에만 마운트되어 `/api/disclosure/list` 를 호출한다. */
+function DisclosureListContent({
   ticker,
-  count = 5,
-  collapsible = false,
-}: DisclosureListProps) {
+  count,
+}: {
+  ticker: string;
+  count: number;
+}) {
   const { data, isLoading, isError, error } = useQueryDisclosureList(
     ticker,
     count,
   );
 
-  const body = isLoading ? (
-    <p className="text-body-md text-text-muted" aria-busy="true">
-      {STOCK_DETAIL_LOADING}
-    </p>
-  ) : isError ? (
-    <div className="card-critical" role="alert">
-      <p className="text-body-strong">
-        {error?.message ?? STOCK_DETAIL_NOT_FOUND}
+  if (isLoading) {
+    return (
+      <p className="text-body-md text-text-muted" aria-busy="true">
+        {STOCK_DETAIL_LOADING}
       </p>
-    </div>
-  ) : !data || data.length === 0 ? (
-    <p className="text-body-md text-text-muted">{DISCLOSURE_LIST_EMPTY}</p>
-  ) : (
+    );
+  }
+  if (isError) {
+    return (
+      <div className="card-critical" role="alert">
+        <p className="text-body-strong">
+          {error?.message ?? STOCK_DETAIL_NOT_FOUND}
+        </p>
+      </div>
+    );
+  }
+  if (!data || data.length === 0) {
+    return <p className="text-body-md text-text-muted">{DISCLOSURE_LIST_EMPTY}</p>;
+  }
+  return (
     <ul className="flex flex-col">
       {data.map((item, idx) => (
         <li
@@ -84,11 +99,17 @@ export function DisclosureList({
       ))}
     </ul>
   );
+}
 
+export function DisclosureList({
+  ticker,
+  count = 5,
+  collapsible = false,
+}: DisclosureListProps) {
   if (collapsible) {
     return (
       <CollapsibleCard title={STOCK_DETAIL_DISCLOSURE_LIST_TITLE}>
-        {body}
+        <DisclosureListContent ticker={ticker} count={count} />
       </CollapsibleCard>
     );
   }
@@ -100,7 +121,7 @@ export function DisclosureList({
           {STOCK_DETAIL_DISCLOSURE_LIST_TITLE}
         </h2>
       </header>
-      {body}
+      <DisclosureListContent ticker={ticker} count={count} />
     </section>
   );
 }
