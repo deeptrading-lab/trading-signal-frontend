@@ -2816,3 +2816,23 @@
   > - 스택 다음: `refactor/watchlist-modal-lazy`(PR 1.1). 본 PR 머지 후 base 자동 재타깃.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 스택 다음: `refactor/watchlist-modal-lazy`(PR 1.1). 본 PR 머지 후 base 자동 재타깃.
+
+### 2026-06-01 — perf(watchlist): 추가 모달 지연 로드 (next/dynamic) (#77)
+
+- **slug**: `refactor/watchlist-modal-lazy` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/77
+- **요약**: perf(watchlist): 추가 모달 지연 로드 (next/dynamic)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `WatchlistAddModal` 을 `next/dynamic` + `modalOpen` 게이트로 전환 — 첫 '+ 종목 추가' 클릭 시에만 로드. 동작 보존(UX 변화 0).
+  > 
+  > (이전 #72 는 베이스(#71 브랜치) 삭제로 자동 closed → 본 PR 로 대체. main 에 rebase 완료, 단건 커밋.)
+  > 
+  > ## 검증
+  > - 합본 QA PASS + 리뷰 APPROVE: docs/qa/stock-meta-store.md. vitest/typecheck/lint/build 그린.
+  > 
+  > ## 다음 작업
+  > - 스택 다음: pickStockName(#73).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 스택 다음: pickStockName(#73).
