@@ -71,7 +71,7 @@ describe("mapStockPrice", () => {
   it("snake_case + 문자열 숫자를 camelCase + number 로 변환", () => {
     const kis: KisInquirePriceOutput = {
       hts_kor_isnm: "삼성전자",
-      bstp_kor_isnm: "전기·전자", // 종목명 아님 — 회귀 차단 검증.
+      bstp_kor_isnm: "전기·전자", // 종목명엔 안 쓰임(name=삼성전자), 업종 sector 로만 매핑.
       stck_prpr: "71500",
       prdy_vrss: "500",
       prdy_ctrt: "0.70",
@@ -93,7 +93,38 @@ describe("mapStockPrice", () => {
       open: 71_000,
       high: 71_900,
       low: 70_800,
+      sector: "전기·전자",
     });
+  });
+
+  it("bstp_kor_isnm → sector (업종, 종목명과 분리)", () => {
+    const kis: KisInquirePriceOutput = {
+      hts_kor_isnm: "셀트리온",
+      bstp_kor_isnm: "제약",
+      stck_prpr: "180000",
+      prdy_vrss: "0",
+      prdy_ctrt: "0",
+      prdy_vrss_sign: "3",
+      acml_vol: "0",
+    };
+    const result = mapStockPrice(kis, "068270");
+    expect(result.sector).toBe("제약");
+    expect(result.name).toBe("셀트리온"); // 종목명은 hts_kor_isnm, sector 와 절대 안 섞임.
+  });
+
+  it("bstp_kor_isnm 누락/공백 → sector undefined", () => {
+    const kis = {
+      hts_kor_isnm: "종목",
+      stck_prpr: "1000",
+      prdy_vrss: "0",
+      prdy_ctrt: "0",
+      prdy_vrss_sign: "3",
+      acml_vol: "0",
+    } as KisInquirePriceOutput;
+    expect(mapStockPrice(kis, "000000").sector).toBeUndefined();
+    expect(
+      mapStockPrice({ ...kis, bstp_kor_isnm: "  " }, "000000").sector,
+    ).toBeUndefined();
   });
 
   it("음수 change + 하락 방향", () => {

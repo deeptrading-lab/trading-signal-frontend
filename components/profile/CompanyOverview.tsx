@@ -38,6 +38,7 @@ import {
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { useQueryDisclosureCompany } from "@/hooks/disclosure/useQueryDisclosureCompany";
+import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import type { CompanyProfile } from "@/lib/api/dart/types";
 
@@ -60,9 +61,27 @@ function marketLabel(market: CompanyProfile["market"]): string {
   }
 }
 
+/**
+ * 업종 라벨 합성 — 큰 업종(KRX 섹터, price.sector "전기·전자") · 상세 업종(KIS 표준산업분류,
+ * company.industry "통신 및 방송 장비 제조업")를 " · " 로 병기. 둘 중 하나만 있으면 그것만,
+ * 동일 문자열이면 중복 제거. 둘 다 없으면 undefined → OverviewRow 가 "-" 표시.
+ */
+function composeIndustry(
+  sector: string | undefined,
+  industry: string | undefined,
+): string | undefined {
+  const parts = [sector, industry]
+    .map((p) => p?.trim())
+    .filter((p): p is string => Boolean(p));
+  const unique = [...new Set(parts)];
+  return unique.length > 0 ? unique.join(" · ") : undefined;
+}
+
 /** 데이터 패칭 + 본문 — 펼침(또는 비접힘) 시에만 마운트되어 `/api/disclosure/company` 를 호출한다. */
 function CompanyOverviewContent({ ticker }: { ticker: string }) {
   const { data, isLoading, isError, error } = useQueryDisclosureCompany(ticker);
+  // 큰 업종(섹터)은 이미 화면(StockHeader)이 패칭한 price 쿼리에서 재사용 — 캐시 공유라 추가 KIS 콜 0.
+  const { data: price } = useQueryStockPrice(ticker);
 
   if (isLoading) {
     return (
@@ -96,7 +115,10 @@ function CompanyOverviewContent({ ticker }: { ticker: string }) {
           label={COMPANY_LABEL_ESTABLISHED}
           value={data.establishedDate}
         />
-        <OverviewRow label={COMPANY_LABEL_INDUSTRY} value={data.industry} />
+        <OverviewRow
+          label={COMPANY_LABEL_INDUSTRY}
+          value={composeIndustry(price?.sector, data.industry)}
+        />
         <OverviewRow
           label={COMPANY_LABEL_HOMEPAGE}
           value={

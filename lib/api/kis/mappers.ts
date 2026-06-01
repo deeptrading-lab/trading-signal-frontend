@@ -93,6 +93,8 @@ export function mapStockPrice(
     open: output.stck_oprc ? toNumber(output.stck_oprc) : undefined,
     high: output.stck_hgpr ? toNumber(output.stck_hgpr) : undefined,
     low: output.stck_lwpr ? toNumber(output.stck_lwpr) : undefined,
+    // ⚠️ 업종명(섹터) — 종목명 아님. extractStockName 과 혼동 금지. 기업개황 업종 라벨 보강용.
+    sector: output.bstp_kor_isnm?.trim() || undefined,
   };
 }
 
@@ -140,6 +142,7 @@ export function mapStockInfo(
     isTradeStopped: output.tr_stop_yn?.trim() === "Y",
     isAdminItem: output.admn_item_yn?.trim() === "Y",
     isKospi200: output.kospi200_item_yn?.trim() === "Y",
+    industryName: output.std_idst_clsf_cd_name?.trim() || undefined,
   };
 }
 

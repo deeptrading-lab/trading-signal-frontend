@@ -86,6 +86,25 @@ describe("mapStockInfo — 거래정지/관리/코스피200 boolean", () => {
   });
 });
 
+describe("mapStockInfo — 업종명(industryName 상세, 기업개황 보강)", () => {
+  it("std_idst_clsf_cd_name → industryName (상세)", () => {
+    expect(
+      mapStockInfo(
+        { ...base, std_idst_clsf_cd_name: "반도체 제조업" },
+        "005930",
+      ).industryName,
+    ).toBe("반도체 제조업");
+  });
+
+  it("industryName 빈 값/공백/미존재 → undefined", () => {
+    expect(
+      mapStockInfo({ ...base, std_idst_clsf_cd_name: "  " }, "005930")
+        .industryName,
+    ).toBeUndefined();
+    expect(mapStockInfo(base, "005930").industryName).toBeUndefined();
+  });
+});
+
 describe("mapStockInfo — 업종명 미사용 (AC-2 #4)", () => {
   it("[#4] bstp_kor_isnm 류 업종명 필드는 타입에 존재하지 않아 종목명에 절대 끼어들지 않음", () => {
     // KisSearchStockInfoOutput 에 bstp_kor_isnm 이 없으므로 추가 필드를 넣어도 무시된다.
