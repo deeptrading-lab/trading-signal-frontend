@@ -25,6 +25,7 @@ import { formatPct } from "@/lib/utils/formatPct";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { readRecentSearches } from "@/lib/utils/recentSearch";
+import { pickStockName } from "@/lib/utils/resolveStockName";
 import {
   STOCK_DETAIL_LOADING,
   STOCK_DETAIL_NOT_FOUND,
@@ -37,15 +38,6 @@ export interface StockHeaderProps {
 export function StockHeader({ ticker }: StockHeaderProps) {
   const { data, isLoading, isError, error } = useQueryStockPrice(ticker);
   const { getName } = useWatchlistTickers();
-
-  // 이름 우선순위: watchlist store → 최근 검색 → API 응답(ticker 폴백 가능성 있음)
-  function resolveDisplayName(apiName: string): string {
-    const fromWatchlist = getName(ticker);
-    if (fromWatchlist) return fromWatchlist;
-    const fromRecent = readRecentSearches().find((e) => e.ticker === ticker)?.name;
-    if (fromRecent) return fromRecent;
-    return apiName !== ticker ? apiName : ticker;
-  }
 
   if (isLoading) {
     return (
@@ -73,7 +65,13 @@ export function StockHeader({ ticker }: StockHeaderProps) {
     );
   }
 
-  const displayName = resolveDisplayName(data.name);
+  // 이름 우선순위: watchlist store → 최근 검색 → API 응답 → ticker 폴백.
+  const displayName =
+    pickStockName(ticker, [
+      getName(ticker),
+      readRecentSearches().find((e) => e.ticker === ticker)?.name,
+      data.name,
+    ]) ?? ticker;
   const direction = data.direction;
   const isUp = direction === "up";
   const isFlat = direction === "flat";

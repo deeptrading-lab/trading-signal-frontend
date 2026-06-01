@@ -25,6 +25,7 @@ import dynamic from "next/dynamic";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { getSymbolName } from "@/lib/api/kis/search";
+import { pickStockName } from "@/lib/utils/resolveStockName";
 import { WatchlistPage } from "./WatchlistPage";
 import { WatchlistTable } from "./WatchlistTable";
 import {
@@ -51,9 +52,9 @@ export function WatchlistContainer() {
     useWatchlistTickers();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // 디그레이드 행 표시명 — 추가 시점 store name 우선, 없으면 시드 name fallback.
+  // 디그레이드 행 표시명 — 추가 시점 store name 우선, 없으면 시드 name. 둘 다 없으면 null(행은 ticker 만 표시).
   const resolveName = useCallback(
-    (ticker: string) => getName(ticker) ?? getSymbolName(ticker),
+    (ticker: string) => pickStockName(ticker, [getName(ticker), getSymbolName(ticker)]),
     [getName],
   );
 

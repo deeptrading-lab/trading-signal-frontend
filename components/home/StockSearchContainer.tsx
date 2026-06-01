@@ -27,6 +27,7 @@ import {
   readRecentSearches,
   type RecentSearchEntry,
 } from "@/lib/utils/recentSearch";
+import { pickStockName } from "@/lib/utils/resolveStockName";
 import { cn } from "@/lib/utils/cn";
 
 const PLACEHOLDER = "종목명·코드로 검색… (예: 삼성전자, 005930)";
@@ -98,7 +99,7 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
     const quote = watchlistQuotes?.find((q) => q.ticker === ticker);
     return {
       ticker,
-      name: getName(ticker) ?? quote?.name ?? ticker,
+      name: pickStockName(ticker, [getName(ticker), quote?.name]) ?? ticker,
       changePercent: quote?.changePercent,
       direction: quote?.direction,
     };
