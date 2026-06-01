@@ -26,6 +26,7 @@ import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { pickStockName } from "@/lib/utils/resolveStockName";
+import { useStockMetaStore } from "@/lib/store/stockMetaStore";
 import { WatchlistPage } from "./WatchlistPage";
 import { WatchlistTable } from "./WatchlistTable";
 import {
@@ -51,11 +52,19 @@ export function WatchlistContainer() {
   const { tickers, addTicker, removeTicker, hasTicker, getName } =
     useWatchlistTickers();
   const [modalOpen, setModalOpen] = useState(false);
+  // 종목 메타 스토어 — 상세에서 본 실종목명을 디그레이드 행 표시명 후보로 공유(이름 일원화).
+  const stockQuotes = useStockMetaStore((s) => s.quotes);
 
-  // 디그레이드 행 표시명 — 추가 시점 store name 우선, 없으면 시드 name. 둘 다 없으면 null(행은 ticker 만 표시).
+  // 디그레이드 행 표시명 — watchlist store(추가 시점) → 메타 스토어(상세에서 본 실명) → 시드 name.
+  //   모두 없으면 null(행은 ticker 만 표시).
   const resolveName = useCallback(
-    (ticker: string) => pickStockName(ticker, [getName(ticker), getSymbolName(ticker)]),
-    [getName],
+    (ticker: string) =>
+      pickStockName(ticker, [
+        getName(ticker),
+        stockQuotes[ticker]?.name,
+        getSymbolName(ticker),
+      ]),
+    [getName, stockQuotes],
   );
 
   const query = useQueryWatchlist(tickers);
