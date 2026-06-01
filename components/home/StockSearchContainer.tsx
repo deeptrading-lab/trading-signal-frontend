@@ -140,7 +140,7 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          className="input !pl-10 !h-14 !text-base !border-0 !shadow-none focus:!shadow-none !outline-none !bg-white w-full !rounded-md"
+          className="input-search"
           placeholder={PLACEHOLDER}
           aria-label={SEARCH_ARIA}
           aria-haspopup="listbox"

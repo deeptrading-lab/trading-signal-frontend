@@ -25,6 +25,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
+import { useListboxNav } from "@/hooks/utils/useListboxNav";
 import {
   WATCHLIST_MODAL_TITLE,
   WATCHLIST_MODAL_CLOSE,
@@ -55,7 +56,6 @@ export function WatchlistAddModal({
 }: WatchlistAddModalProps) {
   const [keyword, setKeyword] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [activeIdx, setActiveIdx] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // 포털 컨테이너(body 직속) — 배경 inert 가 모달 자신을 가리지 않도록 트리 밖으로 분리.
@@ -87,22 +87,36 @@ export function WatchlistAddModal({
 
   const isSearching = trimmed.length > 0;
 
+  // 선택 가능한(미추가) 검색 결과만 키보드 내비 대상.
+  const navItems = useMemo(
+    () => results.filter((item) => !hasTicker(item.ticker)),
+    [results, hasTicker],
+  );
+
+  // ↑/↓ 포커스(#7) — clamp(wrap 없음). 인덱스 수학·범위 보정은 useListboxNav.
+  const {
+    focusIndex: activeIdx,
+    reset: resetActive,
+    moveDown,
+    moveUp,
+  } = useListboxNav(navItems.length, { wrap: false });
+
   useEffect(() => {
     if (!open) {
       setKeyword("");
       setDebounced("");
-      setActiveIdx(-1);
+      resetActive();
       return;
     }
     // 모달 오픈 시 입력칸 포커스.
     const id = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(id);
-  }, [open]);
+  }, [open, resetActive]);
 
   // 결과/입력 변경 시 활성 항목 리셋(#7).
   useEffect(() => {
-    setActiveIdx(-1);
-  }, [trimmed]);
+    resetActive();
+  }, [trimmed, resetActive]);
 
   // 닫을 때 트리거(직전 활성 요소)로 포커스 복귀(#1).
   useEffect(() => {
@@ -136,12 +150,6 @@ export function WatchlistAddModal({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
-
-  // 선택 가능한(미추가) 검색 결과만 키보드 내비 대상.
-  const navItems = useMemo(
-    () => results.filter((item) => !hasTicker(item.ticker)),
-    [results, hasTicker],
-  );
 
   if (!open || !portalEl) return null;
 
@@ -178,10 +186,10 @@ export function WatchlistAddModal({
     if (navItems.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIdx((i) => Math.min(i + 1, navItems.length - 1));
+      moveDown();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIdx((i) => Math.max(i - 1, 0));
+      moveUp();
     } else if (e.key === "Enter" && activeIdx >= 0) {
       e.preventDefault();
       const item = navItems[activeIdx];
