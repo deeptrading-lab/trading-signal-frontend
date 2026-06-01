@@ -42,7 +42,6 @@
 "use client";
 
 import {
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -53,6 +52,7 @@ import {
 import type { WhitelistItem } from "@/lib/types/workbench/whitelist";
 import { useTickerSearch } from "@/hooks/workbench/useTickerSearch";
 import { useOutsideClick } from "@/hooks/utils/useOutsideClick";
+import { useListboxNav } from "@/hooks/utils/useListboxNav";
 import { cn } from "@/lib/utils/cn";
 
 type Props = {
@@ -63,8 +63,6 @@ type Props = {
 export function SearchPanel({ selectedTicker, onSelect }: Props) {
   const [query, setQuery] = useState(selectedTicker?.ticker ?? "");
   const [open, setOpen] = useState(false);
-  // v6: 초기 -1 (옵션 focus 없음). ↓ 누르면 0, ↑ 누르면 마지막. DESIGN.md v6 Keyboard 표.
-  const [focusIndex, setFocusIndex] = useState(-1);
   const inputId = useId();
   const listId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -77,12 +75,12 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     enabled: isSearching || query.trim() === "",
   });
 
-  useEffect(() => {
-    // 결과가 줄어들면 focusIndex 가 범위 밖이 될 수 있다. -1 (focus 없음) 은 보존.
-    if (focusIndex >= results.length) {
-      setFocusIndex(results.length === 0 ? -1 : results.length - 1);
-    }
-  }, [results.length, focusIndex]);
+  // v6: 초기 -1(옵션 focus 없음). ↓ 0, ↑ 마지막. wrap-around (DESIGN.md v6 Keyboard 표).
+  // count 축소 시 범위 보정은 훅 내부 처리.
+  const { focusIndex, setFocusIndex, reset, moveDown, moveUp } = useListboxNav(
+    results.length,
+    { wrap: true },
+  );
 
   // v5 R3 — dropdown 외부 mousedown / touchstart 자동 닫힘.
   useOutsideClick(wrapperRef, () => setOpen(false), { enabled: open });
@@ -96,25 +94,22 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     onSelect(item);
     setQuery(item.ticker);
     setOpen(false);
-    setFocusIndex(-1);
+    reset();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    // v6 키보드 navigation — wrap-around (DESIGN.md v6 Keyboard 표).
+    // v6 키보드 navigation — wrap-around (DESIGN.md v6 Keyboard 표). 인덱스 수학은 useListboxNav.
     if (event.key === "ArrowDown") {
       event.preventDefault();
       if (!open) setOpen(true);
-      const total = results.length;
-      if (total === 0) return;
-      setFocusIndex((idx) => (idx + 1) % total);
+      if (results.length === 0) return;
+      moveDown();
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      const total = results.length;
-      if (total === 0) return;
-      // 초기 -1 또는 0 에서 ↑ → 마지막. 그 외는 한 칸 위로.
-      setFocusIndex((idx) => (idx <= 0 ? total - 1 : idx - 1));
+      if (results.length === 0) return;
+      moveUp();
       return;
     }
     if (event.key === "Enter") {
@@ -128,7 +123,7 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
     if (event.key === "Escape") {
       event.preventDefault();
       setOpen(false);
-      setFocusIndex(-1);
+      reset();
       // ESC 후에도 검색 input 에 focus 유지 — v6 Keyboard 표.
       inputRef.current?.focus();
     }
@@ -169,7 +164,7 @@ export function SearchPanel({ selectedTicker, onSelect }: Props) {
             setQuery(e.target.value);
             setOpen(true);
             // v6: 타이핑 시 옵션 focus 없음 상태로 리셋 — Enter 의도하지 않은 선택 방지.
-            setFocusIndex(-1);
+            reset();
             if (selectedTicker && e.target.value.trim() !== selectedTicker.ticker) {
               onSelect(null);
             }
