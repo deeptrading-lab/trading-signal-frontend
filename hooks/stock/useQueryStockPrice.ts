@@ -44,6 +44,8 @@ export function useQueryStockPrice(
     retry: 1,
     refetchOnWindowFocus: false,
     // 스토어에 last-known 시세가 있으면 즉시 페인트(잠정값). 없으면 undefined → 기존 로딩 동작.
+    // 의도된 "시점 스냅샷": 최초 무데이터 시 1회 산출되고 스토어 변화에 라이브 바인딩되지 않는다.
+    //   실제 KIS 응답이 1라운드트립 내 교체하므로 stale 위험 없음(PRD §4.3).
     placeholderData: () => {
       const q = useStockMetaStore.getState().quotes[ticker];
       if (!q) return undefined;
