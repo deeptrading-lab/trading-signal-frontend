@@ -3251,3 +3251,40 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 시각 마이너 폴리시 — 후속 없음.
+
+### 2026-06-01 — feat(stock): 기업개황 업종에 큰 업종·상세 업종 병기 (#92)
+
+- **slug**: `company-industry-name` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/92
+- **요약**: feat(stock): 기업개황 업종에 큰 업종·상세 업종 병기
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 종목 분석 기업개황의 **업종** 행에 "무엇을 하는 회사인지" 맥락을 강화한다. 큰 업종(KRX 섹터) · 상세 업종(표준산업분류)을 병기한다.
+  > 
+  > | 종목 | 업종 행 표시 |
+  > |---|---|
+  > | 삼성전자 | 전기·전자 · 통신 및 방송 장비 제조업 |
+  > | SK하이닉스 | 전기·전자 · 반도체 제조업 |
+  > | 카카오 | IT 서비스 · 자료처리, 호스팅, 포털… |
+  > | 현대차 | 운송장비·부품 · 자동차용 엔진 및 자동차 제조업 |
+  > | 셀트리온 | 제약 · 기초 의약물질 및 생물학적 제제 제조업 |
+  > 
+  > ## 변경
+  > - **큰 업종(섹터)**: KIS `bstp_kor_isnm`(inquire-price)을 `StockPrice.sector`로 노출. `mapStockPrice` 매핑.
+  > - **상세 업종**: KIS `std_idst_clsf_cd_name`(search-stock-info) override — 기존 동작 유지.
+  > - `CompanyOverview`가 `composeIndustry(price.sector, company.industry)`로 ` · ` 병기. 동일값/누락 graceful.
+  > - 단위 테스트 보강(sector·industryName 추출·공백→undefined).
+  > 
+  > ## 설계 판단
+  > 1. **broad 소스 = `bstp_kor_isnm`** — search-stock-info `idx_bztp_mcls`는 일부 종목에서 지수 멤버십(`KOGI지배구조지수`·`증권`)을 반환해 불안정. 라이브 프로브로 확인 후 폐기.
+  > 2. **추가 KIS 콜 0** — 섹터는 StockHeader가 이미 패칭한 price 쿼리 캐시 재사용(클라이언트 병기). 서버 중복 inquire-price 회피(#90 EGW00201 스로틀 정합).
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 193/193 · `npm run build` 성공
+  > - 라이브(prod 키): 위 표 5종목 실응답 확인(`X-Data-Source: kis`)
+  > 
+  > ## 다음 작업
+  > - 자유 텍스트 기업 설명(DART 사업보고서 파싱)은 별도 트랙(중량 작업)으로 분리.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 자유 텍스트 기업 설명(DART 사업보고서 파싱)은 별도 트랙(중량 작업)으로 분리.
