@@ -2793,3 +2793,26 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) 라인 모드 툴팁 등락률 — 이번엔 범위 외. 필요 시 priceSeries 에 prevClose 실어 별도 처리.
   - 기존 차트 후속 백로그(W2 차트 색 hex→토큰화 등)는 [project_stock-chart-followups] 참조.
+
+### 2026-06-01 — test: 스테일 테스트 6개 현행화 — 그린 복구 (#71)
+
+- **slug**: `fix/stale-market-tests` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/71
+- **요약**: test: 스테일 테스트 6개 현행화 — 그린 복구
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 최근 PR로 스테일된 테스트 6개를 현행 동작에 맞게 수정(코드 변경 0). main 의 `npm run test` 가 빨강이던 것을 그린으로 복구. **스택의 베이스 PR.**
+  > 
+  > ## 변경
+  > - **market/ticker(3):** 해외지수 진입점이 `fetchOverseasIndex`→`fetchOverseasIndexShared`(L2 store)로 바뀐 것에 mock 매핑 교정.
+  > - **market/indices·lib indices(2):** `DEFAULT_INDEX_CODES` 2001→SPX/COMP 변경 기대값 현행화.
+  > - **middleware(1):** #58 이후 `/_next/static·image` 는 matcher 제외(함수 미실행) → 함수 직접호출 케이스 제거 + matcher 설정 단언으로 의도 보존.
+  > 
+  > ## 검증
+  > - vitest **181 passed (28 files)**, typecheck/lint 통과.
+  > 
+  > ## 다음 작업
+  > - 스택 다음: `refactor/watchlist-modal-lazy`(PR 1.1). 본 PR 머지 후 base 자동 재타깃.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 스택 다음: `refactor/watchlist-modal-lazy`(PR 1.1). 본 PR 머지 후 base 자동 재타깃.

@@ -75,7 +75,8 @@ describe("GET /api/market/indices", () => {
     expect(body.map((q: { code: string }) => q.code)).toEqual([
       "0001",
       "1001",
-      "2001",
+      "SPX",
+      "COMP",
     ]);
   });
 

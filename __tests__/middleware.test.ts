@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "../middleware";
+import { middleware, config } from "../middleware";
 import { signSession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 
@@ -96,11 +96,18 @@ describe("middleware (app password gate)", () => {
       ["/icon"],
       ["/favicon.ico"],
       ["/fonts/pretendard/Pretendard-Bold.subset.woff2"],
-      ["/_next/static/chunks/main.js"],
     ])("%s 는 쿠키 없이도 통과(401·리다이렉트 X)", async (path) => {
       const res = await middleware(makeRequest(path));
       expect(res.status).toBe(200);
       expect(res.headers.get("location")).toBeNull();
+    });
+
+    // `/_next/static`·`/_next/image` 는 matcher 단계에서 제외 → 미들웨어 함수 자체가 실행되지
+    // 않는다(성능, 빌드 자산). 따라서 함수 직접 호출이 아니라 matcher 설정으로 공개를 보장한다.
+    it("[matcher] _next/static·_next/image 는 matcher 에서 제외(함수 미실행)", () => {
+      const m = Array.isArray(config.matcher) ? config.matcher[0] : config.matcher;
+      expect(m).toContain("_next/static");
+      expect(m).toContain("_next/image");
     });
 
     it("[루프 가드] 미인증 + /login → 다시 /login 리다이렉트하지 않음", async () => {
