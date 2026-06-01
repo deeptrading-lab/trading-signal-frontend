@@ -37,6 +37,26 @@ export const queryConfig = {
       staleTime: 5 * MINUTE,
       gcTime: 30 * MINUTE,
     },
+    /**
+     * 종목별 개인/외국인/기관 일자별 순매수 추이(투자자 표면 B) — 일별 데이터, 당일치는 장 종료
+     * 후 반영. 실시간성 낮아 staleTime 5min(PRD `investor-flow` §4.B). 단일 진실 원천.
+     */
+    investors: {
+      staleTime: 5 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
+  },
+  /**
+   * 수급(외국인/기관 순매수) 도메인 TTL.
+   *
+   * - flow.top10 — 시장 전체 당일 순매수 Top10(표면 A). 당일 가집계가 하루 4~5회라 초단위
+   *   폴링 무의미 → staleTime 60s + 재진입 갱신(PRD `investor-flow` §4.A). 단일 진실 원천.
+   */
+  flow: {
+    top10: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   disclosure: {
     /** 기업개황 — 거의 변하지 않음 (대표자명·설립일·업종 등). */

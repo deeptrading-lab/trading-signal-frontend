@@ -7,6 +7,7 @@ import { StockHeader } from "./StockHeader";
 import { StockDailyChart } from "./StockDailyChart";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
+import { StockInvestorTrend } from "./StockInvestorTrend";
 import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
@@ -61,6 +62,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
         <StockDailyChart ticker={ticker} {...chartControls} />
         <CompanyOverview ticker={ticker} collapsible />
         <DisclosureList ticker={ticker} count={5} collapsible />
+        <StockInvestorTrend ticker={ticker} collapsible />
       </div>
     );
   }
@@ -86,6 +88,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
             <CompanyOverview ticker={ticker} />
             <DisclosureList ticker={ticker} count={5} />
           </div>
+          <StockInvestorTrend ticker={ticker} />
         </div>
       ) : (
         /* 기본: 헤더(전폭) → 데스크탑 2-col (좌=기업정보, 우=차트) / 모바일 1-col 스택.
@@ -105,6 +108,8 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
               />
             </div>
           </div>
+          {/* 수급 — 표가 넓어(min-w 520px) 2-col 밖 전폭으로 배치 */}
+          <StockInvestorTrend ticker={ticker} />
         </div>
       )}
     </div>
