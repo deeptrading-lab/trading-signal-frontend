@@ -2947,3 +2947,45 @@
   - **Wave 2b**: `StockSearchContainer` 정리 — W1 `!` 오버라이드 7개 → `.input-search` variant, `useTabPanel` 추출, SearchDropdown 채택.
   - **Wave 3a/3b**: `StockDailyChart`(558줄) 구조 분리(behavior-preserving) → 차트 토큰화 W2/W5(ux-designer 위임, visual QA).
   - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md), 계획 파일 `wise-giggling-sunrise.md`.
+
+### 2026-06-01 — refactor(search): useListboxNav 훅 추출 + W1 input-search variant (Wave 2) (#84)
+
+- **slug**: `search-dropdown-extract` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/84
+- **요약**: refactor(search): useListboxNav 훅 추출 + W1 input-search variant (Wave 2)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > Phase 3 순서계획 **Wave 2** — 검색 드롭다운 정리. 단, 코드 정독 후 **계획의 "공유 SearchDropdown 컴포넌트" 전제를 재조정**했다(아래 설계 변경 참조).
+  > 
+  > | 항목 | 내용 |
+  > |---|---|
+  > | **useListboxNav 훅 추출** | `SearchPanel`(워크벤치)·`WatchlistAddModal`이 손수 구현하던 ↑/↓ 포커스 인덱스 로직을 `hooks/utils/useListboxNav.ts`로 단일화. wrap-around/clamp 파라미터화 |
+  > | **W1 input-search variant** | `StockSearchContainer`의 `input !pl-10 !h-14 !text-base ...` 7개 `!` 강제 오버라이드 → `components.css`의 `.input-search` 합성 variant (`bg-white`→`bg-surface` 토큰화 포함) |
+  > 
+  > ## 설계 변경 (계획 대비 — 정직한 재조정)
+  > 계획은 "두 소비자가 검색결과 리스트를 중복 구현 → 공유 `<SearchDropdown>` 추출"이었으나, **3개 소비자**(SearchPanel·WatchlistAddModal·StockSearchContainer)를 정독한 결과 공유 컴포넌트 전제가 약했다:
+  > 
+  > | | 옵션 요소 | 키보드 네비 | hover |
+  > |---|---|---|---|
+  > | SearchPanel | `<div role=option>` | **wrap-around** | setFocusIndex |
+  > | WatchlistAddModal | `<button>` (disabled) | **clamp** | 없음 |
+  > | StockSearchContainer | `<button>` (prefetch) | **없음** | prefetch |
+  > 
+  > - 진짜 공유물인 `search-result-item(-focus)` 스타일은 **이미 CSS 합성 클래스로 DRY**.
+  > - 요소 타입·키보드 의미·hover가 셋 다 달라 단일 컴포넌트로 묶으면 **과추상**(props로 차이 흡수).
+  > - 실질 중복은 **키보드 네비 로직**(SearchPanel·WatchlistAddModal 2곳) → 이것만 훅으로 추출하는 게 정답.
+  > - `useTabPanel` 추출·SearchDropdown 어댑션은 가치 대비 위험으로 드롭. (사용자 승인 — "useListboxNav 훅 + W1")
+  > 
+  > ## 동작 parity (behavior-preserving)
+  > - **SearchPanel**: ArrowDown `(i+1)%count` / ArrowUp `i<=0?count-1:i-1` — 훅 `wrap:true`와 **수학적으로 동일**. open-on-arrowdown·Enter open 가드·ESC focus 유지 모두 호출 측 유지.
+  > - **WatchlistAddModal**: ArrowDown `min(i+1,count-1)` / ArrowUp `max(i-1,0)` — 훅 `wrap:false`와 **동일**. raw-add Enter 우선·activeIdx>=0 가드 유지. (훅의 count 축소 클램프가 방어적으로 추가 — 종목 추가로 navItems 축소 시 out-of-range 방지, 정상 흐름 무영향)
+  > 
+  > ## 검증
+  > - `npx tsc --noEmit` exit 0
+  > - `eslint` 변경 파일 clean
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Wave 3a**: `StockDailyChart`(558줄) 구조 분리 — CandleBar/CandleTooltip/ChartShell/포맷터/useChartData를 책임별 파일로(behavior-preserving). 동작·시각 무변경 → tsc/build + 시각 비교 QA.
+  - **Wave 3b**: 차트 토큰화 W2(ux-designer 위임, `chart-*` 토큰 11개 + 기존 5색 매핑) + W5 px 토큰 + W3 캔들 검증. 시각 변경 → 수동 2뷰포트 QA.
+  - 상세 SSOT: [api-optimization-roadmap.md](docs/references/api-optimization-roadmap.md), 계획 `wise-giggling-sunrise.md`.
