@@ -608,6 +608,10 @@
   .netbuy-amount-down {
     @apply text-signal-down text-mono-numeric tabular-nums;
   }
+  /* 보합(0) — muted. 합성 클래스라 cn 사이즈 override 시에도 색이 twMerge 에 드롭되지 않는다. */
+  .netbuy-amount-flat {
+    @apply text-text-muted text-mono-numeric tabular-nums;
+  }
   /* 순매수 수량 병기(보조 caption). */
   .netbuy-qty {
     @apply text-caption text-text-muted tabular-nums;

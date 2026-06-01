@@ -44,11 +44,11 @@ import {
 /** 화면 노출 일수 절단(과밀 방지, DESIGN R4). API 가 더 주면 보관만. */
 const VISIBLE_DAYS = 15;
 
-/** 순매수 부호 → 금액 텍스트 색 토큰. */
+/** 순매수 부호 → 금액 텍스트 색 토큰(전부 합성 클래스 — cn 사이즈 override 시 색 보존). */
 function amountClass(value: number): string {
   if (value > 0) return "netbuy-amount-up";
   if (value < 0) return "netbuy-amount-down";
-  return "text-text-muted text-table-cell-numeric tabular-nums";
+  return "netbuy-amount-flat";
 }
 
 /** 종가 전일대비 부호("1"/"2" 상승, "4"/"5" 하락) → 색. */
@@ -71,7 +71,7 @@ function SummaryCell({
   return (
     <div className="flow-summary-cell flex flex-col gap-xs">
       <span className="flow-summary-label">{label}</span>
-      {/* 금액 = 카드 hero. amountClass(15px) 뒤에 text-body-strong(16px)을 둬 사이즈가 이기게 한다. */}
+      {/* 금액 = 카드 hero. netbuy-amount-* 합성 클래스(색) + text-body-strong(16px) — 색 보존 + 사이즈 상향. */}
       <span className={cn(amountClass(amount), "text-body-strong")}>
         {formatNetBuyAmount(amount)}
       </span>
