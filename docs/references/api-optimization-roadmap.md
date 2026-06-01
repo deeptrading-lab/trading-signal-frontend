@@ -12,7 +12,7 @@
 1. **자동 폴링 0건.** `refetchInterval`/`setInterval` 기반 주기 리패칭이 어디에도 없다. "사용자가 새로고침 안 해도 몇 초/몇 분마다 호출"은 **현재 일어나지 않는다.** 리패칭은 ① stale 상태 mount/remount ② 수동 새로고침 버튼뿐. → 따라서 실질적 호출 증폭 벡터는 **타이머가 아니라 "페이지 이동/리마운트"** 다.
 2. **목록 → 상세 진입 시 시세 재호출.** `WatchlistRow`·검색 드롭다운(`watchlist.list` 키)이 이미 `price·changePercent·name`을 들고 있으나, 상세의 `StockHeader`는 `stock.price` 키로 **새로 호출**한다(캐시 키가 달라 미스). 방금 본 값을 버리고 KIS를 또 친다.
 3. **이름(ticker→name) 해석 3중 중복.** `StockHeader`·`StockSearchContainer`·`WatchlistRow`가 각자 `watchlist store → 최근검색 → API` 폴백을 구현. 공유 출처가 없다.
-4. **정적 데이터가 BFF 왕복.** 종목 검색은 in-repo `symbols.json`(완전 정적)인데 매 키워드마다 `/api/stock/search` 라운드트립.
+4. **정적 데이터가 BFF 왕복.** 종목 검색은 in-repo `symbols.json`(완전 정적)인데 매 키워드마다 `/api/stock/search` 라운드트립. → ✅해소(#80): `useQueryStockSearch` 가 `searchSymbols` 동적 import 로 클라 직검색(시드 lazy 청크, 홈 초기 번들 미포함). BFF 라우트는 유지하나 UI 미호출.
 5. **최다 호출 페이지 = `/stock/[ticker]`.** 진입 시 price+company+list+chart 4콜 + 헤더 티커. (company·chart는 1d 캐시라 재방문 시 저렴, price·list는 짧음.)
 6. **국내·해외 지수 이중 BFF 페치.** 헤더(`/api/market/ticker`)와 홈(`/api/market/indices`)이 0001·1001·SPX·COMP를 중복 요청. 단, 서버 `index-store`(L2)가 **KIS 실호출은 1회로 합치므로** rate-limit 위험은 낮다(클라 BFF 호출만 2회).
 7. **접힌 카드도 진입 즉시 호출(#63).** 모바일 종목상세의 `CompanyOverview`·`DisclosureList`는 접기카드(기본 접힘)지만, 데이터 훅이 컴포넌트 상단에서 무조건 실행돼 **접혀 있어도 company/list를 즉시 호출**한다(지연 로딩 아님). 접힘은 표시만 숨긴다.
@@ -80,7 +80,7 @@
 | 우선 | 항목 | 문제 | 해결 | 기대효과 | 규모 |
 |---|---|---|---|---|---|
 | **P0** ✅완료(#76) | zustand 도입 + `useStockMetaStore` | 목록→상세 시세 재호출 · 이름 3중 해석 | 패칭 응답을 store에 upsert, 상세는 즉시 페인트 + 백그라운드 재검증 | KIS `inquire-price` 호출 절감, 체감 즉시 렌더, 이름 단일 경로 | 중 |
-| **P1** | symbols 검색 클라이언트화 | 정적 seed가 매 검색 BFF 왕복 | 번들 직검색 또는 장기 캐시 헤더 | 검색 API 호출 0~최소화 | 소~중 |
+| **P1** ✅완료(#80) | symbols 검색 클라이언트화 | 정적 seed가 매 검색 BFF 왕복 | `useQueryStockSearch` queryFn 이 `searchSymbols` 동적 import → 클라 직검색(시드 lazy 청크, 홈 초기 번들 미포함) | 검색 BFF 왕복 0, 즉시 결과 | 소~중 |
 | **P1** | 의도 기반 prefetch | 상세 진입 첫 페치 콜드 | 검색결과/관심행 hover·click 시 `queryClient.prefetchQuery`(price/company) | 상세 첫 렌더 지연↓ | 소 |
 | **P1** ✅완료(#79) | 접힌 카드 쿼리 지연(#63) | 모바일 접기카드가 접혀 있어도 company/list 즉시 호출 | 데이터 훅을 `*Content` 로 분리 → 접힘 시 미마운트(펼침 전까지 미호출) | 모바일 진입 4콜→2콜(price+chart), 나머지 온디맨드 | 소 |
 | **P2** | whitelist staleTime 정합 | 정적인데 30s | 5m로 상향 | 미세 | 1줄 |

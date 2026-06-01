@@ -37,7 +37,7 @@
 
 | 자식 컴포넌트 | 훅 | 엔드포인트 | TTL | 활성 조건(enabled) | 분류 |
 |---|---|---|---|---|---|
-| `StockSearchContainer` | `useQueryStockSearch` | `GET /api/stock/search?q=` | 5m / 30m | `keyword.length > 0` | **정적(seed)** |
+| `StockSearchContainer` | `useQueryStockSearch` | **클라이언트 검색**(`searchSymbols`, 동적 import) — 네트워크 0 (#80) | 5m / 30m | `keyword.length > 0` | **정적(seed)** |
 | `StockSearchContainer` | `useQueryWatchlist` ×2 (관심·최근검색 탭) | `GET /api/watchlist?tickers=` | 30s / 5m | 드롭다운 열림 & 키워드 없음 | 동적 |
 | `IndicesCardContainer` | `useQueryIndices(DEFAULT_INDEX_CODES)` | `GET /api/market/indices?codes=0001,1001,SPX,COMP` | 30s / 5m | `codes.length > 0` | 동적 |
 | `FearGreedContainer` | `useQueryIndices(DEFAULT_INDEX_CODES)` | (동일 쿼리) | 30s / 5m | 동일 | 동적 |
@@ -109,7 +109,7 @@
 - `/dashboard` → `/profile`, `/market` → `/`
 
 ### 기타 엔드포인트 / 비-데이터 라우트 (참고 — 맵 대상 외)
-- **현재 페이지 미소비 BFF:** `GET /api/stock/daily`(`useQueryStockDaily` 훅은 존재하나 어떤 페이지도 렌더 안 함 — 상세 차트는 `chart` 사용) · `POST /api/auth/logout`(UI 미연결).
+- **현재 페이지 미소비 BFF:** `GET /api/stock/daily`(`useQueryStockDaily` 훅은 존재하나 어떤 페이지도 렌더 안 함 — 상세 차트는 `chart` 사용) · `POST /api/auth/logout`(UI 미연결) · `GET /api/stock/search`(#80 이후 종목 검색은 **클라이언트 사이드**로 전환 — 라우트는 유지하나 UI 미호출, 향후 제거 후보).
 - **메타/PWA 라우트(#54~#57):** `app/opengraph-image.tsx` · `app/icon.tsx` · `app/apple-icon.tsx` · `app/manifest.ts` — 소셜 공유·홈화면 설치용 정적 자산 라우트. 데이터 패칭 API 아님.
 - **404:** `app/(main)/[...not_found]/page.tsx`.
 - **인증 미들웨어(#58):** 공개 경로 정확 매칭으로 게이트 우회 표면 제거(`/login`·메타 라우트만 공개). 데이터 호출엔 영향 없음.
