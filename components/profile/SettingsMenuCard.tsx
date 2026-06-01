@@ -16,7 +16,7 @@
  */
 
 import { Bell, CreditCard, LogOut, Moon, Shield } from "lucide-react";
-import { cn } from "@/lib/utils/cn";
+import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import type {
   ProfileMenuItem,
   ProfileMenuKey,
@@ -67,7 +67,8 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
               <div className="my-sm h-px bg-border-line" />
             </li>
             <li>
-              <MenuButton item={danger} />
+              {/* danger = 로그아웃 — 동작이 필요해 client 컴포넌트로 분리(onClick → 쿠키삭제 → /login). */}
+              <LogoutMenuButton />
             </li>
           </>
         ) : null}
@@ -76,27 +77,16 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
   );
 }
 
+// default(비위험) 설정 항목 전용 — danger(로그아웃)는 LogoutMenuButton 이 담당.
 function MenuButton({ item }: { item: ProfileMenuItem }) {
   const Icon = ICON_MAP[item.iconName];
-  const isDanger = item.variant === "danger";
   return (
     <button
       type="button"
-      className={cn(
-        "w-full flex items-center gap-md p-md rounded-md text-left transition-colors hover:bg-surface-muted",
-        isDanger && "text-critical hover:bg-critical-soft",
-      )}
+      className="w-full flex items-center gap-md p-md rounded-md text-left transition-colors hover:bg-surface-muted"
     >
-      <Icon
-        className={cn("h-5 w-5", isDanger ? "text-critical" : "text-text-muted")}
-        aria-hidden="true"
-      />
-      <span
-        className={cn(
-          "text-body-strong",
-          isDanger ? "text-critical" : "text-text-strong",
-        )}
-      >
+      <Icon className="h-5 w-5 text-text-muted" aria-hidden="true" />
+      <span className="text-body-strong text-text-strong">
         {MENU_LABEL[item.key]}
       </span>
     </button>

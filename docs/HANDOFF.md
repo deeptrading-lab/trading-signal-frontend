@@ -3112,3 +3112,40 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (로드맵 보류 항목 정리) Phase 3 순서계획 Wave 1~3b + 본 마이그레이션으로 cleanup chore 대부분 소진. 잔존: W4 MACD 0패딩(워밍업으로 시각 차단, 지표 정확도 작업 시)·W3 캔들 wick 수동 시각검증.
+
+### 2026-06-01 — fix(cleanup): logout 버튼 동작 연결 + watchlist 이중재시도 제거 (#88)
+
+- **slug**: `cleanup-logout-retry` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/88
+- **요약**: fix(cleanup): logout 버튼 동작 연결 + watchlist 이중재시도 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > cleanup 배치 — 사용자 지목 5건 중 **실제 작업 2건**(나머지 3건은 조사 결과 작업 불필요).
+  > 
+  > ### 1) logout 버튼 동작 연결
+  > `/profile` 설정 메뉴의 로그아웃이 **죽은 버튼**(onClick 0건, 클릭 무동작)이었다. `/api/auth/logout` 라우트(쿠키 삭제)는 이미 있었으나 호출처가 0이었다.
+  > - `lib/api/auth/logout.ts` — 클라 어댑터(httpClient → BFF, login.ts 정합)
+  > - `hooks/auth/useLogout.ts` — 도메인 훅(쿠키삭제 → `/login` full navigation, `useLogin` 성공이동과 정합; 실패해도 게이트가 재검증하므로 로그인 화면으로)
+  > - `components/profile/LogoutMenuButton.tsx` — client 컴포넌트(서버인 SettingsMenuCard가 onClick 못 달아 danger 항목만 분리). 마크업·토큰은 기존 danger MenuButton과 동일(**시각 무변경**), onClick·pending만 추가
+  > - `SettingsMenuCard`(서버 유지) danger 항목 → `LogoutMenuButton` 교체
+  > 
+  > ### 2) watchlist 이중 재시도 제거
+  > `useQueryWatchlist` `retry:1` → `0`. BFF(`/api/watchlist`)가 이미 transient(EGW00201/네트워크) **1회 재시도 + mock graceful degrade**를 하므로, RQ가 또 재시도하면 실패 시 KIS 일괄콜이 **최대 4회로 증폭**된다. BFF degrade 결과를 그대로 수용.
+  > 
+  > ## 조사 결과 — 작업 불필요로 판명된 3건 (정직 보고)
+  > - **ASSET_TYPE_* 데드코드**: 코드베이스에 **이미 0건**(과거 제거됨, 메모가 stale). 작업 없음.
+  > - **"profile/[ticker] retry 중첩"**: 메모가 **부정확**했음. 종목상세는 disclosure `retry:0`·price/chart엔 BFF withRetry 없음 → 이중재시도 없음. 실제 대상은 **watchlist**였고 위 2)로 처리.
+  > - **wasLastCallDegraded per-call화**: `UpstashKisStore`의 공유 인스턴스 필드 → per-call 정밀화는 **store 인터페이스+token.ts+테스트를 건드리는 동시성 리팩터**라 비차단 보류(메모도 "선택/비차단").
+  > - **.input-search 토큰**: `h-14`/`pl-10`/`text-base`는 **표준 Tailwind 스케일 클래스**(arbitrary `[56px]` 아님) → 이미 px 직타 룰 준수. 일회용 토큰 신설은 블로트라 유지.
+  > 
+  > ## 검증
+  > - `npx tsc --noEmit` 0 · `eslint` 변경/신규 clean · `npm run build` 0 · 테스트 **189**
+  > - ⚠️ logout은 인터랙션이라 자동 테스트 없음(레포에 컴포넌트 테스트 0) → **수동 QA 필요**: `/profile` 로그아웃 클릭 → 쿠키 삭제 → `/login` 이동(게이트 활성 시). watchlist retry는 코드/콜 흐름 정적 검증.
+  > 
+  > ## 다음 작업
+  > - (cleanup 소진) 남은 후속: 기능트랙(수급 페이지·내자산 실데이터 — PRD 필요) · 관측(X-Data-Source 분포 정량화) · 보류(W3/W4 차트 시각·wasLastCallDegraded 동시성).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (cleanup 소진) 남은 후속: 기능트랙(수급 페이지·내자산 실데이터 — PRD 필요) · 관측(X-Data-Source 분포 정량화) · 보류(W3/W4 차트 시각·wasLastCallDegraded 동시성).
