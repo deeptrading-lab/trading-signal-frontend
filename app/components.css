@@ -524,7 +524,16 @@
   }
   .nav-tooltip::after {
     content: "";
-    @apply absolute left-1/2 -bottom-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-text-strong;
+    @apply absolute -bottom-1 h-2 w-2 rotate-45 bg-text-strong;
+  }
+  /* Sidebar: 말풍선이 트리거 중앙 정렬 → 화살표도 박스 중앙. */
+  .nav-tooltip-sidebar::after {
+    @apply left-1/2 -translate-x-1/2;
+  }
+  /* BottomNav: 말풍선이 오른쪽 끝 정렬(`right-1`)이라 박스 중앙 화살표는 AI 분석 왼쪽을 가리킨다.
+   * 화살표를 박스 우측으로 옮겨 마지막 슬롯(AI 분석) 아이콘 중심(≈ 화면 우측 39px)을 가리키게 한다. */
+  .nav-tooltip-bottom::after {
+    @apply right-8;
   }
 
   /* fng-band-* 배지 — 공포·탐욕 구간 라벨 배지. DESIGN.md v9 `fng-band-*` 합성 토큰 정합.
