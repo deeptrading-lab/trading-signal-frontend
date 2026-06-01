@@ -19,6 +19,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Search, Star } from "lucide-react";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
+import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -46,6 +47,7 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
   const [activeTab, setActiveTab] = useState<Tab>("recent");
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
 
   // 검색 결과 — keyword 있을 때만 활성
   const { data: searchResults, isLoading: searchLoading } = useQueryStockSearch(keyword, {
@@ -87,6 +89,7 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
   const showDropdown = showSearchResults || showTabs;
 
   function handleSelect(ticker: string, name: string) {
+    prefetch(ticker); // 확정 의도 — 라우팅 직전 상세 선반입.
     addRecentSearch({ ticker, name });
     setKeyword("");
     setOpen(false);
@@ -169,6 +172,10 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
                     role="option"
                     aria-selected={false}
                     onClick={() => handleSelect(item.ticker, item.name)}
+                    onMouseEnter={() => onIntent(item.ticker)}
+                    onMouseLeave={cancelIntent}
+                    onFocus={() => onIntent(item.ticker)}
+                    onBlur={cancelIntent}
                   >
                     <span className="text-body-sm-strong text-text-strong">
                       {item.name}
