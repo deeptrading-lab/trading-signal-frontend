@@ -38,6 +38,7 @@ import { useQueryStockChart, type ChartPeriod } from "@/hooks/stock/useQueryStoc
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
+import { formatPct } from "@/lib/utils/formatPct";
 import { calcMACD, calcRSI } from "@/lib/utils/technicalIndicators";
 import {
   STOCK_DETAIL_LOADING,
@@ -159,13 +160,22 @@ function CandleBar(props: {
 
 // 캔들 툴팁
 function CandleTooltip({ active, payload, label }: {
-  active?: boolean; payload?: { payload: { open: number; close: number; high: number; low: number } }[]; label?: string;
+  active?: boolean;
+  payload?: { payload: {
+    open: number; close: number; high: number; low: number;
+    change: number | null; changePct: number | null;
+  } }[];
+  label?: string;
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d) return null;
   const isUp = d.close >= d.open;
   const color = isUp ? C.stroke : C.macdLine;
+  // 등락률 색 — 한국식(상승 빨강 / 하락 파랑 / 보합 기본). 직전 봉 종가 대비.
+  const chgColor = d.changePct == null || d.changePct === 0
+    ? C.tooltipText
+    : d.changePct > 0 ? C.stroke : C.macdLine;
   return (
     <div style={{ ...tooltipStyle, padding: "8px 12px", minWidth: 130 }}>
       <p style={{ color: C.axisTick, marginBottom: 6, fontSize: 11 }}>{label}</p>
@@ -175,6 +185,15 @@ function CandleTooltip({ active, payload, label }: {
           <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatNumber(d[k])} 원</span>
         </p>
       ))}
+      {d.changePct != null && (
+        <p style={{ color: chgColor, fontSize: 12, lineHeight: "1.6", marginTop: 4, paddingTop: 4, borderTop: "1px solid rgba(15,20,25,0.06)" }}>
+          등락&nbsp;
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {formatPct(d.changePct, { digits: 2, sign: true })}
+            {d.change != null && ` (${d.change > 0 ? "+" : ""}${formatNumber(d.change, { digits: 0 })})`}
+          </span>
+        </p>
+      )}
     </div>
   );
 }
@@ -237,15 +256,24 @@ export function StockDailyChart({
 
     // 3) 전체 시리즈 빌드 후 보기 구간으로 슬라이스(지표는 워밍업 덕에 첫 봉부터 값이 있음).
     const fullPrice = sorted.map((c) => ({ date: c.date.slice(5), price: c.close }));
-    const fullCandle = sorted.map((c) => ({
-      date: c.date.slice(5),
-      wickRange: [c.low, c.high] as [number, number],
-      open: c.open,
-      close: c.close,
-      high: c.high,
-      low: c.low,
-      isUp: c.close >= c.open,
-    }));
+    const fullCandle = sorted.map((c, i) => {
+      // 등락률 — 직전 봉 종가 대비(일봉=전일/주봉=전주/월봉=전월). 워밍업 구간 덕에 첫 표시 봉도 직전값 존재.
+      const prevClose = i > 0 ? sorted[i - 1].close : null;
+      const change = prevClose !== null ? c.close - prevClose : null;
+      const changePct =
+        prevClose !== null && prevClose !== 0 ? ((c.close - prevClose) / prevClose) * 100 : null;
+      return {
+        date: c.date.slice(5),
+        wickRange: [c.low, c.high] as [number, number],
+        open: c.open,
+        close: c.close,
+        high: c.high,
+        low: c.low,
+        isUp: c.close >= c.open,
+        change,
+        changePct,
+      };
+    });
     const fullVol = sorted.map((c) => ({
       date: c.date.slice(5),
       volume: c.volume,

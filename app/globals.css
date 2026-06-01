@@ -55,4 +55,16 @@
     0%, 100% { opacity: 0.55; }
     50% { opacity: 1; }
   }
+
+  /* recharts 차트 클릭/탭 시 나타나는 브라우저 기본 포커스 아웃라인(둥근 굵은 테두리) 제거.
+   * 실제 포커스 대상은 surface(svg) 가 아니라 그 내부의 zIndex 레이어 `<g tabindex>` 라
+   *   wrapper 후손 전체(`:focus`)를 덮는다(zIndex 값 `_-100`/`_0`/`_100` … 가변 → 후손 선택자가 안전).
+   * 차트는 키보드 조작 대상이 아니고 툴팁은 hover/touch 로 동작 → 아웃라인은 시각 노이즈만 남긴다.
+   * PC(click)·모바일(tap) 양쪽 동일 적용. preflight 가 흡수하지 않는 서드파티 DOM 잔여물이라 본 파일에 둔다. */
+  .recharts-wrapper:focus,
+  .recharts-wrapper:focus-visible,
+  .recharts-wrapper :focus,
+  .recharts-wrapper :focus-visible {
+    outline: none;
+  }
 }
