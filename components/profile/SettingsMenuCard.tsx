@@ -17,6 +17,7 @@
 
 import { Bell, CreditCard, LogOut, Moon, Shield } from "lucide-react";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
+import { ThemeMenuButton } from "@/components/theme/ThemeMenuButton";
 import type {
   ProfileMenuItem,
   ProfileMenuKey,
@@ -58,7 +59,12 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
       <ul className="flex flex-col gap-xs">
         {defaults.map((item) => (
           <li key={item.key}>
-            <MenuButton item={item} />
+            {/* THEME 항목만 client 로 분리(3-state 토글 동작) — 나머지는 server MenuButton 유지. */}
+            {item.key === "THEME" ? (
+              <ThemeMenuButton />
+            ) : (
+              <MenuButton item={item} />
+            )}
           </li>
         ))}
         {danger ? (

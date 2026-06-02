@@ -135,6 +135,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // 클라이언트에서 <html> 에 추가 속성을 주입하여 SSR/CSR mismatch 가 발생.
     // 외부 요인이므로 본 한 레벨에서만 경고 억제 (자식 트리에는 미전파).
     <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
+      <head>
+        {/* FOUC 방지 — hydration 전 동기 실행으로 첫 페인트부터 올바른 테마 클래스를 적용한다.
+         *  localStorage "finsight:theme"(없으면 "system") → system 이면 matchMedia 로 해석 →
+         *  `<html>.classList.toggle("dark")` + style.colorScheme. ThemeProvider 하이드레이션과 동일 동작.
+         *  next/script 가 아니라 raw 인라인 <script> 여야 head 에서 동기 실행된다. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=localStorage.getItem("finsight:theme");if(p!=="light"&&p!=="dark"&&p!=="system")p="system";var d=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var e=document.documentElement;e.classList.toggle("dark",d);e.style.colorScheme=d?"dark":"light";}catch(_){}})();`,
+          }}
+        />
+      </head>
       <body>
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />

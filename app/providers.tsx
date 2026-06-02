@@ -15,6 +15,7 @@ import {
   type Query,
 } from "@tanstack/react-query";
 import { useStockMetaStore } from "@/lib/store/stockMetaStore";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import type { StockPrice, WatchlistQuote } from "@/lib/api/kis/types";
 
 /**
@@ -54,7 +55,10 @@ export function Providers({ children }: { children: ReactNode }) {
       }),
   );
 
+  // ThemeProvider 가 바깥 — 테마 클래스 적용/구독을 Query 트리 전체보다 먼저 마운트.
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </ThemeProvider>
   );
 }
