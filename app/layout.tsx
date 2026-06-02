@@ -27,12 +27,23 @@ const IOS_SPLASH_DEVICES: ReadonlyArray<[number, number, number]> = [
   [402, 874, 3], // 16 Pro
 ];
 
-const APPLE_STARTUP_IMAGES = IOS_SPLASH_DEVICES.map(([w, h, r]) => ({
+const APPLE_STARTUP_IMAGES = IOS_SPLASH_DEVICES.flatMap(([w, h, r]) => {
   // `r`(devicePixelRatio) 도 넘겨, 라우트가 로고/워드마크를 인앱 스플래시와 동일한 고정 dp×r 로 굽게 한다
   // (시작화면 → 인앱 스플래시 로고 점프 방지).
-  url: `/splash-ios?w=${w * r}&h=${h * r}&r=${r}`,
-  media: `screen and (device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
-}));
+  // 기기별 기존 조건에 `(prefers-color-scheme: light/dark)` 를 AND 로 붙여 light/dark 두 변형을 생성한다.
+  // dark 변형은 url 에 `&theme=dark` 를 더해 어두운 시작화면(다크 surface-muted 배경)을 굽는다.
+  const deviceQuery = `screen and (device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`;
+  return [
+    {
+      url: `/splash-ios?w=${w * r}&h=${h * r}&r=${r}`,
+      media: `${deviceQuery} and (prefers-color-scheme: light)`,
+    },
+    {
+      url: `/splash-ios?w=${w * r}&h=${h * r}&r=${r}&theme=dark`,
+      media: `${deviceQuery} and (prefers-color-scheme: dark)`,
+    },
+  ];
+});
 
 /**
  * Pretendard (Korean-Hangul + Latin subset) — `next/font/local` 로 self-host.
@@ -125,7 +136,14 @@ export const metadata: Metadata = {
  *   의 safe-area 패딩과 세트). 데스크탑·일반 브라우저 탭은 인셋이 0이라 무회귀.
  */
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  // OS prefers-color-scheme 별 상태바/툴바 tint. system 모드는 본 media query 만으로 자동 전환된다.
+  // 명시 선택(light/dark)을 OS 와 다르게 고른 경우는 `lib/store/themeStore.ts` 의 런타임 교체가 덮는다
+  // (별도 media 없는 `<meta name="theme-color">` 를 마지막에 추가 → 항상 매칭이라 우선 적용).
+  // hex 는 다크 토큰 `--fs-surface-muted`(#0e141b) / light surface(#ffffff) 와 동기 — viewport 는 토큰 클래스 사용 불가.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e141b" },
+  ],
   viewportFit: "cover",
 };
 
@@ -139,10 +157,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* FOUC 방지 — hydration 전 동기 실행으로 첫 페인트부터 올바른 테마 클래스를 적용한다.
          *  localStorage "finsight:theme"(없으면 "system") → system 이면 matchMedia 로 해석 →
          *  `<html>.classList.toggle("dark")` + style.colorScheme. ThemeProvider 하이드레이션과 동일 동작.
+         *  추가로 별도 media 없는 `<meta name="theme-color">` 를 첫 페인트 색(#0e141b/#ffffff)으로 생성/갱신 —
+         *  명시 선택이 OS 와 달라도 첫 페인트부터 상태바 색이 맞고, viewport 가 만든 media 태그 뒤에 와 우선한다.
+         *  hex 는 themeStore.applyThemeMetaColor 와 동일 값(다크 surface-muted / light surface)으로 동기.
          *  next/script 가 아니라 raw 인라인 <script> 여야 head 에서 동기 실행된다. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=localStorage.getItem("finsight:theme");if(p!=="light"&&p!=="dark"&&p!=="system")p="system";var d=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var e=document.documentElement;e.classList.toggle("dark",d);e.style.colorScheme=d?"dark":"light";}catch(_){}})();`,
+            __html: `(function(){try{var p=localStorage.getItem("finsight:theme");if(p!=="light"&&p!=="dark"&&p!=="system")p="system";var d=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var e=document.documentElement;e.classList.toggle("dark",d);e.style.colorScheme=d?"dark":"light";var m=document.querySelector('meta[name="theme-color"]:not([media])');if(!m){m=document.createElement("meta");m.setAttribute("name","theme-color");document.head.appendChild(m);}m.setAttribute("content",d?"#0e141b":"#ffffff");}catch(_){}})();`,
           }}
         />
       </head>

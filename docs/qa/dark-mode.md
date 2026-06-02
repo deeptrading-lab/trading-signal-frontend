@@ -527,5 +527,181 @@ PR3 범위 AC(차트 4종 다크 시인성·툴팁·축/그리드·light 무회�
 > **PR3 라운드 판정: qa-passed.** 다크 누락 다발 영역인 차트 4종이 런타임 훅으로 **전부 다크 시인성 확보**(캔들 빨강/파랑 6.5:1↑, MACD 파랑/앰버, RSI 보라+기준선, 툴팁 어두운 반투명) + **light 무회귀** + **reload 없는 라이브 토글** 충족. 정보성 관찰 2건(stale 주석 · 거래량 저채도 INFO)은 차단 아님. 메타/스플래시(PR4)·hex 전수 마감(PR5)은 본 라운드 비범위.
 
 ---
+---
+
+# QA — 다크모드 PR4 (메타/이미지 — themeColor + 스플래시) (`dark-mode`)
+
+> **PR**: 브랜치 `feature/dark-mode-meta` (커밋 `535faf6` — PR4-1 `2a1c3ac` themeColor media 배열 + theme-color 런타임 교체 / PR4-2 `535faf6` 스플래시 다크 대응)
+> **PRD**: `docs/prd/dark-mode.md` (§3.4 PR4 · AC-8 G7·G8 메타/스플래시 · AC-9 게이트)
+> **라운드**: **PR4 (메타/이미지)** — 5-PR 분할의 4단계. 상태바 색(`theme-color`) 정합(G8) + iOS/in-app 스플래시 다크 대응(G7). hex 전수 마감은 PR5.
+> **PR4 핵심 기준 = ① `theme-color` 가 현재 테마와 정합(system media 자동 + 명시 선택 런타임 교체, viewport media 태그와 충돌 없음) · ② in-app·iOS 스플래시가 다크에서 어둡게(흰 눈부심 0) · ③ light 무회귀.**
+> **QA 수행**: QA 에이전트 · 2026-06-02 · macOS · Node v20.19.6 · 프로덕션 빌드(Turbopack) + `PORT=4811 npm run start` + Playwright(npx 캐시 1.60) headless chromium · `newContext({colorScheme})` + `finsight:theme` 시드/storage 이벤트
+> **판정**: **qa-passed** (themeColor 충돌·읽기불가·흰 스플래시 잔존 등 차단급 0건, 정보성 관찰 2건 — 그중 1건은 light 스플래시 배경 토큰 의미)
+
+---
+
+## 0. 검증 환경
+
+- `git checkout feature/dark-mode-meta` (`535faf6`). `git diff 28c1657..HEAD --stat`: `app/layout.tsx`(+33/-12 viewport.themeColor media 배열 + FOUC 스크립트 theme-color 생성 + APPLE_STARTUP_IMAGES light/dark 변형) · `lib/store/themeStore.ts`(+36 `applyThemeMetaColor`) · `app/components.css`(+8/-2 `.splash-screen` bg) · `app/splash-ios/route.tsx`(+18/-3 `theme=dark` 분기).
+- `npm run build` → `PORT=4811 npm run start` 프로덕션 서버(PR1~3 선례 — dev Turbopack HMR 이 proxy 와 충돌하므로 `next start`).
+- 앱 비밀번호 게이트 비활성(`.env.local` `APP_PASSWORD` 미설정). themeColor/스플래시 head·이미지는 인증 무관(`/login` 공개 라우트로 layout head 동일 산출). 스플래시 이미지(`/splash-ios`)는 `PUBLIC_EXACT_PATHS` 공개.
+- BE(`127.0.0.1:8000`) 라이브 불가(`curl /health` = 000). **PR4 는 메타/이미지 전용** PR 이라 BFF/데이터 경로 무관(diff 에 `app/api/**`·데이터 경로 없음).
+- **runtime 교체 경로 충실성**: 토글 UI 의 명시 선택은 `useThemeStore.setPreference → applyThemeClass → applyThemeMetaColor`. 본 QA 는 동일 종착점을 거치는 cross-tab `storage` 이벤트(`ThemeProvider` → `hydrate → applyThemeClass → applyThemeMetaColor`)로 명시 선택을 시뮬 — 둘 다 `applyThemeClass` 단일 경로라 meta 교체 결과 동일. system 자동·FOUC 는 별도 검증.
+
+---
+
+## 1. AC 별 재현·기대·실측 (PR4 범위)
+
+| # | AC (PR4) | 재현 절차 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|---|
+| AC-9a | typecheck 0 | `npm run typecheck` | 0 에러 | `tsc --noEmit` exit 0(무출력) | 통과 |
+| AC-9b | lint 0 | `npm run lint` | 0 에러 | `eslint .` exit 0(무출력) | 통과 |
+| AC-9c | build 0 (Turbopack) | `npm run build` | 0 에러, 전 라우트 정상 | exit 0. `/login /market /profile /watchlist /dashboard /stock /stock/[ticker]` 정상, `/splash-ios` ƒ(dynamic), `/opengraph-image`·`/icon`·`/apple-icon` ○, Proxy(Middleware) 정상 | 통과 |
+| AC-8a | **themeColor 정적(빌드 head)** — light/dark media 2태그 | `curl /login` head grep | `theme-color media=light #ffffff` + `media=dark #0e141b` 2개 | 정확히 2개 출현(비-media 태그는 정적 HTML 에 0건 — 런타임 생성) | 통과 |
+| AC-8b | **themeColor 런타임 교체(명시 선택)** — 비-media meta content swap | Playwright 명시 dark/light pick(storage 경로) | dark→`#0e141b`, light→`#ffffff` 로 비-media meta 교체, media 2태그는 보존 | dark pick: non-media `#0e141b`, htmlDark=true, cs=dark / light pick: `#ffffff`, htmlDark=false / **media 2태그 항상 보존(총 3태그)** | 통과 |
+| AC-8c | **system 선택 → OS 따라감** | system + OS=dark/light | system+OS-dark→non-media `#0e141b`·htmlDark / system+OS-light→`#ffffff` | system+OS-dark: non-media `#0e141b`, htmlDark=true, cs=dark / system+OS-light(pick): `#ffffff`, htmlDark=false | 통과 |
+| AC-8d | **FOUC theme-color(첫 페인트)** — 비-media meta 동기 생성 | reload, `domcontentloaded` 스냅샷 | dark면 비-media `#0e141b` 동기 생성, light면 `#ffffff` | DCL 시점 dark: htmlDark=true·non-media `#0e141b`·cs=dark / light: htmlDark=false·`#ffffff`·cs=light. **head 마지막 raw 인라인 `<script>` 가 파싱 중 동기 실행 → 첫 페인트 전 적용** | 통과 |
+| AC-8e | **명시 선택 reload 영속 + FOUC 교체** — OS=light 에서 dark 명시 후 reload | dark 시드 → reload commit/idle | reload 첫 페인트부터 dark + non-media `#0e141b`(OS=light 무관) | reload(commit) htmlDark=true·non-media `#0e141b`·cs=dark, idle 동일. **OS=light 인데 명시 dark 가 media 태그 덮음(비-media 우선)** | 통과 |
+| AC-8f | **in-app 스플래시 다크** — `.splash-screen` 다크 배경 | standalone 시뮬·computed bg | 다크 `#0e141b`(`rgb(14,20,27)`), 워드마크/글리프 가독 | `.splash-screen` computed bg `rgb(14,20,27)`(=`#0e141b`), htmlDark=true. 워드마크(text-strong→text-muted 그라데이션)·글리프(브랜드 3색) 다크 자동 적응 | 통과 |
+| AC-8g | **iOS startup image 다크** — `/splash-ios?theme=dark` | 두 변형 fetch + 픽셀 샘플 | dark: 배경 `#0e141b`+워드마크 밝은(`#e6edf3`) / light: 흰(`#ffffff`)+다크 워드마크 | dark PNG: bg `(14,20,27)`=`#0e141b`, 워드마크 `(230,237,243)`=`#e6edf3` / light PNG: bg `(255,255,255)`=`#ffffff`, 워드마크 `(30,41,59)`=`#1e293b`. 글리프 3색 맥박 양 변형 공통 | 통과 |
+| AC-8h | **APPLE_STARTUP_IMAGES light/dark media 변형** | `git grep`/diff `app/layout.tsx` | 기기별 `(prefers-color-scheme: light/dark)` AND + dark url `&theme=dark` | `IOS_SPLASH_DEVICES` 11기기 × 2변형 = 22 startupImage. dark 변형 url `&theme=dark`, media 끝에 `and (prefers-color-scheme: dark)` | 통과 |
+| AC-8i | 파비콘·OG·manifest 아이콘 light 고정(비목표 무위반) | diff 확인 | 다크 분기 미추가 | `icon.tsx`/`apple-icon.tsx`/`opengraph-image.tsx`/`lib/brand-mark.tsx` PR4 diff 무변경 — light 고정 유지(비목표 무위반) | 통과 |
+
+### AC-9 실측 로그
+
+```
+$ npm run typecheck   → tsc --noEmit (무출력)  exit 0
+$ npm run lint        → eslint .     (무출력)  exit 0
+$ npm run build       → 성공 (전 라우트 prerender/dynamic + Proxy(Middleware) 정상)  exit 0
+```
+
+### AC-8a 실측 (정적 head — `curl /login`)
+
+```
+$ curl -s http://localhost:4811/login | grep -oE '<meta name="theme-color"[^>]*>'
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#0e141b" media="(prefers-color-scheme: dark)"/>
+# 정적 HTML 비-media theme-color 태그: 0건 (런타임/FOUC 스크립트가 생성) ✓
+```
+
+### AC-8b / AC-8c / AC-8d / AC-8e 실측 (Playwright — `document.querySelector('meta[name=theme-color]:not([media])').content`)
+
+```
+[FOUC commit, OS=dark, ls=null]  htmlDark=false non-media=null    ← navigation commit 시점(head script 미파싱)
+[FOUC DCL,    OS=dark, ls=null]  htmlDark=true  non-media=#0e141b cs=dark   ← 첫 페인트 전 동기 적용 ✓
+[FOUC DCL,    OS=light, ls=null] htmlDark=false non-media=#ffffff cs=light  ✓
+[start,       OS=light, ls=null] non-media=#ffffff (media 2태그 + 비-media = 총 3) ✓
+[pick DARK,   OS=light]          non-media=#0e141b htmlDark=true  cs=dark  (media 2태그 보존) ✓
+[pick LIGHT,  OS=light]          non-media=#ffffff htmlDark=false cs=light ✓
+[pick SYSTEM, OS=light]          non-media=#ffffff htmlDark=false           (OS 따라감) ✓
+[system,      OS=dark, ls=system] non-media=#0e141b htmlDark=true cs=dark   (OS 따라감) ✓
+[explicit DARK + reload, OS=light] commit·idle 모두 non-media=#0e141b htmlDark=true cs=dark  (OS=light 무관, 명시 우선) ✓
+```
+
+- **viewport media 태그와 충돌 0**: 모든 상태에서 viewport 가 만든 media 2태그(`#ffffff`/`#0e141b`)는 그대로 남고, 런타임/FOUC 가 비-media 태그 1개를 추가(총 3태그). 비-media 태그는 항상 매칭 + 문서 뒤쪽이라 명시 선택이 OS media 를 덮음 — **media 태그 제거/변형 없이 우선순위만으로 정합**(부작용 0).
+
+### AC-8f / AC-8g 실측 (스플래시 배경 — computed style + PNG 픽셀 샘플)
+
+```
+# in-app 스플래시 (.splash-screen computed bg)
+dark  : rgb(14, 20, 27)  = #0e141b   htmlDark=true   ✓
+light : rgb(246,248,250) = #f6f8fa   htmlDark=false   ← surface-muted(=body 와 동일), §6 INFO-PR4-1
+
+# iOS startup image (/splash-ios PNG 코너/워드마크 픽셀)
+light (?w=600&h=1200&r=2)           : 200 image/png  bg #ffffff  wordmark #1e293b
+dark  (?theme=dark&w=600&h=1200&r=2): 200 image/png  bg #0e141b  wordmark #e6edf3
+# 글리프(브랜드 3색 맥박)는 양 변형 공통, 다크 배경에서 또렷 (이미지 육안 확인)
+```
+
+---
+
+## 2. themeColor 충돌·우선순위 정밀 검증 (PR4 핵심)
+
+PR4 의 최대 리스크 = **viewport.themeColor 가 만든 media 태그 2개**와 **런타임/FOUC 가 추가하는 비-media 태그 1개**가 충돌해 상태바 색이 어긋나는 것. 브라우저 규칙(다수 `<meta name=theme-color>` 중 **매칭되는 마지막 태그**가 이긴다)을 실측으로 검증.
+
+| 상황 | media-light | media-dark | non-media(런타임) | 적용 색(이론) | 실측 일치 |
+|---|---|---|---|---|---|
+| system, OS=light | #ffffff(매칭) | #0e141b | #ffffff | #ffffff | ✓ |
+| system, OS=dark | #ffffff | #0e141b(매칭) | #0e141b | #0e141b | ✓ |
+| 명시 dark, OS=light | #ffffff(매칭) | #0e141b | **#0e141b(매칭·마지막)** | **#0e141b** | ✓ (명시 우선) |
+| 명시 light, OS=dark | #ffffff | #0e141b(매칭) | **#ffffff(매칭·마지막)** | **#ffffff** | ✓ (명시 우선) |
+
+- 비-media 태그는 OS 무관 항상 매칭 + DOM 상 media 2태그 뒤(런타임 `appendChild`/FOUC head 마지막)라, **명시 선택이 OS media 를 항상 덮는다.** system 모드에서도 비-media 값이 resolved(=OS 따라간 값)와 동일하게 세팅되므로 system media 결과와 일치(중복 무해).
+- **media 태그는 한 번도 제거/수정되지 않음** — 런타임은 비-media 태그만 만지므로 viewport 정적 산출과 부작용 0.
+
+---
+
+## 3. 라운드트립 (프로덕션 서버, 두 뷰포트)
+
+PR4 는 메타/이미지 전용(BE 무관)이라 PR #11 분석 5건 대신 **PR4 상태바/스플래시 시나리오**를 두 뷰포트 관점에서 재현. themeColor/스플래시 head·이미지는 뷰포트 무관(layout head 동일)이며, in-app 스플래시는 standalone display-mode 한정 + 화면 채움(반응형 영향 없음). 모바일(375) 관점은 iOS startup image(모바일 전용)·standalone 스플래시로 대표.
+
+| # | 시나리오 | 데스크탑(1280) 관점 | 모바일(375)/iOS 관점 |
+|---|---|---|---|
+| 1 | system, OS=dark 진입 → 상태바/스플래시 다크 | non-media meta #0e141b, htmlDark | iOS startup image dark 변형(`&theme=dark`) media 매칭 → 어두운 시작화면 |
+| 2 | 명시 dark 선택(OS=light) → 상태바 즉시 #0e141b | 런타임 교체 #0e141b(media 덮음) | 동일(standalone 상태바 dark) |
+| 3 | 명시 dark 후 reload → FOUC 없이 다크 유지 | reload commit·idle non-media #0e141b | 콜드 로드 시 in-app 스플래시 즉시 #0e141b(흰 눈부심 0) |
+| 4 | in-app 스플래시 다크 렌더 | `.splash-screen` bg #0e141b(standalone) | 동일(standalone) — 워드마크/글리프 가독 |
+| 5 | light 무회귀 — 상태바/스플래시 light | non-media #ffffff, media 2태그 보존 | iOS startup light 변형 흰 배경+다크 워드마크(기존 유지) |
+
+- **리사이즈/SSR 하이드레이션**: themeColor media 2태그는 SSR 정적 산출(빌드 head)이라 hydration mismatch 없음. 비-media 태그는 FOUC 스크립트(head 동기)가 첫 페인트 전 생성하고 `applyThemeMetaColor` 가 동일 값으로 재사용(중복 생성 아님 — `:not([media])` 셀렉터로 1개 유지). `<html suppressHydrationWarning>` + FOUC 클래스 정합 유지. 빌드/콘솔 pageerror 0.
+
+---
+
+## 4. 에지 케이스
+
+| 케이스 | 처리 | 실측/근거 | 판정 |
+|---|---|---|---|
+| viewport media 태그 ↔ 런타임 비-media 충돌 | 비-media 태그가 항상 매칭+마지막 → 명시 선택 우선, media 태그 보존 | §2 매트릭스 4상황 실측 일치 | 통과 |
+| 비-media meta 중복 생성(FOUC + 런타임) | `querySelector('meta[name=theme-color]:not([media])')` 재사용, 없으면 1개 생성 | 모든 상태에서 총 3태그(중복 0) | 통과 |
+| FOUC 스크립트 throw | `try{…}catch(_){}` 로 감쌈 — meta/클래스 실패해도 페이지 영향 0 | 인라인 스크립트 try/catch 존재 | 통과 |
+| SSR(window 없음) — applyThemeMetaColor | `hasWindow()` 가드 → no-op | `themeStore.ts:59` 가드 | 통과 |
+| OS prefers-color-scheme 런타임 변경(system) | `ThemeProvider` matchMedia change → `syncResolved → applyThemeMetaColor` | system 모드만 재계산(코드 경로) | 통과 |
+| 스플래시 다크 콜드 로드(흰 눈부심) | FOUC 스크립트가 head 에서 dark 클래스 먼저 → `.splash-screen` bg-surface-muted 다크 #0e141b 즉시 | computed bg #0e141b(AC-8f) — 흰 번쩍임 0 | 통과 |
+| iOS startup image 파라미터 클램프 | `clampDim`/`clampRatio`(NaN·범위밖 → 기본값), `theme!=="dark"` → light | `?theme=dark` 만 다크, 그 외 light 폴백 | 통과 |
+| 일반 브라우저 탭(비-standalone) in-app 스플래시 | `display:none` 기본, `(display-mode: standalone)` 에서만 flex | 비-standalone 에서 스플래시 미노출(번쩍임 0) | 통과 |
+| manifest theme_color 와 정합 | manifest light 고정(비목표) — system 자동/명시 교체는 meta 가 담당 | manifest 미변경(AC-8i) | 통과 |
+
+---
+
+## 5. 공통 AC 무회귀
+
+| 항목 | 명령/방법 | 결과 | 판정 |
+|---|---|---|---|
+| typecheck/lint/build 0 | (AC-9) | 0/0/성공 | 통과 |
+| BFF 원칙 무회귀 | `git grep -nE "http://127\.0\.0\.1" -- app/` | route handler fallback 3건(`whitelist/search`·`workbench/_adapters/fastapi` `FASTAPI_BASE_URL ?? "…"` + 주석)만 — 허용 예외. PR4 diff 에 `app/api/**` 무변경 | 통과 |
+| 다크 hex 코드 직타(SSOT) | `themeStore`·`layout`·`splash-ios` 의 `#0e141b`/`#ffffff`/`#e6edf3` | **PRD 명시 예외** — viewport.themeColor·FOUC 스크립트·ImageResponse(Satori)는 토큰 클래스 사용 불가 영역으로 hex 명시 합리적 예외(주석으로 토큰 동기 명시). theme-vars.css 산출 토큰값과 1:1 동기 확인(surface-muted #0e141b / text-strong #e6edf3) | 통과 |
+| `dark:` variant 0건(G5) | `grep -rnoE 'className=[^>]*\bdark:[a-z]' components app` | 0건 | 통과 |
+| 한글 톤 무회귀 | PR4 신규 사용자 노출 문구 없음(메타/이미지·주석만). 워드마크 "FinSight" 는 고유명사 | 회귀 0 | 통과 |
+| 접근성 무회귀 | PR4 는 meta/이미지·CSS bg 만 — 인터랙티브 요소·aria 무변경 | 회귀 0 | 통과 |
+
+---
+
+## 6. 발견 이슈
+
+### 정보성 관찰 (실패 아님, 차단 아님)
+
+- **[INFO-PR4-1] in-app `.splash-screen` light 배경이 `#ffffff`→`#f6f8fa`(surface-muted)로 바뀜 + 주석의 "light #ffffff" 표기가 실제 토큰값과 불일치.** PR4 가 `.splash-screen` 을 `bg-surface`(light #ffffff)→`bg-surface-muted`(light **#f6f8fa**, dark #0e141b)로 변경했다. 이는 **의도된 개선** — `body` 가 PR4 이전부터 `bg-surface-muted`(#f6f8fa)였으므로, 스플래시(과거 #ffffff)와 앱 베이스(#f6f8fa) 사이에 있던 미세 seam 이 제거되어 **스플래시→앱 배경이 한 색으로 이어진다**(PRD G7 의도와 정합). 다크는 #0e141b 로 정확. **다만**: (a) light 에서 in-app 스플래시가 더 이상 순백이 아니므로, 같은 light 의 iOS startup image(#ffffff)·theme-color(#ffffff)와는 미세 차이(#ffffff↔#f6f8fa, 사람 눈 거의 비가시)가 생긴다 — 작업 지시의 "light 무변경(#ffffff)" 문구와는 어긋나나 body 정합 우선의 합리적 trade-off. (b) `app/components.css` 의 신규 주석이 "surface-muted(light #ffffff / dark #0e141b)" 라 적었는데 light 실값은 **#f6f8fa** 라 **주석이 부정확**(코드/동작에는 영향 0). **권고(선택, 차단 아님)**: 주석을 `light #f6f8fa`로 정정. 순백 통일을 원하면 startup image/theme-color 를 #f6f8fa 로 맞추거나 스플래시를 `bg-surface`(#ffffff) 유지 중 택1 — PM/디자이너 판단(차단 아님).
+- **[INFO-PR4-2] Playwright `waitUntil:'commit'` 스냅샷에서 FOUC 비-media meta·dark 클래스 미적용으로 보일 수 있음(테스트 아티팩트).** navigation `commit` 이벤트는 head 인라인 스크립트 파싱 이전 시점이라 `htmlDark=false·non-media=null` 로 찍히나, `domcontentloaded` 시점엔 정상 적용(AC-8d). raw 인라인 head 스크립트는 파싱 중 동기 실행되어 **첫 페인트(body 렌더) 전에 적용**되므로 실제 사용자 FOUC 는 없다. 측정 타이밍 이슈일 뿐 PR 결함 아님(PR1 라운드에서도 동일 commit-타이밍 특성 기록).
+
+### 실패 — 없음
+
+PR4 범위 AC(themeColor 정적/런타임/system/FOUC · in-app·iOS 스플래시 다크 · light 무회귀 · 게이트) 전부 통과. **themeColor media 충돌·읽기불가·흰 스플래시 잔존 0건.**
+
+---
+
+## 7. PR4 판정
+
+- AC-9 typecheck/lint/build — **통과** (0/0/성공)
+- AC-8a themeColor 정적 head media 2태그 — **통과**
+- AC-8b/c **themeColor 런타임 교체(명시) + system OS 따라감** — **통과** (비-media meta swap, media 2태그 보존, viewport 충돌 0)
+- AC-8d/e **FOUC theme-color + reload 영속·명시 우선** — **통과** (첫 페인트 전 동기 적용)
+- AC-8f **in-app 스플래시 다크** — **통과** (`.splash-screen` #0e141b, 흰 눈부심 0)
+- AC-8g/h **iOS startup image 다크 + 11기기 light/dark media 변형** — **통과** (dark #0e141b+#e6edf3 / light #ffffff+#1e293b, 픽셀 샘플 일치)
+- AC-8i 파비콘·OG·manifest light 고정(비목표 무위반) — **통과**
+- 공통 무회귀(BFF/한글/a11y/`dark:` 0/SSOT) — **통과**
+
+> **PR4 라운드 판정: qa-passed.** 핵심 리스크였던 **themeColor 런타임 교체 ↔ viewport media 태그 충돌이 0**(런타임은 비-media 태그만 추가, media 2태그 보존, 명시 선택이 우선순위만으로 OS media 를 덮음) — system 자동·명시 선택·FOUC 첫 페인트 전부 상태바 색 정합. in-app·iOS 스플래시 다크 어둡게(흰 눈부심 0), light 변형 유지. 정보성 관찰 2건(light 스플래시 배경이 #ffffff→#f6f8fa=surface-muted 로 body 와 정합화·주석 표기 부정확 / commit-타이밍 테스트 아티팩트)은 차단 아님. hex 전수 마감(PR5)은 본 라운드 비범위 — 다음 라운드에서 본 문서에 추가 검증한다.
+
+---
 
 산출물: `docs/qa/dark-mode.md`

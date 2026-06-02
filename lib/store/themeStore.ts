@@ -38,12 +38,46 @@ function resolvePreference(preference: ThemePreference): ResolvedTheme {
   return preference === "system" ? resolveFromSystem() : preference;
 }
 
-/** `<html>` 에 dark 클래스·colorScheme 적용. FOUC 스크립트와 동일 동작(SSR no-op). */
+/**
+ * 상태바/툴바 tint(`<meta name="theme-color">`) 의 런타임 색. light surface(#ffffff) /
+ * dark surface-muted(#0e141b = `--fs-surface-muted`, 앱 베이스·스플래시색과 동일) 와 동기.
+ * viewport.themeColor·FOUC 스크립트가 같은 값을 쓰므로 토큰 변경 시 세 곳을 함께 갱신.
+ */
+const META_THEME_COLOR: Record<ResolvedTheme, string> = {
+  light: "#ffffff",
+  dark: "#0e141b",
+};
+
+/**
+ * 별도 media 없는 `<meta name="theme-color">` 의 content 를 resolved 색으로 교체한다.
+ * - `viewport.themeColor` 는 OS prefers-color-scheme media 태그 2개만 만들므로, 명시 선택이
+ *   OS 와 다를 때 상태바가 안 맞는다. media 없는 태그는 항상 매칭 + 문서 뒤쪽이라 media 태그를 덮어,
+ *   OS 와 무관하게 사용자 선택을 반영한다(media 태그는 그대로 둬 부작용 없음).
+ * - FOUC 스크립트가 이미 만들어 둔 태그를 재사용하고, 없으면(예외) 생성한다.
+ */
+function applyThemeMetaColor(resolved: ResolvedTheme): void {
+  if (!hasWindow()) return;
+  let meta = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]:not([media])',
+  );
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute("content", META_THEME_COLOR[resolved]);
+}
+
+/**
+ * `<html>` 에 dark 클래스·colorScheme + 상태바 theme-color 적용. FOUC 스크립트와 동일 동작(SSR no-op).
+ * setPreference/hydrate/syncResolved 가 모두 본 함수를 거치므로 상태바 색이 한 곳에서 전부 반영된다.
+ */
 export function applyThemeClass(resolved: ResolvedTheme): void {
   if (!hasWindow()) return;
   const root = document.documentElement;
   root.classList.toggle("dark", resolved === "dark");
   root.style.colorScheme = resolved;
+  applyThemeMetaColor(resolved);
 }
 
 type ThemeState = {

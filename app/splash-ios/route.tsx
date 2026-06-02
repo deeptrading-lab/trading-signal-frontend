@@ -16,10 +16,19 @@ import {
  * 인앱 스플래시(`components/pwa/SplashScreen.tsx`)와 **배경(#ffffff)·글리프·워드마크를 맞춰**,
  * 네이티브 스플래시 → 인앱 스플래시 전환이 "중복 2회" 가 아니라 연속 화면으로 보이게 한다.
  *
+ * `theme=dark` 쿼리: 배경을 다크(`#0e141b` = `--fs-surface-muted`)·워드마크를 밝은색
+ * (`#e6edf3` = 다크 `--fs-text-strong`)으로 굽는다. `layout.tsx` 의 startupImage media query 가
+ * `(prefers-color-scheme: dark)` 변형에 `&theme=dark` 를 붙여 참조 → 다크 OS 의 iOS 시작화면도 어둡게.
+ * 기본(theme 미지정/light)은 흰 배경 + 다크 워드마크 유지. 글리프(브랜드 3색 맥박)는 양 테마 공통.
+ *
  * 색/글리프는 `lib/brand-mark.tsx` 단일 소스. ImageResponse(Satori) 내부는 Tailwind 토큰 직접
- * 호출 불가라 hex 명시(디자인 토큰 직타의 합리적 예외 — 토큰 변경 시 본 상수도 갱신).
+ * 호출 불가라 hex 명시(디자인 토큰 직타의 합리적 예외 — 토큰 변경 시 본 상수·다크값도 갱신).
  * 공개 경로: `middleware.ts` `PUBLIC_EXACT_PATHS` 의 `/splash-ios` (미인증 iOS 도 PNG 수신).
  */
+// 다크 변형 색 — `--fs-surface-muted` / 다크 `--fs-text-strong` 와 동기(ImageResponse 는 토큰 클래스 불가).
+const DARK_BG = "#0e141b";
+const DARK_WORDMARK = "#e6edf3";
+const LIGHT_WORDMARK = "#1e293b"; // slate-800 — 흰 배경 위 다크 워드마크(OG 이미지와 동일 톤).
 const MIN_DIM = 320;
 const MAX_DIM = 3000;
 const DEFAULT_W = 1170; // iPhone 12~14 (390pt @3x)
@@ -44,6 +53,9 @@ export function GET(request: Request) {
   // 인앱 스플래시(`.splash-icon`/`.splash-wordmark`)와 동일 레이아웃 — **로고 정중앙 + 워드마크 하단**.
   // 고정 dp(로고 160 / 폰트 36)에 기기 ratio 를 곱해, iOS 시작화면(본 이미지)→인앱 전환 시 위치·크기 점프 없음.
   const ratio = clampRatio(url.searchParams.get("r"));
+  const isDark = url.searchParams.get("theme") === "dark";
+  const background = isDark ? DARK_BG : BRAND_MARK_BG;
+  const wordmarkColor = isDark ? DARK_WORDMARK : LIGHT_WORDMARK;
   const glyph = Math.round(160 * ratio);
   const fontSize = Math.round(36 * ratio);
   // 워드마크 하단 위치 — 인앱 `.splash-wordmark` bottom(safe-area-inset-bottom ~34dp + 48px ≈ 82dp) 매칭.
@@ -59,7 +71,7 @@ export function GET(request: Request) {
           display: "flex",
           alignItems: "center", // 로고 정중앙
           justifyContent: "center",
-          background: BRAND_MARK_BG,
+          background,
         }}
       >
         <svg
@@ -87,7 +99,7 @@ export function GET(request: Request) {
             fontWeight: 800,
             letterSpacing: -2,
             lineHeight: 1,
-            color: "#1e293b", // slate-800 — 흰 배경 위 다크 워드마크(OG 이미지와 동일 톤).
+            color: wordmarkColor, // light=slate-800 / dark=다크 text-strong(#e6edf3).
           }}
         >
           FinSight

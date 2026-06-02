@@ -3406,3 +3406,36 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **PR4 (메타/이미지)**: `app/layout.tsx` `viewport.themeColor` media 배열(light #ffffff / dark #0e141b) + ThemeProvider effect로 명시선택 시 `<meta name="theme-color">` 런타임 교체 + in-app 스플래시(`SplashScreen.tsx`·`splash-ios/route.tsx`) 다크. 파비콘/OG는 light 고정.
   - **PR5 (검증/마감)**: 직타 hex 전수조사 + INFO-PR2-1(search-result-item 톤)·INFO-PR3-2(거래량 봉 저대비) 폴리시 검토 + 전 표면 최종 QA.
+
+### 2026-06-02 — feat(theme): 다크모드 PR4 — themeColor 런타임 교체 + 스플래시 다크 (#96)
+
+- **slug**: `dark-mode-meta` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/96
+- **요약**: feat(theme): 다크모드 PR4 — themeColor 런타임 교체 + 스플래시 다크
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇
+  > 
+  > 다크모드 시리즈 **PR4 — 메타/이미지(themeColor + 스플래시)**. 자동 전환이 안 되는 메타/이미지 영역의 다크 대응. 사용자 확정 범위: in-app 스플래시까지 다크, 파비콘·OG는 light 고정.
+  > 
+  > PRD: `docs/prd/dark-mode.md`.
+  > 
+  > ## 어떻게
+  > 
+  > - **themeColor(상태바)**: `app/layout.tsx` `viewport.themeColor`를 light/dark media 배열(`#ffffff`/`#0e141b`)로 → system 자동 전환. 명시 선택(OS와 다를 때)은 `lib/store/themeStore.ts` `applyThemeMetaColor()`가 **별도 media 없는 `<meta name=theme-color>`를 런타임 교체**(문서 순서상 마지막+항상매칭이라 OS media를 덮음). FOUC 스크립트도 첫 페인트에 동일 처리.
+  > - **in-app 스플래시**: `.splash-screen` `bg-surface dark:bg-surface-muted` — **light #ffffff(네이티브 스플래시·manifest 정합, 무회귀)** / dark #0e141b(앱 베이스 정합).
+  > - **iOS startup image**: `app/splash-ios/route.tsx`에 `theme=dark` 분기(배경 #0e141b + 워드마크 #e6edf3), `APPLE_STARTUP_IMAGES`가 기기별 light/dark media 변형(dark는 `&theme=dark`).
+  > - **light 고정**: 파비콘·OG·manifest·statusBarStyle(default 유지, 상태바 글자색은 iOS 적응형).
+  > 
+  > ## 검증
+  > 
+  > - **QA qa-passed** (`docs/qa/dark-mode.md` PR4 라운드): themeColor 정적 2태그 + 런타임 non-media 교체(media 2태그 보존, 충돌 0), FOUC 첫 페인트 적용, in-app 스플래시 dark #0e141b, iOS startup dark PNG(#0e141b/#e6edf3) 22변형, light 무회귀.
+  > - **Review**: meta 우선순위 전략(`:not([media])` 덮어쓰기) 안전·SSR 이중가드·dark hex 토큰 정합·startup 페어링 정확. 지적된 B1(스플래시 light 회귀)은 `bg-surface dark:bg-surface-muted`로 수정 완료(light #ffffff 복원).
+  > - typecheck/lint/build 0 에러.
+  > 
+  > ## 다음 작업
+  > 
+  > - **PR5 (검증/마감)**: 직타 hex 전수조사(brand-mark/splash-ios 의도 예외 목록화) + INFO-PR2-1(search-result-item 톤)·INFO-PR3-2(거래량 봉 저대비) 폴리시 검토 + 전 표면 최종 QA(라이트/다크/시스템 × 라우트) + 실기기 iOS standalone 상태바 확인. PRD §9 q2 런타임 교체는 applyThemeClass 단일 경유로 구현(effect 대신, 더 일관적).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR5 (검증/마감)**: 직타 hex 전수조사(brand-mark/splash-ios 의도 예외 목록화) + INFO-PR2-1(search-result-item 톤)·INFO-PR3-2(거래량 봉 저대비) 폴리시 검토 + 전 표면 최종 QA(라이트/다크/시스템 × 라우트) + 실기기 iOS standalone 상태바 확인. PRD §9 q2 런타임 교체는 applyThemeClass 단일 경유로 구현(effect 대신, 더 일관적).
