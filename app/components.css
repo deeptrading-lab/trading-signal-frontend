@@ -419,6 +419,10 @@
   /* ---------- 메인 영역 ---------- */
   .main-area {
     @apply bg-surface-muted text-text-strong p-lg lg:p-2xl;
+    /* 스크롤바 공간을 항상 예약 — 페이지마다 스크롤 유무가 달라 데스크탑에서 콘텐츠가 좌우로
+     * 밀리던 현상 제거(전 페이지 가로폭 일관). 모바일은 scrollbar-width:none(스크롤바 숨김)이라
+     * 예약폭 0 → 무영향. */
+    scrollbar-gutter: stable;
   }
   .ticker-header {
     @apply flex items-center justify-between gap-md bg-surface text-text-strong rounded-sm p-[14px];
@@ -615,9 +619,10 @@
    * 신규 spacing(table-row-h/table-cell-px) + typography(table-cell-numeric)는
    * tailwind.theme.json 에 주입(tailwind.config.ts 헤더 참조). hex/px 직타 0건. */
 
-  /* asset-hero: 총자산 히어로 — card-hero 와 동일(rounded.xl + hero padding). DESIGN.md Elevation 절. */
+  /* asset-hero: 총자산 히어로 — rounded.xl. 가로는 hero padding(24), 상하는 card padding(20)으로 줄여
+   * 불필요한 상하 여백 축소(도넛 120px 축소와 함께). DESIGN.md Elevation 절. */
   .asset-hero {
-    @apply bg-surface text-text-strong border border-border-line rounded-xl p-hero-px;
+    @apply bg-surface text-text-strong border border-border-line rounded-xl px-hero-px py-card-px;
   }
 
   /* holdings-table-header: 보유종목 테이블 헤더 셀 — surface-muted × text-muted, label-sm. */

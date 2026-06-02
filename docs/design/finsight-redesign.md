@@ -234,7 +234,7 @@ spacing:
   gauge-w: 220px
   gauge-h: 120px
   gauge-track-w: 14px
-  donut-size: 168px
+  donut-size: 120px
   donut-thickness: 22px
   table-row-h: 48px
   table-cell-px: 12px
@@ -901,7 +901,7 @@ frontend-dev 호출 패턴 — `<div className="card-base px-card-px py-card-py"
 
 - **`home-grid-gap: 16px`** — 홈 카드 그리드 셀 간격.
 - **`gauge-w: 220px` / `gauge-h: 120px` / `gauge-track-w: 14px`** — 대시보드 Fear & Greed 게이지 너비·높이·트랙 두께.
-- **`donut-size: 168px` / `donut-thickness: 22px`** — 대시보드 도넛 차트 지름·링 두께.
+- **`donut-size: 120px` / `donut-thickness: 22px`** — 마이페이지 자산비중 도넛 지름·링 두께(상하 여백 축소 위해 168→120).
 - **`table-row-h: 48px` / `table-cell-px: 12px`** — 테이블 행 높이·셀 좌우 padding.
 - **`disclosure-row-py: 12px`** — 공시 테이블 행 상하 padding.
 

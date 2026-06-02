@@ -4,7 +4,7 @@
  * 시안 `Watchlist.tsx` 정합 + PRD `watchlist-real-data` §3.7·§3.9 (검색 모달·상태 카피).
  */
 
-export const WATCHLIST_PAGE_TITLE = "관심종목";
+export const WATCHLIST_PAGE_TITLE = "관심 종목";
 /** 실데이터 전환(§3.7) — "그룹" 개념 미사용(단일 목록)이라 "+ 종목 추가" 로 조정. */
 export const WATCHLIST_TABLE_NAME = "종목명";
 export const WATCHLIST_TABLE_PRICE = "현재가";
