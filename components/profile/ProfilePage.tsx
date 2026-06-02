@@ -4,7 +4,7 @@
  * PR9 (finsight-redesign) 신규. home-market-redesign PR1 — "내 자산" 섹션 추가(계좌 위젯 이전).
  *
  * 책임:
- *   - 페이지 타이틀 "마이페이지" (max-w-4xl 정합 — 본 페이지는 시안의 좁은 max-w 유지).
+ *   - 페이지 타이틀 "마이페이지" (max-w-main-max-w — 전 페이지 너비 통일, 사이드 메뉴 이동 시 가로 밀림 제거).
  *   - ProfileCard 전폭 hero.
  *   - "내 자산" 섹션(AssetHero + 보유종목 전체 테이블) — ProfileCard 바로 아래(PRD §3.1, AC-2).
  *   - 2-column 그리드 (ConnectedExchangesCard + SettingsMenuCard).
@@ -55,7 +55,7 @@ export function ProfilePage({
   holdings,
 }: ProfilePageProps) {
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-lg">
+    <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
       <h1 className="text-h1 text-text-strong">{PROFILE_PAGE_TITLE}</h1>
       <ProfileCard user={user} />
       <AssetSection portfolio={portfolio} holdings={holdings} />

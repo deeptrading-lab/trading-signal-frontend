@@ -419,6 +419,10 @@
   /* ---------- 메인 영역 ---------- */
   .main-area {
     @apply bg-surface-muted text-text-strong p-lg lg:p-2xl;
+    /* 스크롤바 공간을 항상 예약 — 페이지마다 스크롤 유무가 달라 데스크탑에서 콘텐츠가 좌우로
+     * 밀리던 현상 제거(전 페이지 가로폭 일관). 모바일은 scrollbar-width:none(스크롤바 숨김)이라
+     * 예약폭 0 → 무영향. */
+    scrollbar-gutter: stable;
   }
   .ticker-header {
     @apply flex items-center justify-between gap-md bg-surface text-text-strong rounded-sm p-[14px];
