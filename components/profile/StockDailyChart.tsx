@@ -13,7 +13,7 @@
  *   - 데이터 페치+지표 계산+슬라이스 → `@/hooks/stock/useChartData`
  *   - 카드 셸/컨트롤 → `./chart/ChartShell`, 보조지표 헤더 → `./chart/SubLabel`
  *   - 캔들 shape/툴팁 → `./chart/CandleBar`·`./chart/CandleTooltip`
- *   - 색·스타일 상수 → `./chart/chartTheme`(C/tooltip/axis), 포맷터 → `@/lib/utils/chartFormat`
+ *   - 색·스타일(런타임 테마) → `@/hooks/utils/useChartTheme`(C/tooltip/axis, 다크 전환), 포맷터 → `@/lib/utils/chartFormat`
  *   본 파일은 위 조각을 조립해 서브플롯 레이아웃만 담당. 차트 컨트롤 상태는 상위 StockPageLayout 소유.
  */
 

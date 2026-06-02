@@ -123,7 +123,7 @@ function adaptFontSize(
  *
  * 변수 프리픽스는 **반드시 `--fs-`** (FinSight). Tailwind v4 가 `--color-*` 네임스페이스를
  * 자체 예약해 자동 emit 하므로, `--color-` 를 쓰면 우리 변수와 충돌 위험이 있다 → `--fs-` 로 격리.
- * theme.json 의 hex 는 그대로 보존된다(차트 chartTheme.ts 가 빌드타임 hex 직접 소비 — PR3 영역).
+ * theme.json 의 hex 는 그대로 보존된다(차트 useChartTheme 의 SSR 폴백이 themeJson light hex 직접 소비).
  */
 function toCssVarColors(
   colors: Record<string, string>,
