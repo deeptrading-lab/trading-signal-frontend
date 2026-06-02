@@ -6,7 +6,7 @@
  * 이 scale 정보로 open/close body 와 wick 을 정확히 위치시킨다.
  */
 
-import { C } from "./chartTheme";
+import { useChartThemeContext } from "./ChartThemeContext";
 
 export function CandleBar(props: {
   x?: number;
@@ -15,6 +15,7 @@ export function CandleBar(props: {
   height?: number;
   payload?: { open: number; close: number; high: number; low: number; isUp: boolean };
 }) {
+  const { C } = useChartThemeContext();
   const { x = 0, y = 0, width = 0, height = 0, payload } = props;
   if (!payload || width <= 0 || height <= 0) return null;
   const { open, close, high, low, isUp } = payload;

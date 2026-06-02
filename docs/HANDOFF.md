@@ -3371,3 +3371,38 @@
   - **PR3 (차트 런타임 테마)**: recharts는 색 문자열 prop이라 CSS 변수 자동전환 불가 → `hooks/utils/useChartTheme.ts`로 `getComputedStyle` 런타임 read. `chartTheme.ts`(tooltipBg rgba 등) 소비처 전수 전환. CandleTooltip elevated 정합.
   - **PR4 (메타/이미지)**: `viewport.themeColor` media 배열 + 명시선택 런타임 `<meta theme-color>` 교체 + in-app 스플래시(`.splash-screen`) 다크. 파비콘/OG는 light 고정.
   - **PR5 (검증/마감)**: 직타 hex 전수조사 + INFO-PR2-1(search-result-item 톤) 폴리시 + 주석 49키 정합 + 전 표면 최종 QA.
+
+### 2026-06-02 — feat(theme): 다크모드 PR3 — 차트 런타임 테마 (useChartTheme) (#95)
+
+- **slug**: `dark-mode-chart` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/95
+- **요약**: feat(theme): 다크모드 PR3 — 차트 런타임 테마 (useChartTheme)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇
+  > 
+  > 다크모드 시리즈 **PR3 — 차트 런타임 테마**. recharts 차트(StockDailyChart: 캔들/거래량/MACD/RSI)가 다크에서 색이 안 바뀌던 문제 해결. recharts는 색을 문자열 prop으로 받아 CSS 변수 자동전환이 안 통하므로, 런타임에 `--fs-*`를 읽어 테마별 색을 주입한다.
+  > 
+  > PRD: `docs/prd/dark-mode.md`.
+  > 
+  > ## 어떻게
+  > 
+  > - **`hooks/utils/useChartTheme.ts`(신규)**: `useThemeStore`의 `resolvedTheme` 구독 + `getComputedStyle(documentElement)`로 `--fs-*` 런타임 read → `C`/`tooltipStyle`/`labelStyle`/`axisProps` 재생성. SSR/첫 렌더는 themeJson light 폴백, 마운트 후 swap. 테마 전환 시 새 객체 → recharts 리렌더.
+  > - **`components/profile/chart/ChartThemeContext.tsx`(신규)**: recharts가 `shape`/`content`로 clone하는 `CandleBar`/`CandleTooltip`엔 props 주입이 어려워, StockDailyChart가 훅 1회 호출 → Provider로 차트 서브트리에 전달(getComputedStyle 중복 호출 회피).
+  > - 툴팁 rgba(알파라 토큰화 불가)는 `resolvedTheme` 분기 — dark는 어두운 반투명 `rgba(29,38,48,0.85)`(surface-elevated 톤) + 밝은 보더.
+  > - `chartTheme.ts` 삭제(훅으로 흡수), 소비처 전수 전환.
+  > 
+  > ## 검증
+  > 
+  > - **QA qa-passed** (`docs/qa/dark-mode.md` PR3 라운드): 차트 4종 다크 SVG 색이 `--fs-chart-*`/`--fs-signal-*`와 1:1 일치(런타임 read 성공). 캔들 상승 #f47171(6.56:1)/하락 #5b9bff(6.68:1), MACD/RSI/툴팁 가독. light 무회귀, 라이브 토글 reload 없이 즉시 swap.
+  > - **Review approved**: hook 규칙 준수·SSR 가드·Context 적절성·무회귀(15토큰 1:1)·rgba 분기·chartTheme.ts 삭제 안전.
+  > - typecheck/lint/build 0 에러.
+  > 
+  > ## 다음 작업
+  > 
+  > - **PR4 (메타/이미지)**: `app/layout.tsx` `viewport.themeColor` media 배열(light #ffffff / dark #0e141b) + ThemeProvider effect로 명시선택 시 `<meta name="theme-color">` 런타임 교체 + in-app 스플래시(`SplashScreen.tsx`·`splash-ios/route.tsx`) 다크. 파비콘/OG는 light 고정.
+  > - **PR5 (검증/마감)**: 직타 hex 전수조사 + INFO-PR2-1(search-result-item 톤)·INFO-PR3-2(거래량 봉 저대비) 폴리시 검토 + 전 표면 최종 QA.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR4 (메타/이미지)**: `app/layout.tsx` `viewport.themeColor` media 배열(light #ffffff / dark #0e141b) + ThemeProvider effect로 명시선택 시 `<meta name="theme-color">` 런타임 교체 + in-app 스플래시(`SplashScreen.tsx`·`splash-ios/route.tsx`) 다크. 파비콘/OG는 light 고정.
+  - **PR5 (검증/마감)**: 직타 hex 전수조사 + INFO-PR2-1(search-result-item 톤)·INFO-PR3-2(거래량 봉 저대비) 폴리시 검토 + 전 표면 최종 QA.

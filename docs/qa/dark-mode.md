@@ -351,5 +351,181 @@ PR2 범위 AC(시인성·SSOT·게이트·무회귀) 전부 통과. **읽기 불
 > **PR2 라운드 판정: qa-passed.** 다크모드 "룩" 첫 적용에서 **전 UI 표면 시인성 무누락(사용자 핵심 요구) 충족** — 어두운 배경에서 안 보이는 텍스트/요소 0, 자동 대비 스캔 7라우트 0건, 육안 28컷 깨짐 0. 정보성 관찰 2건(검색 항목 미세 inset 미감 · design:sync export 비결정성)은 차단 아님. 차트 4종 색 분기(PR3)·메타/스플래시(PR4)·hex 전수 마감(PR5)은 본 라운드 비범위 — 후속 라운드에서 본 문서에 추가 검증한다.
 
 ---
+---
+
+# QA — 다크모드 PR3 (차트 런타임 테마) (`dark-mode`)
+
+> **PR**: 브랜치 `feature/dark-mode-chart` (커밋 `dc32b20` — `feat(theme): 다크모드 PR3 — 차트 런타임 테마 훅(useChartTheme)`)
+> **PRD**: `docs/prd/dark-mode.md` (§3.3 PR3 · AC-7 차트 런타임 테마 · AC-9 게이트)
+> **라운드**: **PR3 (차트 런타임 테마)** — 5-PR 분할의 3단계. recharts 색 문자열 prop 은 CSS 변수 자동 전환이 안 통하므로(PR2 시점 차트만 light 잔존) `hooks/utils/useChartTheme.ts` + `ChartThemeContext` 로 런타임 전환.
+> **PR3 핵심 기준 = 차트 4종(캔들/거래량/MACD/RSI)이 다크 배경에서 시인성 확보 + light 무회귀 + 라이브 토글(reload 없이) 전환.** 차트 캔버스 내부 색이 다크에서 안 보이거나 흰 차트로 남으면 FAIL.
+> **QA 수행**: QA 에이전트 · 2026-06-02 · macOS · Node v20.19.6 · 프로덕션 빌드(Turbopack) + `npx next start -p 4733` + Playwright(npx 캐시 1.60) headless chromium · `colorScheme:'dark'` + `localStorage["finsight:theme"]="dark"` 강제
+> **판정**: **qa-passed** (차트 시인성 깨짐·안 보이는 봉/라인/텍스트·흰 차트 잔존 **0건**, 정보성 관찰 2건)
+
+---
+
+## 0. 검증 환경
+
+- `git checkout feature/dark-mode-chart` (`dc32b20`). `git diff 470f46a..dc32b20 --stat`: `StockDailyChart.tsx` · `chart/CandleBar.tsx` · `chart/CandleTooltip.tsx` · `chart/ChartThemeContext.tsx`(신규) · `chart/chartTheme.ts`(삭제 −56) · `hooks/utils/useChartTheme.ts`(신규 +140).
+- `npm run build` → `npx next start -p 4733` (PR1·PR2 선례 — dev Turbopack HMR 이 proxy 와 충돌하므로 `next start`).
+- 다크 강제: Playwright `newContext({colorScheme:'dark'})` + `addInitScript` `localStorage["finsight:theme"]="dark"` → `/stock/005930` 진입 시 `document.documentElement.className` 에 `dark` 포함 확인(`"… variable dark"`).
+- 앱 비밀번호 게이트: `.env.local` `APP_PASSWORD` 미설정 → 게이트 비활성(서버 로그 `[auth] APP_PASSWORD 미설정`). 로그인 불필요.
+- BE(`127.0.0.1:8000`) 라이브 불가(`curl /health` = 000). 차트 데이터(`inquire-daily-itemchartprice`, FHKST03010100)는 route handler 가 **KIS 외부 API(env 키 라이브)** 로 프록시 → 삼성전자(005930) 실데이터로 캔들/거래량/MACD/RSI 4종 전부 렌더됨.
+- **recharts 소비처 전수 확인**: 본 저장소에서 recharts(`from "recharts"`) 사용처는 `components/profile/StockDailyChart.tsx` **단 1곳**. PRD AC-7 가 언급한 market 도넛·analyze workbench 차트는 recharts 차트로 미구현(market = home 통합 표면·workbench = 결과 텍스트/배지). 따라서 PR3 차트 점검 대상 = StockDailyChart 4종 + 툴팁이 전부. (`grep -rln 'from "recharts"' components app` → StockDailyChart 만 일치.)
+
+---
+
+## 1. AC 별 재현·기대·실측 (PR3 범위)
+
+| # | AC (PR3) | 재현 절차 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|---|
+| AC-9a | typecheck 0 | `npm run typecheck` | 0 에러 | `tsc --noEmit` 무출력, exit 0 | 통과 |
+| AC-9b | lint 0 | `npm run lint` | 0 에러 | `eslint .` 무출력, exit 0 | 통과 |
+| AC-9c | build 0 (Turbopack) | `npm run build` | 0 에러, 전 라우트 prerender/dynamic 정상 | 성공. `/ /market /stock /stock/[ticker] /profile /watchlist /dashboard /analyze` + api ƒ(dynamic) + Proxy(Middleware) 정상 | 통과 |
+| AC-7a | `useChartTheme` 훅 신설 + chartTheme 소비처 전수 전환 | `ls hooks/utils/useChartTheme.ts` + `grep 'from.*chartTheme'` 잔존 | 훅 존재, 빌드타임 `chartTheme.ts` 삭제·소비처 훅/context 경유 | `useChartTheme.ts`(신규) + `ChartThemeContext.tsx`(신규). `chartTheme.ts` 삭제됨. `CandleBar`·`CandleTooltip` 가 `import { C } from "./chartTheme"` → `useChartThemeContext()` 로 전환. `from "./chartTheme"` 실제 import 잔존 **0건**(StockDailyChart:16 은 doc 주석, import 아님) | 통과 |
+| AC-7b | 차트 색 단일 출처(SSOT) — 두 팔레트 코드 하드코딩 0 | 훅이 `getComputedStyle(--fs-*)` 런타임 read | 다크 hex 직타 0, CSS 변수 read | 색은 전부 `--fs-chart-*`/`--fs-signal-*`/`--fs-text-*`/`--fs-border-line` 런타임 read. PR3 차트 코드 5파일에 불투명 다크 hex 직타 0(`#1d2630` 1건은 rgba 유도 설명 **주석** — load-bearing 아님). rgba 8건은 PRD §3.3 명시 예외(알파 채널 토큰화 불가, `resolvedTheme` 분기) | 통과 |
+| AC-7c | **다크 차트 4종 SVG 색 = 다크 토큰 적용** | Playwright 로 `.recharts-surface` SVG 의 stroke/fill 실수집 | 다크 토큰 hex 가 SVG 에 실제 적용 | `surfaceCount=4`(캔들+거래량+MACD+RSI 전부 렌더). SVG strokes={`#2a333e`grid, `#f47171`up, `#5b9bff`down/macd/refOs, `#f5b945`signal, `#6b7682`refMid, `#a98bff`rsi}, fills={`#f47171`,`#5b9bff`,`#35527a`vol-dn,`#7a3f3f`vol-up,`#3fcf6a`histUp}. **다크 토큰 1:1 일치** | 통과 |
+| AC-7d | **다크 툴팁 = 어두운 반투명 + 텍스트 가독** | 차트 호버 → 툴팁 computed style | 흰색 아님, 어두운 반투명, 텍스트 읽힘 | 툴팁 bg `rgba(29,38,48,0.85)`(surface-elevated 톤, **흰색 아님**), color `rgb(230,237,243)`(text-strong), border `rgba(255,255,255,0.1)`(밝은 hairline). 캡처 육안: 고/시/종/저 OHLC + 등락 구분선 + 등락값(빨강) 전부 가독 | 통과 |
+| AC-7e | **light 무회귀** — 머지 전(PR2) 차트색 동일 | light context SVG 색 수집 | 기존 light 토큰과 동일 | light SVG strokes={`#eceff3`,`#2563eb`,`#c81e1e`,`#9ca3af`,`#f59e0b`,`#dc2626`,`#7c3aed`} = light `--fs-*` 1:1. 툴팁 bg `rgba(255,255,255,0.82)`. **light 차트색 전부 PR2 동일(무회귀)** | 통과 |
+| AC-7f | **라이브 토글(reload 없이)** — 차트 떠있는 상태 light↔dark 즉시 전환 | 동일 페이지에서 `finsight:theme`→dark + storage 이벤트 → SVG 색 변화 관찰 | reload 없이 차트 색 즉시 dark 로 swap | 토글 전 light strokes → 토글 후 `html.dark` 추가 + SVG strokes 가 dark 세트로 **즉시 전환**(reload 0). `useChartTheme` `resolvedTheme` deps 가 새 색 객체 reference 를 recharts 에 내려 리렌더. 캡처(`live-toggle-after.png`) 육안: 페이지·차트 동시 dark | 통과 |
+
+### AC-9 실측 로그
+
+```
+$ npm run typecheck   → tsc --noEmit (무출력, exit 0)
+$ npm run lint        → eslint .     (무출력, exit 0)
+$ npm run build       → 성공 (전 라우트 prerender/dynamic + Proxy(Middleware) 정상)
+```
+
+### AC-7c / AC-7e 실측 (recharts SVG 색 — Playwright 실수집)
+
+```
+DARK  html.class = "… variable dark"  | surfaceCount = 4 (캔들·거래량·MACD·RSI 전부 렌더)
+DARK  strokes = #2a333e(grid) #5b9bff #f47171 #6b7682 #f5b945 #a98bff
+DARK  fills   = #5b9bff #f47171 #35527a(vol-dn) #7a3f3f(vol-up) #3fcf6a(histUp)
+      → html.dark --fs-chart-* / --fs-signal-* 와 1:1 일치 (런타임 read 성공)
+
+LIGHT strokes = #eceff3 #2563eb #c81e1e #9ca3af #f59e0b #dc2626 #7c3aed
+LIGHT fills   = #2563eb #c81e1e #93c5fd #fca5a5 #16a34a #dc2626
+      → :root(light) --fs-* 와 1:1 일치 (PR2 무회귀)
+```
+
+### AC-7f 실측 (라이브 토글, 동일 페이지 reload 없이)
+
+```
+before(light) strokes = [#eceff3, #2563eb, #c81e1e, #9ca3af, #f59e0b, #dc2626, #7c3aed]
+  → localStorage["finsight:theme"]="dark" + dispatch StorageEvent (ThemeProvider storage 리스너 경로)
+after          html.class = "… variable dark"
+after strokes  = [#2a333e, #5b9bff, #f47171, #6b7682, #f5b945, #a98bff]
+  → reload 없이 차트 SVG 색이 light→dark 로 즉시 swap. live-toggle-after.png 육안 일치.
+```
+
+### 차트 그래픽 요소 대비(다크 base `#0e141b` 기준, 비텍스트 floor 3:1)
+
+| 요소 | 다크 hex | base 대비 | 판정 |
+|---|---|---|---|
+| 축 눈금 텍스트(text-muted) | `#9aa6b2` | 7.47:1 | ✓ (텍스트 4.5:1↑) |
+| 캔들 상승 / RSI-OB라벨 / hist-down | `#f47171` | 6.56:1 | ✓ |
+| 캔들 하락 / MACD라인 / RSI-OS라벨 | `#5b9bff` | 6.68:1 | ✓ |
+| MACD signal | `#f5b945` | 10.50:1 | ✓ |
+| MACD hist-up | `#3fcf6a` | 9.12:1 | ✓ |
+| RSI 라인 | `#a98bff` | 6.90:1 | ✓ |
+| RSI refMid(50) | `#6b7682` | — | 보조선(opacity 0.4) 적정 |
+| 그리드선 | `#2a333e` | 1.45:1 | 의도적 저대비(그리드는 과하지 않아야 — 육안 적정) |
+| 거래량 vol-up | `#7a3f3f` | 2.30:1 | 저채도(PRD 의도), 봉 가시·구분됨 — INFO-PR3-2 |
+| 거래량 vol-down | `#35527a` | 2.33:1 | 저채도(PRD 의도), 봉 가시·구분됨 — INFO-PR3-2 |
+
+---
+
+## 2. 차트 요소별 다크 시인성 정밀 검증 (육안 — 본 라운드의 전부)
+
+스크린샷 산출물: `/tmp/dark-pr3-shots/` (`dark-chart-crop.png` 데스크탑 4종 · `dark-chart-mobile.png` 모바일 4종 · `dark-chart-crop-line.png` 라인/gradient · `dark-tooltip.png` 툴팁 · `light-chart-crop.png` light 무회귀 · `live-toggle-after.png` 라이브 토글).
+
+| # | 차트 요소 | 재현 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|---|
+| 1 | **캔들(가격)** | `/stock/005930` 캔들 탭 다크 | 상승 빨강(`#f47171`)·하락 파랑(`#5b9bff`)이 base `#0e141b`에서 선명 구분, 심지/몸통 가독 | 빨강/파랑 캔들 명확 구분(각 6.5:1↑). 심지(wick)·몸통(body) 분리 또렷. 우상향 추세 봉 전부 식별 | ✓ |
+| 2 | **거래량** | 거래량 서브플롯 | 봉이 보이고 vol-up/vol-down 구분 | 봉 전 구간 가시. 저채도 적/청(`#7a3f3f`/`#35527a`)으로 상승/하락 봉 hue 구분됨 — 대비는 2.3:1 로 가장 낮음(PRD "저채도" 의도, INFO-PR3-2) | ✓(INFO) |
+| 3 | **MACD** | MACD 서브플롯 | macd 라인(파랑)+signal(앰버) + 히스토그램(초록 양수/빨강 음수) 시인 | 파랑 MACD·앰버 signal 라인 또렷 구분(10.5:1 앰버 매우 선명). 히스토그램 초록(`#3fcf6a` 9.1:1)/빨강(`#f47171` 6.6:1) 0선 기준 가독 | ✓ |
+| 4 | **RSI** | RSI 서브플롯 | 보라 라인 + 기준선(70/30/50) 시인, 기준선 과튐·미시인 없음 | 보라 라인(`#a98bff` 6.9:1) 또렷. OB70(빨강 점선)·OS30(파랑 점선) `strokeOpacity 0.7` + 색라벨 가독. mid50(refMid `strokeOpacity 0.4`) 은은 — 과하게 튀거나 안 보이지 않음 | ✓ |
+| 5 | **툴팁** | 차트 호버 | 어두운 반투명 배경(흰색 아님) + 텍스트 가독 + 등락 구분선 | bg `rgba(29,38,48,0.85)` 어두운 반투명(흰색 아님), text `#e6edf3`. 고/시/종/저 + 등락 구분선(`rgba(255,255,255,0.08)`) + 등락값(빨강) 전부 읽힘 | ✓ |
+| 6 | **축/그리드** | 전 서브플롯 | 축 눈금·그리드 적절 대비(과진/미시인 아님) | 축 눈금(7.47:1) 가독. 그리드선(`#2a333e` 1.45:1) 은은 — 데이터를 가리지 않고 적정. Y축 만/M 단위·날짜축 가독 | ✓ |
+| 7 | **light 무회귀** | light 차트 4종 | PR2 와 동일 색 | light SVG 색 1:1 동일(§AC-7e). 빨강/파랑 캔들·light 거래량·파랑/앰버 MACD·보라 RSI — 머지 전과 동일 | ✓ |
+| 8 | **라이브 토글** | 차트 떠있는 상태 light↔dark | reload 없이 즉시 색 전환 | storage 이벤트로 즉시 dark swap, 차트 4종 동시 전환(§AC-7f) | ✓ |
+| 9 | **라인/gradient** | 라인 차트 탭 다크 | Area stroke(빨강) + `sdcFill` gradient 시인 | 빨강 라인(`#f47171`) + 적→투명 gradient 정상 렌더(훅 `C.fill` 참조). 다크 배경에서 또렷 | ✓ |
+
+---
+
+## 3. 라운드트립 (프로덕션 서버, 두 뷰포트)
+
+차트는 BE 무관(KIS 외부 API 프록시)·색 전용 PR 이라 PR #11 분석 5건 대신 **PR3 차트 테마 시나리오**를 데스크탑(1280)·모바일(375) 두 뷰포트에서 재현.
+
+| # | 시나리오 | 데스크탑(1280) | 모바일(375) |
+|---|---|---|---|
+| 1 | 다크 강제 진입 → 캔들 4종 렌더 | `surfaceCount=4`, 다크색 적용, 깨짐 0 (`dark-chart-crop.png`) | 4종 전부 좁은 폭에서도 가독 (`dark-chart-mobile.png`) |
+| 2 | 라인 차트 탭 전환 → gradient | 빨강 라인 + 적→투명 gradient 정상 | 동일 정상 (`dark-chart-mobile-line.png`) |
+| 3 | 툴팁 호버 → 어두운 반투명 | OHLC·등락 가독, 흰박스 아님 | (동일 로직, 데스크탑서 확인) |
+| 4 | light 무회귀 | light 4종 PR2 동일 (`light-chart-crop.png`) | 동일 |
+| 5 | 라이브 토글(reload 없이) light↔dark | SVG 색 즉시 swap, 페이지·차트 동시 (`live-toggle-after.png`) | (동일 store 경로) |
+
+- **리사이즈/SSR 하이드레이션**: `useChartTheme` 는 SSR/첫 렌더에 `staticLightColors()`(themeJson light hex) 폴백 → 마운트 후 `useEffect` 에서 `getComputedStyle(--fs-*)` 실계산값으로 swap. 차트는 `"use client"` 전용이라 첫 페인트 깜빡임 영향 미미(PRD §3.3 가정). 빌드/콘솔 pageerror 0.
+- **테마 토글 UI 경로 확인**: `/profile` SettingsMenuCard `화면 테마` 행 클릭 시 `role="radiogroup" aria-label="화면 테마"` + radio 3개(라이트 checked=false / **다크 checked=true** / 시스템 false) 노출(다크 컨텍스트). 토글 UI 정상.
+
+---
+
+## 4. 공통 AC 무회귀
+
+| 항목 | 명령/방법 | 결과 | 판정 |
+|---|---|---|---|
+| typecheck/lint/build 0 | (AC-9) | 0/0/성공 | 통과 |
+| BFF 원칙 무회귀 | PR3 diff 에 `app/api/**`·`FASTAPI_BASE_URL` 무변경(차트/훅만) | 회귀 0 | 통과 |
+| 차트 SSOT(다크 hex 직타 0) | `grep '#[0-9a-fA-F]{6}'` PR3 차트 5파일 | 0건(주석 1건 제외, rgba 8건은 PRD 명시 알파 예외) | 통과 |
+| `dark:` variant 0건(G5) | `grep -rnoE 'className=[^>]*\bdark:[a-z]' components app` | 0건 | 통과 |
+| 한글 톤 무회귀 | PR3 신규 사용자 노출 문구 없음(색·구조 전용). 훅/context 주석·에러문구("…ChartThemeProvider 안에서만 사용할 수 있어요") 한글 | 회귀 0 | 통과 |
+| 접근성 무회귀 | 차트 SVG·툴팁(시각 색만 변경), 테마 토글 radiogroup/radio aria 유지(§3) | 회귀 0 | 통과 |
+
+---
+
+## 5. 에지 케이스
+
+| 케이스 | 처리 | 실측/근거 | 판정 |
+|---|---|---|---|
+| SSR / 첫 렌더(window 없음) | `staticLightColors()` themeJson 폴백 → 마운트 후 swap | `useState` 초기값 = light 정적, `useEffect` 가 runtime read | 통과 |
+| BE 다운(차트 데이터 경로) | 차트는 KIS 외부 API 프록시(env 키 라이브) — FastAPI(`:8000`) 무관 | `:8000` down 에도 005930 캔들 4종 실데이터 렌더 | 통과 |
+| 데이터 부족(MACD<26봉/RSI<15봉) | `macdSeries.some(macd!==null)` 가드 → SubLabel 안내 표시 | 100봉 데이터라 4종 전부 유효 렌더(가드 자체는 코드 경로) | 통과 |
+| 빈 차트(priceSeries 0) | "차트 데이터가 없어요" 빈상태(text-muted) | 코드 경로(005930 은 데이터 有) | 통과 |
+| StrictMode 더블 마운트 | `useChartTheme` `useEffect` 멱등(색 객체 재계산만, cleanup 불필요) | effect 부작용 없음(setState만) | 통과 |
+| recharts 봉마다 getComputedStyle 중복 | `ChartThemeContext` 로 StockDailyChart 1회 호출 후 CandleBar/CandleTooltip 구독(단일 reference) | context 패턴(파일 주석 근거) — 봉별 중복 read 회피 | 통과 |
+| rgba 알파 토큰화 불가 | `TOOLTIP_RGBA[resolved]` light/dark 리터럴 분기 | 다크 툴팁 `rgba(29,38,48,0.85)` 적용 확인 | 통과 |
+| 라이브 토글 시 차트 미갱신 우려 | `resolvedTheme` deps → 새 색 객체 reference → recharts 리렌더 | reload 없이 SVG 색 swap 확인(AC-7f) | 통과 |
+
+---
+
+## 6. 발견 이슈
+
+### 정보성 관찰 (실패 아님, 차단 아님)
+
+- **[INFO-PR3-1] `StockDailyChart.tsx:16` doc 주석이 삭제된 `./chart/chartTheme` 를 참조(stale 주석).** 파일 상단 책임분리 주석에 "색·스타일 상수 → `./chart/chartTheme`(C/tooltip/axis)" 가 남아 있으나 실제 `chartTheme.ts` 는 PR3 에서 삭제됨(import 는 `useChartTheme`/`ChartThemeContext` 로 전환 완료). **import 아닌 주석이라 빌드·동작·시인성 영향 0**(typecheck/lint/build 통과). 향후 정리 시 주석을 `./chart/ChartThemeContext`/`@/hooks/utils/useChartTheme` 로 갱신 권고(선택, 차단 아님).
+- **[INFO-PR3-2] 거래량 봉이 다크에서 가장 저대비(vol-up `#7a3f3f` 2.30:1 · vol-down `#35527a` 2.33:1, 비텍스트 3:1 floor 미만).** PRD §3.3·디자인이 거래량을 **"저채도 vol-up/vol-down"** 으로 의도 설계한 결과로, 캡처 육안 확인 시 봉은 전 구간 가시·상승/하락 구분 가능하며 거래량은 보조(secondary) 정보다. **시인성 깨짐(안 보이는 봉) 아님** — FAIL 아닌 INFO. 단 4종 중 가장 어두워, 디자이너가 후속(PR5 또는 폴리시)에서 채도/명도를 한 단계 올릴지 검토 여지(선택). 캔들 등락색(6.5:1↑)·MACD/RSI 라인(6.9~10.5:1)은 충분.
+
+### 실패 — 없음
+
+PR3 범위 AC(차트 4종 다크 시인성·툴팁·축/그리드·light 무회귀·라이브 토글·SSOT·게이트) 전부 통과. **안 보이는 봉/라인/텍스트·흰 차트 잔존·대비 미달(차단급) 0건.**
+
+---
+
+## 7. PR3 판정
+
+- AC-9 typecheck/lint/build — **통과** (0/0/성공)
+- AC-7 차트 런타임 테마 훅 + 소비처 전수 전환 + SSOT — **통과** (`chartTheme.ts` 삭제, 훅/context 경유, 다크 hex 직타 0)
+- 캔들/거래량/MACD/RSI **4종 다크 시인성** — **통과** (SVG 색 다크 토큰 1:1, 육안 깨짐 0, surfaceCount=4)
+- 툴팁 다크 반투명 + 텍스트 가독 — **통과** (`rgba(29,38,48,0.85)`, 흰색 아님)
+- 축/그리드 적정 대비 — **통과** (눈금 7.47:1, 그리드 은은)
+- **light 무회귀** — **통과** (light SVG 색 PR2 1:1 동일)
+- **라이브 토글(reload 없이)** — **통과** (SVG 색 즉시 swap)
+- 공통 무회귀(BFF/한글/a11y/`dark:` 0/SSOT) — **통과**
+
+> **PR3 라운드 판정: qa-passed.** 다크 누락 다발 영역인 차트 4종이 런타임 훅으로 **전부 다크 시인성 확보**(캔들 빨강/파랑 6.5:1↑, MACD 파랑/앰버, RSI 보라+기준선, 툴팁 어두운 반투명) + **light 무회귀** + **reload 없는 라이브 토글** 충족. 정보성 관찰 2건(stale 주석 · 거래량 저채도 INFO)은 차단 아님. 메타/스플래시(PR4)·hex 전수 마감(PR5)은 본 라운드 비범위.
+
+---
 
 산출물: `docs/qa/dark-mode.md`
