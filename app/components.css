@@ -246,6 +246,92 @@
     @apply bg-surface-elevated text-text-strong border border-border-line rounded-sm p-xs;
   }
 
+  /* ---------- 관심종목 검색 결과 별 토글 (wl-star) ----------
+   * 빈 별(outline) ↔ 채운 별(filled) + 추가 시 파티클 축하(uiverse 참고).
+   * checked = 관심종목 포함 여부(controlled). 채움 팝·파티클은 **추가 클릭에서만** `.is-celebrating`
+   * 으로 발화한다 → 이미 추가된 종목이 검색결과에 뜰 땐 자동 발화하지 않는다. 색은 토큰(chart-signal). */
+  .wl-star {
+    --star-color: var(--fs-chart-signal);
+    @apply relative inline-grid place-items-center h-8 w-8 cursor-pointer;
+  }
+  .wl-star-check {
+    @apply absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20;
+  }
+  .wl-star-svg-wrap {
+    @apply grid place-items-center w-full h-full;
+  }
+  .wl-star-outline,
+  .wl-star-filled {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: 100%;
+    fill: var(--star-color);
+    transition: all 0.3s ease;
+  }
+  .wl-star-outline {
+    opacity: 1;
+  }
+  .wl-star-filled {
+    opacity: 0;
+    transform: scale(0);
+  }
+  .wl-star-check:checked ~ .wl-star-svg-wrap .wl-star-outline {
+    opacity: 0;
+  }
+  .wl-star-check:checked ~ .wl-star-svg-wrap .wl-star-filled {
+    opacity: 1;
+    transform: scale(1);
+  }
+  /* 추가(빈→채움) 클릭 순간에만 통통 팝 + 파티클. */
+  .wl-star.is-celebrating .wl-star-filled {
+    animation: wl-star-pop 0.6s;
+  }
+  .wl-star-celebrate {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.55);
+    display: none;
+    stroke: var(--star-color);
+    fill: var(--star-color);
+    stroke-width: 2px;
+    pointer-events: none;
+  }
+  .wl-star-particle {
+    display: none;
+    animation-fill-mode: forwards;
+  }
+  .wl-star.is-celebrating .wl-star-celebrate {
+    display: block;
+  }
+  .wl-star.is-celebrating .wl-star-particle {
+    display: block;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(1) {
+    animation: wl-particle-1 1s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(2) {
+    animation: wl-particle-2 1s ease-out;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(3) {
+    animation: wl-particle-3 1s ease-out;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(4) {
+    animation: wl-particle-4 1s ease-out;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(5) {
+    animation: wl-particle-5 1s ease-out;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(6) {
+    animation: wl-particle-6 1s ease-out;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(7) {
+    animation: wl-particle-7 1s ease-out;
+  }
+  .wl-star.is-celebrating .wl-star-particle:nth-child(8) {
+    animation: wl-particle-8 1s ease-out;
+  }
+
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
   .price-bar-track {
     @apply absolute top-[6px] left-0 right-0 h-[6px] bg-border-line rounded-pill;
@@ -736,4 +822,52 @@
       display: none; /* Chrome/Safari */
     }
   }
+}
+
+/* 관심종목 별 토글 keyframes (wl-star) — 채움 팝 + 8방향 파티클(uiverse 참고).
+ * preflight·@apply 비대상 잔여물이라 @layer 밖 top-level 에 둔다(skeletonShimmer 선례). */
+@keyframes wl-star-pop {
+  0% { transform: scale(0); opacity: 0; }
+  25% { transform: scale(1.2); opacity: 1; }
+  50% { transform: scale(1); filter: brightness(1.5); }
+}
+@keyframes wl-particle-1 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  40% { transform: translate(-20px, -25px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(-40px, 40px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-2 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  40% { transform: translate(20px, -25px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(40px, 40px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-3 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  40% { transform: translate(-30px, -20px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(-50px, 45px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-4 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  40% { transform: translate(30px, -20px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(50px, 45px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-5 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  45% { transform: translate(0, -30px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(0, 40px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-6 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  35% { transform: translate(-35px, -15px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(-60px, 50px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-7 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  35% { transform: translate(35px, -15px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(60px, 50px) scale(0); opacity: 0; }
+}
+@keyframes wl-particle-8 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  45% { transform: translate(0, -35px) scale(0.6); opacity: 0.6; }
+  100% { transform: translate(0, 45px) scale(0); opacity: 0; }
 }

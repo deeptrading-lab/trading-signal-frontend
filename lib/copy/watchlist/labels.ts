@@ -49,3 +49,10 @@ export const WATCHLIST_SEARCH_ADDED = "추가됨";
 export const WATCHLIST_SEARCH_ADD_RAW = (ticker: string) => `${ticker} 직접 추가`;
 /** 직접 추가 항목의 보조 라벨(코드 기반). */
 export const WATCHLIST_SEARCH_RAW_META = "코드";
+
+/** 인라인 검색(페이지 상단) — 검색 시작 전 안내. */
+export const WATCHLIST_SEARCH_HINT =
+  "종목을 검색해 별을 눌러 관심종목에 추가하세요.";
+/** 검색 결과 별 버튼 aria — 추가/제거 토글. */
+export const WATCHLIST_STAR_ADD = "관심종목에 추가";
+export const WATCHLIST_STAR_REMOVE = "관심종목에서 제거";

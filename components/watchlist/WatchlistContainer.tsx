@@ -4,10 +4,11 @@
  * PRD `watchlist-real-data` §3.6 방안 A — page.tsx(server) 아래 단일 client 컨테이너.
  *
  * 책임:
- *   - `useWatchlistTickers()` 로 영구화된 ticker 배열 + 추가/삭제 핸들러.
+ *   - `useWatchlistTickers()` 로 영구화된 ticker 배열 + 추가/삭제/멤버십 핸들러.
  *   - `useQueryWatchlist(tickers)` 로 시세+메타 실데이터(BFF `/api/watchlist`).
- *   - 로딩 / 에러(한글+재시도) / 빈 상태(CTA) / 성공(좌조인=담은 ticker 전부) 분기.
- *   - 추가 모달(`WatchlistAddModal`) 오픈 상태 관리.
+ *   - 로딩 / 에러(한글+재시도) / 빈 상태 / 성공(좌조인=담은 ticker 전부) 분기.
+ *   - 상단 인라인 검색(`WatchlistSearch`) — 별 버튼으로 추가/제거(기존 "+ 종목 추가" 모달 대체).
+ *     단일 `useWatchlistTickers` 인스턴스를 검색·표가 공유(스토어 desync 방지).
  *
  * `fix/watchlist-partial-render` — 부분실패 종목 누락 방지:
  *   - 행을 BFF 성공분(`quotes`) 이 아니라 사용자가 담은 `tickers` 기준으로 `WatchlistTable`
@@ -20,38 +21,26 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
-import dynamic from "next/dynamic";
+import { useCallback } from "react";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { useStockMetaStore } from "@/lib/store/stockMetaStore";
 import { WatchlistPage } from "./WatchlistPage";
+import { WatchlistSearch } from "./WatchlistSearch";
 import { WatchlistTable } from "./WatchlistTable";
 import {
   WATCHLIST_ERROR_TITLE,
   WATCHLIST_ERROR_HINT,
   WATCHLIST_RETRY,
   WATCHLIST_EMPTY_TITLE,
-  WATCHLIST_EMPTY_HINT,
-  WATCHLIST_EMPTY_CTA,
+  WATCHLIST_SEARCH_HINT,
 } from "@/lib/copy/watchlist/labels";
-
-/**
- * 추가 모달은 "+ 종목 추가" 클릭 시에만 필요 → `next/dynamic` 지연 로드.
- * `modalOpen` 시에만 렌더해, 첫 오픈 전까지 모달 청크(+`useQueryStockSearch`)를 받지 않는다.
- * 포털/`document` 사용 client 전용이라 `ssr: false`.
- */
-const WatchlistAddModal = dynamic(
-  () => import("./WatchlistAddModal").then((m) => m.WatchlistAddModal),
-  { ssr: false },
-);
 
 export function WatchlistContainer() {
   const { tickers, addTicker, removeTicker, hasTicker, getName } =
     useWatchlistTickers();
-  const [modalOpen, setModalOpen] = useState(false);
   // 종목 메타 스토어 — 상세에서 본 실종목명을 디그레이드 행 표시명 후보로 공유(이름 일원화).
   const stockQuotes = useStockMetaStore((s) => s.quotes);
 
@@ -79,71 +68,52 @@ export function WatchlistContainer() {
   const canRefresh = !isEmpty && !showSkeleton && !showError;
 
   return (
-    <>
-      <WatchlistPage
-        onAdd={() => setModalOpen(true)}
-        onRefresh={() => query.refetch()}
-        isRefreshing={query.isFetching}
-        canRefresh={canRefresh}
-      >
-        {isEmpty ? (
-          <div className="card flex flex-col items-center gap-sm py-2xl text-center">
-            <p className="text-body-strong text-text-strong">
-              {WATCHLIST_EMPTY_TITLE}
-            </p>
-            <p className="text-body-sm text-text-muted">
-              {WATCHLIST_EMPTY_HINT}
-            </p>
-            <button
-              type="button"
-              className="button-primary mt-sm"
-              onClick={() => setModalOpen(true)}
-            >
-              {WATCHLIST_EMPTY_CTA}
-            </button>
-          </div>
-        ) : showError ? (
-          <div
-            className="card flex flex-col items-center gap-sm py-2xl text-center"
-            role="alert"
-          >
-            <p className="text-body-strong text-text-strong">
-              {WATCHLIST_ERROR_TITLE}
-            </p>
-            <p className="text-body-sm text-text-muted">
-              {WATCHLIST_ERROR_HINT}
-            </p>
-            <button
-              type="button"
-              className="button-secondary mt-sm"
-              onClick={() => query.refetch()}
-            >
-              {WATCHLIST_RETRY}
-            </button>
-          </div>
-        ) : (
-          <WatchlistTable
-            tickers={tickers}
-            quotes={quotes}
-            isLoading={showSkeleton}
-            skeletonRows={Math.min(tickers.length, 6)}
-            getName={resolveName}
-            onRemove={removeTicker}
-          />
-        )}
-      </WatchlistPage>
+    <WatchlistPage
+      onRefresh={() => query.refetch()}
+      isRefreshing={query.isFetching}
+      canRefresh={canRefresh}
+    >
+      {/* 상단 인라인 검색 — 별 버튼으로 추가/제거(여러 개 연속 추가, 바깥 클릭 시에만 닫힘). */}
+      <WatchlistSearch
+        hasTicker={hasTicker}
+        addTicker={addTicker}
+        removeTicker={removeTicker}
+      />
 
-      {modalOpen && (
-        <WatchlistAddModal
-          open
-          onClose={() => setModalOpen(false)}
-          onAdd={(ticker, name) => {
-            addTicker(ticker, name);
-            setModalOpen(false);
-          }}
-          hasTicker={hasTicker}
+      {isEmpty ? (
+        <div className="card flex flex-col items-center gap-sm py-2xl text-center">
+          <p className="text-body-strong text-text-strong">
+            {WATCHLIST_EMPTY_TITLE}
+          </p>
+          <p className="text-body-sm text-text-muted">{WATCHLIST_SEARCH_HINT}</p>
+        </div>
+      ) : showError ? (
+        <div
+          className="card flex flex-col items-center gap-sm py-2xl text-center"
+          role="alert"
+        >
+          <p className="text-body-strong text-text-strong">
+            {WATCHLIST_ERROR_TITLE}
+          </p>
+          <p className="text-body-sm text-text-muted">{WATCHLIST_ERROR_HINT}</p>
+          <button
+            type="button"
+            className="button-secondary mt-sm"
+            onClick={() => query.refetch()}
+          >
+            {WATCHLIST_RETRY}
+          </button>
+        </div>
+      ) : (
+        <WatchlistTable
+          tickers={tickers}
+          quotes={quotes}
+          isLoading={showSkeleton}
+          skeletonRows={Math.min(tickers.length, 6)}
+          getName={resolveName}
+          onRemove={removeTicker}
         />
       )}
-    </>
+    </WatchlistPage>
   );
 }
