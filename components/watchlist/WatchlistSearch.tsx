@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
 import { WatchlistStarButton } from "./WatchlistStarButton";
 import {
@@ -84,23 +85,32 @@ export function WatchlistSearch({
   }
 
   return (
-    <div ref={containerRef} className="relative">
-      <input
-        type="text"
-        className="input w-full"
-        autoComplete="off"
-        role="combobox"
-        aria-expanded={showDropdown}
-        aria-controls="watchlist-search-results"
-        aria-label={WATCHLIST_MODAL_TITLE}
-        placeholder={WATCHLIST_SEARCH_PLACEHOLDER}
-        value={keyword}
-        onChange={(e) => {
-          setKeyword(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-      />
+    <div ref={containerRef} className="relative w-full">
+      {/* 홈/종목분석 검색과 동일 패턴 — wrapper ring 으로 경계, 좌측 돋보기 + 큰 input-search(56px). */}
+      <div className="relative rounded-md shadow-sm ring-1 ring-border-line transition-all duration-150 focus-within:ring-2 focus-within:ring-accent-vivid">
+        <span
+          className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-md text-text-muted"
+          aria-hidden="true"
+        >
+          <Search className="h-5 w-5" />
+        </span>
+        <input
+          type="text"
+          className="input-search"
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={showDropdown}
+          aria-controls="watchlist-search-results"
+          aria-label={WATCHLIST_MODAL_TITLE}
+          placeholder={WATCHLIST_SEARCH_PLACEHOLDER}
+          value={keyword}
+          onChange={(e) => {
+            setKeyword(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+        />
+      </div>
 
       {showDropdown ? (
         <div
