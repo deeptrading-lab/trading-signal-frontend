@@ -345,14 +345,14 @@ components:
     rounded: "{rounded.md}"
     padding: 4px
   search-result-item:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.surface-elevated}"
     textColor: "{colors.text-strong}"
     rounded: "{rounded.sm}"
     typography: "{typography.body-sm-strong}"
     padding: "{spacing.dropdown-item-py}"
     height: "{spacing.dropdown-item-h}"
   search-result-item-meta:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.surface-elevated}"
     textColor: "{colors.text-muted}"
     typography: "{typography.caption}"
     padding: 0px
