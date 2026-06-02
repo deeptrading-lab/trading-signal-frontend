@@ -237,9 +237,11 @@
   .search-result-item-focus-meta {
     @apply text-caption text-accent-vivid;
   }
-  /* dropdown-panel: input 바로 아래 absolute floating. 그림자 없음 (border 로 분리). */
+  /* dropdown-panel: input 바로 아래 absolute floating. 그림자 없음 (border 로 분리).
+   * 떠있는 면 → bg-surface-elevated (다크 모드 §Elevation): light 는 surface-elevated=surface(#fff)
+   * 무회귀, 다크는 한 톤 밝은 면(#1d2630)으로 surface(#161d26) 위에서 부상. */
   .dropdown-panel {
-    @apply bg-surface text-text-strong border border-border-line rounded-sm p-xs;
+    @apply bg-surface-elevated text-text-strong border border-border-line rounded-sm p-xs;
   }
 
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
@@ -315,9 +317,11 @@
     @apply bg-surface-muted text-text-muted text-caption rounded-sm p-[12px];
   }
 
-  /* ---------- 모바일 drawer ---------- */
+  /* ---------- 모바일 drawer ----------
+   * 떠있는 면 → bg-surface-elevated (다크 모드 §Elevation): light 무회귀,
+   * 다크는 한 톤 밝은 면(#1d2630)으로 부상(다크에선 그림자가 거의 안 보여 면 명도로 분리). */
   .drawer {
-    @apply fixed top-0 left-0 z-[60] h-screen w-drawer-w bg-surface text-text-strong rounded-r-md p-lg overflow-y-auto;
+    @apply fixed top-0 left-0 z-[60] h-screen w-drawer-w bg-surface-elevated text-text-strong rounded-r-md p-lg overflow-y-auto;
     box-shadow: 0 16px 48px rgba(23, 32, 42, 0.16);
   }
   .drawer-scrim {

@@ -205,7 +205,12 @@ export function WatchlistAddModal({
     >
       <div
         ref={panelRef}
-        className="card mt-2xl w-full max-w-md flex flex-col gap-md"
+        className={cn(
+          "card mt-2xl w-full max-w-md flex flex-col gap-md",
+          // 떠있는 면(모달 다이얼로그) → 다크에서 surface 위 한 톤 밝은 면으로 부상.
+          // light 는 surface-elevated=surface(#fff) 무회귀. (다크 모드 §Elevation)
+          "bg-surface-elevated",
+        )}
         role="dialog"
         aria-modal="true"
         aria-label={WATCHLIST_MODAL_TITLE}
