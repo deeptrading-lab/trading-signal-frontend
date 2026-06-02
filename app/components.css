@@ -225,7 +225,9 @@
     @apply flex flex-col justify-center gap-dropdown-item-gap min-h-dropdown-item-h px-md py-dropdown-item-py rounded-sm cursor-pointer text-body-sm-strong;
   }
   .search-result-item {
-    @apply bg-surface text-text-strong;
+    /* 떠있는 드롭다운 패널(surface-elevated) 안의 항목 → 패널과 같은 surface-elevated 로 맞춰
+     * 다크에서 항목이 패널보다 어두워 "박힌" 듯 보이던 현상 제거(light 는 elevated=surface=#fff 무변경). */
+    @apply bg-surface-elevated text-text-strong;
   }
   .search-result-item-focus {
     @apply bg-accent-vivid-soft text-accent-vivid;

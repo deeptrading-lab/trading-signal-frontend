@@ -9,8 +9,8 @@
  *     html.dark  { --fs-surface: #161d26 }   ← dark
  *
  * 단일 진실 원천(SSOT):
- *   - light 48키 = `tailwind.theme.json.theme.extend.colors`(@google/design.md export 산출).
- *   - dark  48키 = `docs/design/finsight-redesign.md` front matter 의 `colors-dark:` 블록.
+ *   - light 49키 = `tailwind.theme.json.theme.extend.colors`(@google/design.md export 산출, surface-elevated 포함).
+ *   - dark  49키 = `docs/design/finsight-redesign.md` front matter 의 `colors-dark:` 블록.
  *     (export 도구가 colors-dark 를 흘려보내지 않으므로 `inject-breakpoints.mjs` 처럼 직접 파싱.)
  *   - `tailwind.theme.json` 에 다크 hex 를 직접 박지 않는다(#86 SSOT 사고 회피).
  *

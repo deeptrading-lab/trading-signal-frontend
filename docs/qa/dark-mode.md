@@ -703,5 +703,239 @@ PR4 범위 AC(themeColor 정적/런타임/system/FOUC · in-app·iOS 스플래�
 > **PR4 라운드 판정: qa-passed.** 핵심 리스크였던 **themeColor 런타임 교체 ↔ viewport media 태그 충돌이 0**(런타임은 비-media 태그만 추가, media 2태그 보존, 명시 선택이 우선순위만으로 OS media 를 덮음) — system 자동·명시 선택·FOUC 첫 페인트 전부 상태바 색 정합. in-app·iOS 스플래시 다크 어둡게(흰 눈부심 0), light 변형 유지. 정보성 관찰 2건(light 스플래시 배경이 #ffffff→#f6f8fa=surface-muted 로 body 와 정합화·주석 표기 부정확 / commit-타이밍 테스트 아티팩트)은 차단 아님. hex 전수 마감(PR5)은 본 라운드 비범위 — 다음 라운드에서 본 문서에 추가 검증한다.
 
 ---
+---
+
+# QA — 다크모드 PR5 (전 표면 검증 + 마감) (`dark-mode`)
+
+> **PR**: 브랜치 `feature/dark-mode-polish` (커밋 `4dcdb35` — `fix(theme): 검색 결과 항목 surface-elevated 정합(다크 박힘 해소) + inject 주석 49키 정정 (INFO-PR2-1)`)
+> **PRD**: `docs/prd/dark-mode.md` (§3.5 PR5 검증/마감 · AC-6 핵심 시인성 · §5 전 AC 누적 충족)
+> **라운드**: **PR5 (전 표면 검증 + 마감)** — 5-PR 분할의 **마지막 관문**. PR1~4 머지 완료(#93·#94·#95·#96, main 반영). PR5 코드 변경은 **INFO-PR2-1 폴리시 1건**(search-result-item bg `surface`→`surface-elevated`, light 무변경) + inject 주석 48→49키 정정. 본 라운드는 **시리즈 전체를 닫는 최종 검증** — 직타 hex 전수조사 + 전 표면 최종 시인성 스윕(7라우트 × light/dark/system × 2뷰포트) + DESIGN.md 토큰 라이브 동기화 + PR1~5 종합 클로즈.
+> **PR5 핵심 기준 = ① 직타 hex 회귀 0(의도 예외만 잔존, 다크 토큰 동기) · ② 전 표면 다크 시인성 무누락(WCAG AA, search-result-item 변경 반영) · ③ search-result-item 폴리시(다크 박힘 해소, light 무회귀) · ④ DESIGN.md 토큰 라이브 동기화.**
+> **QA 수행**: QA 에이전트 · 2026-06-03 · macOS · Node v20.19.6 · 프로덕션 빌드(Turbopack) + `PORT=4901 npm run start` + Playwright(npx 캐시 1.60) headless chromium · `colorScheme` + `localStorage["finsight:theme"]` 시드
+> **판정**: **qa-passed (시리즈 클로즈)** (직타 hex 회귀·시인성 깨짐·search-result-item 폴리시 부작용 **0건**, 정보성 관찰은 PR2~4 라운드 INFO 승계 — 신규 INFO 0)
+
+---
+
+## 0. 검증 환경
+
+- `git checkout feature/dark-mode-polish` (`4dcdb35`). `git diff origin/main..HEAD --stat`: `app/components.css`(+3/-1 search-result-item bg) · `docs/design/finsight-redesign.md`(+2/-2 search-result-item(-meta) backgroundColor `surface`→`surface-elevated`) · `scripts/inject-color-themes.mjs`(+2/-2 주석 48→49키). **PR5 는 폴리시 1건 + 주석 정정** — 인프라/팔레트/차트/메타 무변경.
+- PR1~4(#93~96) **머지 완료**(`gh pr view` 전부 `MERGED`, base=main). PR5 HEAD 는 main 대비 1커밋.
+- `npm run build` → `PORT=4901 npm run start` 프로덕션 서버(PR1~4 선례 — dev Turbopack HMR 이 proxy 와 충돌하므로 `next start`).
+- 앱 비밀번호 게이트 비활성(`.env.local` `APP_PASSWORD` 미설정, 서버 로그 `[auth] APP_PASSWORD 미설정`). 로그인 불필요.
+- BE(`127.0.0.1:8000`) 라이브 불가(`curl /health` = 000). 시세·검색·관심종목·차트는 route handler 가 KIS·DART 외부 API(env 키 라이브)로 프록시 → 실데이터 렌더. **PR5 는 색·폴리시 전용**이라 데이터 경로 무관.
+- 자동 대비 스윕: 7라우트 × light/dark × 데스크탑(1280)·모바일(375) = **28 페이지스캔**. 산출물 `/tmp/dark-pr5-shots/`(라우트 12컷 + 검색드롭다운/모달/라이브토글/모바일).
+
+---
+
+## 1. AC 별 재현·기대·실측 (PR5 범위 + 시리즈 누적 게이트)
+
+| # | AC (PR5) | 재현 절차 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|---|
+| AC-9a | typecheck 0 | `npm run typecheck` | 0 에러 | `tsc --noEmit` 무출력, exit 0 | 통과 |
+| AC-9b | lint 0 | `npm run lint` | 0 에러 | `eslint .` 무출력, exit 0 | 통과 |
+| AC-9c | build 0 (Turbopack) | `npm run build` | 0 에러, 전 라우트 정상 | exit 0. `/ /market /stock /stock/[ticker] /profile /watchlist /dashboard /analyze /login` + api ƒ(dynamic) + `/splash-ios`·`/icon`·`/apple-icon`·`/opengraph-image` + Proxy(Middleware) 정상 | 통과 |
+| AC-9d | design:sync 49키 1:1 검증 | `npm run design:sync` | 49키 1:1 통과 | `colors-dark 49키 파싱·1:1 검증 통과` / `theme-vars.css 생성 완료 (light 49키 / dark 49키)`, theme-vars.css·theme.json **drift 0**(커밋본 동일) | 통과 |
+| AC-6-H | **직타 hex 전수조사** — 회귀 0(의도 예외만) | `grep -rnE "#[0-9a-fA-F]{3,6}" app components --include='*.tsx' --include='*.css'` ∖ theme-vars.css | 의도 예외 외 신규 직타 hex 0 | 실제 코드(주석 제외) hex 10건 전부 **의도 예외**(아래 §2 분류표). 회귀 0 | 통과 |
+| AC-6-V | **전 표면 시인성 무누락** — 7라우트×light/dark×2뷰포트 자동 대비 스캔 | gradient-clip 보정 스캐너 28 페이지스캔 | 전 스캔 sub-threshold 0 | **28/28 스캔 전부 sub-threshold 0**(아래 §3). 육안 12컷 깨짐 0 | 통과 |
+| AC-6-P | **search-result-item 폴리시** — 다크 박힘 해소 + light 무회귀 | 다크/light 드롭다운 computed bg | 다크 item=panel=elevated, light item=panel=#fff | 다크: panel `#1d2630`·item `#1d2630`(동일, 박힘 해소) / light: panel `#ffffff`·item `#ffffff`(무회귀) | 통과 |
+| AC-2-S | **DESIGN.md 토큰 라이브 동기화** | colors-dark 토큰 임시 변경 → sync → build → 번들 반영 → 복원 | DESIGN.md→theme-vars→bundle 전파, 복원 clean | surface-elevated 다크 `#1d2630`→`#ff00ff` 임시변경 → sync 후 theme-vars `--fs-surface-elevated:#ff00ff`(dark만, light `#ffffff` 무변경) → build 후 번들 CSS 에 `ff00ff` **FOUND** → `git checkout` 복원, working tree clean | 통과 |
+| AC-1-NR | `dark:` variant 무회귀(G5) | `grep -rnoE 'className=[^>]*\bdark:[a-z]'` | 0건 | 0건 | 통과 |
+
+### AC-9 실측 로그
+
+```
+$ npm run typecheck   → tsc --noEmit (무출력)  exit 0
+$ npm run lint        → eslint .     (무출력)  exit 0
+$ npm run build       → 성공 (전 라우트 prerender/dynamic + 메타이미지 + Proxy(Middleware) 정상)  exit 0
+$ npm run design:sync → colors-dark 49키 파싱·1:1 검증 통과 / theme-vars.css 생성 완료 (light 49키 / dark 49키)
+                        git diff --stat app/theme-vars.css tailwind.theme.json → (drift 0)
+```
+
+---
+
+## 2. 직타 hex 전수조사 (AC-6 마감) — 의도 예외 vs 회귀
+
+`grep -rnE "#[0-9a-fA-F]{3,6}" app components --include='*.tsx' --include='*.css'`(∖ theme-vars.css). 주석 매치 다수 제외 후 **실제 코드(load-bearing) hex 10건** 을 분류. 전부 PRD §3.4·작업 지시의 **의도된 예외**이며 다크 토큰값과 동기.
+
+| 위치 | hex | 분류 | 다크 토큰 동기 |
+|---|---|---|---|
+| `lib/brand-mark.tsx` PULSE_UP/MID/DOWN/BG | `#ef4444`·`#94a3b8`·`#3b82f6`·`#ffffff` | 의도 예외 — 브랜드 3색 맥박(light/dark 단일, 브랜드 정체성) | n/a(브랜드 고정) |
+| `components/layout/BrandPulseIcon.tsx` | `#0f172a` floodColor | 의도 예외 — 브랜드 글리프 그림자(brand-mark 글리프 영역, 단일) | n/a(브랜드 고정) |
+| `app/icon.tsx` | `#ffffff`·`#e2e8f0` | 의도 예외 — 파비콘 light 고정(PRD 비목표) | n/a(light 고정 수용) |
+| `app/opengraph-image.tsx` | `#ffffff`·`#e7edf5`·`#e2e8f0`·`#1e293b` | 의도 예외 — OG 공유카드 light 고정(PRD 비목표) | n/a(light 고정 수용) |
+| `app/layout.tsx` viewport.themeColor | `#ffffff`·`#0e141b` | 의도 예외 — viewport 토큰 클래스 사용 불가 | **#0e141b = `--fs-surface-muted` dark** ✓ |
+| `app/layout.tsx` FOUC 인라인 스크립트 | `#ffffff`·`#0e141b` | 의도 예외 — head raw script 동기 실행(토큰 read 불가) | **#0e141b = surface-muted dark** ✓ |
+| `lib/store/themeStore.ts` META_THEME_COLOR | `#ffffff`·`#0e141b` | 의도 예외 — meta theme-color 런타임 교체(PRD §9 q2) | **#0e141b = surface-muted dark** ✓ (주석 명시) |
+| `app/splash-ios/route.tsx` DARK_BG/DARK_WORDMARK/LIGHT_WORDMARK | `#0e141b`·`#e6edf3`·`#1e293b` | 의도 예외 — ImageResponse(Satori) 토큰 클래스 사용 불가 | **#0e141b = surface-muted dark · #e6edf3 = `--fs-text-strong` dark** ✓ (theme-vars.css line 59·61 동기 확인) |
+
+- **회귀(위 외 신규 직타 hex): 0건.** PR5 가 새로 박은 hex 0(diff 는 `bg-surface-elevated` 토큰 클래스·주석·DESIGN.md 토큰 참조뿐).
+- **다크 팔레트 hex 코드 직타 0**: `git grep -nE "#161d26|#1d2630|#9aa6b2|#5b9bff|#f47171" -- '*.tsx' '*.ts'`(∖ theme-vars) → `useChartTheme.ts:61` 주석 1건만(PR3 라운드 분류 승계, load-bearing 아님). 다크 hex 는 theme-vars.css 산출물에만 존재(#86 SSOT 규율 무위반).
+- themeColor/splash-ios 의 `#0e141b`·`#e6edf3` 가 theme-vars.css 다크 토큰(`--fs-surface-muted:#0e141b`·`--fs-text-strong:#e6edf3`)과 **1:1 동기** 재확인 — 의도 예외가 DESIGN.md 다크값과 어긋나지 않음.
+
+---
+
+## 3. 전 표면 최종 시인성 스윕 (light/dark × 데스크탑/모바일) — AC-6 핵심
+
+다크 강제(`colorScheme:'dark'` + `localStorage["finsight:theme"]="dark"`) 후 7라우트에서 **직접 텍스트 노드를 가진 모든 DOM 요소**에 대해 `color` vs 유효 배경(불투명 면까지 부모 추적) WCAG 2.x 대비 계산. floor = 일반 4.5:1 / 큰글자(≥24px 또는 ≥18.66px bold) 3:1. **gradient-clip 보정**: `background-clip:text` + 투명 `color` 워드마크(FinSight)는 보이는 글리프가 그라데이션이므로 스캐너 false-positive 제외(아래 보정 노트).
+
+```
+                       1280            375
+                  light  dark      light  dark
+/ (home)          0/211  0/211     0/218  0/218
+/market           0/211  0/211     0/218  0/218
+/stock/005930     0/233  0/233     0/76   0/76
+/profile          0/83   0/83      0/88   0/88
+/watchlist        0/39   0/39      0/44   0/44
+/dashboard        0/83   0/83      0/88   0/88
+/analyze          0/39   0/39      0/44   0/44
+```
+
+→ **28 페이지스캔 전부 sub-threshold 0건.** 다크/light 모두에서 WCAG AA 미달(=안 보일 위험) 텍스트 0. PRD G3(전 표면 시인성 무누락)·AC-6 충족의 최종 증거.
+
+> **gradient-clip 보정 노트(스캐너 정확도)**: 1차 스캔에서 다크 전 라우트 "sub=3"(텍스트 `FinSight`, color [0,0,0]) 가 잡혔으나, 실측으로 `.sidebar-brand-text`/`.header-brand-text`/`.splash-wordmark` 가 `background-clip:text` + `color:rgba(0,0,0,0)`(투명) + `linear-gradient(text-strong #e6edf3 → text-muted #9aa6b2)` 임을 확인 — 보이는 글리프는 밝은 그라데이션(14:1↑)이고 computed `color` 의 검정은 클립 베이스라 비가시. **false-positive**. 보정 스캐너(clip:text + 투명 color 요소 제외)로 재실행 → 28/28 전부 0. PR2 라운드의 "전 라우트 0" 결과와 정합.
+
+### 표면 유형별 다크 최종 확인 (육안 — 스크린샷 산출물 `/tmp/dark-pr5-shots/`)
+
+| 표면 유형 | 다크 실측 | 판정 |
+|---|---|---|
+| 카드 (지수/기업개황/공시/자산/보유종목) | surface `#161d26` 위 text-strong/muted 가독, 등락 빨강/파랑 명확 | ✓ |
+| **모달**(WatchlistAddModal elevated) | dialog bg `#1d2630`(elevated), `aria-modal=true`·`aria-label="관심종목 추가"`, 스크림 dim. (헤드리스 폭 42px = PR2 §4 문서화된 테마무관 환경 아티팩트, light=dark 동일) | ✓ |
+| **드롭다운**(검색 패널 + 결과항목) | panel `#1d2630` + item `#1d2630`(정합) + text `#e6edf3` — 박힘 해소(§4) | ✓ |
+| **드로어**(모바일) | `.drawer` bg-surface-elevated `#1d2630` 부상(components.css:326) | ✓ |
+| 토스트 | surface-elevated 톤(합성 토큰 자동 전환) | ✓ |
+| 스켈레톤/빈상태 | skeletonShimmer·text-muted 빈상태 가독 | ✓ |
+| 에러상태(card-critical) | critical `#f08585`/critical-soft `#3a1d1f`(다크 토큰) — 어두운 면 위 가독 | ✓ |
+| 배지 | accent-soft/asset-*-soft/signal-*-soft 위 텍스트 대비 충분(자동 스캔 0) | ✓ |
+| 버튼/포커스링 | accent-vivid `#5b9bff`(다크) 버튼, 포커스 shadow `var(--fs-accent-soft)` | ✓ |
+| navbar/header-glass 반투명 | `bg-surface/80·/85` → `color-mix(var(--fs-surface) …)` 다크 적용(PR1 AC-3c) | ✓ |
+| 차트 툴팁 | `rgba(29,38,48,0.85)` 어두운 반투명(PR3 AC-7d 승계) | ✓ |
+
+---
+
+## 4. search-result-item 폴리시 확인 (INFO-PR2-1 해소) — PR5 핵심 변경
+
+PR5 의 유일한 코드 변경. 다크 검색 드롭다운에서 결과 항목이 패널(surface-elevated `#1d2630`)보다 한 톤 어두운 면(surface `#161d26`)이라 "박힌(sunken)" 인상이던 INFO-PR2-1 을, 항목 bg 를 `surface`→`surface-elevated` 로 맞춰 해소.
+
+| 상태 | panel bg | item bg | text | 판정 |
+|---|---|---|---|---|
+| **다크** | `#1d2630`(elevated) | `#1d2630`(elevated — **변경 후 panel 과 동일**) | `#e6edf3`(text-strong ~14:1) | 박힘 해소 ✓ |
+| **light** | `#ffffff` | `#ffffff`(elevated=surface=#fff) | `#0f1419` | **무회귀** ✓ |
+
+- 다크 드롭다운(`삼성` 검색 → 삼성전자/삼성바이오로직스/삼성물산/삼성SDI/삼성생명) 육안: 항목이 패널과 한 면으로 매끄럽게 이어짐(`dark-search-dropdown.png`). 박힘/inset 인상 사라짐.
+- **focus 항목 강조 유지**: `.search-result-item-focus` → `bg-accent-vivid-soft text-accent-vivid`(components.css:232). 다크 토큰 accent-vivid-soft `#1b2b44` + accent-vivid `#5b9bff` 으로 focus 항목이 elevated 면 위에서 강조 구분(토큰 와이어링 확인 — 키보드 ArrowDown focus 클래스는 컴포넌트 자체 nav 로직 경로).
+- **light 무회귀 실측**: light 드롭다운 panel `#ffffff`·item `#ffffff`(동일) — elevated=surface=#fff 라 시각 변화 0.
+- **DESIGN.md 동기**: `search-result-item`/`search-result-item-meta` backgroundColor `{colors.surface}`→`{colors.surface-elevated}`(finsight-redesign.md:345·352) — SSOT 정합.
+
+---
+
+## 5. INFO-PR3-2(거래량 봉 저대비) 재확인
+
+다크 차트 거래량 봉의 실제 식별 가능성을 PR5 마감 시점 재확인.
+
+- 라이브 토글 차트(`/stock/005930`) 다크 SVG fills 수집: `#5b9bff`·`#f47171`·`#35527a`(vol-down)·`#7a3f3f`(vol-up)·`#3fcf6a` — vol-up/vol-down 봉 **양쪽 존재·hue 구분**.
+- 육안(`dark-stock-1280.png`·`dark-live-toggle-chart.png`): 거래량 서브플롯 봉이 전 구간 가시, 상승(저채도 적)/하락(저채도 청) 구분됨. base `#0e141b` 대비 2.3:1 로 가장 낮으나 **봉은 식별 가능**(거래량 = 보조 정보, PRD §3.3 "저채도 vol-up/vol-down" 의도 설계).
+- **판정: INFO 유지(깨짐 아님).** 안 보이는 봉 없음. 디자이너 후속(채도 한 단계 상향) 검토 여지는 선택(차단 아님) — 시리즈 클로즈 후 폴리시 트랙.
+
+---
+
+## 6. 라이브 토글 (light↔dark↔system) — 전 표면 즉시 반영
+
+| 시나리오 | 실측 | 판정 |
+|---|---|---|
+| `/stock` 차트 떠있는 상태 light→dark(storage 이벤트) | html.dark 추가, body `#0e141b`, 차트 SVG strokes light→dark 즉시 swap(`#5b9bff`·`#f47171`·`#f5b945`·`#a98bff`), surfaceCount=4(4종 동시 전환) — reload 0 | ✓ |
+| 모바일 system + OS=dark | html.dark, body `#0e141b` | ✓ |
+| 모바일 system + OS=light(런타임 flip) | html.dark 제거, body `#f6f8fa`(surface-muted light) — matchMedia 자동 따라감, reload 0 | ✓ |
+
+- 페이지 표면 + 차트가 reload 없이 동시 전환(PR1 store + PR3 useChartTheme `resolvedTheme` deps 경로). 전 표면 즉시 반영 확인.
+
+---
+
+## 7. 공통 AC 무회귀 (시리즈 마감)
+
+| 항목 | 명령/방법 | 결과 | 판정 |
+|---|---|---|---|
+| typecheck/lint/build 0 | (AC-9) | 0/0/성공 | 통과 |
+| design:sync 49키 + drift 0 | `npm run design:sync` + `git diff` | 49키 1:1, theme-vars.css/theme.json drift 0 | 통과 |
+| BFF 원칙 무회귀 | `git grep -nE "http://127\.0\.0\.1" -- app/` | route handler fallback 2건(`whitelist/search`·`workbench/_adapters/fastapi` `FASTAPI_BASE_URL ??`)만 — 허용 예외, 그 외 0. 클라이언트 `fetch(` 직접 호출 0(refetch/prefetch 는 TanStack Query) | 통과 |
+| 직타 hex 회귀 0(SSOT 마감) | §2 전수조사 | 의도 예외 10건만, 신규 회귀 0, 다크 hex 코드 직타 0 | 통과 |
+| `dark:` variant 0건(G5) | `grep -rnoE 'className=[^>]*\bdark:[a-z]'` | 0건 | 통과 |
+| 한글 톤 무회귀 | PR5 신규 사용자 노출 문구 없음(components.css 주석 한글 + DESIGN.md 토큰 + inject 주석) | 회귀 0 | 통과 |
+| 접근성 무회귀 | 드롭다운/모달/테마토글 aria 유지(modal `aria-modal`·`aria-label`, 테마토글 `aria-expanded`·`role=radiogroup`·`aria-label`·`role=radio`·`aria-checked` 소스 확인) | 회귀 0 | 통과 |
+
+---
+
+## 8. 발견 이슈
+
+### 신규 — 없음
+
+PR5 범위(hex 전수조사·전 표면 시인성·search-result-item 폴리시·DESIGN.md 라이브 동기화·게이트) 전부 통과. **직타 hex 회귀·시인성 깨짐·search-result-item 폴리시 부작용 0건.**
+
+### 승계 INFO (PR2~4 라운드, 차단 아님)
+
+- **[INFO-PR2-1] 검색 드롭다운 결과 항목 박힘** → **PR5 에서 해소**(§4, item bg surface→surface-elevated). 클로즈.
+- **[INFO-PR3-1] `StockDailyChart.tsx:16` stale 주석**(삭제된 chartTheme 참조) — 미해결(주석, 동작 영향 0). 후속 정리 여지.
+- **[INFO-PR3-2] 거래량 봉 다크 저대비**(vol-up/down 2.3:1) — 식별 가능(보조 정보, PRD 의도). INFO 유지(§5). 디자이너 채도 상향 검토 여지(선택).
+- **[INFO-PR4-1] in-app `.splash-screen` light 배경 #ffffff→#f6f8fa**(body 정합) + 주석 표기 부정확 — body seam 제거의 합리적 trade-off. 주석 정정 여지(선택).
+
+> 승계 INFO 는 전부 차단 아님. 시인성/동작/SSOT 영향 0. PR5 신규 INFO 0.
+
+---
+
+## 9. PR5 판정
+
+- AC-9 typecheck/lint/build/design:sync 49키 — **통과** (0/0/성공/49키 1:1·drift 0)
+- AC-6-H 직타 hex 전수조사 — **통과** (의도 예외 10건만, 회귀 0, 다크 hex 코드 직타 0)
+- AC-6-V 전 표면 시인성 무누락 — **통과** (28 페이지스캔 sub-threshold 0, 육안 깨짐 0)
+- AC-6-P search-result-item 폴리시 — **통과** (다크 박힘 해소, light 무회귀)
+- AC-2-S DESIGN.md 토큰 라이브 동기화 — **통과** (DESIGN.md→sync→theme-vars→bundle 전파, 복원 clean)
+- 라이브 토글(light/dark/system) 전 표면 즉시 반영 — **통과** (차트 포함, reload 0)
+- 공통 무회귀(BFF/한글/a11y/`dark:` 0/SSOT) — **통과**
+
+> **PR5 라운드 판정: qa-passed.** 시리즈 마감 라운드로 직타 hex 전수조사(회귀 0, 의도 예외만)·전 표면 최종 시인성 스윕(28/28 sub-threshold 0)·search-result-item 박힘 해소(INFO-PR2-1 클로즈)·DESIGN.md 토큰 라이브 동기화 전부 충족. 신규 결함 0.
+
+---
+---
+
+# 다크모드 시리즈 종합 클로즈 (PR1~PR5)
+
+> 5-PR 분할(인프라 → 팔레트 → 차트 → 메타/이미지 → 검증/마감) 전 라운드 qa-passed. 사용자 핵심 요구 **"전 표면 시인성 무누락"** 충족 매트릭스.
+
+## PRD 수용 기준(G1~G9) 충족 매트릭스
+
+| 목표 | 내용 | 충족 근거(라운드) | 상태 |
+|---|---|---|---|
+| **G1** | 3-state 토글(light/dark/system) + localStorage 영속, 기본 system | PR1 AC-3/AC-4(토글 실측·`finsight:theme` 영속) | ✅ |
+| **G2** | system 자동 반영(matchMedia, reload 없이) | PR1 AC-4b + PR5 §6(모바일 OS flip 자동 따라감) | ✅ |
+| **G3** | **전 표면 시인성 무누락(WCAG AA 4.5:1)** — 7라우트+전 표면유형+차트 4종 | PR2 자동스캔 0 + PR3 차트 4종 + **PR5 28페이지스캔 sub-threshold 0** | ✅ (핵심) |
+| **G4** | FOUC 방지(첫 페인트 전 동기 적용) | PR1 AC-5(head 인라인 script, commit 전 적용) + PR4 AC-8d(theme-color FOUC) | ✅ |
+| **G5** | 자동 토큰 전환(컴포넌트 수정 0, `dark:` variant 0) | PR1 AC-1(computed-style 0/597) + 전 라운드 `dark:` 0건 | ✅ |
+| **G6** | SSOT 유지(다크 49값 DESIGN.md 단일, theme.json/코드 직타 0) | PR2 AC-2 + **PR5 §2 hex 전수조사 회귀 0 + AC-2-S 라이브 동기화** | ✅ |
+| **G7** | 스플래시 다크 대응(흰 눈부심 방지) | PR4 AC-8f/g(in-app `.splash-screen` #0e141b + iOS startup image dark 변형) | ✅ |
+| **G8** | 상태바(theme-color) 현재 테마 정합 | PR4 AC-8a~e(viewport media 2태그 + 런타임 비-media 교체, 충돌 0) | ✅ |
+| **G9** | 품질 게이트(typecheck/lint/build 0 + design:sync 49키) | 전 라운드 0/0/성공 + PR5 49키·drift 0 | ✅ |
+
+## 핵심 리스크 차단 결과
+
+| PRD §8.4 회귀 위험 | 차단 결과 |
+|---|---|
+| `var()` 맵 전환 빌드 산출 변화(중) | PR1 게이트 3종 + computed-style 0/597 — 시각 무회귀 |
+| 알파 수정자 var 색 미동작(중) | PR1 AC-3c — `color-mix` 정상(navbar/header 반투명) |
+| 차트 런타임 훅 전환 누락(중) | PR3 AC-7 — 소비처 전수 전환, 흰 차트 잔존 0 |
+| **표면 누락 시 다크 시인성 깨짐(중·핵심)** | 자동 방어선 3종(49키 1:1·WCAG 스캔·hex 전수) + PR2/PR5 자동스캔 sub-threshold 0 |
+| FOUC 깜빡임(저) | PR1 AC-5 — head 동기 적용 |
+
+## 미해결/후속 (전부 차단 아님 · 선택)
+
+- **INFO-PR3-1** — `StockDailyChart.tsx:16` stale 주석(삭제된 chartTheme 참조). 주석만, 동작 영향 0.
+- **INFO-PR3-2** — 거래량 봉 다크 저대비(2.3:1, 식별 가능·PRD 의도). 디자이너 채도 상향 검토 여지.
+- **INFO-PR4-1** — in-app 스플래시 light 배경 #f6f8fa(body 정합 trade-off) + 주석 표기 정정 여지.
+- **PR1 INFO-1** — 빌드 CSS 죽은 유틸 `.shadow-[...theme(colors.accent-soft)]`(inert, 참조 0).
+- **계정 동기화 / 자동(시간대) 전환 / 고대비·색맹 팔레트** — PRD 비목표, Supabase 도입 후·별도 트랙.
+
+## 최종 판정
+
+> **다크모드 시리즈(PR1~PR5): qa-passed (시리즈 클로즈).** PRD 목표 G1~G9 전건 충족. 사용자 핵심 요구 **"전 표면 시인성 무누락"** = 7라우트 × light/dark × 2뷰포트 자동 대비 스캔 sub-threshold 0(PR2·PR5 누적) + 차트 4종 다크 시인성(PR3) + 메타/스플래시 다크(PR4) + SSOT 무위반(다크 hex 코드 직타 0, DESIGN.md 단일 출처 라이브 동기화). 차단급 실패 0건. 미해결 항목은 전부 정보성(차단 아님)이며 후속 폴리시 트랙으로 이관.
+
+---
 
 산출물: `docs/qa/dark-mode.md`
