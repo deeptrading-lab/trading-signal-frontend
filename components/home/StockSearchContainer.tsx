@@ -17,7 +17,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Search, Star } from "lucide-react";
+import { Clock, Star } from "lucide-react";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
@@ -124,29 +125,18 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
 
   return (
     <div ref={containerRef} className="relative w-full">
-      {/* 검색 입력 — wrapper ring으로 시인성 확보, input 자체 border 제거해 단일 경계 */}
-      <div className="relative rounded-md shadow-sm ring-1 ring-border-line focus-within:ring-2 focus-within:ring-accent-vivid transition-all duration-150">
-        <span
-          className="absolute inset-y-0 left-0 pl-md flex items-center pointer-events-none text-text-muted"
-          aria-hidden="true"
-        >
-          <Search className="h-5 w-5" />
-        </span>
-        <input
-          type="text"
-          value={keyword}
-          onChange={(e) => {
-            setKeyword(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          className="input-search"
-          placeholder={PLACEHOLDER}
-          aria-label={SEARCH_ARIA}
-          aria-haspopup="listbox"
-          autoComplete="off"
-        />
-      </div>
+      {/* 공용 검색 입력(`components/ui/SearchInput`) — 관심종목 검색과 동일 비주얼 공유. */}
+      <SearchInput
+        value={keyword}
+        onChange={(e) => {
+          setKeyword(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder={PLACEHOLDER}
+        aria-label={SEARCH_ARIA}
+        aria-haspopup="listbox"
+      />
 
       {/* 드롭다운 */}
       {showDropdown && (
