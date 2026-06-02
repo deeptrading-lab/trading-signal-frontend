@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
 import { WatchlistStarButton } from "./WatchlistStarButton";
 import {
@@ -84,11 +85,9 @@ export function WatchlistSearch({
   }
 
   return (
-    <div ref={containerRef} className="relative">
-      <input
-        type="text"
-        className="input w-full"
-        autoComplete="off"
+    <div ref={containerRef} className="relative w-full">
+      {/* 공용 검색 입력(홈/종목분석과 동일 비주얼) — 상태·드롭다운은 본 컴포넌트 소유. */}
+      <SearchInput
         role="combobox"
         aria-expanded={showDropdown}
         aria-controls="watchlist-search-results"
