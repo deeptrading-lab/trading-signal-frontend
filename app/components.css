@@ -384,6 +384,44 @@
     @apply bg-surface-muted text-text-strong outline-none;
   }
 
+  /* theme-toggle — 헤더 전역 테마 토글(light↔dark). 달↔해가 회전(360°)+스케일로 크로스페이드.
+   * uiverse(santosh-sarkar/terrible-mole-8) 애니메이션 참고하되, 체크박스 대신 **html.dark 클래스**로
+   * 구동한다 → FOUC 스크립트가 paint 전에 클래스를 붙이므로 hydration 깜빡임 0, 프로필 3-state·system
+   * 변경에도 함께 애니메이션. 색은 토큰(달=text-muted / 해=warm warn). hit-area 40×40(헤더 정합). */
+  .theme-toggle {
+    @apply inline-grid place-items-center h-hit-area-min w-hit-area-min p-sm bg-surface text-text-strong rounded-pill cursor-pointer border-0;
+  }
+  .theme-toggle:hover,
+  .theme-toggle:focus-visible {
+    @apply bg-surface-muted text-text-strong outline-none;
+  }
+  /* 두 아이콘을 같은 그리드 칸에 겹쳐 두고 transform 으로 전환(시간값/transform 은 토큰 비대상). */
+  .theme-toggle-icon {
+    @apply h-6 w-6;
+    grid-area: 1 / 1;
+    transition: transform 500ms;
+  }
+  /* light(기본): 해 보임 / 달 숨김. */
+  .theme-toggle-icon--sun {
+    /* 해(sun) — 팔레트에서 가장 노란 앰버/골드 토큰(chart-signal #f59e0b/#f5b945) 재사용. */
+    @apply text-chart-signal;
+    transform: scale(1) rotate(0deg);
+    transition-delay: 200ms;
+  }
+  .theme-toggle-icon--moon {
+    @apply text-text-muted;
+    transform: scale(0) rotate(360deg);
+  }
+  /* dark: 달 보임 / 해 숨김. */
+  html.dark .theme-toggle-icon--sun {
+    transform: scale(0) rotate(360deg);
+    transition-delay: 0ms;
+  }
+  html.dark .theme-toggle-icon--moon {
+    transform: scale(1) rotate(360deg);
+    transition-delay: 200ms;
+  }
+
   /* ---------- Sidebar 글로벌 6 메뉴 (PR3 신규 sub-class) ----------
    * `.sidebar` shell 은 layout-redesign v4 무회귀 — 본 PR3 도 호출.
    * sub-class 만 신규: sidebar-brand / sidebar-nav / sidebar-nav-item / -active.
