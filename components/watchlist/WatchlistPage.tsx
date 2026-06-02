@@ -13,8 +13,10 @@
  *   - `canRefresh` false(빈 상태 등) 시 버튼 미노출.
  *
  * v8 토큰: 컨테이너 `mx-auto max-w-main-max-w flex flex-col gap-lg` · 타이틀 `text-h1` ·
- *   Star `text-chart-signal fill-chart-signal`(앰버/골드, 헤더 테마 토글 해와 색 통일) · "새로고침" = **배경 투명** 아이콘 버튼(RefreshCw 만, 박스 없이 —
- *   종목추가와 크기 착시 회피, hover 시 아이콘 색만 진해짐, aria-label 로 접근성) · "+ 종목 추가" `button-primary`.
+ *   Star `text-chart-signal fill-chart-signal`(앰버/골드, 헤더 테마 토글 해와 색 통일).
+ *   "새로고침" = **배경 투명** 아이콘 버튼(RefreshCw 만). 버튼 박스를 `h-2xl w-2xl`(24px)로 둬 타이틀
+ *   행 높이(text-h1 ~26px) 이하 → 다른 페이지 헤더와 높이 일치(이전 32px 박스가 헤더를 더 키우던 것 수정).
+ *   종목 추가는 상단 인라인 검색(`WatchlistSearch`)으로 이동(기존 "+ 종목 추가" 버튼 제거).
  */
 
 "use client";
@@ -57,7 +59,7 @@ export function WatchlistPage({
         {canRefresh ? (
           <button
             type="button"
-            className="inline-flex items-center justify-center h-button-sm-h w-button-sm-h rounded-sm bg-transparent text-text-muted hover:text-text-strong transition-colors cursor-pointer disabled:opacity-[0.65] disabled:cursor-not-allowed"
+            className="inline-flex h-2xl w-2xl items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong cursor-pointer disabled:opacity-[0.65] disabled:cursor-not-allowed"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
