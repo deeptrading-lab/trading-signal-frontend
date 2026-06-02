@@ -3331,3 +3331,43 @@
   - **PR3 (차트 런타임)**: recharts는 CSS 변수 자동전환 불가 → `hooks/utils/useChartTheme.ts`로 `getComputedStyle` 런타임 read. `chartTheme.ts` 소비처 전수 전환.
   - **PR4 (메타/이미지)**: `viewport.themeColor` media 배열 + 명시선택 런타임 `<meta theme-color>` 교체 + in-app 스플래시 다크. 파비콘/OG는 light 고정.
   - **PR5 (검증/마감)**: 직타 hex 전수조사 + WCAG 대비 검사 + 전 표면 QA 체크리스트.
+
+### 2026-06-02 — feat(theme): 다크모드 PR2 — 다크 팔레트 49값 + surface-elevated (깊은 청회슬레이트) (#94)
+
+- **slug**: `dark-mode-palette` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/94
+- **요약**: feat(theme): 다크모드 PR2 — 다크 팔레트 49값 + surface-elevated (깊은 청회슬레이트)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇
+  > 
+  > 다크모드 시리즈 **PR2 — 다크 팔레트 49값 + surface-elevated**. PR1(토큰 CSS 변수화 인프라) 위에서, 다크모드의 실제 "룩"이 처음 적용된다. 기본값 system이므로 **머지 후 다크 OS 사용자에게 즉시 다크 UI 노출**.
+  > 
+  > PRD: `docs/prd/dark-mode.md`.
+  > 
+  > ## 어떻게
+  > 
+  > - **`docs/design/finsight-redesign.md`(SSOT)**: light `colors`에 `surface-elevated`(=#ffffff, surface 동일→light 무회귀) 추가 + **`colors-dark:` 49키 블록**(깊은 청회슬레이트 베이스) 신설 + 본문 다크 팔레트 섹션.
+  >   - 면 명도 위계: `surface-muted #0e141b` < `surface #161d26` < `surface-elevated #1d2630` < `border-line #2a333e` — 다크에서 그림자 대신 명도로 부상.
+  >   - 순백/순흑 회피: `text-strong #e6edf3` / `text-muted #9aa6b2`.
+  >   - 한국식 등락: `signal-up #c81e1e→#f47171`(빨강) / `signal-down #1d4ed8→#5b9bff`(파랑), soft는 짙은 저명도 틴트.
+  > - **`app/theme-vars.css` / `tailwind.theme.json`**: `design:sync` 산출물 자동 재생성(49키 light/dark, 키셋 1:1 검증 통과).
+  > - **surface-elevated 와이어링**: `app/components.css`의 `.dropdown-panel`/`.drawer` + `WatchlistAddModal`(유일 dialog)을 `bg-surface-elevated`로. 떠있는 면만, 일반 카드는 surface 유지. light 무회귀.
+  > 
+  > ## 검증
+  > 
+  > - **QA qa-passed** (`docs/qa/dark-mode.md` PR2 라운드): 7라우트 × light/dark × 데스크톱/모바일 = 28컷 + 자동 WCAG 대비 스캔. **전 텍스트 요소 sub-threshold 0건, 육안 시인성 깨짐 0.** 등락색 명확 구분, elevation 명도 위계 라이브 확인, 테마 토글 3-state a11y 정상.
+  > - **Review approved**: SSOT 규율(DESIGN.md 경유, theme-vars 바이트동일 재생성), 키셋 1:1, elevated 와이어링 적절성, WCAG 표 정확성.
+  > - WCAG AA: 본문 31페어 4.5:1+, UI 9페어 3:1+ (0 FAIL).
+  > - typecheck/lint/build 0 에러.
+  > 
+  > ## 다음 작업
+  > 
+  > - **PR3 (차트 런타임 테마)**: recharts는 색 문자열 prop이라 CSS 변수 자동전환 불가 → `hooks/utils/useChartTheme.ts`로 `getComputedStyle` 런타임 read. `chartTheme.ts`(tooltipBg rgba 등) 소비처 전수 전환. CandleTooltip elevated 정합.
+  > - **PR4 (메타/이미지)**: `viewport.themeColor` media 배열 + 명시선택 런타임 `<meta theme-color>` 교체 + in-app 스플래시(`.splash-screen`) 다크. 파비콘/OG는 light 고정.
+  > - **PR5 (검증/마감)**: 직타 hex 전수조사 + INFO-PR2-1(search-result-item 톤) 폴리시 + 주석 49키 정합 + 전 표면 최종 QA.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR3 (차트 런타임 테마)**: recharts는 색 문자열 prop이라 CSS 변수 자동전환 불가 → `hooks/utils/useChartTheme.ts`로 `getComputedStyle` 런타임 read. `chartTheme.ts`(tooltipBg rgba 등) 소비처 전수 전환. CandleTooltip elevated 정합.
+  - **PR4 (메타/이미지)**: `viewport.themeColor` media 배열 + 명시선택 런타임 `<meta theme-color>` 교체 + in-app 스플래시(`.splash-screen`) 다크. 파비콘/OG는 light 고정.
+  - **PR5 (검증/마감)**: 직타 hex 전수조사 + INFO-PR2-1(search-result-item 톤) 폴리시 + 주석 49키 정합 + 전 표면 최종 QA.
