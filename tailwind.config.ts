@@ -114,10 +114,31 @@ function adaptFontSize(
   return out;
 }
 
+/**
+ * colors 맵을 hex 직타가 아닌 `var(--fs-<key>)` 참조로 전환한다 (다크모드 indirection).
+ *
+ * 빌드타임에 hex 를 `theme.extend.colors` 에 박으면 `html.dark` 토글로 색을 못 바꾼다.
+ * 대신 utility 가 `var(--fs-surface)` 를 참조하고, 실제 hex 는 `app/theme-vars.css`
+ * (`:root` light / `html.dark` dark) 가 선언한다 — `scripts/inject-color-themes.mjs` 산출물.
+ *
+ * 변수 프리픽스는 **반드시 `--fs-`** (FinSight). Tailwind v4 가 `--color-*` 네임스페이스를
+ * 자체 예약해 자동 emit 하므로, `--color-` 를 쓰면 우리 변수와 충돌 위험이 있다 → `--fs-` 로 격리.
+ * theme.json 의 hex 는 그대로 보존된다(차트 chartTheme.ts 가 빌드타임 hex 직접 소비 — PR3 영역).
+ */
+function toCssVarColors(
+  colors: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of Object.keys(colors)) {
+    out[key] = `var(--fs-${key})`;
+  }
+  return out;
+}
+
 function adaptDesignTokens(json: typeof themeJson) {
   const t = json.theme.extend;
   return {
-    colors: t.colors,
+    colors: toCssVarColors(t.colors as Record<string, string>),
     spacing: t.spacing,
     borderRadius: t.borderRadius,
     fontFamily: t.fontFamily,
@@ -136,6 +157,10 @@ function adaptDesignTokens(json: typeof themeJson) {
 }
 
 const config: Config = {
+  // 다크모드는 `html.dark` 클래스 토글로 전환한다(자체 ThemeProvider/FOUC 스크립트가 붙임).
+  // 색 분기는 `dark:` variant 가 아니라 `app/theme-vars.css` 의 `html.dark { --fs-* }` 재선언으로
+  // 자동 처리되므로(토큰 indirection), 컴포넌트에는 `dark:` 클래스를 쓰지 않는다(PRD G5).
+  darkMode: "class",
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",

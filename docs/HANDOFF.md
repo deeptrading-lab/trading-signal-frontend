@@ -3288,3 +3288,46 @@
   > - 자유 텍스트 기업 설명(DART 사업보고서 파싱)은 별도 트랙(중량 작업)으로 분리.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 자유 텍스트 기업 설명(DART 사업보고서 파싱)은 별도 트랙(중량 작업)으로 분리.
+
+### 2026-06-02 — feat(theme): 다크모드 PR1 — 토큰 CSS 변수화(--fs-*) + 3-state 토글 인프라 (#93)
+
+- **slug**: `dark-mode` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/93
+- **요약**: feat(theme): 다크모드 PR1 — 토큰 CSS 변수화(--fs-*) + 3-state 토글 인프라
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇
+  > 
+  > 다크모드 도입 시리즈 **PR1 — 토큰 CSS 변수화 + 토글 인프라**. light/dark/system 3-state 다크모드의 기반을 깐다.
+  > 
+  > > **핵심 불변식: 이 PR 머지 후 화면 100% 동일 (dark=light 동일값, 시각 무변경).** 실제 다크 팔레트는 PR2.
+  > 
+  > PRD: `docs/prd/dark-mode.md` · 계획: 5-PR 분할(인프라→팔레트→차트→메타/이미지→검증).
+  > 
+  > ## 어떻게
+  > 
+  > - **토큰 CSS 변수 indirection**: `tailwind.config.ts`의 `adaptDesignTokens()`가 색 48키를 hex가 아닌 `var(--fs-<key>)` 참조로 매핑. 실제 hex는 `app/theme-vars.css`(`:root` light / `html.dark` dark)가 선언. → 기존 컴포넌트 240여 곳·합성토큰 106개 **수정 0**으로 자동 전환 준비.
+  >   - 프리픽스 `--fs-` (Tailwind v4가 예약하는 `--color-*`와 충돌 회피).
+  >   - `darkMode: "class"`.
+  > - **생성 파이프라인**: `scripts/inject-color-themes.mjs`(`inject-breakpoints.mjs` 선례 복제)가 theme.json의 light hex + DESIGN.md `colors-dark:`(아직 없음→PR1은 dark=light 폴백)를 읽어 `app/theme-vars.css` 생성 + 키셋 1:1 검증. `package.json` `design:sync`에 체이닝.
+  > - **테마 상태(자체 구현, next-themes 미도입)**: `lib/store/theme/store.ts`(localStorage 격리, `finsight:theme`) + `lib/store/themeStore.ts`(Zustand 3-state + resolvedTheme) + `components/theme/ThemeProvider.tsx`(하이드레이션 + matchMedia + cross-tab storage 구독).
+  > - **FOUC 방지**: `app/layout.tsx` `<head>` raw 인라인 스크립트(hydration 전 동기 dark 클래스 적용).
+  > - **토글 UI**: `components/theme/ThemeMenuButton.tsx`(SettingsMenuCard THEME 항목 client 분리, light/dark/system 세그먼트).
+  > 
+  > ## 검증 (게이트)
+  > 
+  > - `typecheck` / `lint` / `build` 통과.
+  > - 빌드 CSS 인라인 확인: 포커스링 `theme(colors.accent-soft)`→`var(--fs-accent-soft)`, 알파 수정자 `bg-surface/80`→`color-mix`, `--color-*` 충돌 0.
+  > - 신규 직타 hex 0. theme-vars.css 48키 light=dark 완전 동일(시각 무변경 불변식).
+  > 
+  > ## 다음 작업
+  > 
+  > - **PR2 (다크 팔레트)**: `docs/design/finsight-redesign.md`에 `colors-dark:` + `surface-elevated` 신규 토큰(49→50키, 깊은 청회슬레이트 톤, WCAG AA 4.5:1) 정의 → `design:sync`가 키셋 1:1 검증 후 theme-vars.css의 `html.dark` 블록을 실제 다크값으로 재생성. 이 시점 처음으로 다크 시각 분기(차트 제외). PR1의 dark=light 폴백 자동 해제.
+  > - **PR3 (차트 런타임)**: recharts는 CSS 변수 자동전환 불가 → `hooks/utils/useChartTheme.ts`로 `getComputedStyle` 런타임 read. `chartTheme.ts` 소비처 전수 전환.
+  > - **PR4 (메타/이미지)**: `viewport.themeColor` media 배열 + 명시선택 런타임 `<meta theme-color>` 교체 + in-app 스플래시 다크. 파비콘/OG는 light 고정.
+  > - **PR5 (검증/마감)**: 직타 hex 전수조사 + WCAG 대비 검사 + 전 표면 QA 체크리스트.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR2 (다크 팔레트)**: `docs/design/finsight-redesign.md`에 `colors-dark:` + `surface-elevated` 신규 토큰(49→50키, 깊은 청회슬레이트 톤, WCAG AA 4.5:1) 정의 → `design:sync`가 키셋 1:1 검증 후 theme-vars.css의 `html.dark` 블록을 실제 다크값으로 재생성. 이 시점 처음으로 다크 시각 분기(차트 제외). PR1의 dark=light 폴백 자동 해제.
+  - **PR3 (차트 런타임)**: recharts는 CSS 변수 자동전환 불가 → `hooks/utils/useChartTheme.ts`로 `getComputedStyle` 런타임 read. `chartTheme.ts` 소비처 전수 전환.
+  - **PR4 (메타/이미지)**: `viewport.themeColor` media 배열 + 명시선택 런타임 `<meta theme-color>` 교체 + in-app 스플래시 다크. 파비콘/OG는 light 고정.
+  - **PR5 (검증/마감)**: 직타 hex 전수조사 + WCAG 대비 검사 + 전 표면 QA 체크리스트.

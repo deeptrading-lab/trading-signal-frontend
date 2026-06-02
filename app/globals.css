@@ -16,14 +16,21 @@
 
 @import "tailwindcss";
 @config "../tailwind.config.ts";
+/* 색 토큰 CSS 변수(`--fs-*`) 선언 — design:sync 산출물(`scripts/inject-color-themes.mjs`).
+ * `:root`(light) + `html.dark`(dark) 두 블록. tailwind.config 의 colors 맵이 이 변수를 참조한다. */
+@import "./theme-vars.css";
 
 /* 합성 토큰 컴포넌트 클래스 (`@layer components` + `@apply`) 는 별도 파일에 거주.
  * layout.tsx 에서 본 파일 다음으로 import 한다. */
 
 @layer base {
-  /* color-scheme: light 고정 — 다크모드는 별도 PRD (PRD §4 비범위). */
+  /* color-scheme — light 기본. 다크 토글 시 `html.dark` 로 dark 선언(폼 컨트롤·스크롤바 OS 톤 정합).
+   * 색 토큰 자체는 `theme-vars.css` 의 `:root` / `html.dark` 가 담당(PRD 다크모드). */
   :root {
     color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
 
   /* body 의 배경·텍스트는 Tailwind theme 토큰을 그대로 참조 (preflight 가 색까지 흡수하지는 않음). */

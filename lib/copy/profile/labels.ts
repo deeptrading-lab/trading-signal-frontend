@@ -58,3 +58,10 @@ export const MENU_SECURITY = "보안 및 인증";
 export const MENU_BILLING = "구독 / 결제 관리";
 export const MENU_THEME = "화면 테마 설정 (다크모드)";
 export const MENU_LOGOUT = "로그아웃";
+
+/* 테마 3-state 토글 (light/dark/system) — `components/theme/ThemeMenuButton.tsx`. */
+export const THEME_OPTION_LIGHT = "라이트";
+export const THEME_OPTION_DARK = "다크";
+export const THEME_OPTION_SYSTEM = "시스템";
+/** 현재 선택 모드를 메뉴 행 우측에 요약 표시할 때의 a11y 라벨 prefix. */
+export const THEME_GROUP_LABEL = "화면 테마";
