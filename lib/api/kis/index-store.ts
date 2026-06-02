@@ -19,6 +19,8 @@
  * - `kis:index:{code}` (예 `kis:index:0001`, `kis:index:SPX`).
  */
 
+import { isApiError } from "@/lib/api/errors";
+import { fetchOverseasIndexFallback } from "@/lib/api/market/overseasIndexFallback";
 import { fetchIndexPrice } from "./index-price";
 import { fetchOverseasIndex } from "./overseas-index";
 import { getKisStore, type KisStore } from "./store";
@@ -29,6 +31,78 @@ const INDEX_STORE_TTL_SEC = 30;
 
 /** 해외 지수 store TTL — 10분(일봉 갱신 주기, ticker 라우트 L1 정합). */
 const OVERSEAS_STORE_TTL_SEC = 10 * 60;
+
+/**
+ * 직전 성공값(last-known-good) 보관 TTL — 24h.
+ *
+ * KIS 해외 지수 엔드포인트가 (미 동부 egress 등에서) 간헐적 HTTP 500 을 반환해 SPX/COMP 가
+ * 드롭되던 현상(2026-06-03 진단) 방어선: 한 번이라도 성공하면 그 종가를 별도 키에 24h 보관하고,
+ * 이후 전송성 실패(5xx/네트워크) 시 직전 종가로 폴백해 화면이 비지 않게 한다(지수는 일봉이라 무방).
+ * prod 는 Upstash(L2) 공유라 인스턴스 간·콜드스타트까지 폴백값이 살아남는다.
+ */
+const LAST_GOOD_TTL_SEC = 24 * 60 * 60;
+
+/** 전송성 실패 재시도 — 간헐적 5xx/네트워크면 짧은 backoff 후 재시도로 200 을 잡는다. */
+const RETRY_BACKOFF_MS = 250;
+const MAX_RETRIES = 2;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 재시도/폴백 대상인 전송성 실패(5xx server / 네트워크·타임아웃)인지. 비즈니스 에러는 제외. */
+function isTransientError(error: unknown): boolean {
+  return isApiError(error) && (error.kind === "server" || error.kind === "network");
+}
+
+/** transient 실패면 짧은 backoff 로 최대 MAX_RETRIES 회 재시도. 비즈니스 에러는 즉시 전파. */
+async function fetchWithRetry(
+  fetcher: () => Promise<MarketIndexQuote>,
+): Promise<MarketIndexQuote> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      return await fetcher();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientError(error) || attempt === MAX_RETRIES) throw error;
+      await sleep(RETRY_BACKOFF_MS * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * 공유 store 경유 + 재시도 + 직전 성공값 폴백.
+ *   1) L2 fresh hit → 즉시 반환(KIS 실호출 0).
+ *   2) miss → 재시도 포함 fetch. 성공 시 fresh(짧은 TTL) + last-good(24h) 둘 다 SET.
+ *   3) 전송성 실패(5xx/네트워크) → last-good 폴백(있으면). 없으면 원에러 전파(부분성공 드롭).
+ */
+async function fetchSharedResilient(
+  code: string,
+  store: KisStore,
+  fetcher: () => Promise<MarketIndexQuote>,
+  freshTtlSec: number,
+): Promise<MarketIndexQuote> {
+  const key = indexStoreKey(code);
+  const lastGoodKey = `${key}:last`;
+
+  const cached = await store.get<MarketIndexQuote>(key);
+  if (cached) return cached;
+
+  try {
+    const quote = await fetchWithRetry(fetcher);
+    await store.set(key, quote, freshTtlSec);
+    await store.set(lastGoodKey, quote, LAST_GOOD_TTL_SEC);
+    return quote;
+  } catch (error) {
+    if (isTransientError(error)) {
+      const stale = await store.get<MarketIndexQuote>(lastGoodKey);
+      if (stale) return stale; // 직전 종가로 폴백 — 화면 비움 방지.
+    }
+    throw error;
+  }
+}
 
 /** store 공유 캐시 대상 국내 코드. */
 const SHARED_INDEX_CODES = new Set(["0001", "1001"]);
@@ -63,26 +137,42 @@ export async function fetchIndexPriceShared(
   store: KisStore = getKisStore(),
 ): Promise<MarketIndexQuote> {
   if (!isSharedIndexCode(code)) {
-    return fetchIndexPrice(code);
+    return fetchWithRetry(() => fetchIndexPrice(code));
   }
-
-  const key = indexStoreKey(code);
-  const cached = await store.get<MarketIndexQuote>(key);
-  if (cached) return cached;
-
-  const quote = await fetchIndexPrice(code);
-  await store.set(key, quote, INDEX_STORE_TTL_SEC);
-  return quote;
+  return fetchSharedResilient(
+    code,
+    store,
+    () => fetchIndexPrice(code),
+    INDEX_STORE_TTL_SEC,
+  );
 }
 
 /**
- * 해외 지수(SPX/COMP)를 L2 공유 store 경유로 조회. store hit(10분 윈도우) 시 KIS 실호출 0,
- * miss 시 `fetchOverseasIndex` 1회 후 store SET(10분 TTL).
+ * KIS 해외 지수 1차 + 실패 시 Yahoo 폴백.
  *
- * ticker·indices 두 라우트가 동시에 SPX/COMP를 요청하는 cold-start 시나리오에서
- * KIS 실호출 수를 줄여 EGW00201 drop 확률을 낮춘다.
+ * KIS 가 비-한국 IP(Vercel 미국)에서 HTTP 500 을 주는 제약(2026-06-03 진단)을 우회 —
+ * KIS 가 성공하면(한국 실행 등) 그 값을, 실패하면 US-friendly Yahoo 소스로 SPX/COMP 를 채운다.
+ * 둘 다 실패하면 원 KIS 에러를 전파(상위에서 스테일 폴백/드롭 처리).
+ */
+async function fetchOverseasWithFallback(
+  code: string,
+): Promise<MarketIndexQuote> {
+  try {
+    return await fetchOverseasIndex(code);
+  } catch (kisError) {
+    try {
+      return await fetchOverseasIndexFallback(code);
+    } catch {
+      throw kisError; // 폴백도 실패 → 원 KIS 에러(transient면 상위가 스테일로 메움).
+    }
+  }
+}
+
+/**
+ * 해외 지수(SPX/COMP)를 L2 공유 store 경유로 조회. store hit(10분 윈도우) 시 실호출 0,
+ * miss 시 KIS→Yahoo 폴백 체인 + 직전 성공값(24h) 폴백(`fetchSharedResilient`).
  *
- * store 장애는 fail-soft → `fetchOverseasIndex` 직접 호출로 degrade.
+ * store 장애는 fail-soft → 직접 호출로 degrade.
  *
  * @param code 해외 지수 코드 ("SPX" / "COMP").
  * @param store 테스트용 store 주입(기본 `getKisStore()`).
@@ -92,14 +182,12 @@ export async function fetchOverseasIndexShared(
   store: KisStore = getKisStore(),
 ): Promise<MarketIndexQuote> {
   if (!SHARED_OVERSEAS_CODES.has(code)) {
-    return fetchOverseasIndex(code);
+    return fetchOverseasWithFallback(code);
   }
-
-  const key = indexStoreKey(code);
-  const cached = await store.get<MarketIndexQuote>(key);
-  if (cached) return cached;
-
-  const quote = await fetchOverseasIndex(code);
-  await store.set(key, quote, OVERSEAS_STORE_TTL_SEC);
-  return quote;
+  return fetchSharedResilient(
+    code,
+    store,
+    () => fetchOverseasWithFallback(code),
+    OVERSEAS_STORE_TTL_SEC,
+  );
 }

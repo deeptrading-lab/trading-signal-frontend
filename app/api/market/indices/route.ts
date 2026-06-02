@@ -41,6 +41,7 @@ import {
   withTimeout,
   delay,
   jsonWithDataSource,
+  describeIndexError,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
@@ -68,6 +69,10 @@ const FALLBACK_SERVER_MESSAGE =
 /** 모듈 레벨 in-memory TTL 캐시 — code 단위. 같은 인스턴스 warm 상태에서 KIS 실호출 보호. */
 type CacheEntry = { value: MarketIndexQuote; expiresAt: number };
 const indexCache = new Map<string, CacheEntry>();
+
+// KIS 는 한국(서울) 서버다. 함수가 미 동부(iad1)에서 실행되면 해외 지수 엔드포인트가 HTTP 500 을
+// 반환해 SPX/COMP 가 드롭되는 현상(2026-06-03 진단)을 회피하기 위해 실행 리전을 서울(icn1)로 고정한다.
+export const preferredRegion = "icn1";
 
 export async function GET(request: NextRequest) {
   const codes = parseCodes(request.nextUrl.searchParams.getAll("codes"));
@@ -133,11 +138,20 @@ async function fetchIndices(
     const chunk = misses.slice(i, i + KIS_CHUNK_SIZE);
     // 국내(0001/1001)는 L2 공유 store 경유로 dedup. 해외(SPX/COMP)는 fetchOverseasIndex 직접.
     const settled = await Promise.allSettled(
-      chunk.map((code) =>
-        OVERSEAS_CODES_SET.has(code)
+      chunk.map((code) => {
+        const startedAt = Date.now();
+        const call = OVERSEAS_CODES_SET.has(code)
           ? fetchOverseasIndexShared(code)
-          : fetchIndexPriceShared(code),
-      ),
+          : fetchIndexPriceShared(code);
+        // 진단(2026-06-03): allSettled 가 reject 를 조용히 드롭해 mixed/해외 누락 원인이
+        // prod 로그에 안 남았음. 드롭 사유·소요시간을 노출한다.
+        return call.catch((error: unknown) => {
+          console.warn(
+            `[market/indices] 지수 드롭 code=${code} dur=${Date.now() - startedAt}ms ${describeIndexError(error)}`,
+          );
+          throw error;
+        });
+      }),
     );
     settled.forEach((r, idx) => {
       if (r.status === "fulfilled") {

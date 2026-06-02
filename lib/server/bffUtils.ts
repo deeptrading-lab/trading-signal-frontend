@@ -33,6 +33,37 @@ export function delay(ms: number): Promise<void> {
 }
 
 /**
+ * 지수 등 외부 API 호출이 `Promise.allSettled` 에서 reject 되어 조용히 드롭될 때,
+ * 그 사유를 한 줄 문자열로 요약한다(prod 로그 진단용).
+ *
+ * 드롭의 진짜 원인(타임아웃 / KIS 비즈니스 에러 / 네트워크)을 구분하려는 목적:
+ *   - axios 타임아웃 → `msg="timeout of 5000ms exceeded"` (또는 code=ECONNABORTED)
+ *   - KIS rt_cd≠0  → `status=200 msg_cd=EGW... msg="<한글>"`
+ *   - 5xx/네트워크 → `kind=server/network status=<n>`
+ */
+export function describeIndexError(error: unknown): string {
+  if (error && typeof error === "object") {
+    const e = error as {
+      name?: string;
+      kind?: string;
+      status?: number;
+      code?: string;
+      message?: string;
+      detail?: { msg_cd?: string };
+    };
+    const parts: string[] = [];
+    if (e.name) parts.push(`name=${e.name}`);
+    if (e.kind) parts.push(`kind=${e.kind}`);
+    if (typeof e.status === "number") parts.push(`status=${e.status}`);
+    if (e.code) parts.push(`code=${e.code}`);
+    if (e.detail?.msg_cd) parts.push(`msg_cd=${e.detail.msg_cd}`);
+    if (e.message) parts.push(`msg="${e.message}"`);
+    return parts.length > 0 ? parts.join(" ") : `raw=${String(error)}`;
+  }
+  return `raw=${String(error)}`;
+}
+
+/**
  * `X-Data-Source` 헤더(`kis`/`mock`/`seed`/`mock-timeout` 등)와 `Cache-Control: no-store`
  * 를 붙인 200 JSON 응답을 만든다.
  */
