@@ -12,7 +12,7 @@
  * 별은 검색 컨테이너 내부라, 바깥 클릭 닫힘(mousedown) 대상이 아니다 → 클릭해도 드롭다운 유지.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import {
   WATCHLIST_STAR_ADD,
@@ -40,6 +40,14 @@ export function WatchlistStarButton({
 }: WatchlistStarButtonProps) {
   const [celebrating, setCelebrating] = useState(false);
   const timerRef = useRef<number | null>(null);
+
+  // 언마운트(드롭다운 닫힘/키워드 변경으로 행 제거) 시 대기 중 타이머 정리 — 죽은 컴포넌트 setState 방지.
+  useEffect(
+    () => () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   const label = added ? WATCHLIST_STAR_REMOVE : WATCHLIST_STAR_ADD;
 
