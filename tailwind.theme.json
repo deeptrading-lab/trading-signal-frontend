@@ -266,7 +266,7 @@
         "gauge-w": "220px",
         "gauge-h": "120px",
         "gauge-track-w": "14px",
-        "donut-size": "168px",
+        "donut-size": "120px",
         "donut-thickness": "22px",
         "table-row-h": "48px",
         "table-cell-px": "12px",

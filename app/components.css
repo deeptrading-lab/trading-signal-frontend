@@ -619,9 +619,10 @@
    * 신규 spacing(table-row-h/table-cell-px) + typography(table-cell-numeric)는
    * tailwind.theme.json 에 주입(tailwind.config.ts 헤더 참조). hex/px 직타 0건. */
 
-  /* asset-hero: 총자산 히어로 — card-hero 와 동일(rounded.xl + hero padding). DESIGN.md Elevation 절. */
+  /* asset-hero: 총자산 히어로 — rounded.xl. 가로는 hero padding(24), 상하는 card padding(20)으로 줄여
+   * 불필요한 상하 여백 축소(도넛 120px 축소와 함께). DESIGN.md Elevation 절. */
   .asset-hero {
-    @apply bg-surface text-text-strong border border-border-line rounded-xl p-hero-px;
+    @apply bg-surface text-text-strong border border-border-line rounded-xl px-hero-px py-card-px;
   }
 
   /* holdings-table-header: 보유종목 테이블 헤더 셀 — surface-muted × text-muted, label-sm. */

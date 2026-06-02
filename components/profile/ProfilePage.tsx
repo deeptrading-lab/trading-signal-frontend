@@ -28,6 +28,7 @@
  * Sidebar / BottomNav 의 "마이페이지" 메뉴 활성 — `isNavItemActive("/profile", "/profile")` true.
  */
 
+import { User } from "lucide-react";
 import { ProfileCard } from "./ProfileCard";
 import { AssetSection } from "./AssetSection";
 import { ConnectedExchangesCard } from "./ConnectedExchangesCard";
@@ -56,7 +57,10 @@ export function ProfilePage({
 }: ProfilePageProps) {
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
-      <h1 className="text-h1 text-text-strong">{PROFILE_PAGE_TITLE}</h1>
+      <header className="flex items-center gap-sm">
+        <User className="h-2xl w-2xl text-accent-vivid" aria-hidden="true" />
+        <h1 className="text-h1 text-text-strong">{PROFILE_PAGE_TITLE}</h1>
+      </header>
       <ProfileCard user={user} />
       <AssetSection portfolio={portfolio} holdings={holdings} />
       <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
