@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs"
+    "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.11",
