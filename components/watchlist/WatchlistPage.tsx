@@ -24,13 +24,11 @@ import { Star, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import {
   WATCHLIST_PAGE_TITLE,
-  WATCHLIST_ADD_GROUP,
   WATCHLIST_REFRESH,
   WATCHLIST_REFRESHING,
 } from "@/lib/copy/watchlist/labels";
 
 export interface WatchlistPageProps {
-  onAdd: () => void;
   /** 상단 새로고침 — 전체 query refetch. */
   onRefresh: () => void;
   /** refetch 진행 중(query.isFetching) — 버튼 비활성 + 아이콘 스핀. */
@@ -41,7 +39,6 @@ export interface WatchlistPageProps {
 }
 
 export function WatchlistPage({
-  onAdd,
   onRefresh,
   isRefreshing = false,
   canRefresh = false,
@@ -57,25 +54,20 @@ export function WatchlistPage({
           />
           {WATCHLIST_PAGE_TITLE}
         </h1>
-        <div className="flex items-center gap-sm">
-          {canRefresh ? (
-            <button
-              type="button"
-              className="inline-flex items-center justify-center h-button-sm-h w-button-sm-h rounded-sm bg-transparent text-text-muted hover:text-text-strong transition-colors cursor-pointer disabled:opacity-[0.65] disabled:cursor-not-allowed"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
-            >
-              <RefreshCw
-                className={cn("h-5 w-5", isRefreshing && "animate-spin")}
-                aria-hidden="true"
-              />
-            </button>
-          ) : null}
-          <button type="button" className="button-primary" onClick={onAdd}>
-            {WATCHLIST_ADD_GROUP}
+        {canRefresh ? (
+          <button
+            type="button"
+            className="inline-flex items-center justify-center h-button-sm-h w-button-sm-h rounded-sm bg-transparent text-text-muted hover:text-text-strong transition-colors cursor-pointer disabled:opacity-[0.65] disabled:cursor-not-allowed"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
+          >
+            <RefreshCw
+              className={cn("h-5 w-5", isRefreshing && "animate-spin")}
+              aria-hidden="true"
+            />
           </button>
-        </div>
+        ) : null}
       </div>
       {children}
     </div>

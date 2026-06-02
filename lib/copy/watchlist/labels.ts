@@ -6,7 +6,6 @@
 
 export const WATCHLIST_PAGE_TITLE = "관심종목";
 /** 실데이터 전환(§3.7) — "그룹" 개념 미사용(단일 목록)이라 "+ 종목 추가" 로 조정. */
-export const WATCHLIST_ADD_GROUP = "+ 종목 추가";
 export const WATCHLIST_TABLE_NAME = "종목명";
 export const WATCHLIST_TABLE_PRICE = "현재가";
 export const WATCHLIST_TABLE_CHANGE = "등락률";
@@ -44,8 +43,14 @@ export const WATCHLIST_SEARCH_EMPTY =
   "대표 종목 위주로만 검색돼요. 6자리 종목코드로도 추가할 수 있어요.";
 export const WATCHLIST_SEARCH_PENDING = "검색 중…";
 export const WATCHLIST_SEARCH_PROMPT = "추가할 종목을 검색해 주세요.";
-export const WATCHLIST_SEARCH_ADDED = "추가됨";
 /** 6자리 ticker 직접 추가(시드 미수록 보완) — `{ticker}` 치환. */
 export const WATCHLIST_SEARCH_ADD_RAW = (ticker: string) => `${ticker} 직접 추가`;
 /** 직접 추가 항목의 보조 라벨(코드 기반). */
 export const WATCHLIST_SEARCH_RAW_META = "코드";
+
+/** 인라인 검색(페이지 상단) — 검색 시작 전 안내. */
+export const WATCHLIST_SEARCH_HINT =
+  "종목을 검색해 별을 눌러 관심종목에 추가하세요.";
+/** 검색 결과 별 버튼 aria — 추가/제거 토글. */
+export const WATCHLIST_STAR_ADD = "관심종목에 추가";
+export const WATCHLIST_STAR_REMOVE = "관심종목에서 제거";
