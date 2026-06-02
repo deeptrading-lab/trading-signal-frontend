@@ -13,7 +13,7 @@
  *   - `canRefresh` false(빈 상태 등) 시 버튼 미노출.
  *
  * v8 토큰: 컨테이너 `mx-auto max-w-main-max-w flex flex-col gap-lg` · 타이틀 `text-h1` ·
- *   Star `text-warn fill-warn` · "새로고침" = **배경 투명** 아이콘 버튼(RefreshCw 만, 박스 없이 —
+ *   Star `text-chart-signal fill-chart-signal`(앰버/골드, 헤더 테마 토글 해와 색 통일) · "새로고침" = **배경 투명** 아이콘 버튼(RefreshCw 만, 박스 없이 —
  *   종목추가와 크기 착시 회피, hover 시 아이콘 색만 진해짐, aria-label 로 접근성) · "+ 종목 추가" `button-primary`.
  */
 
@@ -52,7 +52,7 @@ export function WatchlistPage({
       <div className="flex items-center justify-between">
         <h1 className="inline-flex items-center gap-sm text-h1 text-text-strong">
           <Star
-            className="h-2xl w-2xl text-warn fill-warn"
+            className="h-2xl w-2xl text-chart-signal fill-chart-signal"
             aria-hidden="true"
           />
           {WATCHLIST_PAGE_TITLE}
