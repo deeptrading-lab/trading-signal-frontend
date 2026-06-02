@@ -648,11 +648,13 @@
    * 않도록 `display:none` 기본, `(display-mode: standalone)` 에서만 `flex`. (iOS 16+/Android 모두 지원) */
   .splash-screen {
     /* 로고(유일한 in-flow 자식)를 정중앙 배치 — 워드마크는 absolute 라 flow 밖.
-     * 배경은 surface-muted(light #ffffff / dark #0e141b) — 앱 베이스(body)·상태바 theme-color 와 동일 색이라
-     * 네이티브 스플래시 → 인앱 스플래시 → 앱 배경이 한 색으로 이어진다. FOUC 스크립트가 head 에서
-     * dark 클래스를 먼저 붙이므로 다크 콜드 로드 시 스플래시가 즉시 어둡게 뜬다(흰 눈부심 0).
+     * 배경: light=surface(#ffffff) — 네이티브 스플래시·manifest background_color(#ffffff)와 같은 흰색이라
+     * 콜드 로드 시 네이티브→인앱 점프 0(기존 동작 무회귀). dark=surface-muted(#0e141b) — 앱 베이스(body)·
+     * 상태바 theme-color 와 같은 어두운 색이라 인앱→앱 배경이 한 색으로 이어진다(다크 OS 는 manifest 가
+     * light 고정이라 네이티브만 잠깐 흰색, 인앱부터 어둡게). FOUC 스크립트가 head 에서 dark 클래스를 먼저
+     * 붙이므로 다크 콜드 로드 시 스플래시가 즉시 어둡게 뜬다(흰 눈부심 최소화).
      * 워드마크(text-strong→text-muted 그라데이션)·글리프(브랜드 3색)는 토큰/브랜드색이라 자동 적응. */
-    @apply fixed inset-0 z-[100] items-center justify-center bg-surface-muted;
+    @apply fixed inset-0 z-[100] items-center justify-center bg-surface dark:bg-surface-muted;
     display: none;
     transition: opacity 320ms ease;
   }
