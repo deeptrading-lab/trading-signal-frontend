@@ -403,7 +403,8 @@
   }
   /* light(기본): 해 보임 / 달 숨김. */
   .theme-toggle-icon--sun {
-    @apply text-warn;
+    /* 해(sun) — 팔레트에서 가장 노란 앰버/골드 토큰(chart-signal #f59e0b/#f5b945) 재사용. */
+    @apply text-chart-signal;
     transform: scale(1) rotate(0deg);
     transition-delay: 200ms;
   }
