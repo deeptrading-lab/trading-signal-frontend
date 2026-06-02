@@ -5,6 +5,7 @@ description: FinSight 브랜드 리디자인 — v7 rev2 (`design-tone-refinemen
 colors:
   primary: "#1f3b4d"
   surface: "#ffffff"
+  surface-elevated: "#ffffff"
   surface-muted: "#f6f8fa"
   border-line: "#eceff3"
   text-strong: "#0f1419"
@@ -51,6 +52,56 @@ colors:
   fng-extreme-greed: "#a83246"
   fng-extreme-greed-soft: "#fbe4e8"
   fng-track: "#eceff3"
+colors-dark:
+  primary: "#cdd9e5"
+  surface: "#161d26"
+  surface-elevated: "#1d2630"
+  surface-muted: "#0e141b"
+  border-line: "#2a333e"
+  text-strong: "#e6edf3"
+  text-muted: "#9aa6b2"
+  accent-soft: "#222c3a"
+  accent-vivid: "#5b9bff"
+  accent-vivid-soft: "#1b2b44"
+  warn: "#e0a45c"
+  warn-soft: "#3a2a14"
+  info: "#6ea8ff"
+  info-soft: "#15263f"
+  critical: "#f08585"
+  critical-soft: "#3a1d1f"
+  signal-up: "#f47171"
+  signal-up-soft: "#3a1d1f"
+  signal-down: "#5b9bff"
+  signal-down-soft: "#15263f"
+  asset-stock: "#6ea8ff"
+  asset-stock-soft: "#15263f"
+  asset-coin: "#f0843e"
+  asset-coin-soft: "#33260f"
+  gradient-ai-from: "#9d92f5"
+  gradient-ai-to: "#5b9bff"
+  gradient-ai-soft: "#1c2440"
+  chart-macd: "#5b9bff"
+  chart-signal: "#f5b945"
+  chart-hist-up: "#3fcf6a"
+  chart-hist-down: "#f47171"
+  chart-rsi: "#a98bff"
+  chart-ref-ob: "#f47171"
+  chart-ref-os: "#5b9bff"
+  chart-ref-mid: "#6b7682"
+  chart-vol-up: "#7a3f3f"
+  chart-vol-down: "#35527a"
+  chart-down: "#5b9bff"
+  fng-extreme-fear: "#4d9fe0"
+  fng-extreme-fear-soft: "#13283b"
+  fng-fear: "#3fae93"
+  fng-fear-soft: "#12302a"
+  fng-neutral: "#9aa6b2"
+  fng-neutral-soft: "#262d36"
+  fng-greed: "#d8a657"
+  fng-greed-soft: "#332815"
+  fng-extreme-greed: "#e8697f"
+  fng-extreme-greed-soft: "#3a1f28"
+  fng-track: "#2a333e"
 typography:
   display:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial
@@ -289,7 +340,7 @@ components:
     typography: "{typography.input-suffix}"
     padding: 0px
   dropdown-panel:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.surface-elevated}"
     textColor: "{colors.text-strong}"
     rounded: "{rounded.md}"
     padding: 4px
@@ -509,7 +560,7 @@ components:
     typography: "{typography.caption}"
     padding: 12px
   drawer:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.surface-elevated}"
     textColor: "{colors.text-strong}"
     rounded: "{rounded.md}"
     padding: 16px
@@ -686,6 +737,97 @@ v7 rev2 의 15 키는 모두 hex 무회귀 (변경 없음). v8 신규 11 키 추
 | `gradient-ai-from` × `gradient-ai-soft` (card-ai / ai-heading 텍스트 × 배경) | 8.85:1 | +97% | OK |
 
 **해석** — v8 신규 토큰 9 페어 모두 4.5:1 통과. 최저 마진은 `asset-coin` × `asset-coin-soft` 4.62:1 (+3% 마진) — orange 계열 페어가 WCAG 채도 분포상 가장 빠듯하나 안전 마진 내. `asset-coin` 권장값 `#f97316` (orange-500) × `#ffedd5` = 3.07:1 (AA 미달) 이라 한 단계 진한 orange-700 (`#c2410c`) 으로 결정. PRD §5.2 AC-V8-7 충족 (≥14 페어, 모두 4.5:1 이상).
+
+### 다크 팔레트 (`colors-dark:` 49값) — PRD `dark-mode` PR2
+
+PRD `dark-mode` (5-PR 분할, §3.2 PR2) 의 다크 색 진실원천. front matter 의 `colors-dark:` 블록이 light `colors:` 와 **키 1:1 일치 (49키)** 하며, `design:sync` → `scripts/inject-color-themes.mjs` 가 두 블록을 파싱해 `app/theme-vars.css` 의 `:root` (light) / `html.dark` (dark) CSS 변수 (`--fs-*`) 로 흘려보낸다. **키셋이 불일치하면 inject 스크립트가 throw** — 시인성 누락의 1차 자동 방어선. 코드·`tailwind.theme.json` 에 다크 hex 직타 0 (SSOT 규율, #86 사고 회피).
+
+PR1 (인프라) 에서 토큰은 이미 `var(--fs-*)` indirection 으로 전환됐고 `colors-dark` 미정의 → dark=light 폴백 (시각 무변경) 이었다. 본 PR2 가 처음으로 다크를 시각 분기시킨다 (차트 런타임 훅은 PR3 별도). 합성 토큰 (`app/components.css` `@apply`) 과 기존 Tailwind utility 호출은 **무수정** 으로 `html.dark` 토글에 따라 자동 전환된다 (PRD §6.1).
+
+#### 신규 light 토큰 1키 — `surface-elevated`
+
+light `colors:` 에 `surface-elevated: "#ffffff"` 추가 (= `surface` 동일값). **light 무회귀** — 흰 배경에서 `surface` 와 시각 구분 0. 용도는 **다크에서 모달 / 드롭다운 / 토스트 / 드로어를 그림자 대신 명도 (더 밝은 면) 로 분리** 하는 것. 다크에서는 그림자가 거의 안 보이므로 (PRD §3.2), elevation 위계를 면 명도로 표현한다. `dropdown-panel` / `drawer` 합성 토큰의 `backgroundColor` 를 `surface` → `surface-elevated` 로 재지정 — light 에서는 동일값이라 무회귀, 다크에서는 한 톤 밝은 면으로 자동 부상. PRD §9 q1 RESOLVED 정합 (49→실질 49키, 기존 48 + elevated).
+
+#### 다크 설계 원칙 (시인성 무누락 = 본 작업의 전부)
+
+1. **전반 톤 = 깊은 청회슬레이트 (deep blue-slate)** — 약간 푸르스름한 짙은 남색-검정 베이스 (GitHub 다크 유사, 브랜드 Signature Slate `#1f3b4d` 와 조화). **순수 검정 (`#000`) 금지** — 순흑은 OLED 번쩍임·과한 대비로 눈 피로를 키운다. 베이스는 `surface-muted #0e141b` (HSL `212°, 31%, 8%`) 로 청회 톤.
+
+2. **Elevation = 밝아짐 (명도 위계)** — `surface-muted #0e141b` (앱 베이스, 가장 어둠) < `surface #161d26` (카드) < `surface-elevated #1d2630` (모달 / 드롭다운 / 토스트 / 드로어, 가장 밝음). light 의 "옅은 그림자·border 로 카드 부상" 을 다크에서는 "면 명도 상승" 으로 치환. 세 면이 약 +2~3 명도 step 씩 벌어져 그림자 없이도 위계 인지.
+
+3. **순백 / 순흑 회피한 텍스트** — `text-strong #e6edf3` (순백 `#fff` 대신 살짝 누른 밝은 회청) — surface 대비 14.36:1 로 압도적 가독이면서 눈부심 완화. `text-muted #9aa6b2` 는 surface / surface-muted / surface-elevated 세 면 모두에서 4.5:1 통과하는 가장 어두운 선 (surface-elevated 위 6.17:1 이 최저, +37% 마진) 까지만 어둡게 — caption·메타 텍스트가 어떤 면 위에서도 읽힌다.
+
+4. **한국식 등락색 — 명도·채도 상향** — light 의 `signal-up #c81e1e` (진한 red-700) / `signal-down #1d4ed8` (blue-700) 은 어두운 배경에서 탁하게 죽는다. 다크는 `signal-up #f47171` (밝은 coral red) / `signal-down #5b9bff` (밝은 sky blue) 로 명도·채도를 올려 surface 대비 6.02:1 / 6.12:1 확보. **soft 페어는 light 처럼 옅은 배경이 아니라 짙은 저명도 틴트** — `signal-up-soft #3a1d1f` (어두운 surface 에 적색 살짝 입힘) / `signal-down-soft #15263f` (청색 틴트). 배지 텍스트 5.41:1 / 5.49:1.
+
+5. **accent / gradient / asset / warn / info / critical — 한 톤 밝게** — 어두운 배경에서 죽지 않게 light 대비 명도 상향. `accent-vivid #5b9bff` (CTA 청색), `warn #e0a45c` (밝은 amber), `info #6ea8ff`, `critical #f08585` (밝은 coral). soft 는 짙은 틴트 (`warn-soft #3a2a14` / `info-soft #15263f` / `critical-soft #3a1d1f` / `accent-vivid-soft #1b2b44`). `asset-stock #6ea8ff` (주식 청색) / `asset-coin #f0843e` (코인 주황) — 자산 식별 hue 유지하되 명도 상향. AI 그라데이션은 `gradient-ai-from #9d92f5` (밝은 보라) → `gradient-ai-to #5b9bff` (청색), soft fill `gradient-ai-soft #1c2440`.
+
+6. **chart-* — recharts 선·면 시인성 위해 전반 +명도** — 어두운 캔버스에서 라인이 보이게 `chart-macd #5b9bff` / `chart-signal #f5b945` / `chart-rsi #a98bff` / `chart-hist-up #3fcf6a` / `chart-hist-down #f47171` 명도 상향 (모두 surface 대비 ≥6:1, RSI 중립선 `chart-ref-mid #6b7682` 은 보조선이라 3.67:1 — UI 요소 3:1 floor 통과). **거래량 봉 `chart-vol-up #7a3f3f` / `chart-vol-down #35527a` 은 저채도 어두운 틴트** — 봉이 데이터 라인을 가리지 않게 의도적으로 배경에 가라앉힌 fill (2.1:1, 면 채움이라 4.5:1 비적용). 상승 캔들은 `signal-up` 재사용 cascade, 하락 캔들 `chart-down #5b9bff`.
+
+7. **fng-* (공포탐욕 5단계) — 색상환 위치 유지 + 명도 상향** — `fng-extreme-fear #4d9fe0` (청) / `fng-fear #3fae93` (청록) / `fng-neutral #9aa6b2` (회) / `fng-greed #d8a657` (황갈) / `fng-extreme-greed #e8697f` (적) — 5단계 hue 순서 보존하되 다크에서 죽지 않게 밝게. soft 는 각 hue 의 짙은 틴트 (5쌍 모두 색/soft 4.5:1+). `fng-track #2a333e` (미채움 트랙) 은 `border-line` 동일값 — 게이지 트랙은 보조 분리선이라 저대비 의도.
+
+#### 다크 elevation 위계 (그림자 없는 면 명도)
+
+| 면 토큰 | dark hex | 명도 (HSL L) | 용도 |
+|---|---|---|---|
+| `surface-muted` | `#0e141b` | 8% | 앱 베이스 (가장 어둠) — `shell` / `main-area` 배경 |
+| `surface` | `#161d26` | 12% | 카드 / navbar / sidebar 면 |
+| `surface-elevated` | `#1d2630` | 15% | 모달 / 드롭다운 / 토스트 / 드로어 (가장 밝음) |
+
+`border-line #2a333e` (명도 ~20%) 는 면 위에 한 단계 더 밝은 hairline 으로 카드·셀 경계를 보조 (그림자 없는 다크에서 면 분리의 2차 신호). light 의 옅은 border 역할 무회귀.
+
+#### WCAG AA 대비 근거 표 (다크, 자동 계산)
+
+상대휘도 → 대비율 (WCAG 2.x 공식) 자동 계산 결과. **본문 텍스트 페어 31건 전부 4.5:1 이상**, **차트 라인 / UI 요소 9건 전부 3:1 이상**. 거래량 봉·트랙·hairline border 는 면 채움 / 보조 분리선이라 4.5:1 비적용 (의도적 저대비, 아래 "의도적 저대비" 절).
+
+| Foreground × Background (사용처) | dark 비율 | 기준 | 판정 |
+|---|---|---|---|
+| `text-strong` × `surface` (본문 / 카드) | 14.36:1 | 4.5:1 | OK |
+| `text-strong` × `surface-muted` (페이지 베이스) | 15.66:1 | 4.5:1 | OK |
+| `text-strong` × `surface-elevated` (모달 본문) | 12.95:1 | 4.5:1 | OK |
+| `text-muted` × `surface` (caption / 메타) | 6.84:1 | 4.5:1 | OK |
+| `text-muted` × `surface-muted` (sidebar-empty) | 7.47:1 | 4.5:1 | OK |
+| `text-muted` × `surface-elevated` (드롭다운 메타) | 6.17:1 | 4.5:1 | OK (최저 마진 +37%) |
+| `primary` × `surface` (sidebar wordmark) | 11.84:1 | 4.5:1 | OK |
+| `signal-up` × `surface` (상승 등락률) | 6.02:1 | 4.5:1 | OK |
+| `signal-down` × `surface` (하락 등락률) | 6.12:1 | 4.5:1 | OK |
+| `accent-vivid` × `surface` (CTA 텍스트 / 링크) | 6.12:1 | 4.5:1 | OK |
+| `info` × `surface` | 7.03:1 | 4.5:1 | OK |
+| `critical` × `surface` (오류 텍스트) | 6.78:1 | 4.5:1 | OK |
+| `warn` × `surface` | 7.78:1 | 4.5:1 | OK |
+| `signal-up` × `signal-up-soft` (상승 배지) | 5.41:1 | 4.5:1 | OK |
+| `signal-down` × `signal-down-soft` (하락 배지) | 5.49:1 | 4.5:1 | OK |
+| `warn` × `warn-soft` (badge-warn / card-warn) | 6.33:1 | 4.5:1 | OK |
+| `critical` × `critical-soft` (card-critical) | 6.11:1 | 4.5:1 | OK |
+| `info` × `info-soft` (badge-info / card-info) | 6.31:1 | 4.5:1 | OK |
+| `accent-vivid` × `accent-vivid-soft` (focus 항목) | 5.14:1 | 4.5:1 | OK |
+| `asset-stock` × `asset-stock-soft` (주식 배지) | 6.31:1 | 4.5:1 | OK |
+| `asset-coin` × `asset-coin-soft` (코인 배지) | 5.67:1 | 4.5:1 | OK |
+| `asset-stock` × `surface` (주식 라벨) | 7.03:1 | 4.5:1 | OK |
+| `asset-coin` × `surface` (코인 라벨) | 6.52:1 | 4.5:1 | OK |
+| `gradient-ai-from` × `gradient-ai-soft` (AI 카드 텍스트) | 5.72:1 | 4.5:1 | OK |
+| `gradient-ai-to` × `gradient-ai-soft` (ai-heading) | 5.51:1 | 4.5:1 | OK |
+| `fng-extreme-fear` × `fng-extreme-fear-soft` | 5.27:1 | 4.5:1 | OK |
+| `fng-fear` × `fng-fear-soft` | 5.19:1 | 4.5:1 | OK |
+| `fng-neutral` × `fng-neutral-soft` | 5.61:1 | 4.5:1 | OK |
+| `fng-greed` × `fng-greed-soft` | 6.54:1 | 4.5:1 | OK |
+| `fng-extreme-greed` × `fng-extreme-greed-soft` | 4.80:1 | 4.5:1 | OK (최저 마진 +7%) |
+| `chart-macd` / `chart-down` × `surface` (MACD·하락 라인) | 6.12:1 | 3:1 (UI) | OK |
+| `chart-signal` × `surface` (시그널 라인) | 9.62:1 | 3:1 (UI) | OK |
+| `chart-hist-up` × `surface` (히스토그램 +) | 8.36:1 | 3:1 (UI) | OK |
+| `chart-hist-down` / `chart-ref-ob` × `surface` | 6.02:1 | 3:1 (UI) | OK |
+| `chart-rsi` × `surface` (RSI 라인) | 6.32:1 | 3:1 (UI) | OK |
+| `chart-ref-os` × `surface` (과매도 기준선) | 6.12:1 | 3:1 (UI) | OK |
+| `chart-ref-mid` × `surface` (RSI 중립선) | 3.67:1 | 3:1 (UI) | OK |
+
+**해석** — 텍스트 31 페어 전부 4.5:1 이상 (최저 `fng-extreme-greed` × soft 4.80:1, +7% 마진 / `text-muted` × `surface-elevated` 6.17:1). 차트 라인·기준선 9 페어 전부 3:1 이상 (recharts 선은 본문 텍스트가 아닌 데이터 시각화 UI 요소 → WCAG 3:1 non-text contrast 적용). PRD `dark-mode` G3 (전 표면 시인성 무누락) · AC-6 (다크 페어 WCAG 4.5:1) 충족.
+
+#### 의도적 저대비 (4.5:1 비적용 — prose 명시)
+
+아래 토큰은 본문 텍스트가 아닌 **면 채움 / 보조 분리선** 이라 4.5:1 / 3:1 대비를 의도적으로 적용하지 않는다 (lint `contrast-ratio` 경고가 떠도 설계 의도임).
+
+- **`chart-vol-up #7a3f3f` / `chart-vol-down #35527a` × `surface` (≈2.1:1)** — 거래량 봉. 가격 라인·MACD·RSI 데이터 선이 주연이고 거래량 봉은 그 아래 배경으로 깔리는 보조 정보라, 일부러 저채도 어두운 틴트로 가라앉혀 선을 가리지 않게 한다. light 의 연빨강 / 연파랑 봉과 동일한 "배경 보조" 역할.
+- **`border-line #2a333e` / `fng-track #2a333e` × `surface` (≈1.33:1)** — hairline 경계선 / 게이지 미채움 트랙. 4.5:1 로 올리면 거친 외곽선처럼 튀어 평면 톤을 깬다. 면 명도 위계를 보조하는 미세 분리선이라 저대비가 정상 (light 의 옅은 `#eceff3` border 와 동일 의도).
+
+본 작업의 컴포넌트 코드 적용 (`bg-surface-elevated` 호출 등) 은 후속 frontend-dev 영역 — 본 PR2 는 DESIGN.md 토큰 정의 + `design:sync` 산출까지.
 
 ## Typography
 
@@ -889,3 +1031,12 @@ PRD §9 의 디자이너 결정 영역.
 | R6 | 카드 padding — 시안의 `p-4 md:p-6` (16 → 24) vs 본 저장소의 정보 밀도 톤 (20px 일관) | **분리 적용** — 데스크탑 일반 카드 20px, 모바일 16px, hero 카드 24px. 시안의 의도 + 본 저장소 정보 밀도 톤 양립. |
 | R7 | `font-display` 사이즈 — 시안의 `text-4xl` (36px) vs `text-5xl` (48px) | **36px / 800 / -0.02em** 채택. 본 저장소의 정보 밀도 톤 — 한 화면에 hero 1회 + 그 외 헤딩들 (`display` 30px / `h1` 22px) 의 위계 자연. 48px 은 정보 밀도 누수. |
 | R8 | bottom-nav-item-active 색 — `accent-vivid` vs `primary` | **`accent-vivid`** 채택. bottom nav 의 active 메뉴는 액션 신호 영역 (사용자가 방금 라우팅 한 결과) 이므로 accent-vivid 정합. primary 는 시그니처 정체성 영역 (navbar wordmark 등) 분리. |
+
+### PRD `dark-mode` PR2 — 다크 팔레트 디자이너 결정
+
+| ID | 질문 | 결정 |
+|---|---|---|
+| R9 | 다크 베이스 톤 — 순흑 (`#000` 계열) vs 청회슬레이트 | **청회슬레이트 `surface-muted #0e141b`** 채택. 순흑은 OLED 번쩍임·과대비 눈피로 + 브랜드 Signature Slate (`#1f3b4d`) 와 hue 단절. 살짝 푸르스름한 짙은 남색-검정 (HSL `212°, 31%, 8%`) 이 GitHub 다크 톤·브랜드 슬레이트와 조화. |
+| R10 | 다크 elevation 표현 — 그림자 강화 vs 면 명도 위계 (`surface-elevated` 신규) | **면 명도 위계** 채택. 다크에서 그림자는 거의 안 보여 무용. `surface-muted (8%) < surface (12%) < surface-elevated (15%)` 3단 명도로 모달·드롭다운·드로어 부상. light 는 `surface-elevated = surface = #ffffff` 무회귀. |
+| R11 | 다크 `text-strong` — 순백 (`#fff`) vs 누른 회청 (`#e6edf3`) | **누른 회청 `#e6edf3`** 채택. 순백은 어두운 배경에서 halation (글자 번짐)·눈부심. surface 대비 14.36:1 로 순백 대비 가독 손실 거의 없으면서 야간 사용 눈피로 완화. |
+| R12 | 다크 등락색 / 시그널색 — light hex 유지 vs 명도·채도 상향 | **상향** 채택. light 의 진한 red-700 / blue-700 은 어두운 배경에서 탁하게 죽어 시인성 저하. `signal-up #c81e1e→#f47171` / `signal-down #1d4ed8→#5b9bff` 등 밝은 톤으로 올려 surface 대비 6:1+ 확보. soft 페어는 옅은 배경 대신 짙은 저명도 틴트 (어두운 surface 에 색 살짝 입힘) 로 다크 정합. |

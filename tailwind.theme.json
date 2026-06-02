@@ -4,6 +4,7 @@
       "colors": {
         "primary": "#1f3b4d",
         "surface": "#ffffff",
+        "surface-elevated": "#ffffff",
         "surface-muted": "#f6f8fa",
         "border-line": "#eceff3",
         "text-strong": "#0f1419",
