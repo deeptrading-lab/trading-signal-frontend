@@ -3439,3 +3439,41 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **PR5 (검증/마감)**: 직타 hex 전수조사(brand-mark/splash-ios 의도 예외 목록화) + INFO-PR2-1(search-result-item 톤)·INFO-PR3-2(거래량 봉 저대비) 폴리시 검토 + 전 표면 최종 QA(라이트/다크/시스템 × 라우트) + 실기기 iOS standalone 상태바 확인. PRD §9 q2 런타임 교체는 applyThemeClass 단일 경유로 구현(effect 대신, 더 일관적).
+
+### 2026-06-02 — feat(theme): 다크모드 PR5 — 전 표면 검증 + 폴리시(시리즈 마감) (#97)
+
+- **slug**: `dark-mode-polish` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/97
+- **요약**: feat(theme): 다크모드 PR5 — 전 표면 검증 + 폴리시(시리즈 마감)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇
+  > 
+  > 다크모드 시리즈 **PR5 — 전 표면 검증 + 마감(폴리시)**. 시리즈를 닫는 최종 검증 + 잔여 폴리시.
+  > 
+  > PRD: `docs/prd/dark-mode.md`.
+  > 
+  > ## 어떻게
+  > 
+  > - **search-result-item 다크 폴리시(INFO-PR2-1)**: 검색 드롭다운 결과 항목 `bg-surface`→`bg-surface-elevated`. 다크에서 항목(#161d26)이 패널(elevated #1d2630)보다 어두워 "박힌" 느낌을 패널과 같은 색으로 맞춰 해소. light는 elevated=surface=#ffffff라 무변경. DESIGN.md 스펙도 동기.
+  > - **stale 주석 정정**: `inject-color-themes.mjs` 48→49키(surface-elevated 포함).
+  > 
+  > ## 검증 (시리즈 클로즈)
+  > 
+  > - **QA qa-passed** (`docs/qa/dark-mode.md` PR5 라운드 + 종합 클로즈):
+  >   - **직타 hex 전수조사(AC-6)**: 실제 코드 hex 10건 전부 의도 예외(brand-mark·icon/OG light고정·viewport/FOUC·themeStore META·splash-ios ImageResponse), **신규 회귀 0**. themeColor/splash hex가 다크 토큰값과 1:1 동기.
+  >   - **전 표면 스윕**: 7라우트 × light/dark × 데스크톱/모바일 = 28페이지 자동 대비 스캔 **sub-threshold 0**. 모달/드롭다운/드로어/토스트/스켈레톤/빈상태/에러/배지/포커스링/차트 툴팁 전부 가독.
+  >   - **DESIGN.md 토큰 라이브 동기화**: surface-elevated 임시변경→sync→번들 반영→복원 검증.
+  >   - **라이브 토글**: light↔dark↔system 차트 포함 즉시 반영.
+  >   - **G1~G9 수용기준 전건 충족 매트릭스.**
+  > - **Review approved**: components.css↔DESIGN.md 1:1, light 무회귀, focus 강조 보존, 주석 정확.
+  > - typecheck/lint/build 0 에러, design:sync 49키 1:1·drift 0.
+  > 
+  > ## 다음 작업
+  > 
+  > - 다크모드 시리즈(PR1~5) 완료 — light/dark/system 3-state, 전 표면 시인성 무누락(WCAG AA), 차트 런타임 테마, 상태바/스플래시 다크.
+  > - **잔여(후속 선택, 비차단)**: INFO-PR3-2(거래량 봉 다크 저대비 #7a3f3f/#35527a — 식별 가능, 디자이너 기호 시 명도 상향 여지). iOS standalone 실기기 상태바 글자색(adaptive) 최종 확인. 향후 toast 컴포넌트 신설 시 `bg-surface-elevated` 적용.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 다크모드 시리즈(PR1~5) 완료 — light/dark/system 3-state, 전 표면 시인성 무누락(WCAG AA), 차트 런타임 테마, 상태바/스플래시 다크.
+  - **잔여(후속 선택, 비차단)**: INFO-PR3-2(거래량 봉 다크 저대비 #7a3f3f/#35527a — 식별 가능, 디자이너 기호 시 명도 상향 여지). iOS standalone 실기기 상태바 글자색(adaptive) 최종 확인. 향후 toast 컴포넌트 신설 시 `bg-surface-elevated` 적용.
