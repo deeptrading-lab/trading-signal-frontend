@@ -69,6 +69,10 @@ type CacheEntry<T> = { value: T; expiresAt: number };
 const indexCache = new Map<string, CacheEntry<MarketIndexQuote>>();
 let btcCache: CacheEntry<BtcQuote> | null = null;
 
+// KIS 는 한국(서울) 서버다. 함수가 미 동부(iad1)에서 실행되면 해외 지수 엔드포인트가 HTTP 500 을
+// 반환해 SPX/COMP 가 드롭되는 현상(2026-06-03 진단)을 회피하기 위해 실행 리전을 서울(icn1)로 고정한다.
+export const preferredRegion = "icn1";
+
 export async function GET() {
   const kisLive = isKisConfigured() && resolveKisEnv() === "prod";
 
