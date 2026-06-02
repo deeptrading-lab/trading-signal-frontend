@@ -4,7 +4,7 @@
 
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
-import { C, tooltipStyle } from "./chartTheme";
+import { useChartThemeContext } from "./ChartThemeContext";
 
 export function CandleTooltip({ active, payload, label }: {
   active?: boolean;
@@ -14,6 +14,7 @@ export function CandleTooltip({ active, payload, label }: {
   } }[];
   label?: string;
 }) {
+  const { C, tooltipStyle, tooltipDivider } = useChartThemeContext();
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d) return null;
@@ -33,7 +34,7 @@ export function CandleTooltip({ active, payload, label }: {
         </p>
       ))}
       {d.changePct != null && (
-        <p style={{ color: chgColor, fontSize: 12, lineHeight: "1.6", marginTop: 4, paddingTop: 4, borderTop: "1px solid rgba(15,20,25,0.06)" }}>
+        <p style={{ color: chgColor, fontSize: 12, lineHeight: "1.6", marginTop: 4, paddingTop: 4, borderTop: tooltipDivider }}>
           등락&nbsp;
           <span style={{ fontVariantNumeric: "tabular-nums" }}>
             {formatPct(d.changePct, { digits: 2, sign: true })}

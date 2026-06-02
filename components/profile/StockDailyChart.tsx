@@ -50,7 +50,8 @@ import {
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { PERIOD_UNIT, type ChartType } from "./stockChartConfig";
-import { C, SYNC_ID, tooltipStyle, labelStyle, axisProps } from "./chart/chartTheme";
+import { useChartTheme, SYNC_ID } from "@/hooks/utils/useChartTheme";
+import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { ChartShell } from "./chart/ChartShell";
@@ -84,6 +85,10 @@ export function StockDailyChart({
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } =
     useChartData(ticker, period, days);
+
+  // 런타임 테마 색 — light/dark 전환 시 새 객체 reference 로 recharts 리렌더.
+  const theme = useChartTheme();
+  const { C, tooltipStyle, labelStyle, axisProps } = theme;
 
   const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange };
 
@@ -119,6 +124,7 @@ export function StockDailyChart({
   }
 
   return (
+    <ChartThemeProvider value={theme}>
     <ChartShell {...shellProps}>
       {/* ① 가격 — 라인 or 캔들 */}
       <div className="w-full overflow-hidden">
@@ -219,5 +225,6 @@ export function StockDailyChart({
         <SubLabel label={`RSI — 데이터 부족 (최소 15${periodUnit})`} />
       )}
     </ChartShell>
+    </ChartThemeProvider>
   );
 }
