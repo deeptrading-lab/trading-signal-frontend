@@ -37,6 +37,7 @@ import {
   withTimeout,
   delay,
   jsonWithDataSource,
+  describeIndexError,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
@@ -152,12 +153,22 @@ async function loadKisIndices(): Promise<Map<string, MarketIndexQuote>> {
   for (let i = 0; i < misses.length; i += KIS_CHUNK_SIZE) {
     const chunk = misses.slice(i, i + KIS_CHUNK_SIZE);
     const settled = await Promise.allSettled(
-      chunk.map(({ code, kind }) =>
+      chunk.map(({ code, kind }) => {
         // 국내(0001/1001)는 L2 공유 store 경유로 indices 라우트와 dedup(§3.3). 해외는 현행 직접.
-        kind === "domestic"
-          ? fetchIndexPriceShared(code)
-          : fetchOverseasIndexShared(code),
-      ),
+        const startedAt = Date.now();
+        const call =
+          kind === "domestic"
+            ? fetchIndexPriceShared(code)
+            : fetchOverseasIndexShared(code);
+        // 진단(2026-06-03): allSettled 가 reject 를 조용히 드롭해 X-Data-Source=mixed 원인(특히
+        // 해외 SPX/COMP 누락)이 prod 로그에 안 남았음. 드롭 사유·소요시간을 노출한다.
+        return call.catch((error: unknown) => {
+          console.warn(
+            `[market/ticker] 지수 드롭 code=${code} kind=${kind} dur=${Date.now() - startedAt}ms ${describeIndexError(error)}`,
+          );
+          throw error;
+        });
+      }),
     );
     settled.forEach((r, idx) => {
       if (r.status === "fulfilled") {
