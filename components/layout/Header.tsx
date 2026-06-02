@@ -33,6 +33,7 @@ import {
   HEADER_PROFILE_ARIA,
 } from "@/lib/copy/layout/navCopy";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
+import { ThemeToggleButton } from "@/components/theme/ThemeToggleButton";
 import { HeaderMarketTicker } from "./HeaderMarketTicker";
 
 export function Header() {
@@ -53,6 +54,8 @@ export function Header() {
       <div className="flex items-center gap-lg ml-auto">
         {/* 글로벌 마켓 티커 (데스크탑 한정 `hidden lg:flex`) — 실데이터 5종 client 컨테이너. */}
         <HeaderMarketTicker />
+        {/* 전역 테마 빠른 토글(light↔dark) — 홈 포함 모든 탭에서 한 번에 전환. */}
+        <ThemeToggleButton />
         {/* 우측 프로필 아이콘 — PR3 에서는 라우팅만 (`/profile` 미존재 → not-found). */}
         <Link
           href="/profile"
