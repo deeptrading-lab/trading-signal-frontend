@@ -23,7 +23,8 @@ export const FEAR_GREED_EXTREME_GREED = "Extreme Greed";
 export const FEAR_GREED_DOMESTIC_TITLE = "국내 (코스피)";
 export const FEAR_GREED_US_TITLE = "미국 (CNN)";
 /** 국내는 자체 합성이라 산출 방식을 밝혀 오해 방지(베타). */
-export const FEAR_GREED_DOMESTIC_SOURCE = "코스피 상승종목·모멘텀 합성 (베타)";
+export const FEAR_GREED_DOMESTIC_SOURCE =
+  "코스피 상승종목·모멘텀·52주위치 합성 (베타)";
 export const FEAR_GREED_US_SOURCE = "출처: CNN";
 export const FEAR_GREED_UNAVAILABLE = "지금은 불러올 수 없어요";
 
