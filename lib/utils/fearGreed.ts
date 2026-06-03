@@ -27,12 +27,19 @@ export type DomesticFearGreedInput = {
   declines: number;
   /** 코스피 당일 등락률(%, 부호 포함). */
   changePercent: number;
+  /** 코스피 현재 지수값 (52주 위치 팩터용, 선택). */
+  value?: number;
+  /** 연중(52주) 최고 지수 (선택). */
+  yearHigh?: number;
+  /** 연중(52주) 최저 지수 (선택). */
+  yearLow?: number;
 };
 
-/** breadth(상승종목 비율) 가중치 — 시장 폭이 심리의 1차 신호. */
-const BREADTH_WEIGHT = 0.6;
-/** 모멘텀(당일 등락률) 가중치. */
-const MOMENTUM_WEIGHT = 0.4;
+/**
+ * 팩터별 가중치 — 가용 팩터만 골라 그 합으로 정규화(누락 팩터는 자연 제외).
+ * breadth(시장 폭) 우위 + 모멘텀(당일 강도) + 52주 위치(중기 추세 레벨).
+ */
+const FACTOR_WEIGHTS = { breadth: 0.5, momentum: 0.3, position: 0.2 } as const;
 /** 모멘텀 정규화 기준 — ±이 값(%)을 0/100 양 끝으로 매핑. */
 const MOMENTUM_CLAMP_PCT = 3;
 
@@ -41,26 +48,55 @@ function clamp01to100(v: number): number {
 }
 
 /**
- * 국내 멀티팩터 공포·탐욕 — **breadth 60% + 모멘텀 40%** 가중 합성(0~100).
+ * 국내 멀티팩터 공포·탐욕 — **breadth 50% + 모멘텀 30% + 52주 위치 20%** 가중 합성(0~100).
+ * 가용 팩터만 가중평균(누락 시 그 가중치 제외 후 재정규화) → 데이터 부족에도 graceful.
  *
- * - breadth = 상승 / (상승+하락) × 100. 시장 종목 폭.
- * - momentum = 50 + (코스피 등락률 / ±3%) × 50, clamp. 당일 강도.
- * - 데이터 부족(상승+하락=0) 시 모멘텀만으로, 그것도 없으면 중립 50.
+ * - breadth = 상승 / (상승+하락) × 100. 시장 종목 폭(상승+하락=0이면 제외).
+ * - momentum = 50 + (코스피 등락률 / ±3%) × 50, clamp. 당일 강도(항상 포함).
+ * - position = (현재 - 52주최저) / (52주최고 - 52주최저) × 100. 중기 추세 레벨
+ *   (코스피가 연중 고점 근처면 탐욕↑). yearHigh>yearLow 일 때만 포함.
  *
- * ⚠️ 간이 합성(베타) — CNN 의 7지표와 다르며 미국 시장과도 무관. 후속에 변동성·외국인수급
- * 팩터 추가 여지(가중치 상수만 조정). 투명성을 위해 가중치를 상수로 노출.
+ * ⚠️ 간이 합성(베타) — CNN 의 7지표와 다르며 미국 시장과도 무관. 후속에 변동성(VKOSPI)·
+ * 외국인수급 팩터 추가 여지(별도 데이터 필요). 투명성을 위해 가중치를 상수로 노출.
  */
 export function computeDomesticFearGreed(
   input: DomesticFearGreedInput,
 ): FearGreed {
+  const factors: Array<{ score: number; weight: number }> = [];
+
   const total = input.advances + input.declines;
-  const hasBreadth = total > 0;
-  const breadth = hasBreadth ? (100 * input.advances) / total : 50;
-  const momentum = clamp01to100(
-    50 + (input.changePercent / MOMENTUM_CLAMP_PCT) * 50,
-  );
-  const value = hasBreadth
-    ? Math.round(breadth * BREADTH_WEIGHT + momentum * MOMENTUM_WEIGHT)
-    : Math.round(momentum);
+  if (total > 0) {
+    factors.push({
+      score: (100 * input.advances) / total,
+      weight: FACTOR_WEIGHTS.breadth,
+    });
+  }
+
+  factors.push({
+    score: clamp01to100(50 + (input.changePercent / MOMENTUM_CLAMP_PCT) * 50),
+    weight: FACTOR_WEIGHTS.momentum,
+  });
+
+  if (
+    typeof input.value === "number" &&
+    typeof input.yearHigh === "number" &&
+    typeof input.yearLow === "number" &&
+    input.yearHigh > input.yearLow
+  ) {
+    factors.push({
+      score: clamp01to100(
+        ((input.value - input.yearLow) / (input.yearHigh - input.yearLow)) * 100,
+      ),
+      weight: FACTOR_WEIGHTS.position,
+    });
+  }
+
+  const weightSum = factors.reduce((s, f) => s + f.weight, 0);
+  const value =
+    weightSum > 0
+      ? Math.round(
+          factors.reduce((s, f) => s + f.score * f.weight, 0) / weightSum,
+        )
+      : 50;
   return { value, label: toFearGreedLabel(value) };
 }

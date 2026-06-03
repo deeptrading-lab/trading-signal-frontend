@@ -43,6 +43,10 @@ export function FearGreedContainer() {
           advances,
           declines,
           changePercent: kospi?.changePercent ?? 0,
+          // 52주 위치 팩터 — 같은 코스피 지수 쿼리의 연중 고저(추가 콜 0).
+          value: kospi?.value,
+          yearHigh: kospi?.yearHigh,
+          yearLow: kospi?.yearLow,
         })
       : NEUTRAL_FEAR_GREED;
 
