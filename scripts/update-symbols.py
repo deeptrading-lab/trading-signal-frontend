@@ -77,7 +77,8 @@ def fetch_dart_corp_codes(api_key: str) -> dict[str, str]:
         sc = item.find("stock_code")
         cc = item.find("corp_code")
         if sc is not None and sc.text and sc.text.strip() and cc is not None:
-            mapping[sc.text.strip()] = cc.text.strip()
+            # 6자리 정규화 — KRX ticker(6자리)와 정확 조인 보장(포맷 드리프트 방지).
+            mapping[sc.text.strip().zfill(6)] = cc.text.strip()
     return mapping
 
 
@@ -126,7 +127,10 @@ def main():
         corp_code = ticker_to_corp.get(t, "")
         if t in existing:
             entry = dict(existing[t])
-            if not entry.get("corp_code") and corp_code:
+            # corp_code 는 OpenDART CORPCODE.xml(stock_code 정확 조인)이 **권위 소스**다.
+            # 매핑이 있으면 항상 덮어쓴다 — 수동 시드(v0.1.0)의 오매핑(예: 009150→삼성SDS)이
+            # "비어있을 때만 채움" 로직에 남던 버그(v0.3.1, 82건)를 차단한다. 매핑 미존재 시에만 기존 보존.
+            if corp_code:
                 entry["corp_code"] = corp_code
             final[t] = entry
         else:
