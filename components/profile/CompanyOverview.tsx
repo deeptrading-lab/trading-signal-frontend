@@ -26,6 +26,7 @@ import {
   COMPANY_LABEL_ADDRESS,
   COMPANY_LABEL_CEO,
   COMPANY_LABEL_ESTABLISHED,
+  COMPANY_LABEL_FOREIGN_RATIO,
   COMPANY_LABEL_HOMEPAGE,
   COMPANY_LABEL_INDUSTRY,
   COMPANY_LABEL_MARKET,
@@ -118,6 +119,15 @@ function CompanyOverviewContent({ ticker }: { ticker: string }) {
         <OverviewRow
           label={COMPANY_LABEL_INDUSTRY}
           value={composeIndustry(price?.sector, data.industry)}
+        />
+        <OverviewRow
+          label={COMPANY_LABEL_FOREIGN_RATIO}
+          value={
+            // 외국인 지분율 — StockHeader 가 이미 패칭한 price 쿼리 캐시 재사용(추가 KIS 콜 0).
+            typeof price?.foreignRatio === "number"
+              ? `${price.foreignRatio.toFixed(2)}%`
+              : undefined
+          }
         />
         <OverviewRow
           label={COMPANY_LABEL_HOMEPAGE}
