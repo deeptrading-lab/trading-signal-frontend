@@ -95,7 +95,22 @@ export function mapStockPrice(
     low: output.stck_lwpr ? toNumber(output.stck_lwpr) : undefined,
     // ⚠️ 업종명(섹터) — 종목명 아님. extractStockName 과 혼동 금지. 기업개황 업종 라벨 보강용.
     sector: output.bstp_kor_isnm?.trim() || undefined,
+    foreignRatio: extractForeignRatio(output),
   };
+}
+
+/**
+ * 외국인 지분율(%) 산출 — 보유주식수/상장주식수 × 100(소수 2자리). 둘 다 유효할 때 우선,
+ * 아니면 HTS 외국인 소진율(`hts_frgn_ehrt`) 폴백. 산출 불가 시 undefined(UI 가 "-").
+ */
+function extractForeignRatio(output: KisInquirePriceOutput): number | undefined {
+  const held = toNumber(output.frgn_hldn_qty);
+  const listed = toNumber(output.lstn_stcn);
+  if (held > 0 && listed > 0) {
+    return Math.round((held / listed) * 10_000) / 100;
+  }
+  const ehrt = toNumber(output.hts_frgn_ehrt);
+  return ehrt > 0 ? ehrt : undefined;
 }
 
 /**

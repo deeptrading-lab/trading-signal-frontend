@@ -26,6 +26,8 @@ export const COMPANY_LABEL_ESTABLISHED = "설립일";
 export const COMPANY_LABEL_INDUSTRY = "업종";
 export const COMPANY_LABEL_HOMEPAGE = "홈페이지";
 export const COMPANY_LABEL_ADDRESS = "주소";
+/** 외국인 지분율(보유) — `StockPrice.foreignRatio`. */
+export const COMPANY_LABEL_FOREIGN_RATIO = "외국인 지분율";
 
 /* 공시 목록 컬럼 */
 export const DISCLOSURE_LIST_COL_REPORT = "보고서명";

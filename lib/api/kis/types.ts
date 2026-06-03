@@ -79,6 +79,12 @@ export type KisInquirePriceOutput = {
   stck_hgpr?: string;
   /** 저가. */
   stck_lwpr?: string;
+  /** HTS 외국인 소진율(%) — 외국인 보유 / 외국인 한도. 한도 없는 종목은 지분율과 동일. */
+  hts_frgn_ehrt?: string;
+  /** 외국인 보유 수량(주). 지분율 = frgn_hldn_qty / lstn_stcn. */
+  frgn_hldn_qty?: string;
+  /** 상장 주수(주). 외국인 지분율 분모. */
+  lstn_stcn?: string;
 };
 
 /**
@@ -134,6 +140,11 @@ export type StockPrice = {
   low?: number;
   /** 업종명 (KRX 큰 업종, `bstp_kor_isnm`) — "전기·전자"·"IT 서비스"·"제약" 등. 빈 값이면 undefined. */
   sector?: string;
+  /**
+   * 외국인 지분율(%) — 외국인 보유주식수 / 상장주식수 × 100. 둘 다 있을 때 계산,
+   * 없으면 HTS 외국인 소진율(`hts_frgn_ehrt`) 폴백. 산출 불가 시 undefined.
+   */
+  foreignRatio?: number;
 };
 
 export type StockDailyCandle = {

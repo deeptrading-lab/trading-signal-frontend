@@ -36,6 +36,7 @@ const MOCK_PRICES: Record<string, StockPrice> = {
     open: 71_000,
     high: 71_900,
     low: 70_800,
+    foreignRatio: 53.21,
   },
   "000660": {
     ticker: "000660",
@@ -48,6 +49,7 @@ const MOCK_PRICES: Record<string, StockPrice> = {
     open: 178_000,
     high: 178_500,
     low: 174_900,
+    foreignRatio: 50.87,
   },
   "035420": {
     ticker: "035420",
