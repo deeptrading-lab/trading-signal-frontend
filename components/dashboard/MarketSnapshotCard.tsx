@@ -73,7 +73,7 @@ export function MarketSnapshotCard({
               {MARKET_SNAPSHOT_UP}
             </p>
             <p className="text-h1 text-signal-up tabular-nums">
-              {formatNumber(snapshot.up)}
+              {formatNumber(snapshot.up, { digits: 0 })}
             </p>
           </div>
           <div className="flex-1 rounded-md border border-border-line p-md">
@@ -81,7 +81,7 @@ export function MarketSnapshotCard({
               {MARKET_SNAPSHOT_DOWN}
             </p>
             <p className="text-h1 text-signal-down tabular-nums">
-              {formatNumber(snapshot.down)}
+              {formatNumber(snapshot.down, { digits: 0 })}
             </p>
           </div>
         </div>
