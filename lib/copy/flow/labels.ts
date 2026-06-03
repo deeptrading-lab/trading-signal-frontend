@@ -15,6 +15,19 @@ export const FLOW_TOP10_TODAY_LABEL = "당일";
 /** 기준 시각 접두 — 뒤에 시각이 붙는다("기준 14:30"). */
 export const FLOW_TOP10_ASOF_PREFIX = "기준";
 
+/* 당일 ↔ 누적 토글 (investor-flow-cumulative) */
+/** 토글 — 당일 모드 버튼. */
+export const FLOW_MODE_TODAY = "당일";
+/** 토글 — 7일 누적 모드 버튼. */
+export const FLOW_MODE_CUMULATIVE = "7일 누적";
+/** 누적 컬럼 헤더 — `최근 ${N}영업일 누적`. N 은 실제 합산 일수(cumulativeDays). */
+export function flowCumulativeLabel(days: number): string {
+  return `최근 ${days}영업일 누적`;
+}
+/** 누적 적립 전(부트스트랩, cumulativeDays=0) 안내. */
+export const FLOW_CUMULATIVE_COLLECTING =
+  "최근 수급을 모으는 중이에요. 영업일이 쌓이면 7일 누적이 표시됩니다.";
+
 /* 컬럼(주체) 소제목 */
 export const FLOW_TOP10_FOREIGN_LABEL = "외국인";
 export const FLOW_TOP10_INSTITUTION_LABEL = "기관";

@@ -19,22 +19,29 @@ import { getInvestorFlowTop10 } from "@/lib/api/flow/top10";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
-import type { InvestorFlowTop10 } from "@/lib/types/flow/top10";
+import type { FlowMode, InvestorFlowTop10 } from "@/lib/types/flow/top10";
 
 export type UseQueryFlowTop10Options = {
   /** false 면 쿼리 비활성. 기본 true. */
   enabled?: boolean;
 };
 
+/**
+ * @param mode "today"(당일 스냅샷, 기본) | "cumulative"(최근 7영업일 누적).
+ *   모드별 queryKey·TTL 분리 — 토글 전환 시 각자 캐시.
+ */
 export function useQueryFlowTop10(
+  mode: FlowMode = "today",
   options?: UseQueryFlowTop10Options,
 ): UseQueryResult<InvestorFlowTop10, ApiError> {
+  const config =
+    mode === "cumulative" ? queryConfig.flow.cumulative : queryConfig.flow.top10;
   return useQuery<InvestorFlowTop10, ApiError>({
-    queryKey: queryKeys.flow.top10(),
-    queryFn: () => getInvestorFlowTop10(),
+    queryKey: queryKeys.flow.top10(mode),
+    queryFn: () => getInvestorFlowTop10(mode),
     enabled: options?.enabled ?? true,
-    staleTime: queryConfig.flow.top10.staleTime,
-    gcTime: queryConfig.flow.top10.gcTime,
+    staleTime: config.staleTime,
+    gcTime: config.gcTime,
     retry: 0,
     refetchOnWindowFocus: false,
   });

@@ -14,7 +14,7 @@
  *   - `X-Data-Source`(kis/mock/mock-timeout) + `X-KIS-Env` 헤더.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   fetchForeignInstitutionTotal,
   isKisConfigured,
@@ -22,6 +22,8 @@ import {
 } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockInvestorFlowTop10 } from "@/lib/mock/flow/top10";
+import { getMockInvestorFlowCumulative } from "@/lib/mock/flow/cumulative";
+import { readCumulativeSnapshots } from "@/lib/server/flowSnapshotStore";
 import type {
   InvestorFlowRow,
   InvestorFlowTop10,
@@ -30,6 +32,7 @@ import {
   withTimeout,
   delay,
   jsonWithDataSource,
+  fetchWithTransientRetry,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
@@ -43,7 +46,22 @@ const FALLBACK_TIMEOUT_MESSAGE =
 const FALLBACK_SERVER_MESSAGE =
   "외국인·기관 순매수 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
 
-export async function GET() {
+const CUMULATIVE_MAX_DAYS = 7;
+
+export async function GET(request: NextRequest) {
+  const mode = request.nextUrl.searchParams.get("mode");
+  if (mode === "cumulative") {
+    const daysParam = Number.parseInt(
+      request.nextUrl.searchParams.get("days") ?? "7",
+      10,
+    );
+    const days = Number.isFinite(daysParam)
+      ? Math.min(Math.max(daysParam, 1), CUMULATIVE_MAX_DAYS)
+      : CUMULATIVE_MAX_DAYS;
+    return handleCumulative(days);
+  }
+
+  // === 당일(today) — 기존 동작(무회귀) ===
   // 이중 게이트 — 미설정 또는 prod 가 아니면 KIS 실호출을 시도하지 않고 mock.
   if (!isKisConfigured() || resolveKisEnv() !== "prod") {
     return jsonWithDataSource(getMockInvestorFlowTop10(), "mock", {
@@ -82,49 +100,46 @@ async function fetchTop10(): Promise<InvestorFlowTop10> {
 }
 
 /**
- * 단일 주체 호출.
- * - **transient(EGW00201 rate-limit / 네트워크) → 짧은 backoff 후 1회 재시도.**
- *   홈 진입 시 다른 KIS 위젯(지수·티커 등)과 동시 호출이 겹치면 주체 콜 하나가 초당 한도(EGW00201)에
- *   걸려 빈 컬럼이 되던 문제를 방어(watchlist route 패턴 정합).
- * - 재시도 후에도 실패하거나 비-transient 실패면 빈 배열로 degrade(부분 성공 허용).
- * - BFF 타임아웃 sentinel 은 상위로 전파해 mock-timeout 분기를 타게 한다.
+ * 단일 주체 호출 — transient(EGW00201/네트워크) 시 backoff 후 1회 재시도, 실패 시 빈 배열 degrade.
+ * 홈 진입 시 다른 KIS 위젯과 동시 호출이 겹쳐 초당 한도에 걸려 빈 컬럼이 되던 문제 방어(#90).
+ * BFF 타임아웃 sentinel 은 상위로 전파(mock-timeout 분기). 공통 헬퍼 `fetchWithTransientRetry` 사용.
  */
 async function safeFetch(
   subject: "frgn" | "orgn",
 ): Promise<InvestorFlowRow[]> {
-  try {
-    return await fetchForeignInstitutionTotal(subject);
-  } catch (error) {
-    if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
-      throw error;
-    }
-    if (isTransientError(error)) {
-      await delay(RETRY_BACKOFF_MS);
-      try {
-        return await fetchForeignInstitutionTotal(subject);
-      } catch (retryError) {
-        if (
-          retryError instanceof Error &&
-          retryError.message === BFF_TIMEOUT_SENTINEL
-        ) {
-          throw retryError;
-        }
-        return [];
-      }
-    }
-    return [];
-  }
+  return fetchWithTransientRetry(
+    () => fetchForeignInstitutionTotal(subject),
+    [],
+    RETRY_BACKOFF_MS,
+  );
 }
 
-/** 재시도 가능한 transient 실패 — 네트워크/타임아웃성 또는 KIS rate-limit(EGW00201). */
-function isTransientError(error: unknown): boolean {
-  if (!isApiError(error)) return false;
-  if (error.kind === "network") return true;
-  const detail = error.detail as { msg_cd?: unknown } | undefined;
-  const msgCd =
-    detail && typeof detail.msg_cd === "string" ? detail.msg_cd : undefined;
-  if (msgCd === "EGW00201") return true;
-  return typeof error.message === "string" && error.message.includes("초당 거래건수");
+/**
+ * 누적 모드 — 최근 N영업일 스냅샷(KV, cron 적립)을 합산해 Top10.
+ * - 비-prod(로컬/preview): KV 미적립이 일반적 → mock 누적(레이아웃·토글 demo).
+ * - prod: KV 합산. 적립 전이면 `cumulativeDays=0` 으로 반환(UI 가 "모으는 중" 안내).
+ */
+async function handleCumulative(days: number): Promise<NextResponse> {
+  if (!isKisConfigured() || resolveKisEnv() !== "prod") {
+    return jsonWithDataSource(getMockInvestorFlowCumulative(days), "mock", {
+      "X-KIS-Env": resolveKisEnv(),
+    });
+  }
+  try {
+    const foreign = await readCumulativeSnapshots("frgn", days);
+    const institution = await readCumulativeSnapshots("orgn", days);
+    const result: InvestorFlowTop10 = {
+      foreign: foreign.rows.slice(0, TOP_N),
+      institution: institution.rows.slice(0, TOP_N),
+      cumulativeDays: Math.max(foreign.daysCount, institution.daysCount),
+    };
+    return jsonWithDataSource(result, "kv", { "X-KIS-Env": resolveKisEnv() });
+  } catch {
+    // KV 장애 등 — 누적 mock 으로 degrade(당일 모드는 별개라 무영향).
+    return jsonWithDataSource(getMockInvestorFlowCumulative(days), "mock", {
+      "X-KIS-Env": resolveKisEnv(),
+    });
+  }
 }
 
 function mapErrorToResponse(error: unknown): NextResponse {

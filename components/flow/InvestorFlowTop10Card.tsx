@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { formatNetBuyAmount, formatNetBuyQty } from "@/lib/utils/formatNetBuy";
-import type { InvestorFlowRow } from "@/lib/types/flow/top10";
+import type { FlowMode, InvestorFlowRow } from "@/lib/types/flow/top10";
 import {
   FLOW_TOP10_ASOF_PREFIX,
   FLOW_TOP10_COLUMN_EMPTY,
@@ -38,6 +38,10 @@ import {
   FLOW_TOP10_SHOW_MORE,
   FLOW_TOP10_TITLE,
   FLOW_TOP10_TODAY_LABEL,
+  FLOW_MODE_TODAY,
+  FLOW_MODE_CUMULATIVE,
+  FLOW_CUMULATIVE_COLLECTING,
+  flowCumulativeLabel,
 } from "@/lib/copy/flow/labels";
 
 const MOBILE_TRUNCATE = 5;
@@ -135,18 +139,18 @@ function FlowRow({ row, rank }: { row: InvestorFlowRow; rank: number }) {
 function FlowColumn({
   label,
   rows,
-  asOf,
+  headerMeta,
   className,
   onRetry,
 }: {
   label: string;
   rows: InvestorFlowRow[];
-  asOf?: string;
+  /** 우측 메타 텍스트 — 당일("당일 · 기준 14:30") 또는 누적("최근 7영업일 누적"). */
+  headerMeta: string;
   className?: string;
   onRetry?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const meta = asOfLabel(asOf);
   const truncated = rows.length > MOBILE_TRUNCATE;
   // 모바일에서만 절단(<md). 데스크탑은 항상 Top10 — Tailwind 로 잘린 행을 md 이상에서 노출한다.
 
@@ -154,10 +158,7 @@ function FlowColumn({
     <section className={cn("flex flex-col gap-sm", className)} aria-label={label}>
       <header className="flex items-baseline justify-between gap-sm">
         <h3 className="text-body-sm-strong text-text-strong">{label}</h3>
-        <span className="text-caption text-text-muted">
-          {FLOW_TOP10_TODAY_LABEL}
-          {meta ? ` · ${meta}` : ""}
-        </span>
+        <span className="text-caption text-text-muted">{headerMeta}</span>
       </header>
 
       {rows.length === 0 ? (
@@ -218,16 +219,77 @@ function SkeletonColumn() {
   );
 }
 
+/** 당일 ↔ 7일 누적 세그먼트 토글. */
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: FlowMode;
+  onChange: (mode: FlowMode) => void;
+}) {
+  const options: Array<{ value: FlowMode; label: string }> = [
+    { value: "today", label: FLOW_MODE_TODAY },
+    { value: "cumulative", label: FLOW_MODE_CUMULATIVE },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label={FLOW_TOP10_TITLE}
+      className="inline-flex rounded-pill bg-surface-muted p-xs"
+    >
+      {options.map((opt) => {
+        const active = mode === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={cn(
+              "px-md h-button-sm-h rounded-pill text-button-sm transition-colors",
+              active
+                ? "bg-surface text-text-strong shadow-sm"
+                : "text-text-muted hover:text-text-strong",
+            )}
+            onClick={() => onChange(opt.value)}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 컬럼 우측 메타 — 당일("당일 · 기준 14:30") 또는 누적("최근 N영업일 누적"). */
+function buildHeaderMeta(
+  mode: FlowMode,
+  asOf: string | undefined,
+  cumulativeDays: number | undefined,
+): string {
+  if (mode === "cumulative") {
+    return flowCumulativeLabel(cumulativeDays && cumulativeDays > 0 ? cumulativeDays : 7);
+  }
+  const meta = asOfLabel(asOf);
+  return `${FLOW_TOP10_TODAY_LABEL}${meta ? ` · ${meta}` : ""}`;
+}
+
 export function InvestorFlowTop10Card() {
-  const { data, isLoading, isError, refetch } = useQueryFlowTop10();
+  const [mode, setMode] = useState<FlowMode>("today");
+  const { data, isLoading, isError, refetch } = useQueryFlowTop10(mode);
 
   const hasRows =
     !!data && (data.foreign.length > 0 || data.institution.length > 0);
+  // 누적 부트스트랩 — 적립 전(cumulativeDays=0, 행 없음)이면 "모으는 중" 안내.
+  const cumulativeCollecting =
+    mode === "cumulative" && !hasRows && (data?.cumulativeDays ?? 0) === 0;
+  const headerMeta = buildHeaderMeta(mode, data?.asOf, data?.cumulativeDays);
 
   return (
     <section className="card flex flex-col gap-md" aria-label={FLOW_TOP10_TITLE}>
       <header className="flex items-center justify-between gap-sm">
         <h2 className="text-h2 text-text-strong">{FLOW_TOP10_TITLE}</h2>
+        <ModeToggle mode={mode} onChange={setMode} />
       </header>
 
       {isLoading ? (
@@ -251,6 +313,8 @@ export function InvestorFlowTop10Card() {
             {FLOW_TOP10_RETRY}
           </button>
         </div>
+      ) : cumulativeCollecting ? (
+        <p className="text-body-sm text-text-muted">{FLOW_CUMULATIVE_COLLECTING}</p>
       ) : !hasRows ? (
         <p className="text-body-sm text-text-muted">{FLOW_TOP10_EMPTY}</p>
       ) : (
@@ -258,13 +322,13 @@ export function InvestorFlowTop10Card() {
           <FlowColumn
             label={FLOW_TOP10_FOREIGN_LABEL}
             rows={data.foreign}
-            asOf={data.asOf}
+            headerMeta={headerMeta}
             onRetry={() => refetch()}
           />
           <FlowColumn
             label={FLOW_TOP10_INSTITUTION_LABEL}
             rows={data.institution}
-            asOf={data.asOf}
+            headerMeta={headerMeta}
             className="lg:border-l lg:border-border-line lg:pl-lg"
             onRetry={() => refetch()}
           />

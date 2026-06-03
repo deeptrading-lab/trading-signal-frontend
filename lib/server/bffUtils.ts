@@ -7,6 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { isApiError } from "@/lib/api/errors";
 
 /** `withTimeout` 이 타임아웃 시 던지는 Error 메시지 — route 의 에러 분기 비교에 사용. */
 export const BFF_TIMEOUT_SENTINEL = "__BFF_TIMEOUT__";
@@ -30,6 +31,61 @@ export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T
 /** 단순 지연 — 외부 API 청크 호출 간 간격(EGW00201 회피) 등에 사용. */
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 재시도 가능한 transient 실패인지 — 네트워크/타임아웃성 또는 KIS rate-limit(EGW00201).
+ *
+ * 멀티콜 KIS 라우트(flow Top10·cron 스냅샷 등)가 홈 진입 시 다른 위젯과 동시 호출돼 초당 한도
+ * (EGW00201)에 걸리는 간헐 실패를 한 곳에서 판별한다(investor-flow #90 교훈 공통화).
+ */
+export function isTransientError(error: unknown): boolean {
+  if (!isApiError(error)) return false;
+  if (error.kind === "network") return true;
+  const detail = error.detail as { msg_cd?: unknown } | undefined;
+  const msgCd =
+    detail && typeof detail.msg_cd === "string" ? detail.msg_cd : undefined;
+  if (msgCd === "EGW00201") return true;
+  return (
+    typeof error.message === "string" && error.message.includes("초당 거래건수")
+  );
+}
+
+/**
+ * `fn` 을 실행하고 **transient 실패(EGW00201/네트워크) 시 backoff 후 1회 재시도**한다.
+ *
+ * - 재시도 후에도 실패하거나 비-transient 실패면 `fallback` 반환(부분 성공 허용).
+ * - `BFF_TIMEOUT_SENTINEL` 은 폴백하지 않고 상위로 전파(타임아웃 분기는 라우트가 처리).
+ *
+ * flow Top10 의 `safeFetch`(빈 배열 폴백)와 cron 스냅샷이 공유한다.
+ */
+export async function fetchWithTransientRetry<T>(
+  fn: () => Promise<T>,
+  fallback: T,
+  backoffMs: number,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
+      throw error;
+    }
+    if (isTransientError(error)) {
+      await delay(backoffMs);
+      try {
+        return await fn();
+      } catch (retryError) {
+        if (
+          retryError instanceof Error &&
+          retryError.message === BFF_TIMEOUT_SENTINEL
+        ) {
+          throw retryError;
+        }
+        return fallback;
+      }
+    }
+    return fallback;
+  }
 }
 
 /**

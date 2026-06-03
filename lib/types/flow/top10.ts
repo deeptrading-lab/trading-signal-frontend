@@ -41,4 +41,12 @@ export type InvestorFlowTop10 = {
   institution: InvestorFlowRow[];
   /** 기준 시각(ISO 문자열) — "기준 시각" 표기용. 미상 시 생략. */
   asOf?: string;
+  /**
+   * 누적 모드(`mode=cumulative`)에서 실제 합산에 사용된 영업일 수(≤7). 당일 모드면 생략.
+   * 0 이면 적립 전(부트스트랩) — UI 가 "모으는 중" 안내. 7 미만이면 "최근 N영업일 누적".
+   */
+  cumulativeDays?: number;
 };
+
+/** Top10 조회 모드 — 당일 스냅샷 / 최근 N영업일 누적. */
+export type FlowMode = "today" | "cumulative";

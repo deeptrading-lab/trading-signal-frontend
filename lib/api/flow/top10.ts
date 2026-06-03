@@ -9,11 +9,22 @@
  */
 
 import { httpClient } from "@/lib/api/client";
-import type { InvestorFlowTop10 } from "@/lib/types/flow/top10";
+import type { FlowMode, InvestorFlowTop10 } from "@/lib/types/flow/top10";
 
 export type { InvestorFlowTop10 } from "@/lib/types/flow/top10";
 
-export async function getInvestorFlowTop10(): Promise<InvestorFlowTop10> {
-  const response = await httpClient.get<InvestorFlowTop10>("/flow/top10");
+/** 누적 모드 기본 합산 영업일 수 — BFF 가 clamp(1~7). */
+const CUMULATIVE_DAYS = 7;
+
+export async function getInvestorFlowTop10(
+  mode: FlowMode = "today",
+): Promise<InvestorFlowTop10> {
+  const params =
+    mode === "cumulative"
+      ? { mode: "cumulative", days: CUMULATIVE_DAYS }
+      : undefined;
+  const response = await httpClient.get<InvestorFlowTop10>("/flow/top10", {
+    params,
+  });
   return response.data;
 }

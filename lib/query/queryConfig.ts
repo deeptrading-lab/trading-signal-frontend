@@ -57,6 +57,14 @@ export const queryConfig = {
       staleTime: 60 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * 7일 누적 Top10 — cron 이 하루 1회 적립하므로 장중 재호출 무의미. staleTime 30분
+     * (PRD `investor-flow-cumulative` §8.2). 단일 진실 원천.
+     */
+    cumulative: {
+      staleTime: 30 * MINUTE,
+      gcTime: 1 * HOUR,
+    },
   },
   disclosure: {
     /** 기업개황 — 거의 변하지 않음 (대표자명·설립일·업종 등). */
