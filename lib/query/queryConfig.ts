@@ -45,6 +45,11 @@ export const queryConfig = {
       staleTime: 5 * MINUTE,
       gcTime: 30 * MINUTE,
     },
+    /** 회사 소개(자유 텍스트) — 분기보고서 주기로 갱신되는 정적 정보. 기업개황과 동일 TTL. */
+    description: {
+      staleTime: 1 * DAY,
+      gcTime: 7 * DAY,
+    },
   },
   /**
    * 수급(외국인/기관 순매수) 도메인 TTL.

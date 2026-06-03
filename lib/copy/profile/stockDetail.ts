@@ -12,6 +12,11 @@ export const STOCK_DETAIL_PRICE_CHART_TITLE = "가격 차트";
 export const STOCK_DETAIL_COMPANY_OVERVIEW_TITLE = "기업개황";
 export const STOCK_DETAIL_DISCLOSURE_LIST_TITLE = "최근 공시";
 
+/* 회사 소개(자유 텍스트, 외부 출처) */
+export const STOCK_DETAIL_COMPANY_DESCRIPTION_TITLE = "회사 소개";
+/** 출처 표기 접두 — `회사 소개` 문단 하단에 "출처: FnGuide" 형태로 노출. */
+export const STOCK_DETAIL_DESCRIPTION_SOURCE_PREFIX = "출처";
+
 /* 로딩·에러·빈 상태 (§3.6) */
 export const STOCK_DETAIL_LOADING = "불러오는 중…";
 export const STOCK_DETAIL_NOT_FOUND =

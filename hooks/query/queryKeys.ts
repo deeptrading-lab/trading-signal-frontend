@@ -33,6 +33,8 @@ export const queryKeys = {
     search: (keyword: string) => ["stock", "search", keyword] as const,
     /** 종목별 개인/외국인/기관 최근 N일 순매수 추이(투자자 도메인 표면 B). */
     investors: (ticker: string) => ["stock", "investors", ticker] as const,
+    /** 종목 "회사 소개"(자유 텍스트, 외부 출처) — 거의 변하지 않는 정적 정보. */
+    description: (ticker: string) => ["stock", "description", ticker] as const,
   },
   flow: {
     /** 시장 전체 외국인/기관 당일 순매수 Top10(수급 표면 A) — 단일 랭킹, 인자 없음. */
