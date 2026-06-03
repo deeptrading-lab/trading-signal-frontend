@@ -15,11 +15,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   fetchStockPrice,
+  getSymbolName,
   isKisConfigured,
   resolveKisEnv,
 } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockStockPrice } from "@/lib/mock/stock/price";
+import type { StockPrice } from "@/lib/api/kis/types";
 import {
   withTimeout,
   jsonWithDataSource,
@@ -46,12 +48,23 @@ export async function GET(request: NextRequest) {
   try {
     // route handler 자체 timeout 가드 (BFF 5s) — Promise.race.
     const data = await withTimeout(fetchStockPrice(ticker), 5_000);
-    return jsonWithDataSource(data, "kis", {
+    return jsonWithDataSource(withSeedName(data, ticker), "kis", {
       "X-KIS-Env": resolveKisEnv(),
     });
   } catch (error) {
     return mapErrorToResponse(error, ticker);
   }
+}
+
+/**
+ * 종목명 보강 — KIS `hts_kor_isnm` 은 prod 에서도 빈 값 케이스가 있어 `mapStockPrice` 가 ticker 로
+ * 폴백한다(reference_kis-api-conventions §1). 이름이 ticker 그대로면 시드(symbols.json, 서버 전용,
+ * 클라 번들 비용 0)에서 보강 → Top10 클릭·딥링크 등 검색을 안 거친 진입에서도 헤더에 종목명이 뜬다.
+ */
+function withSeedName(data: StockPrice, ticker: string): StockPrice {
+  if (data.name && data.name !== ticker) return data;
+  const seedName = getSymbolName(ticker);
+  return seedName ? { ...data, name: seedName } : data;
 }
 
 function mapErrorToResponse(error: unknown, ticker: string): NextResponse {

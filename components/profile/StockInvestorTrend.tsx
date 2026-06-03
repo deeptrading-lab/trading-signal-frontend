@@ -69,13 +69,14 @@ function SummaryCell({
   qty: number;
 }) {
   return (
-    <div className="flow-summary-cell flex flex-col gap-xs">
+    <div className="flow-summary-cell flex min-w-0 flex-col gap-xs">
       <span className="flow-summary-label">{label}</span>
-      {/* 금액 = 카드 hero. netbuy-amount-* 합성 클래스(색) + text-body-strong(16px) — 색 보존 + 사이즈 상향. */}
-      <span className={cn(amountClass(amount), "text-body-strong")}>
+      {/* 금액 = 카드 hero. netbuy-amount-*(색) + 14px·nowrap — 좁은 모바일 3칸에서 큰 금액("+1,234억")이
+       *   "억"만 다음 줄로 떨어지지 않게 한 줄 고정(tabular-nums 는 합성 클래스에 포함). */}
+      <span className={cn(amountClass(amount), "text-body-sm-strong whitespace-nowrap")}>
         {formatNetBuyAmount(amount)}
       </span>
-      <span className="netbuy-qty">{formatNetBuyQty(qty)}</span>
+      <span className="netbuy-qty whitespace-nowrap">{formatNetBuyQty(qty)}</span>
     </div>
   );
 }
