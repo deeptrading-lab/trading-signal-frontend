@@ -3508,3 +3508,39 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 없음(독립 기능). 종목 상세 페이지에도 동일 별 토글 추가 검토 여지.
+
+### 2026-06-03 — feat(stock): 종목 상세 헤더에 관심종목 별 토글 추가 (#112)
+
+- **slug**: `stock-detail-star-toggle` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/112
+- **요약**: feat(stock): 종목 상세 헤더에 관심종목 별 토글 추가
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇
+  > 
+  > 종목 상세 페이지(\`/stock/[ticker]\`) 헤더의 **종목명·종목번호 옆에 관심종목 별(★) 토글**을 추가했다. 지금까진 상세를 보다가 관심종목에 담으려면 관심종목 페이지로 가서 다시 검색해야 했는데, 이제 상세에서 바로 담기/빼기가 가능하다.
+  > 
+  > #100 에서 만든 검색 결과 별과 **동일 UX**(빈 별 ↔ 채운 별, 추가 시 파티클 축하).
+  > 
+  > ## 어떻게
+  > 
+  > - **\`WatchlistStarButton\` 그대로 재사용** — \`added\`/\`onToggle\` 로 제어되는 기존 컴포넌트라 신규 컴포넌트·CSS **0건**.
+  > - \`StockHeader\` 가 이미 쓰던 \`useWatchlistTickers\`(이름 표시용 \`getName\`)에서 \`hasTicker\`/\`addTicker\`/\`removeTicker\` 를 추가로 받아 토글 제어.
+  > - 추가 시 **해결된 종목명을 함께 영구화**(디그레이드 행 식별용). 단 이름이 ticker 폴백이면 \`undefined\` 전달 → store 에 ticker 를 이름으로 저장하지 않음.
+  > - 별은 종목명 + 종목번호 배지와 한 줄에 배치(\`inline-flex items-center gap-sm\`).
+  > 
+  > ## 안전성
+  > 
+  > - \`StockPageLayout\` 의 모바일/확대/기본 **3분기는 상호배타 렌더** → \`StockHeader\` 인스턴스가 한 번에 하나만 마운트. 레이아웃 전환 remount 시 \`useWatchlistTickers\` 가 localStorage(SSOT) 를 재동기화하므로 **desync 없음**. 페이지 내 다른 watchlist 소비처 0건 확인.
+  > - 별 색·애니메이션은 전부 \`.wl-star*\`(토큰 \`chart-signal\`), hex 직타 0.
+  > 
+  > ## 검증
+  > 
+  > - typecheck / lint / build **0 에러**.
+  > - 별 토글 인터랙션(파티클·추가/제거·관심종목 페이지와 상태 일치)은 프리뷰 확인 권장.
+  > 
+  > ## 다음 작업
+  > 
+  > - 없음(독립 UX 개선). 관심종목 페이지(#100)와 store 를 공유하므로 양쪽 상태 자동 일치.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 없음(독립 UX 개선). 관심종목 페이지(#100)와 store 를 공유하므로 양쪽 상태 자동 일치.
