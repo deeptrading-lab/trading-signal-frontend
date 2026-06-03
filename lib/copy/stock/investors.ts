@@ -19,6 +19,8 @@ export const STOCK_INVESTORS_SUMMARY_HEADING = "최근 N일 순매수 합계";
 export const STOCK_INVESTORS_PERSON_LABEL = "개인";
 export const STOCK_INVESTORS_FOREIGN_LABEL = "외국인";
 export const STOCK_INVESTORS_ORG_LABEL = "기관";
+/** 외국인 카드 보조 — 현재 보유 지분율(순매수 흐름과 구분). `현재 지분 48.07%`. */
+export const STOCK_INVESTORS_FOREIGN_HOLDING_PREFIX = "현재 지분";
 
 /* 일자별 표 헤더 */
 export const STOCK_INVESTORS_COL_DATE = "일자";
