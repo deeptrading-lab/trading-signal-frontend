@@ -13,7 +13,11 @@
  * AssetHeader (`components/home/AssetHeader.tsx`) 와 시각 톤 정합. 본 컴포넌트는 별도 — Profile 도메인
  * (실데이터) + Home 도메인 (mock 시안) 의 책임 분리.
  *
- * 'use client' — `useQueryStockPrice` 호출 + 향후 즐겨찾기 토글 확장 여지.
+ * 종목명 옆 관심종목 별 토글(`WatchlistStarButton` 재사용, #100 의 검색 결과 별과 동일 UX) — 상세를
+ * 보면서 바로 관심목록 담기/빼기. `useWatchlistTickers`(localStorage SSOT)로 제어. StockPageLayout 의
+ * 모바일/확대/기본 3분기는 상호배타 렌더라 인스턴스가 한 번에 하나만 마운트 → remount 시 store 재동기화.
+ *
+ * 'use client' — `useQueryStockPrice` + 관심 별 토글.
  */
 
 "use client";
@@ -24,6 +28,7 @@ import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
+import { WatchlistStarButton } from "@/components/watchlist/WatchlistStarButton";
 import { readRecentSearches } from "@/lib/utils/recentSearch";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import {
@@ -37,7 +42,7 @@ export interface StockHeaderProps {
 
 export function StockHeader({ ticker }: StockHeaderProps) {
   const { data, isLoading, isError, error } = useQueryStockPrice(ticker);
-  const { getName } = useWatchlistTickers();
+  const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
   if (isLoading) {
     return (
@@ -72,6 +77,12 @@ export function StockHeader({ ticker }: StockHeaderProps) {
       readRecentSearches().find((e) => e.ticker === ticker)?.name,
       data.name,
     ]) ?? ticker;
+  // 관심종목 토글 — 추가 시 종목명을 함께 영구화(디그레이드 행 식별용). 이름 미해결(ticker 폴백)이면
+  //   ticker 를 이름으로 저장하지 않도록 undefined 전달.
+  const added = hasTicker(ticker);
+  const nameForAdd = displayName === ticker ? undefined : displayName;
+  const toggleWatch = () =>
+    added ? removeTicker(ticker) : addTicker(ticker, nameForAdd);
   const direction = data.direction;
   const isUp = direction === "up";
   const isFlat = direction === "flat";
@@ -86,13 +97,16 @@ export function StockHeader({ ticker }: StockHeaderProps) {
     // 모바일: 2줄 스택(이름 → 가격). 데스크탑(lg): 한 줄 — 좌측 이름·종목번호 / 우측 가격·등락.
     //   헤더를 한 줄로 압축해 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다.
     <div className="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between lg:gap-md">
-      {/* 좌: 종목명 + 종목번호 */}
-      <h1 className="text-h1 text-text-strong inline-flex items-center gap-sm">
-        {displayName}
-        <span className="text-badge px-sm py-[2px] rounded-sm font-normal bg-asset-stock-soft text-asset-stock">
-          {data.ticker}
-        </span>
-      </h1>
+      {/* 좌: 종목명 + 종목번호 + 관심 별 토글 */}
+      <div className="inline-flex items-center gap-sm">
+        <h1 className="text-h1 text-text-strong inline-flex items-center gap-sm">
+          {displayName}
+          <span className="text-badge px-sm py-[2px] rounded-sm font-normal bg-asset-stock-soft text-asset-stock">
+            {data.ticker}
+          </span>
+        </h1>
+        <WatchlistStarButton added={added} onToggle={toggleWatch} />
+      </div>
 
       {/* 우: 가격 + 단위 + 등락 */}
       <div className="flex items-end gap-sm flex-wrap lg:justify-end">
