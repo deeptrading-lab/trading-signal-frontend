@@ -34,10 +34,12 @@ import {
   MARKET_LABEL_KOSPI,
   MARKET_LABEL_OTHER,
   STOCK_DETAIL_COMPANY_OVERVIEW_TITLE,
+  STOCK_DETAIL_DESCRIPTION_SOURCE_PREFIX,
   STOCK_DETAIL_LOADING,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { useQueryDisclosureCompany } from "@/hooks/disclosure/useQueryDisclosureCompany";
+import { useQueryStockDescription } from "@/hooks/stock/useQueryStockDescription";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import type { CompanyProfile } from "@/lib/api/dart/types";
@@ -105,6 +107,7 @@ function CompanyOverviewContent({ ticker }: { ticker: string }) {
   return (
     <>
       <h3 className="text-h2 text-text-strong mb-md">{data.corpName}</h3>
+      <CompanyDescriptionBlock ticker={ticker} />
       <dl className="grid grid-cols-1 md:grid-cols-2 gap-md">
         <OverviewRow label={COMPANY_LABEL_CEO} value={data.ceoName} />
         <OverviewRow
@@ -158,6 +161,31 @@ export function CompanyOverview({ ticker, collapsible = false }: CompanyOverview
       </header>
       <CompanyOverviewContent ticker={ticker} />
     </section>
+  );
+}
+
+/**
+ * 회사 소개(자유 텍스트) 블록 — 기업개황 필드 그리드 위에 한 문단으로 노출.
+ *
+ * 비핵심 정보 — 로딩/에러/빈 문장이면 **아무것도 렌더하지 않는다**(블록 자체 숨김).
+ * 외부 출처(wisereport) 차단/실패 시 BFF 가 빈 배열로 degrade → 자연스럽게 사라진다.
+ * 데이터 훅은 펼침 시 마운트되는 `CompanyOverviewContent` 내부라 별도 지연 처리 불필요.
+ */
+function CompanyDescriptionBlock({ ticker }: { ticker: string }) {
+  const { data } = useQueryStockDescription(ticker);
+  const sentences = data?.sentences ?? [];
+  if (sentences.length === 0) return null;
+  return (
+    <div className="mb-lg">
+      <p className="text-body-md text-text-strong leading-relaxed">
+        {sentences.join(" ")}
+      </p>
+      {data?.source ? (
+        <p className="text-caption text-text-muted mt-xs">
+          {STOCK_DETAIL_DESCRIPTION_SOURCE_PREFIX}: {data.source}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
