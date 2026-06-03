@@ -37,8 +37,8 @@ export const queryKeys = {
     description: (ticker: string) => ["stock", "description", ticker] as const,
   },
   flow: {
-    /** 시장 전체 외국인/기관 당일 순매수 Top10(수급 표면 A) — 단일 랭킹, 인자 없음. */
-    top10: () => ["flow", "top10"] as const,
+    /** 시장 전체 외국인/기관 순매수 Top10(수급 표면 A) — 당일/7일누적 모드별 분리 캐시. */
+    top10: (mode: "today" | "cumulative") => ["flow", "top10", mode] as const,
   },
   disclosure: {
     company: (ticker: string) => ["disclosure", "company", ticker] as const,

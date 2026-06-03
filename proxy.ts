@@ -84,9 +84,12 @@ const PUBLIC_EXACT_PATHS = new Set<string>([
 function isPublicPath(pathname: string): boolean {
   // 1) 플랫 공개 경로 — 정확 일치(로그인·파비콘·아이콘·메타·PWA 에셋).
   if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
-  // 2) 하위 경로가 있는 공개 트리 — 접두 매칭이 타당한 것만(인증 API·공개 폰트).
+  // 2) 하위 경로가 있는 공개 트리 — 접두 매칭이 타당한 것만(인증 API·공개 폰트·cron).
   if (pathname.startsWith("/api/auth/")) return true; // 인증 API(login/logout) — 미인증 호출 가능
   if (pathname.startsWith("/fonts/")) return true; // public/fonts/ 공개 에셋
+  // Vercel Cron 은 세션 쿠키가 없다 → 앱 비밀번호 게이트를 통과시켜야 라우트에 도달한다.
+  // 안전: cron 라우트는 자체적으로 `Authorization: Bearer ${CRON_SECRET}` 를 검증한다(미일치 401).
+  if (pathname.startsWith("/api/cron/")) return true;
   return false;
 }
 
