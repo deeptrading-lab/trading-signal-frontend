@@ -103,6 +103,14 @@ export const queryConfig = {
       staleTime: 60 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * CNN(미국) 공포·탐욕 지수 — 하루 단위로 의미 있는 지표(장중 소폭 변동). 외부 비공식 출처
+     * 부하 최소화 위해 staleTime 30분. 단일 진실 원천.
+     */
+    fearGreed: {
+      staleTime: 30 * MINUTE,
+      gcTime: 1 * HOUR,
+    },
   },
   watchlist: {
     /**
