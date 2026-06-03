@@ -52,6 +52,8 @@ export const queryKeys = {
       ["market", "indices", normalizeTickers(codes)] as const,
     /** 헤더 글로벌 마켓 티커 5종 — 합성 BFF, 인자 없음. */
     ticker: ["market", "ticker"] as const,
+    /** CNN(미국) 공포·탐욕 지수 — 단일, 인자 없음. */
+    fearGreed: ["market", "fear-greed"] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>
