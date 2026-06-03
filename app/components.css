@@ -570,10 +570,15 @@
    * glass 효과 — backdrop-blur + bg-surface/80 + border-t.
    * safe-area: `viewport-fit=cover` 로 콘텐츠가 홈 인디케이터 밑까지 확장되므로
    *   하단 인셋만큼 padding-bottom 을 주어 nav 아이템이 인디케이터에 가리지 않게 한다
-   *   (헤더 상단 safe-area 처리의 하단 짝). 일반 브라우저·데스크탑은 인셋 0 → 무회귀. */
+   *   (헤더 상단 safe-area 처리의 하단 짝). 일반 브라우저·데스크탑은 인셋 0 → 무회귀.
+   * 상단 패딩: min-h(60px, border-box)에 하단 safe-area 인셋(iOS ~34px)이 흡수되면
+   *   콘텐츠 영역이 좁아져 items-center 의 상단 여백이 사라지고 아이콘이 윗변에 붙는다.
+   *   → padding-top 으로 상단 호흡을 고정하고 하단도 동일 여백을 인셋에 합산해 대칭 확보.
+   *   (safe-area-inset-top 은 화면 상단 노치용이라 바텀바엔 부적절 — 고정 토큰 사용.) */
   .bottom-nav {
     @apply flex items-stretch justify-around min-h-navbar-h bg-surface/80 backdrop-blur-md border-t border-border-line;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: theme(spacing.sm);
+    padding-bottom: calc(env(safe-area-inset-bottom) + theme(spacing.sm));
   }
   .bottom-nav-item {
     @apply flex-1 inline-flex flex-col items-center justify-center gap-[2px] text-text-muted text-caption no-underline cursor-pointer;
