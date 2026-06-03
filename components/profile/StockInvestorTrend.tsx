@@ -18,6 +18,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useQueryStockInvestors } from "@/hooks/stock/useQueryStockInvestors";
+import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatNetBuyAmount, formatNetBuyQty } from "@/lib/utils/formatNetBuy";
@@ -30,6 +31,7 @@ import {
   STOCK_INVESTORS_COL_PERSON,
   STOCK_INVESTORS_EMPTY,
   STOCK_INVESTORS_ERROR,
+  STOCK_INVESTORS_FOREIGN_HOLDING_PREFIX,
   STOCK_INVESTORS_FOREIGN_LABEL,
   STOCK_INVESTORS_LOADING,
   STOCK_INVESTORS_ORG_LABEL,
@@ -63,10 +65,13 @@ function SummaryCell({
   label,
   amount,
   qty,
+  holdingPct,
 }: {
   label: string;
   amount: number;
   qty: number;
+  /** 외국인 카드 전용 — 현재 보유 지분율(%). 순매수 흐름과 구분해 별도 라인으로 표기. */
+  holdingPct?: number;
 }) {
   return (
     <div className="flow-summary-cell flex min-w-0 flex-col gap-xs">
@@ -77,6 +82,11 @@ function SummaryCell({
         {formatNetBuyAmount(amount)}
       </span>
       <span className="netbuy-qty whitespace-nowrap">{formatNetBuyQty(qty)}</span>
+      {typeof holdingPct === "number" ? (
+        <span className="mt-xs whitespace-nowrap text-caption text-text-muted">
+          {STOCK_INVESTORS_FOREIGN_HOLDING_PREFIX} {holdingPct.toFixed(2)}%
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -117,6 +127,8 @@ function StockInvestorTrendContent({
   tableDefaultOpen: boolean;
 }) {
   const { data, isLoading, isError, refetch } = useQueryStockInvestors(ticker);
+  // 외국인 현재 지분율 — StockHeader 가 이미 패칭한 price 쿼리 캐시 재사용(추가 KIS 콜 0).
+  const { data: price } = useQueryStockPrice(ticker);
   const [tableOpen, setTableOpen] = useState(tableDefaultOpen);
 
   if (isLoading) {
@@ -168,6 +180,7 @@ function StockInvestorTrendContent({
           label={STOCK_INVESTORS_FOREIGN_LABEL}
           amount={foreignAmt}
           qty={foreignQty}
+          holdingPct={price?.foreignRatio}
         />
         <SummaryCell
           label={STOCK_INVESTORS_ORG_LABEL}
