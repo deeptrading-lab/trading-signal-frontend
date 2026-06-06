@@ -53,7 +53,7 @@ export function tripleBarrier(
   const horizon = opts.horizonDays ?? DEFAULT_HORIZON;
   const entry = candles[fromIdx].close;
 
-  // 배리어 폭 — 명시 % 우선, 없으면 ATR 배수(변동성 적응).
+  // 배리어 폭 — 명시 % 우선, 없으면 ATR 배수(변동성 적응). tp/sl ATR 배수를 따로 주면 비대칭.
   let tpDist: number;
   let slDist: number;
   if (opts.tpPct != null && opts.slPct != null) {
@@ -61,10 +61,10 @@ export function tripleBarrier(
     slDist = (entry * opts.slPct) / 100;
   } else {
     const atr = atrAt(candles, fromIdx);
-    const mult = opts.atrMult ?? DEFAULT_ATR_MULT;
     if (atr === null) return null;
-    tpDist = atr * mult;
-    slDist = atr * mult;
+    const base = opts.atrMult ?? DEFAULT_ATR_MULT;
+    tpDist = atr * (opts.tpAtrMult ?? base);
+    slDist = atr * (opts.slAtrMult ?? base);
   }
 
   // LONG: 위=익절, 아래=손절. SHORT: 아래=익절, 위=손절.

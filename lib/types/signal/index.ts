@@ -81,12 +81,16 @@ export type BarrierLabel = "WIN" | "LOSS" | "NEUTRAL";
 export type BarrierOptions = {
   /** 향후 평가 기간(영업일). 기본 20. */
   horizonDays?: number;
-  /** 익절 폭(%) — 미지정 시 atrMult 사용. */
+  /** 익절 폭(%) — 미지정 시 ATR 배수 사용. */
   tpPct?: number;
-  /** 손절 폭(%) — 미지정 시 atrMult 사용. */
+  /** 손절 폭(%) — 미지정 시 ATR 배수 사용. */
   slPct?: number;
-  /** ATR 배수 — tpPct/slPct 미지정 시 변동성 적응 배리어. 기본 2. */
+  /** ATR 배수(양쪽 공통) — tpPct/slPct 미지정 시 변동성 적응 배리어. 기본 2. */
   atrMult?: number;
+  /** 익절 ATR 배수(비대칭) — 지정 시 atrMult 대신 익절에 적용. winner-run 용. */
+  tpAtrMult?: number;
+  /** 손절 ATR 배수(비대칭) — 지정 시 atrMult 대신 손절에 적용. cut-loss 용. */
+  slAtrMult?: number;
 };
 
 /**

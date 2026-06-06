@@ -119,7 +119,8 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
     const { computeMetrics } = await import("@/lib/signal/backtest/metrics");
     const token = await getToken();
 
-    const barrier = { atrMult: 2, horizonDays: 20 };
+    const symmetric = { atrMult: 2, horizonDays: 20 };
+    const asymmetric = { tpAtrMult: 3, slAtrMult: 1.5, horizonDays: 20 };
     type M = import("@/lib/types/signal").BacktestMetrics;
     type T = import("@/lib/types/signal").BacktestTrade;
     const fmt = (label: string, m: M) =>
@@ -135,23 +136,16 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
       writeFileSync(path.join(FIXTURE_DIR, `${ticker}.json`), JSON.stringify(candles));
       expect(candles.length).toBeGreaterThan(200);
 
-      // 매봉 진입(기존) vs 트리거 선별 진입(재설계) — 둘 다 레짐 필터 on.
-      const off = backtest(candles, {
-        barrier,
-        signal: { regimeFilter: true },
-        entry: { mode: "everyBar" },
-      });
-      const on = backtest(candles, {
-        barrier,
-        signal: { regimeFilter: true },
-        entry: { mode: "trigger", cooldownDays: 5 },
-      });
+      // 트리거 진입 고정. 대칭 배리어(2/2) vs 비대칭(TP3/SL1.5) — winner-run 효과 측정.
+      const sigEntry = { signal: { regimeFilter: true }, entry: { mode: "trigger" as const, cooldownDays: 5 } };
+      const off = backtest(candles, { barrier: symmetric, ...sigEntry });
+      const on = backtest(candles, { barrier: asymmetric, ...sigEntry });
       allOff.push(...off.trades);
       allOn.push(...on.trades);
       if (pass(on.metrics)) passCount += 1;
 
       console.log(
-        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("매봉", off.metrics)} || ${fmt("트리거", on.metrics)} ${pass(on.metrics) ? "✅" : "❌"}`,
+        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("대칭", off.metrics)} || ${fmt("비대칭", on.metrics)} ${pass(on.metrics) ? "✅" : "❌"}`,
       );
     }
 
