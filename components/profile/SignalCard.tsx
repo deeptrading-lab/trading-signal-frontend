@@ -44,7 +44,7 @@ const REGIME_LABEL: Record<string, string> = {
 const REGIME_CLS: Record<string, string> = {
   "1": "text-signal-up",
   "-1": "text-signal-down",
-  "0": "text-text-subtle",
+  "0": "text-text-muted",
 };
 
 // ──────────────────────────── 축 게이지 ────────────────────────────
@@ -63,22 +63,22 @@ function AxisBar({ axis }: { axis: AxisScore }) {
   return (
     <div className="flex flex-col gap-xs">
       <div className="flex items-center justify-between">
-        <span className="text-caption text-text-subtle">{AXIS_LABEL[axis.axis]}</span>
+        <span className="text-caption text-text-muted">{AXIS_LABEL[axis.axis]}</span>
         <span
           className={cn(
             "text-caption font-medium",
             bullish && "text-signal-up",
             bearish && "text-signal-down",
-            !bullish && !bearish && "text-text-subtle",
+            !bullish && !bearish && "text-text-muted",
           )}
         >
           {pct.toFixed(0)}
         </span>
       </div>
       {/* 게이지 바 */}
-      <div className="relative h-[4px] rounded-full bg-surface-secondary overflow-hidden">
+      <div className="relative h-[4px] rounded-full bg-surface-muted overflow-hidden">
         {/* 중심선 */}
-        <div className="absolute inset-y-0 left-1/2 w-px bg-border-subtle" />
+        <div className="absolute inset-y-0 left-1/2 w-px bg-border-line" />
         {/* 채움 — 50 기준 좌우 */}
         {pct >= 50 ? (
           <div
@@ -123,7 +123,7 @@ export function SignalCard({ ticker }: SignalCardProps) {
     return (
       <section className="card flex flex-col gap-md" aria-label="기술적 시그널">
         <h2 className="text-h2 text-text-strong">기술적 시그널</h2>
-        <div className="text-body text-text-subtle">분석 중…</div>
+        <div className="text-body text-text-muted">분석 중…</div>
       </section>
     );
   }
@@ -132,7 +132,7 @@ export function SignalCard({ ticker }: SignalCardProps) {
     return (
       <section className="card flex flex-col gap-md" aria-label="기술적 시그널">
         <h2 className="text-h2 text-text-strong">기술적 시그널</h2>
-        <div className="text-body text-text-subtle">시그널을 불러올 수 없어요.</div>
+        <div className="text-body text-text-muted">시그널을 불러올 수 없어요.</div>
       </section>
     );
   }
@@ -141,7 +141,7 @@ export function SignalCard({ ticker }: SignalCardProps) {
     return (
       <section className="card flex flex-col gap-md" aria-label="기술적 시그널">
         <h2 className="text-h2 text-text-strong">기술적 시그널</h2>
-        <div className="text-body text-text-subtle">
+        <div className="text-body text-text-muted">
           데이터가 부족해 시그널을 산출할 수 없어요. (최소 130봉 필요)
         </div>
       </section>
@@ -155,21 +155,21 @@ export function SignalCard({ ticker }: SignalCardProps) {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <h2 className="text-h2 text-text-strong">기술적 시그널</h2>
-        <span className="text-caption text-text-subtle">{result.asOf} 기준</span>
+        <span className="text-caption text-text-muted">{result.asOf} 기준</span>
       </div>
 
       {/* 메인 배지 + 점수 */}
       <div className="flex items-center gap-md">
         <span className={ACTION_BADGE[result.action]}>{ACTION_LABEL[result.action]}</span>
         <div className="flex flex-col">
-          <span className="text-label text-text-subtle">종합점수</span>
+          <span className="text-label text-text-muted">종합점수</span>
           <span className="text-h1 font-bold text-text-strong">
             {result.score.toFixed(0)}
-            <span className="text-caption text-text-subtle font-normal"> / 100</span>
+            <span className="text-caption text-text-muted font-normal"> / 100</span>
           </span>
         </div>
         <div className="flex flex-col ml-auto text-right">
-          <span className="text-label text-text-subtle">동의도</span>
+          <span className="text-label text-text-muted">동의도</span>
           <span className="text-body font-medium text-text-strong">
             {Math.round(result.confidence * 100)}%
           </span>
@@ -178,7 +178,7 @@ export function SignalCard({ ticker }: SignalCardProps) {
 
       {/* 레짐 */}
       <div className="flex items-center gap-xs text-caption">
-        <span className="text-text-subtle">장기추세</span>
+        <span className="text-text-muted">장기추세</span>
         <span className={cn("font-medium", REGIME_CLS[regimeKey])}>
           {REGIME_LABEL[regimeKey] ?? "중립"}
         </span>
@@ -192,7 +192,7 @@ export function SignalCard({ ticker }: SignalCardProps) {
       </div>
 
       {/* 면책 */}
-      <p className="text-caption text-text-subtle leading-relaxed border-t border-border-subtle pt-md">
+      <p className="text-caption text-text-muted leading-relaxed border-t border-border-line pt-md">
         {SIGNAL_DISCLAIMER}
       </p>
     </section>
