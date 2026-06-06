@@ -33,7 +33,13 @@ export const AXIS_SCALE: Record<AxisKey, number> = {
   volatility: 2,
 };
 
-/** 축 내 규칙 가중치. */
+/**
+ * 축 내 규칙 가중치.
+ *
+ * 보정 이력(2026-06-06, 3종목 3년 백테스트): 평균회귀 매수 규칙(볼린저 하단 터치·RSI 과매도)이
+ * 3종목 전부 음(-)의 평균수익(역예측 = 떨어지는 칼날)으로 확인 → 추세추종(MACD 교차·골든크로스·
+ * 거래량 급증)은 일관 우수. 따라서 mean-reversion 계열(bollTouch·rsiExtreme) 가중을 하향.
+ */
 export const RULE_WEIGHTS = {
   maAligned: 4,
   pricePosition: 2,
@@ -42,10 +48,10 @@ export const RULE_WEIGHTS = {
   macdCross: 3,
   macdHist: 1.5,
   macdZero: 1,
-  rsiExtreme: 2,
+  rsiExtreme: 1.5, // was 2 — 과매도 매수 평균회귀 약화(백테스트 역예측)
   rsiMid: 1.5,
   volumeSurge: 3,
-  bollTouch: 2,
+  bollTouch: 1, // was 2 — 하단 터치 반등 가정이 한국 일봉서 역예측, 최소화
 } as const;
 
 /** 임계값. */

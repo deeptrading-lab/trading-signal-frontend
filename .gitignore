@@ -45,3 +45,7 @@ htmlcov/
 .env.*
 !.env.example
 !.env.local.example
+
+# KIS 로컬 토큰 캐시 (백테스트 러너)
+lib/signal/backtest/__live__/.kis-token.json
+lib/signal/backtest/__live__/__fixtures__/

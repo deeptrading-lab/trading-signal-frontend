@@ -40,7 +40,8 @@ export function evaluateSignal(
     trendAxis,
     aggregateAxis("momentum", momentumHits),
     aggregateAxis("volume", evaluateVolume(ctx)),
-    aggregateAxis("volatility", evaluateVolatility(ctx)),
+    // 변동성도 추세를 레짐 게이트로 받는다(역추세 밴드 터치 = 평균회귀 매수 감쇠).
+    aggregateAxis("volatility", evaluateVolatility(ctx, trendAxis.direction)),
   ];
 
   const { action, score, confidence } = composite(axes, opts);
