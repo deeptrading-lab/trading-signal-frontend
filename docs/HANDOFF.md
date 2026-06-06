@@ -3544,3 +3544,45 @@
   > - 없음(독립 UX 개선). 관심종목 페이지(#100)와 store 를 공유하므로 양쪽 상태 자동 일치.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 없음(독립 UX 개선). 관심종목 페이지(#100)와 store 를 공유하므로 양쪽 상태 자동 일치.
+
+### 2026-06-06 — feat(signal): 매매 시그널 규칙 엔진 + 백테스트 검증 루프 (lib/signal/) (#113)
+
+- **slug**: `signal-rule-engine` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/113
+- **요약**: feat(signal): 매매 시그널 규칙 엔진 + 백테스트 검증 루프 (lib/signal/)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 로드맵 §4-3(숫자 판단 결정론적 분리) · §5.1(백테스팅) · §5.5(확률적 표현)의 토대 구현.
+  > 
+  > **3단계 보정 사이클을 완전히 완주한 PR**:
+  > - 규칙 엔진 구현 → 12종목 아웃오브샘플 검증 → 진단(과다 진입) → 구조 재설계 → 비용 차감 후 흑자 확인
+  > 
+  > ### 핵심 구성
+  > 
+  > | 모듈 | 내용 |
+  > |---|---|
+  > | `lib/signal/` | 추세·모멘텀·거래량·변동성 4축 규칙 엔진 (`evaluateSignal`) |
+  > | `lib/signal/backtest/` | Triple Barrier 라벨링 · 워크포워드 · attribution · metrics |
+  > | `lib/signal/levels/` | 매물대(Volume Profile) · 스윙 고저 · 시장 구조 기반 TP/SL |
+  > | `lib/utils/technicalIndicators.ts` | calcSMA · calcBollinger · calcADX · calcVolumeMA · crossover (추가) |
+  > 
+  > ### 백테스트 누적 개선 (12종목 OOS, net@0.3%)
+  > 
+  > ```
+  > 매봉 진입 (baseline)         PF 0.92  avg -0.32%   (손실)
+  > + 트리거 선별 + 쿨다운        PF 0.98  avg -0.05%   (손익분기)
+  > + 비대칭 배리어 TP3×/SL1.5×  PF 1.15  avg +0.47%   (비용 전 흑자)
+  > + 거래비용 0.3% 차감          PF 1.05  avg +0.17%   (비용 후 흑자)  ✅
+  > ```
+  > 
+  > ### 주요 발견 (attribution 기반)
+  > 
+  > - ❌ **평균회귀 매수(볼린저 하단터치·RSI 과매도)**: 3종목 전부 역예측 — "떨어지는 칼날"
+  > - ✅ **추세추종 컨플루언스(MACD 교차·골든크로스·거래량 급증)**: 일관 우수 (66~89% 적중)
+  > - **시장 구조 TP/SL**: ATR 비대칭과 성능 동등 → UI 정보 표시·LLM 컨텍스트 주입 용도로 유효
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 종목 상세 '시그널 카드' UI 연결 (`useChartData` → `evaluateSignal` → 축별 게이지)
+  - `workbench/analyze` 프롬프트에 `SignalResult` + 구조 레벨 주입 (§4-3 LLM 환각 제거)
+  - 기간 확대 워크포워드 (2018~2020 등 하락 레짐 포함)
