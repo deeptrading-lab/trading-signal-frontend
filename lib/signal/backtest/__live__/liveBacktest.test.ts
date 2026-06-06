@@ -136,34 +136,32 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
       writeFileSync(path.join(FIXTURE_DIR, `${ticker}.json`), JSON.stringify(candles));
       expect(candles.length).toBeGreaterThan(200);
 
-      // 비대칭 배리어+트리거 고정. 비용 전(gross) vs 왕복 0.3% 차감(net).
-      const sigEntry = { barrier: asymmetric, signal: { regimeFilter: true }, entry: { mode: "trigger" as const, cooldownDays: 5 } };
-      const off = backtest(candles, { ...sigEntry, costPct: 0 });
-      const on = backtest(candles, { ...sigEntry, costPct: ROUND_TRIP_COST });
-      allOff.push(...off.trades); // gross — 풀링 비용 민감도 계산용
-      allOn.push(...on.trades);
-      if (pass(on.metrics)) passCount += 1;
+      // ATR 비대칭(이전 best) vs 시장 구조 기반 — 둘 다 트리거+레짐+비용 동일.
+      const sigEntry = { signal: { regimeFilter: true }, entry: { mode: "trigger" as const, cooldownDays: 5 }, costPct: ROUND_TRIP_COST };
+      const atrResult = backtest(candles, { barrier: asymmetric, ...sigEntry });
+      const strResult = backtest(candles, { barrier: { mode: "structure" as const, horizonDays: 20 }, ...sigEntry });
+      allOff.push(...atrResult.trades);
+      allOn.push(...strResult.trades);
+      if (pass(strResult.metrics)) passCount += 1;
 
+      const delta = (strResult.metrics.avgReturnPct - atrResult.metrics.avgReturnPct).toFixed(2);
+      const arrow = strResult.metrics.profitFactor > atrResult.metrics.profitFactor ? "↑" : strResult.metrics.profitFactor < atrResult.metrics.profitFactor ? "↓" : "=";
       console.log(
-        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("gross", off.metrics)} || ${fmt("net0.3", on.metrics)} ${on.metrics.avgReturnPct > 0 ? "🟢" : "🔴"}`,
+        `${ticker} | ${fmt("ATR", atrResult.metrics)} || ${fmt("구조", strResult.metrics)} ${arrow}(Δavg ${delta}%) ${strResult.metrics.avgReturnPct > 0 ? "🟢" : "🔴"}`,
       );
     }
 
-    // 풀링 집계 + 비용 민감도(0.1%/0.2%/0.3%/0.5%).
-    const pooledOff = computeMetrics(allOff);
-    const pooledOn  = computeMetrics(allOn);
-    // 비용 민감도: gross avgR 에서 costPct 단순 차감(선형 근사).
-    const grossAvg = pooledOff.avgReturnPct;
-    const sensitivity = [0.1, 0.2, 0.3, 0.5]
-      .map((c) => `@${c}%: avg ${(grossAvg - c).toFixed(2)}%`)
-      .join("  ");
+    // 풀링 집계 — ATR 비대칭 vs 시장 구조.
+    const pooledAtr = computeMetrics(allOff);
+    const pooledStr = computeMetrics(allOn);
+    const winner = pooledStr.profitFactor > pooledAtr.profitFactor ? "구조↑" : "ATR↑";
     console.log(
-      `\n===== 풀링(${TICKERS.length}종목, 비대칭 TP3/SL1.5, 트리거+레짐) =====\n` +
-        fmt("gross", pooledOff) +
+      `\n===== 풀링(${TICKERS.length}종목, net@0.3%, 트리거+레짐) =====\n` +
+        fmt("ATR비대칭", pooledAtr) +
         "\n" +
-        fmt("net0.3%", pooledOn) +
-        `\n비용 민감도: ${sensitivity}` +
-        `\n순합격(손익비>1.5 & avgR>0 기준): ${passCount}/${TICKERS.length}`,
+        fmt("시장구조", pooledStr) +
+        `\n승자: ${winner}` +
+        `\n합격(PF>1.5 & avgR>0): ${passCount}/${TICKERS.length}`,
     );
   });
 });

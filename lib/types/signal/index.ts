@@ -77,10 +77,22 @@ export type EvaluateOptions = {
 /** Triple Barrier 라벨 — 익절/손절/시간만료. */
 export type BarrierLabel = "WIN" | "LOSS" | "NEUTRAL";
 
+/**
+ * Triple Barrier 배리어 모드.
+ * - `"atr"` (기본): ATR 배수 / 명시 % 기반 고정 폭.
+ * - `"structure"`: 매물대(Volume Profile) + 박스권(Swing H/L) + MA 손절 기반 절대가 결정.
+ *   구조적 TP/SL을 찾지 못하면 ATR 비대칭(TP 3× / SL 1.5×)으로 자동 폴백.
+ */
+export type BarrierMode = "atr" | "structure";
+
 /** Triple Barrier 파라미터. */
 export type BarrierOptions = {
+  /** 배리어 결정 방식. 기본 "atr". */
+  mode?: BarrierMode;
   /** 향후 평가 기간(영업일). 기본 20. */
   horizonDays?: number;
+
+  // ── ATR 모드 ──
   /** 익절 폭(%) — 미지정 시 ATR 배수 사용. */
   tpPct?: number;
   /** 손절 폭(%) — 미지정 시 ATR 배수 사용. */
@@ -91,6 +103,18 @@ export type BarrierOptions = {
   tpAtrMult?: number;
   /** 손절 ATR 배수(비대칭) — 지정 시 atrMult 대신 손절에 적용. cut-loss 용. */
   slAtrMult?: number;
+
+  // ── Structure 모드 ──
+  /** 매물대·스윙 계산 룩백 봉 수. 기본 STRUCTURE_LOOKBACK(60). */
+  lookbackBars?: number;
+  /** Volume Profile 구간 수. 기본 STRUCTURE_BINS(40). */
+  profileBins?: number;
+  /** 스윙 피벗 검출 윈도우(양방향). 기본 STRUCTURE_SWING_WINDOW(3). */
+  swingWindow?: number;
+  /** MA 손절 기간(0=비활성). 기본 STRUCTURE_MA_STOP(20). */
+  maStopPeriod?: number;
+  /** 최소 보상:위험 비율 — 미충족 시 ATR 폴백. 기본 STRUCTURE_MIN_RRR(1.5). */
+  minRRR?: number;
 };
 
 /**

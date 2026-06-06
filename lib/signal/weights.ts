@@ -93,3 +93,16 @@ export const STRONG_BEAR_TRIGGERS = [
 ] as const;
 /** 진입 후 같은 방향 재진입 금지 기간(봉) — 중첩 상관 거래 누적 차단. */
 export const DEFAULT_COOLDOWN_DAYS = 5;
+
+// ───────────────────────── 시장 구조 기반 TP/SL ─────────────────────────
+
+/** 매물대(Volume Profile) · 스윙 고저 계산 룩백 봉 수 (≈ 3개월 일봉). */
+export const STRUCTURE_LOOKBACK = 60;
+/** Volume Profile 구간 수 — 구간폭 ≈ (고가-저가)/40. */
+export const STRUCTURE_BINS = 40;
+/** 스윙 고저 피벗 검출 윈도우(양방향 비교 봉 수). */
+export const STRUCTURE_SWING_WINDOW = 3;
+/** MA 손절 기간. 0이면 비활성. */
+export const STRUCTURE_MA_STOP = 20;
+/** 최소 보상:위험 비율 — 미충족 셋업은 스킵(ATR 폴백). */
+export const STRUCTURE_MIN_RRR = 1.5;

@@ -9,10 +9,14 @@
 
 import type { StockDailyCandle } from "@/lib/api/kis/types";
 import type { BarrierLabel, BarrierOptions } from "@/lib/types/signal";
+import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
 
 const DEFAULT_HORIZON = 20;
 const DEFAULT_ATR_MULT = 2;
 const ATR_PERIOD = 14;
+/** structure 모드 폴백용 ATR 비대칭 배수 (기존 best 파라미터). */
+const FALLBACK_TP_MULT = 3;
+const FALLBACK_SL_MULT = 1.5;
 
 /** fromIdx 종가까지의 직전 ATR_PERIOD True Range 평균. 데이터 부족 시 null. */
 function atrAt(candles: StockDailyCandle[], fromIdx: number): number | null {
@@ -53,23 +57,44 @@ export function tripleBarrier(
   const horizon = opts.horizonDays ?? DEFAULT_HORIZON;
   const entry = candles[fromIdx].close;
 
-  // 배리어 폭 — 명시 % 우선, 없으면 ATR 배수(변동성 적응). tp/sl ATR 배수를 따로 주면 비대칭.
-  let tpDist: number;
-  let slDist: number;
-  if (opts.tpPct != null && opts.slPct != null) {
-    tpDist = (entry * opts.tpPct) / 100;
-    slDist = (entry * opts.slPct) / 100;
+  // 배리어 절대가 결정 — structure 모드 / ATR 모드 / 명시 % 분기.
+  let tpPrice: number;
+  let slPrice: number;
+
+  if (opts.mode === "structure") {
+    // 시장 구조(매물대+스윙+MA) 기반 절대가 결정. 구조 미발견 시 ATR 비대칭 폴백.
+    const past = candles.slice(0, fromIdx + 1);
+    const struct = structureBarrierAt(past, entry, dir, {
+      lookbackBars: opts.lookbackBars,
+      profileBins: opts.profileBins,
+      swingWindow: opts.swingWindow,
+      maStopPeriod: opts.maStopPeriod,
+      minRRR: opts.minRRR,
+    });
+    if (struct) {
+      tpPrice = struct.tpPrice;
+      slPrice = struct.slPrice;
+    } else {
+      // ATR 비대칭 폴백 (기존 best 파라미터).
+      const atr = atrAt(candles, fromIdx);
+      if (atr === null) return null;
+      tpPrice = dir === 1 ? entry + atr * FALLBACK_TP_MULT : entry - atr * FALLBACK_TP_MULT;
+      slPrice = dir === 1 ? entry - atr * FALLBACK_SL_MULT : entry + atr * FALLBACK_SL_MULT;
+    }
+  } else if (opts.tpPct != null && opts.slPct != null) {
+    // 명시 % 모드.
+    tpPrice = dir === 1 ? entry + (entry * opts.tpPct) / 100 : entry - (entry * opts.tpPct) / 100;
+    slPrice = dir === 1 ? entry - (entry * opts.slPct) / 100 : entry + (entry * opts.slPct) / 100;
   } else {
+    // ATR 배수 모드 (기존 기본).
     const atr = atrAt(candles, fromIdx);
     if (atr === null) return null;
     const base = opts.atrMult ?? DEFAULT_ATR_MULT;
-    tpDist = atr * (opts.tpAtrMult ?? base);
-    slDist = atr * (opts.slAtrMult ?? base);
+    const tpDist = atr * (opts.tpAtrMult ?? base);
+    const slDist = atr * (opts.slAtrMult ?? base);
+    tpPrice = dir === 1 ? entry + tpDist : entry - tpDist;
+    slPrice = dir === 1 ? entry - slDist : entry + slDist;
   }
-
-  // LONG: 위=익절, 아래=손절. SHORT: 아래=익절, 위=손절.
-  const tpPrice = dir === 1 ? entry + tpDist : entry - tpDist;
-  const slPrice = dir === 1 ? entry - slDist : entry + slDist;
 
   const realized = (exitPrice: number) =>
     dir === 1

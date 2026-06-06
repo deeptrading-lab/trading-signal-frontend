@@ -5,6 +5,9 @@
  */
 
 export { evaluateSignal } from "./engine";
+export { structureBarrierAt, type StructureBarrierResult } from "./levels/structureBarrier";
+export { calcVolumeProfile, findHVNs, type PriceNode } from "./levels/volumeProfile";
+export { findSwingHighs, findSwingLows } from "./levels/swingLevels";
 export { backtest, type BacktestOptions } from "./backtest/run";
 export { tripleBarrier, type BarrierOutcome } from "./backtest/label";
 export { computeMetrics } from "./backtest/metrics";
