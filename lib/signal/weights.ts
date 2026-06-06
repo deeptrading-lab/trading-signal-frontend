@@ -75,3 +75,21 @@ export const REGIME_DAMPEN = 0.5;
  * 약세 레짐(120선 우하향 + 가격 아래)에선 BUY 를 veto(하락 종목 역추세 롱 차단).
  */
 export const REGIME_SLOPE_LOOKBACK = 20;
+
+/**
+ * 진입 선별성 — "강한 트리거" 규칙. 매 봉 신호(롱 편향) 대신, attribution 에서 적중률이 검증된
+ * 트리거(교차·거래량 급증)가 **새로 발화한** 봉에서만 + 4축 컨플루언스(action 일치) + 쿨다운으로 진입.
+ * 아웃오브샘플 손익비 0.92(매봉)의 근본 원인(과다 진입) 대응.
+ */
+export const STRONG_BULL_TRIGGERS = [
+  "MACD_CROSS_UP",
+  "MA_GOLDEN_CROSS",
+  "VOLUME_SURGE_UP",
+] as const;
+export const STRONG_BEAR_TRIGGERS = [
+  "MACD_CROSS_DOWN",
+  "MA_DEAD_CROSS",
+  "VOLUME_SURGE_DOWN",
+] as const;
+/** 진입 후 같은 방향 재진입 금지 기간(봉) — 중첩 상관 거래 누적 차단. */
+export const DEFAULT_COOLDOWN_DAYS = 5;

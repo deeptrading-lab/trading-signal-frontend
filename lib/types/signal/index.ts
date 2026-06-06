@@ -89,6 +89,19 @@ export type BarrierOptions = {
   atrMult?: number;
 };
 
+/**
+ * 진입 정책.
+ * - `everyBar`: 신호(BUY/SELL)가 뜬 모든 봉에서 진입(기존 — 과다 진입, 롱 편향).
+ * - `trigger`: 강한 트리거(교차·거래량 급증)가 발화 + 4축 컨플루언스 + 쿨다운 충족 시에만 진입(선별).
+ */
+export type EntryMode = "everyBar" | "trigger";
+
+export type EntryOptions = {
+  mode?: EntryMode;
+  /** 진입 후 재진입 금지 기간(봉). 기본 DEFAULT_COOLDOWN_DAYS. */
+  cooldownDays?: number;
+};
+
 /** 한 시점 신호 1건의 백테스트 결과. */
 export type BacktestTrade = {
   /** 진입 봉 날짜. */

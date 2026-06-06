@@ -12,10 +12,16 @@ import type {
   BacktestResult,
   BacktestTrade,
   BarrierOptions,
+  EntryOptions,
   EvaluateOptions,
 } from "@/lib/types/signal";
 import { evaluateSignal } from "../engine";
-import { MIN_BARS } from "../weights";
+import {
+  MIN_BARS,
+  STRONG_BULL_TRIGGERS,
+  STRONG_BEAR_TRIGGERS,
+  DEFAULT_COOLDOWN_DAYS,
+} from "../weights";
 import { tripleBarrier } from "./label";
 import { computeMetrics } from "./metrics";
 import { computeAttribution } from "./attribution";
@@ -23,7 +29,11 @@ import { computeAttribution } from "./attribution";
 export type BacktestOptions = {
   barrier?: BarrierOptions;
   signal?: EvaluateOptions;
+  entry?: EntryOptions;
 };
+
+const BULL = new Set<string>(STRONG_BULL_TRIGGERS);
+const BEAR = new Set<string>(STRONG_BEAR_TRIGGERS);
 
 export function backtest(
   candles: StockDailyCandle[],
@@ -31,6 +41,11 @@ export function backtest(
 ): BacktestResult {
   const n = candles.length;
   const trades: BacktestTrade[] = [];
+  const mode = opts.entry?.mode ?? "everyBar";
+  const cooldown = opts.entry?.cooldownDays ?? DEFAULT_COOLDOWN_DAYS;
+  // 방향별 마지막 진입 인덱스 — 쿨다운 판정.
+  let lastBuyIdx = -Infinity;
+  let lastSellIdx = -Infinity;
 
   // i = 워밍업 확보 시점부터, 미래 봉이 최소 1개 남는 n-2 까지.
   for (let i = MIN_BARS - 1; i < n - 1; i++) {
@@ -38,12 +53,24 @@ export function backtest(
     if (!result.warmupOk || result.action === "HOLD") continue;
 
     const dir = result.action === "BUY" ? 1 : -1;
-    const outcome = tripleBarrier(candles, i, dir, opts.barrier);
-    if (!outcome) continue;
-
     const ruleKeys = result.axes.flatMap((a) =>
       a.hits.filter((h) => h.direction !== 0).map((h) => h.key),
     );
+
+    // 진입 선별 — trigger 모드: 강한 트리거 발화 + 쿨다운 충족 시에만.
+    if (mode === "trigger") {
+      const triggers = dir === 1 ? BULL : BEAR;
+      const hasTrigger = ruleKeys.some((k) => triggers.has(k));
+      if (!hasTrigger) continue;
+      const lastIdx = dir === 1 ? lastBuyIdx : lastSellIdx;
+      if (i - lastIdx < cooldown) continue;
+    }
+
+    const outcome = tripleBarrier(candles, i, dir, opts.barrier);
+    if (!outcome) continue;
+
+    if (dir === 1) lastBuyIdx = i;
+    else lastSellIdx = i;
 
     trades.push({
       date: candles[i].date,

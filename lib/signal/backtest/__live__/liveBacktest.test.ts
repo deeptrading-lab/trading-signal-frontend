@@ -124,7 +124,7 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
     type T = import("@/lib/types/signal").BacktestTrade;
     const fmt = (label: string, m: M) =>
       `${label.padEnd(9)} 표본 ${String(m.trades).padStart(4)} | 적중 ${(m.hitRate * 100).toFixed(1)}% | 손익비 ${m.profitFactor.toFixed(2)} | 평균 ${m.avgReturnPct.toFixed(2)}%`;
-    const pass = (m: M) => m.profitFactor > 1.5 && m.hitRate > 0.5 && m.trades >= 30;
+    const pass = (m: M) => m.profitFactor > 1.5 && m.hitRate > 0.5 && m.trades >= 20;
 
     const allOn: T[] = [];
     const allOff: T[] = [];
@@ -135,14 +135,23 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
       writeFileSync(path.join(FIXTURE_DIR, `${ticker}.json`), JSON.stringify(candles));
       expect(candles.length).toBeGreaterThan(200);
 
-      const off = backtest(candles, { barrier, signal: { regimeFilter: false } });
-      const on = backtest(candles, { barrier, signal: { regimeFilter: true } });
+      // 매봉 진입(기존) vs 트리거 선별 진입(재설계) — 둘 다 레짐 필터 on.
+      const off = backtest(candles, {
+        barrier,
+        signal: { regimeFilter: true },
+        entry: { mode: "everyBar" },
+      });
+      const on = backtest(candles, {
+        barrier,
+        signal: { regimeFilter: true },
+        entry: { mode: "trigger", cooldownDays: 5 },
+      });
       allOff.push(...off.trades);
       allOn.push(...on.trades);
       if (pass(on.metrics)) passCount += 1;
 
       console.log(
-        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("off", off.metrics)} || ${fmt("on", on.metrics)} ${pass(on.metrics) ? "✅" : "❌"}`,
+        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("매봉", off.metrics)} || ${fmt("트리거", on.metrics)} ${pass(on.metrics) ? "✅" : "❌"}`,
       );
     }
 

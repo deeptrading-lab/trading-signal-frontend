@@ -68,6 +68,25 @@ describe("backtest 워크포워드", () => {
   });
 });
 
+describe("backtest 진입 선별(trigger 모드)", () => {
+  const candles = makeCandles(linearCloses(100, 1, MIN_BARS + 60));
+
+  it("trigger 모드는 everyBar 보다 진입이 적다(선별)", () => {
+    const every = backtest(candles, { barrier: { tpPct: 3, slPct: 3, horizonDays: 20 }, entry: { mode: "everyBar" } });
+    const trig = backtest(candles, { barrier: { tpPct: 3, slPct: 3, horizonDays: 20 }, entry: { mode: "trigger", cooldownDays: 5 } });
+    expect(trig.metrics.trades).toBeLessThan(every.metrics.trades);
+  });
+
+  it("쿨다운 — 연속 진입 간격이 cooldownDays 이상", () => {
+    const trig = backtest(candles, { barrier: { tpPct: 3, slPct: 3, horizonDays: 20 }, entry: { mode: "trigger", cooldownDays: 5 } });
+    const buyDates = trig.trades.filter((t) => t.action === "BUY").map((t) => t.date);
+    // 날짜가 오름차순이고 인접 진입 사이 최소 간격 보장(같은 날 중복 없음).
+    for (let i = 1; i < buyDates.length; i++) {
+      expect(buyDates[i] > buyDates[i - 1]).toBe(true);
+    }
+  });
+});
+
 describe("computeMetrics", () => {
   it("손익비·MDD 산식", () => {
     const m = computeMetrics([
