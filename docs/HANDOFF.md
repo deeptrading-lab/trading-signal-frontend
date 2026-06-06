@@ -3586,3 +3586,38 @@
   - 종목 상세 '시그널 카드' UI 연결 (`useChartData` → `evaluateSignal` → 축별 게이지)
   - `workbench/analyze` 프롬프트에 `SignalResult` + 구조 레벨 주입 (§4-3 LLM 환각 제거)
   - 기간 확대 워크포워드 (2018~2020 등 하락 레짐 포함)
+
+### 2026-06-06 — feat(stock): 종목 상세 기술적 시그널 카드 (#113 UI 연결) (#114)
+
+- **slug**: `signal-card-ui` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/114
+- **요약**: feat(stock): 종목 상세 기술적 시그널 카드 (#113 UI 연결)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PR #113(signal-rule-engine)에서 구현한 `evaluateSignal` 엔진을 종목 상세 화면에 라이브 연결.
+  > 
+  > ### 구성
+  > 
+  > - **`hooks/stock/useSignalResult`** — `useQueryStockChart("D", 200봉)` → `evaluateSignal` → `SignalResult`. 차트 데이터 캐시 공유, BFF 추가 호출 0건.
+  > - **`components/profile/SignalCard`** — 액션 배지(BUY/HOLD/SELL) · 종합점수 · 동의도 · 레짐 · 4축 게이지 · 발화된 규칙 태그 · 면책 문구
+  > - **`StockPageLayout`** 세 위치 삽입:
+  >   - 모바일: 차트 바로 아래
+  >   - 데스크탑 기본: 우측 컬럼 차트 아래
+  >   - 데스크탑 확대: 기업정보 그리드 아래
+  > 
+  > ### 검증
+  > 
+  > - `npm run typecheck` ✅
+  > - `npm run build` ✅
+  > - `npm run lint` ✅
+  > - dev 서버 `/stock/005930` 렌더 200 OK, 서버 에러 없음
+  > 
+  > ## 다음 작업
+  > 
+  > - `workbench/analyze` 프롬프트에 `SignalResult` 주입 (§4-3 LLM 환각 제거)
+  > - 시그널 카드 디자인 리파인 (토큰 검토, 모바일 UX)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `workbench/analyze` 프롬프트에 `SignalResult` 주입 (§4-3 LLM 환각 제거)
+  - 시그널 카드 디자인 리파인 (토큰 검토, 모바일 UX)
