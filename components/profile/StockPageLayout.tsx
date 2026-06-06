@@ -5,6 +5,7 @@ import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { StockHeader } from "./StockHeader";
 import { StockDailyChart } from "./StockDailyChart";
+import { SignalCard } from "./SignalCard";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
@@ -61,6 +62,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       <div className="flex flex-col gap-lg">
         <StockHeader ticker={ticker} />
         <StockDailyChart ticker={ticker} {...chartControls} />
+        <SignalCard ticker={ticker} />
         <StockInvestorTrend ticker={ticker} tableDefaultOpen={false} />
         <CompanyOverview ticker={ticker} collapsible />
         <DisclosureList ticker={ticker} count={5} collapsible />
@@ -89,6 +91,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
             <CompanyOverview ticker={ticker} />
             <DisclosureList ticker={ticker} count={5} />
           </div>
+          <SignalCard ticker={ticker} />
           <StockInvestorTrend ticker={ticker} />
         </div>
       ) : (
@@ -106,12 +109,13 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
                 <DisclosureList ticker={ticker} count={5} />
               </div>
             </div>
-            <div className="lg:sticky lg:top-4">
+            <div className="flex flex-col gap-lg lg:sticky lg:top-4">
               <StockDailyChart
                 ticker={ticker}
                 onExpand={() => transition(true)}
                 {...chartControls}
               />
+              <SignalCard ticker={ticker} />
             </div>
           </div>
           {/* 수급 — 표가 넓어(min-w 520px) 2-col 밖 전폭으로 배치 */}
