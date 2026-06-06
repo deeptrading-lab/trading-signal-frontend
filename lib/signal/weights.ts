@@ -69,3 +69,9 @@ export const BOLL_SQUEEZE_BW = 0.1;
 
 /** 레짐 게이트 — 추세 역방향 모멘텀 신호 가중 감쇠 계수(0.5=절반). */
 export const REGIME_DAMPEN = 0.5;
+
+/**
+ * 장기추세 레짐 필터 — 120일선 기울기 측정 룩백(봉). 이 구간 SMA120 변화로 강세/약세 판정.
+ * 약세 레짐(120선 우하향 + 가격 아래)에선 BUY 를 veto(하락 종목 역추세 롱 차단).
+ */
+export const REGIME_SLOPE_LOOKBACK = 20;

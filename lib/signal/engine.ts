@@ -13,6 +13,7 @@ import { evaluateMomentum } from "./factors/momentum";
 import { evaluateVolume } from "./factors/volume";
 import { evaluateVolatility } from "./factors/volatility";
 import { aggregateAxis, composite } from "./score";
+import { computeRegime } from "./regime";
 import { MIN_BARS } from "./weights";
 
 /** 캔들 배열 마지막 봉 기준 신호 평가. */
@@ -25,7 +26,7 @@ export function evaluateSignal(
 
   // 워밍업 부족 — 120일선·지표를 신뢰 못함 → HOLD 안전 폴백.
   if (n < MIN_BARS) {
-    return { action: "HOLD", score: 50, confidence: 0, axes: [], asOf, warmupOk: false };
+    return { action: "HOLD", score: 50, confidence: 0, axes: [], asOf, warmupOk: false, regime: 0 };
   }
 
   const ctx = buildContext(candles);
@@ -44,7 +45,15 @@ export function evaluateSignal(
     aggregateAxis("volatility", evaluateVolatility(ctx, trendAxis.direction)),
   ];
 
-  const { action, score, confidence } = composite(axes, opts);
+  const { action: rawAction, score, confidence } = composite(axes, opts);
 
-  return { action, score, confidence, axes, asOf, warmupOk: true };
+  // 장기추세 레짐 — 항상 산출(투명성). 필터 on(기본)일 때만 역추세 진입 veto.
+  const regime = computeRegime(ctx);
+  let action = rawAction;
+  if (opts?.regimeFilter !== false) {
+    if (regime === -1 && rawAction === "BUY") action = "HOLD";
+    else if (regime === 1 && rawAction === "SELL") action = "HOLD";
+  }
+
+  return { action, score, confidence, axes, asOf, warmupOk: true, regime };
 }

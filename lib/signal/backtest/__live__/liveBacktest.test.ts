@@ -109,20 +109,27 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
     const { backtest } = await import("@/lib/signal/backtest/run");
     const token = await getToken();
 
+    const barrier = { atrMult: 2, horizonDays: 20 };
+    const line = (label: string, m: import("@/lib/types/signal").BacktestMetrics) =>
+      `  ${label.padEnd(10)} 표본 ${String(m.trades).padStart(4)} | 적중률 ${(m.hitRate * 100).toFixed(1)}% | ` +
+      `손익비 ${m.profitFactor.toFixed(2)} | 평균수익 ${m.avgReturnPct.toFixed(2)}% | W/L/N ${m.wins}/${m.losses}/${m.neutrals}`;
+
     for (const ticker of TICKERS) {
       const candles = await fetchChunked(ticker, token);
       writeFileSync(path.join(FIXTURE_DIR, `${ticker}.json`), JSON.stringify(candles));
       expect(candles.length).toBeGreaterThan(200);
 
-      const res = backtest(candles, { barrier: { atrMult: 2, horizonDays: 20 } });
-      const m = res.metrics;
+      // 레짐 필터 off vs on 비교 — 역추세 BUY veto 효과 측정.
+      const off = backtest(candles, { barrier, signal: { regimeFilter: false } });
+      const on = backtest(candles, { barrier, signal: { regimeFilter: true } });
       console.log(
         `\n===== ${ticker} (${candles.length}봉, ${candles[0].date}~${candles[candles.length - 1].date}) =====\n` +
-          `표본 ${m.trades} | 적중률 ${(m.hitRate * 100).toFixed(1)}% | 손익비 ${m.profitFactor.toFixed(2)} | ` +
-          `평균수익 ${m.avgReturnPct.toFixed(2)}% | MDD ${m.maxDrawdownPct.toFixed(1)}% | W/L/N ${m.wins}/${m.losses}/${m.neutrals}\n` +
-          `규칙별 attribution (hitRate 오름차순 — 위가 문제 규칙):\n` +
-          res.attribution
-            .map((a) => `  ${a.key.padEnd(20)} n=${String(a.count).padStart(4)} hit=${(a.hitRate * 100).toFixed(1)}% avgR=${a.avgReturnPct.toFixed(2)}%`)
+          line("필터 off", off.metrics) +
+          "\n" +
+          line("필터 on", on.metrics) +
+          "\n  규칙별 attribution(off, hitRate 오름차순 — 위가 문제 규칙):\n" +
+          off.attribution
+            .map((a) => `    ${a.key.padEnd(20)} n=${String(a.count).padStart(4)} hit=${(a.hitRate * 100).toFixed(1)}% avgR=${a.avgReturnPct.toFixed(2)}%`)
             .join("\n"),
       );
     }

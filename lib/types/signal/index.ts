@@ -53,6 +53,11 @@ export type SignalResult = {
   asOf: string;
   /** 지표 계산에 충분한 봉 수였는지. false 면 action=HOLD 안전 폴백. */
   warmupOk: boolean;
+  /**
+   * 장기추세 레짐 — +1 강세(120일선 우상향+가격 위) / -1 약세 / 0 중립.
+   * 약세 레짐에서 BUY 는, 강세 레짐에서 SELL 은 HOLD 로 veto(추세 역행 진입 차단).
+   */
+  regime: RuleDirection;
 };
 
 /** 엔진 튜닝 옵션 (미지정 시 `weights.ts` 기본값). */
@@ -63,6 +68,8 @@ export type EvaluateOptions = {
   buyThreshold?: number;
   /** SELL 진입 종합점수 상한 (기본 40). */
   sellThreshold?: number;
+  /** 장기추세 레짐 필터 적용 여부 (기본 true). 역추세 진입 veto. */
+  regimeFilter?: boolean;
 };
 
 // ───────────────────────── 백테스트 ─────────────────────────
