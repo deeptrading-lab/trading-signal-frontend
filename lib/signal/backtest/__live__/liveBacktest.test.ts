@@ -119,8 +119,8 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
     const { computeMetrics } = await import("@/lib/signal/backtest/metrics");
     const token = await getToken();
 
-    const symmetric = { atrMult: 2, horizonDays: 20 };
     const asymmetric = { tpAtrMult: 3, slAtrMult: 1.5, horizonDays: 20 };
+    const ROUND_TRIP_COST = 0.3; // 한국장 왕복 수수료+거래세+슬리피지 통념
     type M = import("@/lib/types/signal").BacktestMetrics;
     type T = import("@/lib/types/signal").BacktestTrade;
     const fmt = (label: string, m: M) =>
@@ -136,28 +136,34 @@ describe.skipIf(!ENABLED)("실데이터 백테스트", () => {
       writeFileSync(path.join(FIXTURE_DIR, `${ticker}.json`), JSON.stringify(candles));
       expect(candles.length).toBeGreaterThan(200);
 
-      // 트리거 진입 고정. 대칭 배리어(2/2) vs 비대칭(TP3/SL1.5) — winner-run 효과 측정.
-      const sigEntry = { signal: { regimeFilter: true }, entry: { mode: "trigger" as const, cooldownDays: 5 } };
-      const off = backtest(candles, { barrier: symmetric, ...sigEntry });
-      const on = backtest(candles, { barrier: asymmetric, ...sigEntry });
-      allOff.push(...off.trades);
+      // 비대칭 배리어+트리거 고정. 비용 전(gross) vs 왕복 0.3% 차감(net).
+      const sigEntry = { barrier: asymmetric, signal: { regimeFilter: true }, entry: { mode: "trigger" as const, cooldownDays: 5 } };
+      const off = backtest(candles, { ...sigEntry, costPct: 0 });
+      const on = backtest(candles, { ...sigEntry, costPct: ROUND_TRIP_COST });
+      allOff.push(...off.trades); // gross — 풀링 비용 민감도 계산용
       allOn.push(...on.trades);
       if (pass(on.metrics)) passCount += 1;
 
       console.log(
-        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("대칭", off.metrics)} || ${fmt("비대칭", on.metrics)} ${pass(on.metrics) ? "✅" : "❌"}`,
+        `${ticker} ${candles[0].date}~${candles[candles.length - 1].date} | ${fmt("gross", off.metrics)} || ${fmt("net0.3", on.metrics)} ${on.metrics.avgReturnPct > 0 ? "🟢" : "🔴"}`,
       );
     }
 
-    // 풀링(전 종목 합산) 집계 — 종목별이 아니라 전체 일반화 성능.
+    // 풀링 집계 + 비용 민감도(0.1%/0.2%/0.3%/0.5%).
     const pooledOff = computeMetrics(allOff);
-    const pooledOn = computeMetrics(allOn);
+    const pooledOn  = computeMetrics(allOn);
+    // 비용 민감도: gross avgR 에서 costPct 단순 차감(선형 근사).
+    const grossAvg = pooledOff.avgReturnPct;
+    const sensitivity = [0.1, 0.2, 0.3, 0.5]
+      .map((c) => `@${c}%: avg ${(grossAvg - c).toFixed(2)}%`)
+      .join("  ");
     console.log(
-      `\n===== 풀링(${TICKERS.length}종목) =====\n` +
-        fmt("POOL off", pooledOff) +
+      `\n===== 풀링(${TICKERS.length}종목, 비대칭 TP3/SL1.5, 트리거+레짐) =====\n` +
+        fmt("gross", pooledOff) +
         "\n" +
-        fmt("POOL on", pooledOn) +
-        `\n합격(손익비>1.5 & 적중>50% & 표본>=30): ${passCount}/${TICKERS.length} 종목`,
+        fmt("net0.3%", pooledOn) +
+        `\n비용 민감도: ${sensitivity}` +
+        `\n순합격(손익비>1.5 & avgR>0 기준): ${passCount}/${TICKERS.length}`,
     );
   });
 });

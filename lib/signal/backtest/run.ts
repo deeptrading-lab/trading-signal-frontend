@@ -30,6 +30,11 @@ export type BacktestOptions = {
   barrier?: BarrierOptions;
   signal?: EvaluateOptions;
   entry?: EntryOptions;
+  /**
+   * 거래비용(왕복 %) — 각 거래 수익률에서 1회 차감. 수수료+거래세+슬리피지 합산.
+   * 한국장 통념 ~0.2~0.3%(온라인 수수료 ~0.03% 양방 + 매도 거래세 ~0.15~0.18% + 슬리피지). 기본 0.
+   */
+  costPct?: number;
 };
 
 const BULL = new Set<string>(STRONG_BULL_TRIGGERS);
@@ -43,6 +48,7 @@ export function backtest(
   const trades: BacktestTrade[] = [];
   const mode = opts.entry?.mode ?? "everyBar";
   const cooldown = opts.entry?.cooldownDays ?? DEFAULT_COOLDOWN_DAYS;
+  const cost = opts.costPct ?? 0;
   // 방향별 마지막 진입 인덱스 — 쿨다운 판정.
   let lastBuyIdx = -Infinity;
   let lastSellIdx = -Infinity;
@@ -78,7 +84,7 @@ export function backtest(
       score: result.score,
       entryPrice: candles[i].close,
       label: outcome.label,
-      returnPct: outcome.returnPct,
+      returnPct: outcome.returnPct - cost, // 비용 차감 후 순수익률
       ruleKeys,
     });
   }
