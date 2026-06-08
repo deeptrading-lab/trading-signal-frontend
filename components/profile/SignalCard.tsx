@@ -15,6 +15,7 @@
 
 import { cn } from "@/lib/utils/cn";
 import { useSignalResult } from "@/hooks/stock/useSignalResult";
+import { useMutationAISignal } from "@/hooks/stock/useMutationAISignal";
 import {
   AXIS_LABEL,
   ACTION_LABEL,
@@ -22,6 +23,7 @@ import {
   ruleLabel,
 } from "@/lib/copy/signal/labels";
 import type { AxisScore, SignalAction } from "@/lib/types/signal";
+import type { AISignalVerdict } from "@/lib/types/stock/aiSignal";
 
 export interface SignalCardProps {
   ticker: string;
@@ -45,6 +47,20 @@ const REGIME_CLS: Record<string, string> = {
   "1": "text-signal-up",
   "-1": "text-signal-down",
   "0": "text-text-muted",
+};
+
+const AI_VERDICT_BADGE: Record<AISignalVerdict, string> = {
+  BUY: "badge-signal-up",
+  SELL: "badge-signal-down",
+  HOLD: "badge-info",
+  WATCH: "badge-warn",
+};
+
+const AI_VERDICT_LABEL: Record<AISignalVerdict, string> = {
+  BUY: "AI: 매수 우위",
+  SELL: "AI: 매도 우위",
+  HOLD: "AI: 중립",
+  WATCH: "AI: 관망",
 };
 
 // ──────────────────────────── 축 게이지 ────────────────────────────
@@ -118,6 +134,7 @@ function AxisBar({ axis }: { axis: AxisScore }) {
 
 export function SignalCard({ ticker }: SignalCardProps) {
   const { result, isLoading, isError } = useSignalResult(ticker);
+  const aiMutation = useMutationAISignal();
 
   if (isLoading) {
     return (
@@ -189,6 +206,82 @@ export function SignalCard({ ticker }: SignalCardProps) {
         {result.axes.map((axis) => (
           <AxisBar key={axis.axis} axis={axis} />
         ))}
+      </div>
+
+      {/* AI 최종 판단 섹션 */}
+      <div className="border-t border-border-line pt-md flex flex-col gap-md">
+        {/* 버튼 — pending·성공 시 숨김 */}
+        {!aiMutation.isPending && !aiMutation.isSuccess && (
+          <button
+            type="button"
+            className="button-primary self-start"
+            onClick={() => aiMutation.mutate(ticker)}
+          >
+            AI로 최종 판단
+          </button>
+        )}
+
+        {/* 로딩 */}
+        {aiMutation.isPending && (
+          <p className="text-body text-text-muted">
+            Claude가 웹 리서치 후 분석 중입니다… (최대 60초)
+          </p>
+        )}
+
+        {/* 에러 */}
+        {aiMutation.isError && (
+          <div className="flex flex-col gap-xs">
+            <p className="text-body text-critical">
+              {(aiMutation.error as { message?: string })?.message ?? "AI 분석에 실패했어요."}
+            </p>
+            <button
+              type="button"
+              className="button-primary self-start"
+              onClick={() => aiMutation.mutate(ticker)}
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        {/* 성공 — AI 판단 결과 */}
+        {aiMutation.isSuccess && aiMutation.data && (() => {
+          const ai = aiMutation.data;
+          return (
+            <div className="flex flex-col gap-md">
+              <div className="flex items-center gap-md">
+                <span className={AI_VERDICT_BADGE[ai.verdict]}>{AI_VERDICT_LABEL[ai.verdict]}</span>
+              </div>
+              <p className="text-body text-text-strong leading-relaxed">{ai.reasoning}</p>
+              {ai.key_catalysts.length > 0 && (
+                <div className="flex flex-col gap-xs">
+                  <span className="text-label text-text-muted">최근 이슈·촉매</span>
+                  <ul className="flex flex-col gap-xs">
+                    {ai.key_catalysts.map((c, i) => (
+                      <li key={i} className="text-caption text-text-strong flex gap-xs">
+                        <span className="text-signal-up shrink-0">↑</span>{c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {ai.risk_factors.length > 0 && (
+                <div className="flex flex-col gap-xs">
+                  <span className="text-label text-text-muted">리스크</span>
+                  <ul className="flex flex-col gap-xs">
+                    {ai.risk_factors.map((r, i) => (
+                      <li key={i} className="text-caption text-text-strong flex gap-xs">
+                        <span className="text-signal-down shrink-0">↓</span>{r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-caption text-text-muted">{ai.confidence_note}</p>
+              <p className="text-caption text-text-muted leading-relaxed">{ai.disclaimer}</p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 면책 */}
