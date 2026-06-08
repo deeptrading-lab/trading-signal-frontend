@@ -3621,3 +3621,45 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - `workbench/analyze` 프롬프트에 `SignalResult` 주입 (§4-3 LLM 환각 제거)
   - 시그널 카드 디자인 리파인 (토큰 검토, 모바일 UX)
+
+### 2026-06-08 — feat(stock): AI 최종 판단 — 시그널 데이터 + Claude CLI 웹 리서치 (#115)
+
+- **slug**: `ai-signal-judgment` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/115
+- **요약**: feat(stock): AI 최종 판단 — 시그널 데이터 + Claude CLI 웹 리서치
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 종목 상세 시그널 카드에 **"AI로 최종 판단"** 버튼 추가. 클릭 시 규칙 엔진이 계산한 4축 점수·레짐·동의도를 프롬프트에 직접 주입하고, Claude CLI가 웹 리서치로 최신 뉴스·공시·실적을 검색해 종합 판단을 반환한다.
+  > 
+  > ### 흐름
+  > 
+  > ```
+  > 시그널 카드 "AI로 최종 판단" 버튼
+  >   ↓ POST /api/stock/ai-signal
+  > BFF: fetchStockDailyChart(200봉) → evaluateSignal → SignalResult
+  >   ↓ 4축 점수·레짐·동의도를 user prompt에 주입
+  > claude --print (60s, 웹 리서치 포함)
+  >   ↓ AISignalResponse { verdict, reasoning, key_catalysts, risk_factors, ... }
+  > SignalCard 인라인 결과 표시
+  > ```
+  > 
+  > ### §4-3 LLM 환각 제거
+  > 
+  > - **숫자(점수·레짐·규칙)**: 결정론적 규칙 엔진이 계산, 프롬프트에 주입
+  > - **설명 + 최신 맥락**: Claude가 웹 리서치 후 담당 → 가격 추정 환각 0
+  > 
+  > ### 구성 파일
+  > 
+  > | 파일 | 역할 |
+  > |---|---|
+  > | `app/api/stock/ai-signal/route.ts` | BFF — 서버사이드 신호 계산 + claude subprocess |
+  > | `lib/types/stock/aiSignal.ts` | AISignalRequest / AISignalResponse 타입 |
+  > | `lib/api/stock/aiSignal.ts` | axios 클라이언트 함수 |
+  > | `hooks/stock/useMutationAISignal.ts` | TanStack Query mutation |
+  > | `components/profile/SignalCard.tsx` | 버튼 + 4상태(로딩/에러/성공/재시도) |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 실제 로컬에서 claude CLI로 응답 확인 (웹 리서치 품질)
+  - 응답 시간이 길면 타임아웃 조정 또는 스트리밍 적용
+  - workbench analyze 프롬프트에도 SignalResult 주입 (§4-3 완전 적용)
