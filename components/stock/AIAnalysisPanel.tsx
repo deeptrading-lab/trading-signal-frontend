@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { AGENT_META, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
+import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type {
   AgentKey, AgentMeta, AgentState, AgentStatus,
   DebateMessage, FinalDecision, FinalVerdict,
@@ -72,8 +73,7 @@ function AnalystCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm"
-      style={{ minHeight: 180 }}
+      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm min-h-[180px]"
     >
       {/* 카드 헤더 */}
       <div className={cn(
@@ -99,7 +99,7 @@ function AnalystCard({
       <div className="flex-1 overflow-hidden px-3 py-2.5">
         {isActive && (
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            <span className="line-clamp-5 whitespace-pre-wrap">{displayText || "분석 중..."}</span>
+            <span className="line-clamp-5 whitespace-pre-wrap">{displayText || COPY.card.analyzing}</span>
             <span className="inline-block w-1 h-[14px] bg-blue-500 animate-pulse ml-0.5 align-middle" />
           </p>
         )}
@@ -109,7 +109,7 @@ function AnalystCard({
           </p>
         )}
         {isError && (
-          <p className="text-[11px] text-red-500 mt-1">분석 중 오류가 발생했어요.</p>
+          <p className="text-[11px] text-red-500 mt-1">{COPY.card.error}</p>
         )}
       </div>
 
@@ -118,19 +118,21 @@ function AnalystCard({
         <div>
           {isError && !globalRunning && onRetry && (
             <button
+              type="button"
               onClick={onRetry}
               className="text-[10px] text-red-500 hover:text-red-600 font-medium cursor-pointer flex items-center gap-1"
             >
-              <RefreshCw size={10} /> 재시도
+              <RefreshCw size={10} /> {COPY.card.retry}
             </button>
           )}
         </div>
         {isDone && displayText && (
           <button
+            type="button"
             onClick={() => onExpand(meta.label, displayText)}
             className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium cursor-pointer flex items-center gap-1 ml-auto"
           >
-            전체 보기 <ChevronRight size={10} />
+            {COPY.card.viewFull} <ChevronRight size={10} />
           </button>
         )}
       </div>
@@ -174,7 +176,7 @@ function DebateMsgCard({
           "text-[10px] font-bold",
           isBull ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400",
         )}>
-          {msg.round}라운드
+          {COPY.debate.roundMarker(msg.round)}
         </span>
       </div>
       <div className="px-3 py-2.5">
@@ -186,13 +188,14 @@ function DebateMsgCard({
       {!msg.isStreaming && msg.content && (
         <div className={cn("px-3 py-1.5 border-t", isBull ? "border-red-100 dark:border-red-900/30" : "border-blue-100 dark:border-blue-900/30")}>
           <button
-            onClick={() => onExpand(`${isBull ? "강세" : "약세"} 연구원 — ${msg.round}라운드`, msg.content)}
+            type="button"
+            onClick={() => onExpand(COPY.debate.detailTitle(msg.speaker, msg.round), msg.content)}
             className={cn(
               "text-[10px] font-medium cursor-pointer flex items-center gap-1",
               isBull ? "text-red-500 hover:text-red-600" : "text-blue-500 hover:text-blue-600",
             )}
           >
-            전체 보기 <ChevronRight size={10} />
+            {COPY.card.viewFull} <ChevronRight size={10} />
           </button>
         </div>
       )}
@@ -227,20 +230,20 @@ function DebateSection({
         {/* 섹션 헤더 */}
         <div className="flex items-center gap-2 mb-4">
           <MessageSquare size={14} className="text-slate-400" />
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">강세 vs 약세 토론</span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{COPY.debate.title}</span>
           <span className="ml-auto text-[10px] text-slate-400 font-medium">
-            {currentRound}/{DEBATE_ROUNDS} 라운드
+            {COPY.debate.roundCounter(currentRound, DEBATE_ROUNDS)}
           </span>
         </div>
 
         {/* 컬럼 헤더 */}
         <div className="grid grid-cols-[1fr_28px_1fr] gap-2 mb-3">
           <div className="text-[11px] font-extrabold text-red-600 dark:text-red-400">
-            🐂 강세 연구원
+            {COPY.debate.bullColumn}
           </div>
           <div />
           <div className="text-[11px] font-extrabold text-blue-600 dark:text-blue-400 text-right">
-            🐻 약세 연구원
+            {COPY.debate.bearColumn}
           </div>
         </div>
 
@@ -251,7 +254,6 @@ function DebateSection({
             const bullMsg = bullMsgs.find(m => m.round === round);
             const bearMsg = bearMsgs.find(m => m.round === round);
 
-            // 아직 시작 안 한 라운드 — 진행 중인 경우만 표시
             const isBullThisRound = bullAgent.status === "running" && !bullMsg;
             const isBearThisRound = bearAgent.status === "running" && !bearMsg && !!bullMsg;
 
@@ -271,7 +273,7 @@ function DebateSection({
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
                         </span>
-                        논거 작성 중...
+                        {COPY.debate.bullWriting}
                       </p>
                     </div>
                   )}
@@ -295,7 +297,7 @@ function DebateSection({
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
                         </span>
-                        반론 작성 중...
+                        {COPY.debate.bearWriting}
                       </p>
                     </div>
                   )}
@@ -329,7 +331,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           bearish && "bg-blue-500",
           !bullish && !bearish && "bg-slate-500",
         )}>
-          최종 결정
+          {COPY.verdict.badge}
         </div>
 
         <div className="p-5 border-b border-slate-100 dark:border-slate-800">
@@ -351,7 +353,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
               <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1">
                   <BadgeCheck size={14} className="text-emerald-500" />
-                  확신도: {data.confidence === "HIGH" ? "높음" : data.confidence === "MEDIUM" ? "보통" : "낮음"}
+                  {COPY.verdict.confidence(data.confidence)}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
@@ -369,7 +371,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           {data.key_strengths.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-red-600 dark:text-red-400 mb-2 flex items-center gap-1">
-                <TrendingUp size={14} /> 핵심 강점
+                <TrendingUp size={14} /> {COPY.verdict.strengths}
               </h4>
               <ul className="text-sm space-y-1 text-slate-600 dark:text-slate-300">
                 {data.key_strengths.map((s, i) => (
@@ -381,7 +383,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           {data.key_risks.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1">
-                <TrendingDown size={14} /> 핵심 리스크
+                <TrendingDown size={14} /> {COPY.verdict.risks}
               </h4>
               <ul className="text-sm space-y-1 text-slate-600 dark:text-slate-300">
                 {data.key_risks.map((r, i) => (
@@ -394,7 +396,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
 
         <div className="px-5 py-3 bg-slate-100 dark:bg-slate-950 text-[10px] text-slate-400 flex items-start gap-1.5">
           <Info size={12} className="flex-shrink-0 mt-0.5" />
-          <p>본 AI 분석 결과는 투자 참고용이며, 최종 투자 결정과 책임은 투자자 본인에게 있습니다.</p>
+          <p>{COPY.verdict.disclaimer}</p>
         </div>
       </div>
     </motion.div>
@@ -422,10 +424,11 @@ function CardDetailOverlay({
     >
       <div className="flex-none flex items-center gap-3 px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <button
+          type="button"
           onClick={onClose}
           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium cursor-pointer transition-colors"
         >
-          <ArrowLeft size={14} /> 돌아가기
+          <ArrowLeft size={14} /> {COPY.overlay.back}
         </button>
         <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{title}</h3>
       </div>
@@ -537,7 +540,7 @@ export function AIAnalysisPanel({
             <div className="flex-none flex items-center justify-between px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Sparkles className="text-blue-600 dark:text-blue-400" size={18} />
-                <h2 className="font-bold text-base text-slate-900 dark:text-white">AI 종합분석</h2>
+                <h2 className="font-bold text-base text-slate-900 dark:text-white">{COPY.panel.title}</h2>
                 <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                   {ticker}
                 </span>
@@ -550,7 +553,7 @@ export function AIAnalysisPanel({
                     onClick={stop}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                   >
-                    <Square size={11} fill="currentColor" /> 중지
+                    <Square size={11} fill="currentColor" /> {COPY.panel.stop}
                   </button>
                 ) : !isAllPending && (
                   <>
@@ -561,7 +564,7 @@ export function AIAnalysisPanel({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-md transition-colors cursor-pointer"
                       >
                         <RefreshCw size={11} />
-                        {AGENT_META.find(m => m.key === resumeFrom)?.label}부터
+                        {COPY.panel.resumeFrom(AGENT_META.find(m => m.key === resumeFrom)?.label ?? resumeFrom)}
                       </button>
                     )}
                     <button
@@ -569,7 +572,7 @@ export function AIAnalysisPanel({
                       onClick={run}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                     >
-                      <RefreshCw size={11} /> 처음부터
+                      <RefreshCw size={11} /> {COPY.panel.restartAll}
                     </button>
                   </>
                 )}
@@ -577,7 +580,7 @@ export function AIAnalysisPanel({
                 <button
                   type="button"
                   onClick={toggleMinimize}
-                  title={isMinimized ? "펼치기" : "접기"}
+                  title={isMinimized ? COPY.panel.expand : COPY.panel.minimize}
                   className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
                 >
                   {isMinimized ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
@@ -587,7 +590,7 @@ export function AIAnalysisPanel({
                   type="button"
                   onClick={close}
                   className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
-                  aria-label="닫기"
+                  aria-label={COPY.panel.close}
                 >
                   <X size={18} />
                 </button>
@@ -603,19 +606,27 @@ export function AIAnalysisPanel({
                     {AGENT_META.map((meta) => {
                       const agentStatus = agents.find((a) => a.key === meta.key)?.status ?? "pending";
                       const isError = agentStatus === "error";
-                      const handleClick = isError && !isRunning ? () => resume(meta.key) : undefined;
+                      const isClickable = isError && !isRunning;
                       return (
                         <div
                           key={meta.key}
-                          onClick={handleClick}
-                          title={isError && !isRunning ? `${meta.label}부터 재개` : undefined}
+                          role={isClickable ? "button" : undefined}
+                          tabIndex={isClickable ? 0 : undefined}
+                          onClick={isClickable ? () => resume(meta.key) : undefined}
+                          onKeyDown={isClickable ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              resume(meta.key);
+                            }
+                          } : undefined}
+                          title={isClickable ? COPY.card.resumeTitle(meta.label) : undefined}
                           className={cn(
                             "flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors",
                             agentStatus === "pending" && "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
                             agentStatus === "running" && "bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
                             agentStatus === "done" && "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
                             isError && "bg-red-50 text-red-600 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-                            isError && !isRunning && "cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50",
+                            isClickable && "cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50",
                           )}
                         >
                           {agentStatus === "done" && <Check size={10} />}
@@ -623,7 +634,7 @@ export function AIAnalysisPanel({
                           {agentStatus === "pending" && <div className="w-1.5 h-1.5 rounded-full bg-current opacity-30" />}
                           {isError && <RefreshCw size={10} />}
                           {meta.label}
-                          {isError && !isRunning && <span className="opacity-70">재시도</span>}
+                          {isClickable && <span className="opacity-70">{COPY.card.retry}</span>}
                         </div>
                       );
                     })}
@@ -656,7 +667,7 @@ export function AIAnalysisPanel({
                           className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         >
                           <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
-                            이전 분석 결과가 있습니다. AI로 재분석할까요?
+                            {COPY.reanalysis.prompt}
                           </p>
                           <div className="flex gap-2 flex-none">
                             <button
@@ -664,14 +675,14 @@ export function AIAnalysisPanel({
                               onClick={run}
                               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
                             >
-                              재분석하기
+                              {COPY.reanalysis.confirm}
                             </button>
                             <button
                               type="button"
                               onClick={dismissReanalysisPrompt}
                               className="px-3 py-1.5 text-indigo-600 dark:text-indigo-400 text-xs font-medium cursor-pointer hover:opacity-70"
                             >
-                              유지하기
+                              {COPY.reanalysis.dismiss}
                             </button>
                           </div>
                         </motion.div>
@@ -685,15 +696,15 @@ export function AIAnalysisPanel({
                           <Sparkles className="text-slate-400 w-8 h-8" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">AI 에이전트들이 대기 중입니다</h3>
-                          <p className="text-xs text-slate-500 mt-1">버튼을 눌러 분석을 시작하세요</p>
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{COPY.empty.title}</h3>
+                          <p className="text-xs text-slate-500 mt-1">{COPY.empty.description}</p>
                         </div>
                         <button
                           type="button"
                           onClick={run}
                           className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
                         >
-                          분석 시작하기
+                          {COPY.empty.start}
                         </button>
                       </div>
                     )}
@@ -703,7 +714,7 @@ export function AIAnalysisPanel({
                       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
                         <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">{error}</p>
                         <button type="button" onClick={run} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
-                          다시 시도
+                          {COPY.errorState.retry}
                         </button>
                       </div>
                     )}
@@ -716,7 +727,7 @@ export function AIAnalysisPanel({
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
                             return (
-                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800" style={{ minHeight: 180 }} />
+                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />
                             );
                           }
                           return (
@@ -754,7 +765,7 @@ export function AIAnalysisPanel({
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
                             return (
-                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800" style={{ minHeight: 180 }} />
+                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />
                             );
                           }
                           // portfolio_manager가 완료되고 final이 있으면 Row 4에서 표시 → 이 행은 "결과 확인 ↓" 표시
@@ -765,8 +776,7 @@ export function AIAnalysisPanel({
                                   key={key}
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
-                                  className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800 overflow-hidden flex flex-col shadow-sm"
-                                  style={{ minHeight: 180 }}
+                                  className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800 overflow-hidden flex flex-col shadow-sm min-h-[180px]"
                                 >
                                   <div className="flex items-center gap-2 px-3 py-2.5 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/10 flex-none">
                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-none" />
@@ -783,7 +793,7 @@ export function AIAnalysisPanel({
                                       )}>
                                         {VERDICT_LABEL[final.verdict]}
                                       </div>
-                                      <p className="text-[10px] text-slate-400">아래에서 전체 결과 확인 ↓</p>
+                                      <p className="text-[10px] text-slate-400">{COPY.verdict.portfolioSummary}</p>
                                     </div>
                                   </div>
                                 </motion.div>
