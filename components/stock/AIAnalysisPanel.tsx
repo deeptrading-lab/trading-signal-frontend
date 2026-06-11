@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronUp, AlertCircle, ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { AGENT_META, AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
+import { AGENT_META, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import type {
   AgentKey, AgentMeta, AgentState, AgentStatus,
   DebateMessage, FinalDecision, FinalVerdict,
@@ -453,7 +453,7 @@ export function AIAnalysisPanel({
   final,
   error,
   resumeFrom,
-  open: openPanel,
+  open: _open,
   run,
   resume,
   stop,

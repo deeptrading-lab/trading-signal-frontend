@@ -5,6 +5,7 @@ import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
 import {
   AGENT_ORDER,
   INITIAL_AGENT_STATES,
+  type AIAnalysisEvent,
   type AgentKey,
   type AgentState,
   type DebateMessage,
@@ -51,6 +52,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
   // stale closure 방지용 refs
   const reportsRef = useRef<Partial<Record<AgentKey, string>>>({});
   const debateRef = useRef<DebateMessage[]>([]);
@@ -63,7 +68,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   // ── 공통 이벤트 핸들러 ─────────────────────────────────────────────────────
 
-  const handleEvent = useCallback((event: ReturnType<typeof Object.create>) => {
+  const handleEvent = useCallback((event: AIAnalysisEvent) => {
     if (event.type !== "stream" && event.type !== "debate_stream") {
       console.log("[AIAnalysis] event:", event.type,
         event.type === "progress" ? `${event.agent} ${event.status}` :

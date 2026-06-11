@@ -3663,3 +3663,22 @@
   - 실제 로컬에서 claude CLI로 응답 확인 (웹 리서치 품질)
   - 응답 시간이 길면 타임아웃 조정 또는 스트리밍 적용
   - workbench analyze 프롬프트에도 SignalResult 주입 (§4-3 완전 적용)
+
+---
+
+### 2026-06-12 — [WIP] AI 멀티에이전트 분석 패널 전면 재설계 (main 직접 커밋)
+
+- **slug**: `ai-analysis-panel`
+- **author**: @HY0118
+- **PR**: (main 직접 커밋 — PR 없음)
+- **요약**: 8-에이전트 파이프라인(기술·뉴스·펀더멘탈 → 강세/약세 2라운드 토론 → 리서치·리스크·포트폴리오 매니저 → 최종 결정) + 풀스크린 패널 UI
+- **현재 상태**: main 머지됨 (QA passed, reviewer approved)
+- **주요 변경 파일**:
+  - `app/api/stock/ai-analysis/route.ts` — SSE 스트리밍 BFF, 2라운드 토론 루프
+  - `hooks/stock/useAIAnalysis.ts` — 패널 상태 훅 (open/resume/stop/minimize/reanalysis prompt)
+  - `components/stock/AIAnalysisPanel.tsx` — 3열 카드 / VS 토론 / 최종결론 레이아웃
+  - `lib/types/stock/aiAnalysis.ts` — DEBATE_ROUNDS=2, DebateMessage.round
+- **다음 작업 후보**:
+  - 진행 바 에이전트 pill에 `role="button"` + `tabIndex={0}` 추가 (키보드 접근성)
+  - AI 패널 카피를 `lib/copy/stock/` 으로 분리 (i18n 대비)
+  - `style={{ minHeight: 180 }}` 인라인 px → `min-h-[180px]` Tailwind 토큰으로 교체
