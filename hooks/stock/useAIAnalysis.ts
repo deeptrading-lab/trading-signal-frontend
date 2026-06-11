@@ -55,9 +55,11 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const reportsRef = useRef<Partial<Record<AgentKey, string>>>({});
   const debateRef = useRef<DebateMessage[]>([]);
   const agentsRef = useRef<AgentState[]>(INITIAL_AGENT_STATES);
+  const isRunningRef = useRef(false);
   useEffect(() => { reportsRef.current = reports; }, [reports]);
   useEffect(() => { debateRef.current = debate; }, [debate]);
   useEffect(() => { agentsRef.current = agents; }, [agents]);
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
 
   // ── 공통 이벤트 핸들러 ─────────────────────────────────────────────────────
 
@@ -193,7 +195,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     } else {
       setIsOpen(true);
       setIsMinimized(false);
-      setShowReanalysisPrompt(true);
+      // 분석 진행 중에는 재분석 배너 표시 안 함
+      if (!isRunningRef.current) {
+        setShowReanalysisPrompt(true);
+      }
     }
   }, [run]);
 
@@ -260,6 +265,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         // 토론 에이전트는 bull부터 재개
         const resumeKey: AgentKey = running.key === "bear" ? "bull" : running.key;
         setResumeFrom((rf) => rf ?? resumeKey);
+        // 중지된 에이전트를 error로 전환 (스피너 제거 + 재시도 버튼 표시)
+        return prev.map((a) =>
+          a.key === running.key ? { ...a, status: "error", streamingChunk: "" } : a,
+        );
       }
       return prev;
     });

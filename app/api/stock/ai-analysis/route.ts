@@ -476,14 +476,15 @@ ${state.bearArgument}
 약세 측의 각 핵심 주장을 항목별로 직접 반박하고, 새로운 데이터나 논거를 추가해 강세 포지션이 여전히 타당함을 더 강력하게 주장하세요. 단순 반복이 아닌 심화된 분석으로 응답하세요.`;
 }
 
-function buildBearR2Prompt(state: AnalysisState): string {
+// latestBullText: bull R2에서 방금 생성된 텍스트만 수신 (R1 누적 포함 금지)
+function buildBearR2Prompt(state: AnalysisState, latestBullText: string): string {
   return `강세 연구원의 재반론이 나왔습니다. 최종 입장으로 마무리하세요.
 
 [당신의 1라운드 약세 논거]
 ${state.bearArgument}
 
-[강세 연구원의 재반론]
-${state.bullArgument}
+[강세 연구원의 재반론 (2라운드)]
+${latestBullText}
 
 강세 측의 재반론을 항목별로 반박하고, 약세 포지션의 핵심 위험 요인이 여전히 상존함을 설득력 있게 강조하며 최종 입장을 제시하세요.`;
 }
@@ -533,9 +534,10 @@ async function runDebateLoop(
 
     // ── Bear turn ─────────────────────────────────────────────────────────────
     send({ type: "progress", agent: "bear", status: "running" });
+    // R2는 bull의 최신 라운드 텍스트만 전달 (누적값 사용 금지)
     const bearPrompt = round === 1
       ? AGENT_PROMPTS.bear.user(state)
-      : buildBearR2Prompt(state);
+      : buildBearR2Prompt(state, bullText);
 
     let bearText: string;
     try {
