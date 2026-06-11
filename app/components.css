@@ -416,6 +416,26 @@
     @apply fixed inset-0 z-[55] bg-text-strong/10;
   }
 
+  /* ---------- AI 분석 패널 (우측 슬라이드) ----------
+   * z-[70] — header(50)·dropdown(50)·drawer(60) 위에 노출.
+   * 모바일: 전폭. sm+: 480px. lg+: 600px. */
+  .ai-analysis-panel {
+    @apply fixed right-0 top-0 h-screen bg-surface-elevated text-text-strong z-[70];
+    @apply w-full sm:w-[480px] lg:w-[600px];
+    @apply flex flex-col overflow-hidden;
+    @apply transition-transform duration-300 ease-out;
+    box-shadow: -8px 0 40px rgba(23, 32, 42, 0.14);
+  }
+  .ai-analysis-scrim {
+    @apply fixed inset-0 z-[65] bg-text-strong/20;
+    @apply transition-opacity duration-300 ease-out;
+  }
+  /* 에이전트 카드 스트리밍 커서 블링크 */
+  .ai-streaming-cursor::after {
+    content: "▋";
+    @apply text-accent-vivid animate-pulse ml-[1px];
+  }
+
   /* ---------- 메인 영역 ---------- */
   .main-area {
     @apply bg-surface-muted text-text-strong p-lg lg:p-2xl;

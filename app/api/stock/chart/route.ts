@@ -17,12 +17,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchStockDailyChart, isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockStockChart } from "@/lib/mock/stock/daily";
-import type { StockDailyCandle } from "@/lib/api/kis/types";
-import { withTimeout, delay, BFF_TIMEOUT_SENTINEL } from "@/lib/server/bffUtils";
+import { withTimeout, BFF_TIMEOUT_SENTINEL } from "@/lib/server/bffUtils";
+import { fetchDailyChunked, CHUNK_DAYS as DAILY_CHUNK_DAYS, toYyyymmdd, addDays } from "@/lib/api/kis/chartChunked";
 
-/** 일봉 단일 호출 커버 가능 캘린더일 (100 영업봉 ≒ 140일, 여유 10일). */
-const DAILY_CHUNK_DAYS = 130;
-const CHUNK_DELAY_MS = 150;
 /** 일봉 1년 = ~3콜, 타임아웃을 넉넉히. */
 const BFF_TIMEOUT_MS = 12_000;
 const DEFAULT_DAYS = 100;
@@ -31,62 +28,7 @@ const MAX_DAYS = 3_000;
 const VALID_PERIODS = new Set(["D", "W", "M"]);
 type KisPeriod = "D" | "W" | "M";
 
-const FALLBACK_TIMEOUT_MESSAGE =
-  "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
-
-function toYyyymmdd(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
-}
-
-/** 일봉 청크 분할 호출 — 130일 단위로 나눠 순차 조회 후 합산. */
-async function fetchDailyChunked(
-  ticker: string,
-  fromDate: string,
-  toDate: string,
-): Promise<StockDailyCandle[]> {
-  const from = new Date(`${fromDate.slice(0, 4)}-${fromDate.slice(4, 6)}-${fromDate.slice(6, 8)}`);
-  const to = new Date(`${toDate.slice(0, 4)}-${toDate.slice(4, 6)}-${toDate.slice(6, 8)}`);
-
-  // 청크 목록 생성 (최신 → 과거 순)
-  const chunks: Array<{ from: string; to: string }> = [];
-  let chunkTo = new Date(to);
-  while (chunkTo >= from) {
-    const chunkFrom = addDays(chunkTo, -DAILY_CHUNK_DAYS + 1);
-    const effectiveFrom = chunkFrom < from ? from : chunkFrom;
-    chunks.push({ from: toYyyymmdd(effectiveFrom), to: toYyyymmdd(chunkTo) });
-    chunkTo = addDays(effectiveFrom, -1);
-  }
-
-  // rate-limit 관측 — 청크 수 = 순차 KIS 실호출 수. 큰 범위(days 3000 등)에서
-  // 한도 근접을 조기 감지하기 위한 로그(수치 변경 전 관측용, 로드맵 P2).
-  console.info(
-    `[stock/chart] chunked daily ticker=${ticker} range=${fromDate}~${toDate} ` +
-      `chunks=${chunks.length} (= KIS calls)`,
-  );
-
-  const all: StockDailyCandle[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const { from: cf, to: ct } = chunks[i];
-    const candles = await fetchStockDailyChart(ticker, cf, ct, "D");
-    all.push(...candles);
-    if (i < chunks.length - 1) await delay(CHUNK_DELAY_MS);
-  }
-
-  // 중복 제거 + 오름차순 정렬
-  const seen = new Set<string>();
-  return all
-    .filter((c) => { if (seen.has(c.date)) return false; seen.add(c.date); return true; })
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
+const FALLBACK_TIMEOUT_MESSAGE = "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 
 export async function GET(request: NextRequest) {
   const ticker = (request.nextUrl.searchParams.get("ticker") ?? "").trim();

@@ -9,6 +9,8 @@ import { SignalCard } from "./SignalCard";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
+import { AIAnalysisPanel } from "@/components/stock/AIAnalysisPanel";
+import { useAIAnalysis } from "@/hooks/stock/useAIAnalysis";
 import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
@@ -19,6 +21,7 @@ import {
 
 export function StockPageLayout({ ticker }: { ticker: string }) {
   const { isMobile } = useBreakpoint();
+  const aiAnalysis = useAIAnalysis(ticker);
   const [chartExpanded, setChartExpanded] = useState(false);
   const [visible, setVisible] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,18 +62,23 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   //   접기/펼치기 카드(기본 접힘). 차트 확대는 데스크탑 전용이라 onExpand 미전달.
   if (isMobile) {
     return (
+      <>
+      <AIAnalysisPanel ticker={ticker} {...aiAnalysis} />
       <div className="flex flex-col gap-lg">
-        <StockHeader ticker={ticker} />
+        <StockHeader ticker={ticker} onAIAnalysis={aiAnalysis.open} />
         <StockDailyChart ticker={ticker} {...chartControls} />
         <SignalCard ticker={ticker} />
         <StockInvestorTrend ticker={ticker} tableDefaultOpen={false} />
         <CompanyOverview ticker={ticker} collapsible />
         <DisclosureList ticker={ticker} count={5} collapsible />
       </div>
+      </>
     );
   }
 
   return (
+    <>
+    <AIAnalysisPanel ticker={ticker} {...aiAnalysis} />
     <div
       style={{
         opacity: visible ? 1 : 0,
@@ -80,7 +88,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       {chartExpanded ? (
         /* 확대: 헤더 → 차트(풀너비) → 기업정보. lg:pb-2xl — 수급 하단 여백(PC). */
         <div className="flex flex-col gap-lg lg:pb-2xl">
-          <StockHeader ticker={ticker} />
+          <StockHeader ticker={ticker} onAIAnalysis={aiAnalysis.open} />
           <StockDailyChart
             ticker={ticker}
             expanded
@@ -99,7 +107,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
          *   헤더를 그리드 밖 전폭으로 올려 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다.
          *   lg:pb-2xl — 수급 하단 여백(PC). */
         <div className="flex flex-col gap-lg lg:pb-2xl">
-          <StockHeader ticker={ticker} />
+          <StockHeader ticker={ticker} onAIAnalysis={aiAnalysis.open} />
           {/* items-start 제거 → 좌측 컬럼이 우측 차트 높이에 stretch. 최근 공시 카드를
            *   flex-1 grid 로 남는 높이를 채워 좌우 하단선을 맞춘다(빈 공간 제거). */}
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-lg">
@@ -123,5 +131,6 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
         </div>
       )}
     </div>
+    </>
   );
 }

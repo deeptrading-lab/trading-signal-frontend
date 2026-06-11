@@ -3,26 +3,26 @@
  *
  * POST { ticker: string }
  *
- * 흐름:
- *   1. KIS 일봉(200봉) 서버사이드 fetch → evaluateSignal → SignalResult
- *   2. 신호 데이터를 user prompt에 주입 → claude --print subprocess
- *   3. Claude가 웹 리서치로 최신 뉴스·공시·실적 검색 후 JSON 판단 반환
- *   4. AISignalResponse normalize → 클라이언트에 반환
+ * 응답: SSE(text/event-stream)
+ *   data: { message: string }   — 진행 단계 메시지
+ *   data: { result: AISignalResponse } — 최종 판단
+ *   data: { error: string }     — 오류 메시지
  *
  * ⚠️ Vercel 미지원(claude-cli 로컬 전용) — Vercel 환경 감지 시 503.
- * ⚠️ KIS 미설정 시 시그널 계산 불가 → 400.
- * ⚠️ 타임아웃 60s(웹 리서치 포함, 기존 analyze 30s × 2).
+ * ⚠️ KIS 미설정 시 400.
+ * ⚠️ 타임아웃 60s(웹 리서치 포함).
  */
 
 import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { NextRequest, NextResponse } from "next/server";
-import { fetchStockDailyChart, isKisConfigured } from "@/lib/api/kis";
+import { isKisConfigured } from "@/lib/api/kis";
+import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
 import { evaluateSignal } from "@/lib/signal/engine";
 import { AXIS_LABEL } from "@/lib/copy/signal/labels";
 import type { AISignalResponse, AISignalVerdict } from "@/lib/types/stock/aiSignal";
 import type { AxisScore } from "@/lib/types/signal";
 
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 120_000;
 const MAX_STDOUT_BYTES = 4 * 1024 * 1024;
 const CHART_DAYS = 200;
 
@@ -36,27 +36,42 @@ function isVercelEnv(): boolean {
   );
 }
 
+// ─── SSE 헬퍼 ────────────────────────────────────────────────────────────────
+
+const encoder = new TextEncoder();
+
+function sseChunk(data: object): Uint8Array {
+  return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 // ─── Claude CLI subprocess ────────────────────────────────────────────────────
 
-type CliResult = { stdout: string; timedOut: boolean; exitCode: number };
+type CliResult = { stdout: string; stderr: string; timedOut: boolean; exitCode: number };
 
 function invokeCli(bin: string, args: string[], stdin: string): Promise<CliResult> {
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
     const opts: ExecFileOptionsWithStringEncoding = {
       encoding: "utf-8",
       timeout: TIMEOUT_MS,
       maxBuffer: MAX_STDOUT_BYTES,
     };
-    const child = execFile(bin, args, opts, (error, stdout) => {
+    const child = execFile(bin, args, opts, (error, stdout, stderr) => {
+      const elapsed = Date.now() - startedAt;
       if (error) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code === "ENOENT") { reject(error); return; }
         const killed = (error as NodeJS.ErrnoException & { killed?: boolean }).killed === true;
         const sig = (error as NodeJS.ErrnoException & { signal?: string }).signal;
-        resolve({ stdout: stdout ?? "", timedOut: killed && (sig === "SIGTERM" || sig === "SIGKILL"), exitCode: 1 });
+        // Claude CLI가 SIGTERM을 받으면 graceful exit(code=1)하므로 killed=false로 나온다.
+        // elapsed 기반 fallback으로 타임아웃 감지.
+        const timedOut =
+          (killed && (sig === "SIGTERM" || sig === "SIGKILL")) ||
+          (elapsed >= TIMEOUT_MS - 3_000 && !(stdout ?? "").trim());
+        resolve({ stdout: stdout ?? "", stderr: stderr ?? "", timedOut, exitCode: 1 });
         return;
       }
-      resolve({ stdout: stdout ?? "", timedOut: false, exitCode: 0 });
+      resolve({ stdout: stdout ?? "", stderr: stderr ?? "", timedOut: false, exitCode: 0 });
     });
     if (child.stdin) {
       child.stdin.on("error", () => {});
@@ -164,7 +179,7 @@ function normalizeResponse(raw: unknown): AISignalResponse | null {
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<Response> {
   if (isVercelEnv()) {
     return NextResponse.json(
       { error: "AI 최종 판단은 로컬 환경(next dev)에서만 사용할 수 있어요." },
@@ -182,73 +197,134 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
   }
 
-  // 서버사이드 신호 계산
-  let signalResult;
-  try {
-    const today = new Date();
-    const from = new Date(today);
-    from.setDate(from.getDate() - CHART_DAYS);
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    const candles = await fetchStockDailyChart(ticker, fmt(from), fmt(today), "D");
-    const sorted = [...candles].sort((a, b) => a.date.localeCompare(b.date));
-    signalResult = evaluateSignal(sorted);
-  } catch {
-    return NextResponse.json({ error: "시세 데이터를 불러오는 데 실패했어요." }, { status: 502 });
-  }
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - CHART_DAYS);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const fromStr = fmt(from);
+  const todayStr = fmt(today);
 
-  if (!signalResult.warmupOk) {
-    return NextResponse.json({ error: "데이터가 부족해 시그널을 계산할 수 없어요. (최소 130봉 필요)" }, { status: 400 });
-  }
-
-  // Claude CLI subprocess
   const bin = process.env.CLAUDE_CLI_PATH ?? "claude";
   const model = process.env.CLAUDE_CLI_MODEL;
-  const args = ["--print", "--output-format", "json", "--system-prompt", SYSTEM_PROMPT];
-  if (model?.trim()) args.push("--model", model.trim());
 
-  const userPrompt = buildUserPrompt(
-    ticker,
-    signalResult.axes,
-    signalResult.score,
-    signalResult.action,
-    signalResult.confidence,
-    signalResult.regime,
-    signalResult.asOf,
-  );
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (data: object) => controller.enqueue(sseChunk(data));
 
-  let cliResult: CliResult;
-  try {
-    cliResult = await invokeCli(bin, args, userPrompt);
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    const msg = code === "ENOENT"
-      ? "claude CLI를 찾을 수 없어요. claude CLI가 설치됐는지 확인해 주세요."
-      : "claude CLI 호출에 실패했어요.";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+      try {
+        console.log(`[ai-signal] ── 스트림 시작 ticker=${ticker}`);
 
-  if (cliResult.timedOut) {
-    return NextResponse.json({ error: "AI 분석이 60초를 초과했어요. 잠시 후 다시 시도해 주세요." }, { status: 504 });
-  }
-  if (cliResult.exitCode !== 0 && !cliResult.stdout) {
-    return NextResponse.json({ error: "AI 분석 중 오류가 발생했어요." }, { status: 502 });
-  }
+        // 1단계: 시세 fetch
+        send({ message: "시세 로딩 중…" });
+        let candles;
+        try {
+          candles = await fetchDailyChunked(ticker, fromStr, todayStr);
+          console.log(`[ai-signal] 봉수=${candles.length}`);
+        } catch (err) {
+          console.error("[ai-signal] ✗ 시세 fetch 실패", err);
+          send({ error: "시세 데이터를 불러오는 데 실패했어요." });
+          controller.close();
+          return;
+        }
 
-  const extracted = extractJson(cliResult.stdout);
-  if (!extracted) {
-    console.warn("[ai-signal] JSON parse failed", { stdout: cliResult.stdout.slice(0, 500) });
-    return NextResponse.json({ error: "AI 응답 파싱에 실패했어요." }, { status: 502 });
-  }
+        // 2단계: 시그널 계산
+        send({ message: "시그널 계산 중…" });
+        const sorted = [...candles].sort((a, b) => a.date.localeCompare(b.date));
+        const signalResult = evaluateSignal(sorted);
+        console.log(`[ai-signal] action=${signalResult.action} score=${signalResult.score.toFixed(0)} warmupOk=${signalResult.warmupOk}`);
 
-  const judgment = normalizeResponse(extracted);
-  if (!judgment) {
-    console.warn("[ai-signal] normalize failed", { extracted });
-    return NextResponse.json({ error: "AI 응답 형식이 올바르지 않아요." }, { status: 502 });
-  }
+        if (!signalResult.warmupOk) {
+          send({ error: "데이터가 부족해 시그널을 계산할 수 없어요. (최소 130봉 필요)" });
+          controller.close();
+          return;
+        }
 
-  return NextResponse.json(judgment, {
-    status: 200,
-    headers: { "Cache-Control": "no-store" },
+        // 3단계: Claude CLI
+        send({ message: "AI 분석 중…" });
+        // --allowedTools: --print 모드에서 기본적으로 tool 사용이 차단됨.
+        // WebSearch·WebFetch 명시로 웹 리서치 허용.
+        const args = [
+          "--print", "--output-format", "json",
+          "--allowedTools", "WebSearch,WebFetch",
+          "--system-prompt", SYSTEM_PROMPT,
+        ];
+        if (model?.trim()) args.push("--model", model.trim());
+
+        const userPrompt = buildUserPrompt(
+          ticker,
+          signalResult.axes,
+          signalResult.score,
+          signalResult.action,
+          signalResult.confidence,
+          signalResult.regime,
+          signalResult.asOf,
+        );
+        console.log(`[ai-signal] CLI 실행 bin="${bin}" prompt길이=${userPrompt.length}`);
+
+        let cliResult: CliResult;
+        try {
+          const t0 = Date.now();
+          cliResult = await invokeCli(bin, args, userPrompt);
+          console.log(`[ai-signal] CLI 완료 exitCode=${cliResult.exitCode} timedOut=${cliResult.timedOut} stdout길이=${cliResult.stdout.length} stderr길이=${cliResult.stderr.length} elapsed=${Date.now() - t0}ms`);
+          if (cliResult.stderr) console.warn("[ai-signal] stderr:", cliResult.stderr.slice(0, 500));
+          if (cliResult.stdout) console.log("[ai-signal] stdout 미리보기:", cliResult.stdout.slice(0, 300));
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          console.error("[ai-signal] ✗ CLI 실행 예외 code=", code, err);
+          const msg = code === "ENOENT"
+            ? "claude CLI를 찾을 수 없어요. claude CLI가 설치됐는지 확인해 주세요."
+            : "claude CLI 호출에 실패했어요.";
+          send({ error: msg });
+          controller.close();
+          return;
+        }
+
+        if (cliResult.timedOut) {
+          console.warn("[ai-signal] ✗ 타임아웃");
+          send({ error: "AI 분석이 60초를 초과했어요. 잠시 후 다시 시도해 주세요." });
+          controller.close();
+          return;
+        }
+        if (cliResult.exitCode !== 0 && !cliResult.stdout) {
+          console.warn(`[ai-signal] ✗ exitCode=${cliResult.exitCode} stdout 없음`);
+          send({ error: `AI 분석 중 오류가 발생했어요. (exitCode=${cliResult.exitCode}${cliResult.stderr ? ` — ${cliResult.stderr.slice(0, 100)}` : ""})` });
+          controller.close();
+          return;
+        }
+
+        const extracted = extractJson(cliResult.stdout);
+        if (!extracted) {
+          console.warn("[ai-signal] ✗ JSON 파싱 실패", cliResult.stdout.slice(0, 500));
+          send({ error: "AI 응답 파싱에 실패했어요." });
+          controller.close();
+          return;
+        }
+
+        const judgment = normalizeResponse(extracted);
+        if (!judgment) {
+          console.warn("[ai-signal] ✗ normalize 실패", extracted);
+          send({ error: "AI 응답 형식이 올바르지 않아요." });
+          controller.close();
+          return;
+        }
+
+        console.log(`[ai-signal] ✓ 완료 verdict=${judgment.verdict}`);
+        send({ result: judgment });
+        controller.close();
+      } catch (err) {
+        console.error("[ai-signal] ✗ 예상치 못한 예외", err);
+        send({ error: "분석 중 예상치 못한 오류가 발생했어요." });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
   });
 }

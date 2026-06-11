@@ -22,7 +22,7 @@
 
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, MinusIcon } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, MinusIcon, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -38,9 +38,10 @@ import {
 
 export interface StockHeaderProps {
   ticker: string;
+  onAIAnalysis?: () => void;
 }
 
-export function StockHeader({ ticker }: StockHeaderProps) {
+export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const { data, isLoading, isError, error } = useQueryStockPrice(ticker);
   const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
@@ -97,8 +98,8 @@ export function StockHeader({ ticker }: StockHeaderProps) {
     // 모바일: 2줄 스택(이름 → 가격). 데스크탑(lg): 한 줄 — 좌측 이름·종목번호 / 우측 가격·등락.
     //   헤더를 한 줄로 압축해 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다.
     <div className="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between lg:gap-md">
-      {/* 좌: 종목명 + 종목번호 + 관심 별 토글 */}
-      <div className="inline-flex items-center gap-sm">
+      {/* 좌: 종목명 + 종목번호 + 관심 별 토글 + AI 버튼 */}
+      <div className="flex items-center gap-sm flex-wrap">
         <h1 className="text-h1 text-text-strong inline-flex items-center gap-sm">
           {displayName}
           <span className="text-badge px-sm py-[2px] rounded-sm font-normal bg-asset-stock-soft text-asset-stock">
@@ -106,6 +107,16 @@ export function StockHeader({ ticker }: StockHeaderProps) {
           </span>
         </h1>
         <WatchlistStarButton added={added} onToggle={toggleWatch} />
+        {onAIAnalysis && (
+          <button
+            type="button"
+            onClick={onAIAnalysis}
+            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 rounded-lg text-sm font-bold transition-colors border border-indigo-200 dark:border-indigo-800 shadow-sm cursor-pointer"
+          >
+            <Sparkles size={16} className="text-indigo-500" />
+            AI 종합분석
+          </button>
+        )}
       </div>
 
       {/* 우: 가격 + 단위 + 등락 */}
