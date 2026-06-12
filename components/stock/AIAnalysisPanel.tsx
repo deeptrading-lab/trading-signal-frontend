@@ -591,9 +591,9 @@ export function AIAnalysisPanel({
   // 카드 상세 열기
   const handleExpand = (title: string, content: string) => setExpandedCard({ title, content });
 
-  // 에이전트 그룹 (Row 1: 분석가, Row 3: 매니저)
+  // 에이전트 그룹 (Row 1: 분석가, Row 3: 매니저 — portfolio_manager는 Row 4에서 최종 결론으로 표시)
   const analystKeys: AgentKey[] = ["market", "news", "fundamentals"];
-  const managerKeys: AgentKey[] = ["research_manager", "risk", "portfolio_manager"];
+  const managerKeys: AgentKey[] = ["research_manager", "risk"];
 
   return (
     <AnimatePresence>
@@ -847,60 +847,15 @@ export function AIAnalysisPanel({
                       />
                     )}
 
-                    {/* ── Row 3: 매니저 3개 카드 ──────────────────────── */}
+                    {/* ── Row 3: 매니저 2개 카드 (research_manager, risk) ─ */}
                     {managerKeys.some(k => agents.find(a => a.key === k)?.status !== "pending") && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {managerKeys.map((key) => {
                           const meta = AGENT_META.find(m => m.key === key)!;
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
                             return (
                               <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />
-                            );
-                          }
-                          // portfolio_manager가 완료되고 final이 있으면 Row 4에서 표시 → 이 행은 "결과 확인 ↓" 표시
-                          if (key === "portfolio_manager") {
-                            if (final) {
-                              return (
-                                <motion.div
-                                  key={key}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800 overflow-hidden flex flex-col shadow-sm min-h-[180px]"
-                                >
-                                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/10 flex-none">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-none" />
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex-1">{meta.label}</span>
-                                    <Check size={12} className="text-emerald-500 flex-none" />
-                                  </div>
-                                  <div className="flex-1 flex items-center justify-center p-4">
-                                    <div className="text-center">
-                                      <div className={cn(
-                                        "text-2xl font-extrabold mb-1",
-                                        isBullishVerdict(final.verdict) && "text-red-600 dark:text-red-400",
-                                        isBearishVerdict(final.verdict) && "text-blue-600 dark:text-blue-400",
-                                        !isBullishVerdict(final.verdict) && !isBearishVerdict(final.verdict) && "text-slate-700",
-                                      )}>
-                                        {VERDICT_LABEL[final.verdict]}
-                                      </div>
-                                      <p className="text-[10px] text-slate-400">{COPY.verdict.portfolioSummary}</p>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              );
-                            }
-                            // 아직 final 없는 경우 (running or error)
-                            return (
-                              <AnalystCard
-                                key={key}
-                                meta={meta}
-                                status={agentState.status}
-                                content={reports[key]}
-                                streamingChunk={agentState.streamingChunk}
-                                isRunning={isRunning}
-                                onExpand={handleExpand}
-                                onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                              />
                             );
                           }
                           return (
@@ -919,8 +874,46 @@ export function AIAnalysisPanel({
                       </div>
                     )}
 
-                    {/* ── Row 4: 최종 결정 ─────────────────────────────── */}
-                    {final && <FinalVerdictCard data={final} />}
+                    {/* ── Row 4: 최종 결론 (portfolio_manager 결과) ──────── */}
+                    {(() => {
+                      const pmAgent = agents.find(a => a.key === "portfolio_manager")!;
+                      if (final) return <FinalVerdictCard data={final} />;
+                      if (pmAgent.status === "running") {
+                        return (
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-800 p-5 flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                                <RefreshCw size={18} className="text-blue-500 animate-spin" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">최종 결론 도출 중…</p>
+                                <p className="text-xs text-slate-400 mt-0.5">포트폴리오 매니저가 매매 판단을 내리고 있어요</p>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      }
+                      if (pmAgent.status === "error") {
+                        return (
+                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-5 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+                              <p className="text-sm font-medium text-red-600 dark:text-red-400">최종 결론 도출 실패</p>
+                            </div>
+                            {!isRunning && (
+                              <button
+                                type="button"
+                                onClick={() => resume("portfolio_manager")}
+                                className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1 cursor-pointer hover:opacity-70"
+                              >
+                                <RefreshCw size={11} /> {COPY.card.retry}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                   </div>
                 </div>
