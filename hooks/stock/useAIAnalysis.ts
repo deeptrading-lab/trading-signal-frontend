@@ -305,14 +305,12 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setIsRunning(false);
   }, [haltRunning]);
 
+  // 패널 숨기기 — 분석은 백그라운드에서 계속, 스트림 중단 없음
   const close = useCallback(() => {
-    haltRunning();
-    abortRef.current?.abort();
     setIsOpen(false);
-    setIsRunning(false);
     setIsMinimized(false);
     setShowReanalysisPrompt(false);
-  }, [haltRunning]);
+  }, []);
 
   const toggleMinimize = useCallback(() => {
     setIsMinimized((m) => !m);

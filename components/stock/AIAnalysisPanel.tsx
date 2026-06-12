@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X, Sparkles, Check, RefreshCw, Square,
-  ChevronDown, ChevronUp, AlertCircle,
+  ChevronDown, ChevronUp, AlertCircle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { AGENT_META } from "@/lib/types/stock/aiAnalysis";
@@ -12,7 +12,6 @@ import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisHook } from "@/hooks/stock/useAIAnalysis";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
-import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
@@ -36,6 +35,7 @@ export function AIAnalysisPanel({
   final,
   error,
   resumeFrom,
+  open,
   run,
   resume,
   stop,
@@ -48,16 +48,15 @@ export function AIAnalysisPanel({
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
 
-  const { isMobile } = useBreakpoint();
   const isAllPending = agents.every((a) => a.status === "pending");
   const hasDebate = debate.length > 0
     || agents.some(a => (a.key === "bull" || a.key === "bear") && a.status !== "pending");
 
-  // 모바일에서만 배경 스크롤 잠금 (데스크탑은 사이드패널이라 잠금 불필요)
+  // 배경 스크롤 잠금 (minimized이면 해제)
   useEffect(() => {
-    document.body.style.overflow = (isOpen && !isMinimized && isMobile) ? "hidden" : "";
+    document.body.style.overflow = (isOpen && !isMinimized) ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [isOpen, isMinimized, isMobile]);
+  }, [isOpen, isMinimized]);
 
   // ESC 닫기
   useEffect(() => {
@@ -98,11 +97,34 @@ export function AIAnalysisPanel({
   const analystKeys: AgentKey[] = ["market", "news", "fundamentals", "social"];
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* 스크림 — 모바일에서만, minimized면 숨김 */}
-          {!isMinimized && isMobile && (
+    <>
+      {/* 패널 숨김 상태 — 분석 중이거나 결과 있을 때 우측 탭으로 재열기 */}
+      <AnimatePresence>
+        {!isOpen && !isAllPending && (
+          <motion.button
+            key="reopen-tab"
+            initial={{ x: 56 }}
+            animate={{ x: 0 }}
+            exit={{ x: 56 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            onClick={open}
+            className="fixed right-0 top-1/2 -translate-y-1/2 z-[70] flex flex-col items-center gap-2 px-2.5 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-l-2xl shadow-xl transition-colors cursor-pointer"
+            aria-label="AI 분석 패널 열기"
+          >
+            {isRunning
+              ? <Loader2 size={16} className="animate-spin" />
+              : <Sparkles size={16} />
+            }
+            <span className="text-[9px] font-bold" style={{ writingMode: "vertical-rl" }}>AI 분석</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* 스크림 — minimized면 숨김 */}
+          {!isMinimized && (
             <motion.div
               key="scrim"
               initial={{ opacity: 0 }}
@@ -122,7 +144,7 @@ export function AIAnalysisPanel({
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
               "fixed top-0 right-0 z-[70] bg-slate-50 dark:bg-slate-950 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden",
-              "w-full md:w-[480px]",
+              "w-full",
               isMinimized ? "" : "h-full",
             )}
             aria-label="AI 종합분석"
@@ -462,5 +484,6 @@ export function AIAnalysisPanel({
         </>
       )}
     </AnimatePresence>
+    </>
   );
 }
