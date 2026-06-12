@@ -6,6 +6,20 @@ import { cn } from "@/lib/utils/cn";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { FinalDecision, FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 
+/** **bold** 마크다운만 처리하는 경량 인라인 렌더러. */
+function InlineBold({ text }: { text: string }) {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1
+          ? <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">{part}</strong>
+          : part
+      )}
+    </>
+  );
+}
+
 const VERDICT_LABEL: Record<FinalVerdict, string> = {
   BUY: "강력 매수", OVERWEIGHT: "비중 확대", HOLD: "보유 유지",
   UNDERWEIGHT: "비중 축소", SELL: "매도·회피",
@@ -72,7 +86,7 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
             </div>
           </div>
           <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-            {data.reasoning}
+            <InlineBold text={data.reasoning} />
           </p>
         </div>
 
@@ -88,7 +102,7 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
 
           {data.entry_strategy && (
             <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
-              {data.entry_strategy}
+              <InlineBold text={data.entry_strategy} />
             </p>
           )}
 
@@ -140,13 +154,13 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
             {data.short_term_outlook && (
               <div className="p-4 space-y-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{COPY.verdict.shortTermLabel}</p>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{data.short_term_outlook}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed"><InlineBold text={data.short_term_outlook} /></p>
               </div>
             )}
             {data.mid_term_outlook && (
               <div className="p-4 space-y-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{COPY.verdict.midTermLabel}</p>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{data.mid_term_outlook}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed"><InlineBold text={data.mid_term_outlook} /></p>
               </div>
             )}
           </div>
