@@ -665,12 +665,12 @@ export function AIAnalysisPanel({
           >
             {/* ── 헤더 ──────────────────────────────────────────────────── */}
             <div className="flex-none flex items-center justify-between px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Sparkles className="text-blue-600 dark:text-blue-400" size={18} />
-                <h2 className="font-bold text-base text-slate-900 dark:text-white">{COPY.panel.title}</h2>
-                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                  {displayName}
-                </span>
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="text-blue-500 dark:text-blue-400 shrink-0" size={20} />
+                <div className="flex flex-col">
+                  <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{displayName}</h2>
+                  <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 leading-none mt-0.5">{COPY.panel.title}</span>
+                </div>
               </div>
               <div className="flex items-center gap-1">
                 {/* 중지 / 재개 버튼 */}
