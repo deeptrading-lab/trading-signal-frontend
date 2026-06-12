@@ -24,13 +24,14 @@ export function DebateSection({
   bearAgent,
   onExpand,
 }: DebateSectionProps) {
-  if (bullAgent.status === "pending") return null;
-
   const bullMsgs = useMemo(() => debate.filter(d => d.speaker === "bull"), [debate]);
   const bearMsgs = useMemo(() => debate.filter(d => d.speaker === "bear"), [debate]);
-  const currentRound = Math.max(bullMsgs.length, bearMsgs.length, 1);
   const completedBullRounds = useMemo(() => bullMsgs.filter(m => !m.isStreaming).length, [bullMsgs]);
   const completedBearRounds = useMemo(() => bearMsgs.filter(m => !m.isStreaming).length, [bearMsgs]);
+
+  if (bullAgent.status === "pending") return null;
+
+  const currentRound = Math.max(bullMsgs.length, bearMsgs.length, 1);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
