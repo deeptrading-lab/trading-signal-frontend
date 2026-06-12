@@ -3754,3 +3754,32 @@
   - 차트 후속: W3 캔들바 wickRange Y좌표 육안 QA (장대봉/상한가)
   - MACD/RSI 워밍업 fetch 구현 (`WARMUP_DAYS` 앞당겨 지표 항상 표시)
   - investor flow `0억` 표시 버그 수정
+
+### 2026-06-12 — fix(flow): 수급 순매수 0억 표시 버그 수정 (#119)
+
+- **slug**: `fix-investor-flow-zero-amount` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/119
+- **요약**: fix(flow): 수급 순매수 0억 표시 버그 수정
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경 요약
+  > 
+  > 홈 수급 Top10 위젯에서 외국인/기관 순매수 금액이 `0억`(실제 `0.0억`)으로 표시되는 버그 수정.
+  > 
+  > ## 원인
+  > 
+  > KIS API `frgn_ntby_tr_pbmn` / `orgn_ntby_tr_pbmn` 필드가 빈 문자열로 반환되면
+  > `toNumber("")` → `0` → `formatNetBuyAmount(0)` → `"0.0억"` 출력.
+  > `0`은 실제 순매수 0이 아닌 미확인 데이터 폴백값이므로 `-`로 표시해야 함.
+  > 
+  > ## 변경 내용
+  > 
+  > `lib/utils/formatNetBuy.ts` — `formatNetBuyAmount(0)` 시 `"-"` 반환 조건 추가 (1줄).
+  > 
+  > 표면 A (홈 Top10) / 표면 B (종목 수급 추이) 공용 포맷터이므로 양쪽 모두 수정됨.
+  > 
+  > ## 다음 작업
+  > 
+  > - MACD/RSI 워밍업 fetch 구현
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - MACD/RSI 워밍업 fetch 구현
