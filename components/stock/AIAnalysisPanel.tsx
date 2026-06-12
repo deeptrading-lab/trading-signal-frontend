@@ -152,6 +152,69 @@ function AnalystCard({
   );
 }
 
+// ─── 토론 로딩 플레이스홀더 (순환 메시지) ─────────────────────────────────────
+
+function DebateLoadingCard({ side }: { side: "bull" | "bear" }) {
+  const isBull = side === "bull";
+  const messages = COPY.progress[side];
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setMsgIdx(i => (i + 1) % messages.length), 2400);
+    return () => clearInterval(id);
+  }, [messages.length]);
+
+  return (
+    <div className={cn(
+      "rounded-xl border px-3 py-3",
+      isBull
+        ? "border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/10"
+        : "border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/10",
+    )}>
+      <p className={cn(
+        "text-[11px] flex items-center gap-1.5",
+        isBull ? "text-red-500" : "text-blue-500",
+      )}>
+        <span className="relative flex h-2 w-2 flex-none">
+          <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isBull ? "bg-red-400" : "bg-blue-400")} />
+          <span className={cn("relative inline-flex h-2 w-2 rounded-full", isBull ? "bg-red-500" : "bg-blue-500")} />
+        </span>
+        {messages[msgIdx]}
+      </p>
+    </div>
+  );
+}
+
+// ─── PM 로딩 카드 ────────────────────────────────────────────────────────────
+
+function PMLoadingCard({ streamingChunk }: { streamingChunk: string }) {
+  const messages = COPY.progress.portfolio_manager;
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    if (streamingChunk) { setMsgIdx(0); return; }
+    const id = setInterval(() => setMsgIdx(i => (i + 1) % messages.length), 2400);
+    return () => clearInterval(id);
+  }, [streamingChunk, messages.length]);
+
+  // 스트리밍 중이면 마지막 200자 노출 (JSON 생성 진행 중임을 시각적으로 표현)
+  const tailText = streamingChunk.length > 200 ? "…" + streamingChunk.slice(-200) : streamingChunk;
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-800 p-5">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+          <RefreshCw size={18} className="text-blue-500 animate-spin" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">최종 결론 도출 중…</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {streamingChunk ? tailText : messages[msgIdx]}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 토론 메시지 카드 (단일 발화 / 단일 라운드) ──────────────────────────────
 
 function DebateMsgCard({
@@ -165,6 +228,10 @@ function DebateMsgCard({
 }) {
   const isBull = msg.speaker === "bull";
   const isStreaming = msg.isStreaming && debatingSide === msg.speaker;
+  // 스트리밍 중에는 마지막 250자(생성 중인 끝부분)를 보여줘서 텍스트가 실시간으로 쌓이는 게 보임
+  const tailText = isStreaming && msg.content.length > 250
+    ? "…" + msg.content.slice(-250)
+    : msg.content;
 
   return (
     <div className={cn(
@@ -192,10 +259,20 @@ function DebateMsgCard({
         </span>
       </div>
       <div className="px-3 py-2.5">
-        <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-5 whitespace-pre-wrap">
-          {msg.content}
-          {isStreaming && <span className={cn("inline-block w-1 h-3 animate-pulse ml-0.5 align-middle", isBull ? "bg-red-500" : "bg-blue-500")} />}
-        </p>
+        {isStreaming ? (
+          // 스트리밍 중: 텍스트 꼬리 표시 (line-clamp 없음, 새 텍스트가 끝에 붙는 게 보임)
+          <p className={cn(
+            "text-[11px] leading-relaxed whitespace-pre-wrap break-words",
+            isBull ? "text-red-800 dark:text-red-300" : "text-blue-800 dark:text-blue-300",
+          )}>
+            {tailText}
+            <span className={cn("inline-block w-1 h-[13px] animate-pulse ml-0.5 align-middle", isBull ? "bg-red-500" : "bg-blue-500")} />
+          </p>
+        ) : (
+          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-5 whitespace-pre-wrap">
+            {msg.content}
+          </p>
+        )}
       </div>
       {!msg.isStreaming && msg.content && (
         <div className={cn("px-3 py-1.5 border-t", isBull ? "border-red-100 dark:border-red-900/30" : "border-blue-100 dark:border-blue-900/30")}>
@@ -291,17 +368,7 @@ function DebateSection({
                   {bullMsg && (
                     <DebateMsgCard msg={bullMsg} debatingSide={debatingSide} onExpand={onExpand} />
                   )}
-                  {isBullThisRound && !bullMsg && (
-                    <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/10 px-3 py-3">
-                      <p className="text-[11px] text-red-400 flex items-center gap-1.5">
-                        <span className="relative flex h-2 w-2 flex-none">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                        </span>
-                        {COPY.debate.bullWriting}
-                      </p>
-                    </div>
-                  )}
+                  {isBullThisRound && !bullMsg && <DebateLoadingCard side="bull" />}
                 </div>
 
                 {/* VS 구분선 */}
@@ -315,17 +382,7 @@ function DebateSection({
                   {bearMsg && (
                     <DebateMsgCard msg={bearMsg} debatingSide={debatingSide} onExpand={onExpand} />
                   )}
-                  {isBearThisRound && !bearMsg && (
-                    <div className="rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/10 px-3 py-3">
-                      <p className="text-[11px] text-blue-400 flex items-center gap-1.5">
-                        <span className="relative flex h-2 w-2 flex-none">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                        </span>
-                        {COPY.debate.bearWriting}
-                      </p>
-                    </div>
-                  )}
+                  {isBearThisRound && !bearMsg && <DebateLoadingCard side="bear" />}
                 </div>
               </div>
             );
@@ -918,15 +975,7 @@ export function AIAnalysisPanel({
                       if (pmAgent.status === "running") {
                         return (
                           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-800 p-5 flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                                <RefreshCw size={18} className="text-blue-500 animate-spin" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">최종 결론 도출 중…</p>
-                                <p className="text-xs text-slate-400 mt-0.5">포트폴리오 매니저가 매매 판단을 내리고 있어요</p>
-                              </div>
-                            </div>
+                            <PMLoadingCard streamingChunk={pmAgent.streamingChunk} />
                           </motion.div>
                         );
                       }
