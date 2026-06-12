@@ -12,9 +12,9 @@
 
 import { formatNumber } from "@/lib/utils/formatMoney";
 
-/** 백만원 → "OO억" 표기(부호 보존, 원 단위 생략). */
+/** 백만원 → "OO억" 표기(부호 보존, 원 단위 생략). 0은 KIS 빈 필드 폴백이므로 "-" 반환. */
 export function formatNetBuyAmount(amountInMillionWon: number): string {
-  if (!Number.isFinite(amountInMillionWon)) return "-";
+  if (!Number.isFinite(amountInMillionWon) || amountInMillionWon === 0) return "-";
   const eok = amountInMillionWon / 100;
   const digits = Math.abs(eok) >= 1 ? 0 : 1;
   const sign = eok > 0 ? "+" : "";
