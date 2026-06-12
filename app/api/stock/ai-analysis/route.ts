@@ -28,12 +28,13 @@ import { AXIS_LABEL } from "@/lib/copy/signal/labels";
 import type { AxisScore } from "@/lib/types/signal";
 import type { AgentKey, AIAnalysisEvent, FinalDecision, ResumeState } from "@/lib/types/stock/aiAnalysis";
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
+import type { AIDecisionEntry } from "@/lib/api/stock/aiDecisionStore";
 
 const CHART_DAYS = 200;
-// 8에이전트 순차 실행 최대 허용 시간 (40분)
-// market(5m)+news(6m)+fundamentals(6m)+bull(5m)×2+bear(5m)×2+manager(5m)+risk(5m)+pm(3m) ≈ 45m 이론상한
-// 실제 Opus 기준 평균은 절반 수준 → 40분으로 여유
-const TIMEOUT_TOTAL_MS = 2_400_000;
+// 12-에이전트 파이프라인 최대 허용 시간 (50분)
+// Phase A(6m) + Phase B(20m) + research_manager(5m) + trader/effort:high(6m)
+//   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
+const TIMEOUT_TOTAL_MS = 3_000_000;
 
 // ─── Vercel guard ─────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ interface AgentCallOpts {
   userPrompt: string;
   tools: string[];
   timeoutMs: number;
+  effort?: "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 /**
@@ -98,6 +100,9 @@ function invokeClaudeAgentStream(
     }
     if (model?.trim()) {
       args.push("--model", model.trim());
+    }
+    if (opts.effort) {
+      args.push("--effort", opts.effort);
     }
 
     const child = spawn(bin, args, {
@@ -268,6 +273,8 @@ type AgentPrompts = {
   user: (state: AnalysisState) => string;
   tools: string[];
   timeoutMs: number;
+  effort?: "low" | "medium" | "high" | "xhigh" | "max";
+  model?: string;
 };
 
 interface AnalysisState {
@@ -280,7 +287,10 @@ interface AnalysisState {
   bullArgument: string;
   bearArgument: string;
   researchPlan: string;
-  riskAssessment: string;
+  traderProposal: string;
+  riskRisky: string;
+  riskNeutral: string;
+  riskSafe: string;
 }
 
 const LANG_INSTRUCTION = "\n\n모든 응답은 반드시 한국어로 작성하세요.";
@@ -291,7 +301,8 @@ const LANG_INSTRUCTION = "\n\n모든 응답은 반드시 한국어로 작성하�
 const T = {
   NO_TOOL:   300_000,  // 도구 없음 — 5분
   WEB_TOOL:  360_000,  // WebSearch/WebFetch — 6분
-  PM:        180_000,  // Portfolio Manager (JSON만) — 3분
+  PM:        300_000,  // Portfolio Manager (effort:high 적용) — 5분
+  TRADER:    360_000,  // Trader Agent (effort:high 적용) — 6분
   DEBATE_R2: 300_000,  // 토론 2라운드 (R1 맥락 ~14K 추가) — 5분
 };
 
@@ -503,40 +514,109 @@ ${s.bearArgument}`,
     timeoutMs: T.NO_TOOL,
   },
 
-  // ── 7. 리스크 매니저 ────────────────────────────────────────────────────────
-  // TradingAgents 원본: 3-perspective (aggressive/conservative/neutral) combined into 1
-  risk: {
-    system: `당신은 종합적 리스크 매니저입니다. 투자 계획을 세 가지 관점에서 평가하고 균형 잡힌 리스크 평가를 제공하세요.
+  // ── 7. 트레이더 ─────────────────────────────────────────────────────────────
+  // TradingAgents 원본: Trader Agent — composes analyst/researcher reports into a
+  //   concrete Transaction Proposal (timing + magnitude). deep_think_llm 적용 구간.
+  trader: {
+    system: `당신은 트레이딩 전문가입니다. 리서치 팀의 토론과 투자 계획을 바탕으로 구체적이고 즉시 실행 가능한 매매 제안서(Transaction Proposal)를 작성하세요.
 
-**공격적 관점(Aggressive)**: 고수익·고위험 기회를 적극 옹호하세요. 성장 잠재력과 혁신적 이점에 집중하며, 지나치게 보수적인 가정이 핵심 기회를 놓칠 수 있음을 지적하세요.
+제안서에 반드시 포함할 내용:
+- **매매 방향**: BUY / HOLD / SELL 중 하나
+- **진입 전략**: 즉시 진입 또는 조건부 진입 (구체적 가격대·조건 명시)
+- **포지션 규모**: 포트폴리오 대비 권고 비중 (예: 5~10%)
+- **진입 시점**: 당장 진입 vs 조정 대기 (트리거 조건 명시)
+- **목표 수익률 범위**: 단기(1~2주), 중기(1~3개월) 각각
+- **손절 조건**: 기술적 지지선 또는 % 기준
+- **핵심 전제 조건**: 이 제안이 유효하기 위해 유지되어야 할 조건 2~3가지
 
-**보수적 관점(Conservative)**: 자산 보호와 안정성을 최우선으로 하세요. 잠재적 손실, 경기 침체, 시장 변동성을 면밀히 검토하고, 투자 계획이 과도한 리스크에 노출되는 부분을 지적하세요.
+강세/약세 논거를 모두 검토했음을 반영해 균형 잡힌 제안을 만들되, 결론에서는 명확한 방향을 제시하세요. 모호한 표현("경우에 따라", "상황 봐서" 등) 금지.
+총 1,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
+    user: (s: AnalysisState) => `${s.ticker}에 대한 다음 분석 결과를 바탕으로 구체적인 매매 제안서를 작성하세요.
 
-**중립적 관점(Neutral)**: 두 관점의 균형을 제시하세요. 성장 잠재력과 리스크를 모두 고려하고, 분산투자 전략을 포함한 지속 가능한 접근법을 권고하세요.
-
-리스크 평가에 포함할 내용:
-- 주요 리스크 요인 (시장·종목·유동성·이벤트 리스크)
-- 시나리오 분석 (최악/기본/최선 시나리오)
-- 포지션 사이징 및 분할 매수 전략
-- 리스크 완화 방안 (헤지, 손절 기준, 스톱로스 레벨)
-- 리스크 대비 기대 수익률(Risk/Reward Ratio)
-마크다운 형식으로 작성하세요. 3관점 각 500자씩, 리스크 요약 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `${s.ticker}에 대한 다음 투자 계획을 공격적·보수적·중립적 세 가지 리스크 관점에서 종합 평가하세요.
-
-[투자 계획]
+[투자 계획 (리서치 매니저 결론)]
 ${s.researchPlan}
 
-[기술적 시그널 요약]
-${s.signalSummary}`,
+[강세 연구원 최종 논거]
+${s.bullArgument.slice(0, 1500)}
+
+[약세 연구원 최종 논거]
+${s.bearArgument.slice(0, 1500)}
+
+[기술 분석 요약]
+${s.marketReport.slice(0, 800)}`,
+    tools: [],
+    timeoutMs: T.TRADER,
+    effort: "high" as const,
+    model: process.env.TRADER_MODEL,
+  },
+
+  // ── 8a. 공격적 리스크 애널리스트 ────────────────────────────────────────────
+  // TradingAgents 원본: Risky/Aggressive analyst — 3개 독립 병렬 실행
+  risk_risky: {
+    system: `당신은 공격적 관점의 리스크 애널리스트입니다. 트레이더의 매매 제안을 고수익·고위험 투자 관점에서 평가하세요.
+성장 잠재력과 혁신적 이점에 집중하고, 보수적 분석이 핵심 기회를 놓칠 수 있음을 강조하세요.
+리스크-보상 비율이 유리하다면 대담한 포지션을 지지하세요.
+주요 리스크 요인, 시나리오 분석(최선/기본/최악), 포지션 사이징 권고를 포함하세요.
+1,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
+    user: (s: AnalysisState) => `${s.ticker}에 대한 트레이더 제안을 공격적 관점에서 평가하세요.
+
+[트레이더 제안]
+${s.traderProposal}
+
+[투자 계획 (리서치 매니저)]
+${s.researchPlan.slice(0, 800)}
+
+[기술적 시그널]
+${s.signalSummary.slice(0, 500)}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
 
-  // ── 8. 포트폴리오 매니저 ────────────────────────────────────────────────────
-  // TradingAgents 원본: trader/final decision + JSON schema
+  // ── 8b. 중립적 리스크 애널리스트 ────────────────────────────────────────────
+  risk_neutral: {
+    system: `당신은 중립적 관점의 리스크 애널리스트입니다. 트레이더의 매매 제안을 성장 잠재력과 위험 요인 모두를 고려해 균형 잡힌 관점으로 평가하세요.
+분산투자와 단계적 접근법을 고려하고, 공격적·보수적 관점 각각의 맹점을 지적하세요.
+주요 리스크 요인, 시나리오 분석(최선/기본/최악), 포지션 사이징 권고를 포함하세요.
+1,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
+    user: (s: AnalysisState) => `${s.ticker}에 대한 트레이더 제안을 중립적 관점에서 평가하세요.
+
+[트레이더 제안]
+${s.traderProposal}
+
+[투자 계획 (리서치 매니저)]
+${s.researchPlan.slice(0, 800)}
+
+[기술적 시그널]
+${s.signalSummary.slice(0, 500)}`,
+    tools: [],
+    timeoutMs: T.NO_TOOL,
+  },
+
+  // ── 8c. 보수적 리스크 애널리스트 ────────────────────────────────────────────
+  risk_safe: {
+    system: `당신은 보수적 관점의 리스크 애널리스트입니다. 트레이더의 매매 제안을 자산 보호·안정성 최우선 관점에서 평가하세요.
+잠재적 손실, 경기 침체, 시장 변동성을 면밀히 검토하고, 포지션이 과도한 리스크에 노출되는 부분을 지적하세요.
+주요 리스크 요인, 시나리오 분석(최선/기본/최악), 손실 한도와 헤지 전략을 포함하세요.
+1,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
+    user: (s: AnalysisState) => `${s.ticker}에 대한 트레이더 제안을 보수적 관점에서 평가하세요.
+
+[트레이더 제안]
+${s.traderProposal}
+
+[투자 계획 (리서치 매니저)]
+${s.researchPlan.slice(0, 800)}
+
+[기술적 시그널]
+${s.signalSummary.slice(0, 500)}`,
+    tools: [],
+    timeoutMs: T.NO_TOOL,
+  },
+
+  // ── 9. 포트폴리오 매니저 ────────────────────────────────────────────────────
+  // TradingAgents 원본: PM approves/rejects Trader's proposal after Risk team debate
   portfolio_manager: {
-    system: `당신은 트레이더와 리스크 팀의 분석을 승인·조정하는 포트폴리오 매니저입니다.
-모든 분석(기술·뉴스·펀더멘털·SNS·강세/약세 토론·투자 계획·리스크 평가)을 종합해 **즉시 실행 가능한 매매 결정**을 내리세요.
+    system: `당신은 트레이더의 매매 제안을 최종 승인·조정하는 포트폴리오 매니저입니다.
+트레이더 제안서, 리스크 팀 3개의 평가(공격적·중립적·보수적), 모든 리서치 결과를 종합해 **즉시 실행 가능한 최종 매매 결정**을 내리세요.
 
 **편향 방지 원칙**: 낙관적 신호와 비관적 신호에 동등한 가중치를 부여하세요. 데이터가 명확한 방향을 제시하면 BUY 또는 SELL을 포함한 확실한 결론을 내리세요. 불확실성을 과대평가하거나 HOLD를 기본값으로 사용하지 마세요. 강세 연구원의 논거가 더 구체적이고 설득력 있다면 BUY/OVERWEIGHT를, 약세 논거가 더 강하다면 SELL/UNDERWEIGHT를 선택하세요.
 
@@ -558,7 +638,7 @@ ${s.signalSummary}`,
   "time_horizon": "단기" | "중기" | "장기"
 }
 
-verdict 선택 기준 (리서치 매니저 의견을 참고하되 독립적으로 판단하세요):
+verdict 선택 기준 (리서치 매니저·트레이더 의견을 참고하되 독립적으로 판단하세요):
 - BUY: 기술적·펀더멘털·심리 지표 중 2개 이상에서 강한 매수 신호. 즉각적 포지션 진입 (target_pct 양수 필수)
 - OVERWEIGHT: 전반적으로 긍정적이나 일부 리스크 존재. 점진적 분할 매수 (target_pct 양수 필수)
 - HOLD: 강세/약세 신호가 진정으로 균형 상태이거나, 단기 불확실성이 있어 방향 전환을 기다려야 할 때만 선택
@@ -571,7 +651,7 @@ stop_loss_pct 설정 기준:
 - UNDERWEIGHT/SELL: 보유 시 손절 기준 (없으면 -3%~-5%)
 
 반드시 구체적인 숫자를 포함하세요. "추후 결정" 또는 모호한 표현 금지.`,
-    user: (s) => `${s.ticker}에 대한 모든 분석을 종합해 최종 투자 결정을 JSON으로 출력하세요.
+    user: (s: AnalysisState) => `${s.ticker}에 대한 모든 분석을 종합해 최종 투자 결정을 JSON으로 출력하세요.
 
 [기술 분석]
 ${s.marketReport}
@@ -594,10 +674,21 @@ ${s.bearArgument.slice(0, 2000)}
 [투자 계획 (리서치 매니저)]
 ${s.researchPlan}
 
-[리스크 평가]
-${s.riskAssessment}`,
+[트레이더 제안서]
+${s.traderProposal}
+
+[공격적 리스크 평가]
+${s.riskRisky}
+
+[중립적 리스크 평가]
+${s.riskNeutral}
+
+[보수적 리스크 평가]
+${s.riskSafe}`,
     tools: [],
     timeoutMs: T.PM,
+    effort: "high" as const,
+    model: process.env.PM_MODEL,
   },
 };
 
@@ -728,11 +819,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  // Body: { ticker, startFrom?, state? }
+  // Body: { ticker, startFrom?, state?, prevDecisions? }
   const body = await req.json().catch(() => null) as {
     ticker?: unknown;
     startFrom?: unknown;
     state?: unknown;
+    prevDecisions?: unknown;
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
@@ -755,6 +847,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   const preState: ResumeState = (body.state && typeof body.state === "object")
     ? body.state as ResumeState
     : {};
+
+  // 과거 결정 이력 (Decision Memory — PM 프롬프트 주입용)
+  const prevDecisions: AIDecisionEntry[] = Array.isArray(body.prevDecisions)
+    ? (body.prevDecisions as AIDecisionEntry[]).slice(0, 3)
+    : [];
+
+  const pastDecisionContext = prevDecisions.length > 0
+    ? `\n\n**과거 결정 참고** (같은 종목 이전 AI 분석 결과 — 패턴 학습용):\n${
+        prevDecisions.map(d =>
+          `- ${d.date.slice(0, 10)}: ${d.verdict} (확신도: ${d.confidence}) / 목표: ${d.target_pct != null ? `+${d.target_pct}%` : "없음"} / 손절: ${d.stop_loss_pct}%`
+        ).join("\n")
+      }\n과거 결정의 논리를 반복하지 말고, 현재 데이터에 기반해 독립적으로 판단하세요.`
+    : "";
 
   if (!isKisConfigured()) {
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
@@ -787,7 +892,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         bullArgument:        preState.bullArgument        ?? "",
         bearArgument:        preState.bearArgument        ?? "",
         researchPlan:        preState.researchPlan        ?? "",
-        riskAssessment:      preState.riskAssessment      ?? "",
+        traderProposal:      preState.traderProposal      ?? "",
+        riskRisky:           preState.riskRisky           ?? "",
+        riskNeutral:         preState.riskNeutral         ?? "",
+        riskSafe:            preState.riskSafe            ?? "",
       };
 
       const runStart = Date.now();
@@ -844,11 +952,14 @@ export async function POST(req: NextRequest): Promise<Response> {
           const agentT0 = Date.now();
           let text: string;
           try {
-            text = await invokeClaudeAgentStream(bin, model, {
-              systemPrompt: prompts.system,
+            text = await invokeClaudeAgentStream(bin, prompts.model ?? model, {
+              systemPrompt: agentKey === "portfolio_manager"
+                ? prompts.system + pastDecisionContext
+                : prompts.system,
               userPrompt: prompts.user(state),
               tools: prompts.tools,
               timeoutMs: prompts.timeoutMs,
+              effort: prompts.effort,
             }, combinedSignal, (token) => {
               send({ type: "stream", agent: agentKey, chunk: token });
             });
@@ -911,12 +1022,15 @@ export async function POST(req: NextRequest): Promise<Response> {
 
           // state 업데이트
           switch (agentKey) {
-            case "market":           state.marketReport = text; break;
-            case "news":             state.newsReport = text; break;
+            case "market":           state.marketReport    = text; break;
+            case "news":             state.newsReport      = text; break;
             case "fundamentals":     state.fundamentalsReport = text; break;
-            case "social":           state.socialReport = text; break;
-            case "research_manager": state.researchPlan = text; break;
-            case "risk":             state.riskAssessment = text; break;
+            case "social":           state.socialReport    = text; break;
+            case "research_manager": state.researchPlan    = text; break;
+            case "trader":           state.traderProposal  = text; break;
+            case "risk_risky":       state.riskRisky       = text; break;
+            case "risk_neutral":     state.riskNeutral     = text; break;
+            case "risk_safe":        state.riskSafe        = text; break;
           }
 
           send({ type: "progress", agent: agentKey, status: "done" });
@@ -943,15 +1057,36 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
         }
 
-        // ── Phase C: 매니저 체인 (순차) ─────────────────────────────────────
-        {
-          const MANAGER: AgentKey[] = ["research_manager", "risk", "portfolio_manager"];
-          for (const agentKey of MANAGER) {
-            if (AGENT_ORDER.indexOf(agentKey) < startIndex) continue;
-            if (combinedSignal.aborted) break;
-            const result = await runOneAgent(agentKey);
-            if (result === "aborted") break;
+        // ── Phase C: 매니저 체인 ─────────────────────────────────────────────
+        // C-1: research_manager
+        if (!combinedSignal.aborted && AGENT_ORDER.indexOf("research_manager") >= startIndex) {
+          const r = await runOneAgent("research_manager");
+          if (r === "aborted") {
+            send({ type: "done" }); controller.close(); clearTimeout(timeoutId); return;
           }
+        }
+
+        // C-2: trader (effort: high)
+        if (!combinedSignal.aborted && AGENT_ORDER.indexOf("trader") >= startIndex) {
+          const r = await runOneAgent("trader");
+          if (r === "aborted") {
+            send({ type: "done" }); controller.close(); clearTimeout(timeoutId); return;
+          }
+        }
+
+        // C-3: risk 3개 병렬 (TradingAgents Risk Management — Risky/Neutral/Safe)
+        if (!combinedSignal.aborted && AGENT_ORDER.indexOf("risk_risky") >= startIndex) {
+          console.log("[ai-analysis] ▶ risk 3개 병렬 시작");
+          await Promise.allSettled([
+            runOneAgent("risk_risky"),
+            runOneAgent("risk_neutral"),
+            runOneAgent("risk_safe"),
+          ]);
+        }
+
+        // C-4: portfolio_manager (effort: high)
+        if (!combinedSignal.aborted && AGENT_ORDER.indexOf("portfolio_manager") >= startIndex) {
+          await runOneAgent("portfolio_manager");
         }
 
         console.log(`[ai-analysis] 전체 완료 total=${((Date.now()-runStart)/1000).toFixed(1)}s`);

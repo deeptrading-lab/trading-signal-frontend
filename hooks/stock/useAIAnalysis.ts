@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
+import { getRecentDecisions, saveDecision } from "@/lib/api/stock/aiDecisionStore";
 import {
   AGENT_ORDER,
   INITIAL_AGENT_STATES,
@@ -61,10 +62,12 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const debateRef = useRef<DebateMessage[]>([]);
   const agentsRef = useRef<AgentState[]>(INITIAL_AGENT_STATES);
   const isRunningRef = useRef(false);
+  const finalRef = useRef<FinalDecision | null>(null);
   useEffect(() => { reportsRef.current = reports; }, [reports]);
   useEffect(() => { debateRef.current = debate; }, [debate]);
   useEffect(() => { agentsRef.current = agents; }, [agents]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+  useEffect(() => { finalRef.current = final; }, [final]);
 
   // ── 공통 이벤트 핸들러 ─────────────────────────────────────────────────────
 
@@ -86,8 +89,11 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
           ),
         );
         if (event.status === "error") {
-          // 토론 에이전트(bear 포함) 에러는 bull부터 재개
-          const resumeKey: AgentKey = event.agent === "bear" ? "bull" : event.agent;
+          // bear → bull (토론은 항상 bull부터 재개), risk_neutral/risk_safe → risk_risky
+          const resumeKey: AgentKey =
+            event.agent === "bear" ? "bull" :
+            (event.agent === "risk_neutral" || event.agent === "risk_safe") ? "risk_risky" :
+            event.agent;
           setResumeFrom((prev) => prev ?? resumeKey);
         }
         break;
@@ -143,6 +149,19 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         break;
 
       case "done":
+        if (finalRef.current) {
+          saveDecision({
+            ticker,
+            date: new Date().toISOString(),
+            verdict: finalRef.current.verdict,
+            confidence: finalRef.current.confidence,
+            reasoning: finalRef.current.reasoning,
+            target_pct: finalRef.current.target_pct,
+            stop_loss_pct: finalRef.current.stop_loss_pct,
+            short_term_outlook: finalRef.current.short_term_outlook,
+            mid_term_outlook: finalRef.current.mid_term_outlook,
+          });
+        }
         setIsRunning(false);
         break;
     }
@@ -165,7 +184,8 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setIsMinimized(false);
     setShowReanalysisPrompt(false);
 
-    fetchAIAnalysisStream(ticker, handleEvent, abort.signal, fromAgent, preState)
+    const prevDecisions = getRecentDecisions(ticker);
+    fetchAIAnalysisStream(ticker, handleEvent, abort.signal, fromAgent, preState, prevDecisions)
       .catch((err: unknown) => {
         if ((err as { name?: string })?.name === "AbortError") return;
         const msg = (err as { message?: string })?.message ?? "분석 중 오류가 발생했어요.";
@@ -234,7 +254,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
       bullArgument:       fromIndex > AGENT_ORDER.indexOf("bull")             ? (accBull || undefined)             : undefined,
       bearArgument:       fromIndex > AGENT_ORDER.indexOf("bear")             ? (accBear || undefined)             : undefined,
       researchPlan:       fromIndex > AGENT_ORDER.indexOf("research_manager") ? currentReports["research_manager"] : undefined,
-      riskAssessment:     fromIndex > AGENT_ORDER.indexOf("risk")             ? currentReports["risk"]             : undefined,
+      traderProposal:     fromIndex > AGENT_ORDER.indexOf("trader")           ? currentReports["trader"]           : undefined,
+      riskRisky:          fromIndex > AGENT_ORDER.indexOf("risk_risky")       ? currentReports["risk_risky"]       : undefined,
+      riskNeutral:        fromIndex > AGENT_ORDER.indexOf("risk_neutral")     ? currentReports["risk_neutral"]     : undefined,
+      riskSafe:           fromIndex > AGENT_ORDER.indexOf("risk_safe")        ? currentReports["risk_safe"]        : undefined,
     };
 
     // fromAgent 이후 UI 상태 리셋
@@ -268,9 +291,12 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setAgents((prev) => {
       const runningList = prev.filter((a) => a.status === "running");
       if (runningList.length === 0) return prev;
-      // 재개 기점: 가장 앞 에이전트 (bear면 bull부터)
+      // 재개 기점: 가장 앞 에이전트 (bear→bull, risk_neutral/safe→risk_risky)
       const first = runningList[0];
-      const resumeKey: AgentKey = first.key === "bear" ? "bull" : first.key;
+      const resumeKey: AgentKey =
+        first.key === "bear" ? "bull" :
+        (first.key === "risk_neutral" || first.key === "risk_safe") ? "risk_risky" :
+        first.key;
       setResumeFrom((rf) => rf ?? resumeKey);
       // 병렬 실행 중인 running 에이전트 전체를 error로 전환 (스피너 제거)
       const runningKeys = new Set(runningList.map((a) => a.key));
