@@ -64,12 +64,15 @@ interface AgentCallOpts {
 
 /**
  * Claude CLI를 spawn으로 실행, --output-format stream-json NDJSON을 한 줄씩 파싱.
- * onToken 콜백으로 토큰이 생성될 때마다 SSE에 즉시 forwarding 가능.
+ * onToken 콜백은 각 assistant 이벤트 도착 시 새 텍스트 부분을 forward.
  *
- * stream-json 이벤트 포맷:
- *   content_block_delta  → delta.type==="text_delta"  → delta.text (토큰)
- *   assistant            → message.content[0].text    (누산 텍스트, diff로 토큰 추출)
- *   result               → result 필드이 최종 권위 텍스트
+ * ⚠️ CLI는 응답 완료 후 전체 텍스트를 1개 assistant 이벤트로 emit — API 직접 호출처럼
+ *    토큰 단위 스트리밍이 아님. result 이벤트가 최종 권위 텍스트.
+ *
+ * stream-json 이벤트 포맷 (--verbose 필수):
+ *   system       → init 메타 (무시)
+ *   assistant    → message.content[0].text (누산 텍스트, diff로 새 부분 추출)
+ *   result       → 최종 완성 텍스트
  */
 function invokeClaudeAgentStream(
   bin: string,
@@ -87,6 +90,7 @@ function invokeClaudeAgentStream(
     const args = [
       "--print",
       "--output-format", "stream-json",
+      "--verbose",
       "--system-prompt", opts.systemPrompt,
     ];
     if (opts.tools.length > 0) {
