@@ -3682,3 +3682,37 @@
   - 진행 바 에이전트 pill에 `role="button"` + `tabIndex={0}` 추가 (키보드 접근성)
   - AI 패널 카피를 `lib/copy/stock/` 으로 분리 (i18n 대비)
   - `style={{ minHeight: 180 }}` 인라인 px → `min-h-[180px]` Tailwind 토큰으로 교체
+
+### 2026-06-12 — feat(stock): AI 분석 개선 — 토큰 스트리밍·병렬화·UI 개선 (#116)
+
+- **slug**: `ai-analysis-improvement` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/116
+- **요약**: feat(stock): AI 분석 개선 — 토큰 스트리밍·병렬화·UI 개선
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > AI 멀티에이전트 분석 시스템의 성능·UX 개선 및 버그 수정.
+  > 
+  > ## 변경 내용
+  > 
+  > - **Phase 1**: `isBullThisRound` 버그 수정 — R1 스트리밍 중 R2 플레이스홀더 중복 노출 제거
+  > - **Phase 2**: `DEBATE_R2` 타임아웃 180s → 300s 상향 + `market/news/fundamentals` 병렬화 (`Promise.allSettled`)
+  > - **Phase 3**: `execFile` → `spawn + stream-json` 전환으로 실제 토큰 스트리밍 구현
+  > - **UI 개선**: PM 카드 Row3 제거 → 하단 최종 결론으로 통합
+  > - **UI 개선**: `UNDERWEIGHT` 재진입 구간(파란색, 음수%) 표시
+  > - **UI 개선**: 최종 결론 도착 시 자동 하단 스크롤
+  > - **UI 개선**: 헤더 ticker → 종목명 표시 (`useQueryStockPrice`)
+  > - **UI 개선**: 분석 카드 진행 메시지 2.4초 순환
+  > 
+  > ## 다음 작업
+  > 
+  > - PRD AC-3: `DEBATE_ROUNDS` JSDoc에 "bull+bear 교대 1쌍 = 1라운드" 정의 명시 (현재 미반영)
+  > - PRD AC-5: `buildBullR2Prompt`/`buildBearR2Prompt` 전문 삽입 → 요약/핵심 발췌 전달 방식으로 개선 (PRD §3-3 — 현재 미반영)
+  > - `_open` 미사용 변수 lint 경고 제거 (`AIAnalysisPanel.tsx` L572)
+  > - 실측 완주 검증 (AC-7): 로컬 환경에서 전체 파이프라인 실행 후 `✗` 로그 0건 확인
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PRD AC-3: `DEBATE_ROUNDS` JSDoc에 "bull+bear 교대 1쌍 = 1라운드" 정의 명시 (현재 미반영)
+  - PRD AC-5: `buildBullR2Prompt`/`buildBearR2Prompt` 전문 삽입 → 요약/핵심 발췌 전달 방식으로 개선 (PRD §3-3 — 현재 미반영)
+  - `_open` 미사용 변수 lint 경고 제거 (`AIAnalysisPanel.tsx` L572)
+  - 실측 완주 검증 (AC-7): 로컬 환경에서 전체 파이프라인 실행 후 `✗` 로그 0건 확인
