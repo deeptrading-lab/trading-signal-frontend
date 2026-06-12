@@ -569,7 +569,6 @@ export function AIAnalysisPanel({
   final,
   error,
   resumeFrom,
-  open: _open,
   run,
   resume,
   stop,

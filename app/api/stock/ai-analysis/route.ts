@@ -560,26 +560,32 @@ ${s.riskAssessment}`,
 // ─── 2라운드 토론 프롬프트 빌더 ────────────────────────────────────────────────
 
 function buildBullR2Prompt(state: AnalysisState): string {
+  const prevBull = state.bullArgument.slice(0, 1500);
+  const prevBear = state.bearArgument.slice(0, 1500);
   return `약세 연구원의 반론이 나왔습니다. 이에 맞서 강세 입장을 강화하세요.
+이전 발화는 핵심 논점 파악에만 사용하고, 전문을 그대로 재인용하지 마세요.
 
-[당신의 1라운드 강세 논거]
-${state.bullArgument}
+[당신의 1라운드 강세 논거 — 핵심만]
+${prevBull}
 
-[약세 연구원의 반론]
-${state.bearArgument}
+[약세 연구원의 반론 — 핵심만]
+${prevBear}
 
 약세 측의 각 핵심 주장을 항목별로 직접 반박하고, 새로운 데이터나 논거를 추가해 강세 포지션이 여전히 타당함을 더 강력하게 주장하세요. 단순 반복이 아닌 심화된 분석으로 응답하세요.`;
 }
 
 // latestBullText: bull R2에서 방금 생성된 텍스트만 수신 (R1 누적 포함 금지)
 function buildBearR2Prompt(state: AnalysisState, latestBullText: string): string {
+  const prevBear = state.bearArgument.slice(0, 1500);
+  const bullR2 = latestBullText.slice(0, 1500);
   return `강세 연구원의 재반론이 나왔습니다. 최종 입장으로 마무리하세요.
+이전 발화는 핵심 논점 파악에만 사용하고, 전문을 그대로 재인용하지 마세요.
 
-[당신의 1라운드 약세 논거]
-${state.bearArgument}
+[당신의 1라운드 약세 논거 — 핵심만]
+${prevBear}
 
-[강세 연구원의 재반론 (2라운드)]
-${latestBullText}
+[강세 연구원의 재반론 (2라운드) — 핵심만]
+${bullR2}
 
 강세 측의 재반론을 항목별로 반박하고, 약세 포지션의 핵심 위험 요인이 여전히 상존함을 설득력 있게 강조하며 최종 입장을 제시하세요.`;
 }

@@ -103,7 +103,10 @@ export const INITIAL_AGENT_STATES: AgentState[] = AGENT_META.map((m) => ({
   streamingChunk: "",
 }));
 
-/** 강세↔약세 토론 라운드 수 (서버·클라이언트 공용) */
+/**
+ * 강세↔약세 토론 라운드 수 (서버·클라이언트 공용).
+ * bull+bear 교대 1쌍 = 1라운드. DEBATE_ROUNDS=2는 bull R1→bear R1→bull R2→bear R2의 4발화를 의미한다.
+ */
 export const DEBATE_ROUNDS = 2;
 
 /** 에이전트 실행 순서 (서버·클라이언트 공용) */
