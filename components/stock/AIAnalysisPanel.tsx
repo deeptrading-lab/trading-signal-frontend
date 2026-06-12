@@ -115,7 +115,7 @@ export function AIAnalysisPanel({
               ? <Loader2 size={16} className="animate-spin" />
               : <Sparkles size={16} />
             }
-            <span className="text-[9px] font-bold" style={{ writingMode: "vertical-rl" }}>AI 분석</span>
+            <span className="text-xs font-bold" style={{ writingMode: "vertical-rl" }}>AI 분석</span>
           </motion.button>
         )}
       </AnimatePresence>
