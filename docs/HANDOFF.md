@@ -3783,3 +3783,25 @@
   > - MACD/RSI 워밍업 fetch 구현
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - MACD/RSI 워밍업 fetch 구현
+
+### 2026-06-12 — feat(stock): AI 패널 리서치 매니저·트레이더 2-col 한 줄 배치 (#120)
+
+- **slug**: `ai-panel-rm-trader-inline` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/120
+- **요약**: feat(stock): AI 패널 리서치 매니저·트레이더 2-col 한 줄 배치
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경 요약
+  > 
+  > AI 분석 패널에서 리서치 매니저(Row 3)·트레이더(Row 4)가 각각 full-width로 세로 나열되던 것을 2-col 그리드 한 줄로 병치.
+  > 
+  > - 모바일(`< md`): 기존대로 세로 스택
+  > - 데스크탑(`md+`): 리서치 매니저 | 트레이더 나란히
+  > - 트레이더 "🧠 심층 추론" 배지 위치 유지
+  > - 한쪽이 아직 pending이면 dashed 플레이스홀더로 자리 확보
+  > 
+  > ## 다음 작업
+  > 
+  > 없음
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  없음
