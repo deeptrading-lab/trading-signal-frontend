@@ -65,6 +65,18 @@ export interface FinalDecision {
   key_risks: string[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
   time_horizon: "단기" | "중기" | "장기";
+  /** 진입 전략 — 분할 매수 조건, 관망 이유 등 1~2문장 */
+  entry_strategy: string;
+  /** 목표 수익률 % (예: 15 = +15%). SELL/UNDERWEIGHT 시 null */
+  target_pct: number | null;
+  /** 손절선 % (예: -5 = -5%). 항상 음수 */
+  stop_loss_pct: number;
+  /** 손익비 (예: 3.0 = 3:1). target_pct null이면 null */
+  risk_reward_ratio: number | null;
+  /** 1~2주 단기 전망 1~2문장 */
+  short_term_outlook: string;
+  /** 1~3개월 중기 전망 1~2문장 */
+  mid_term_outlook: string;
 }
 
 // ─── 훅 내부 상태 ────────────────────────────────────────────────────────────

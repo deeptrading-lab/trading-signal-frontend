@@ -223,6 +223,9 @@ function DebateSection({
   const bullMsgs = debate.filter(d => d.speaker === "bull");
   const bearMsgs = debate.filter(d => d.speaker === "bear");
   const currentRound = Math.max(bullMsgs.length, bearMsgs.length, 1);
+  // 완료(isStreaming:false)된 발화 수 — 루프 밖에서 1회만 계산
+  const completedBullRounds = bullMsgs.filter(m => !m.isStreaming).length;
+  const completedBearRounds = bearMsgs.filter(m => !m.isStreaming).length;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -254,8 +257,18 @@ function DebateSection({
             const bullMsg = bullMsgs.find(m => m.round === round);
             const bearMsg = bearMsgs.find(m => m.round === round);
 
-            const isBullThisRound = bullAgent.status === "running" && !bullMsg;
-            const isBearThisRound = bearAgent.status === "running" && !bearMsg && !!bullMsg;
+            // 강세 R-N 로딩: bear가 R(N-1)을 완료해야 bull이 R-N을 시작할 수 있음
+            const isBullThisRound =
+              bullAgent.status === "running" &&
+              !bullMsg &&
+              round === completedBullRounds + 1 &&
+              completedBearRounds === round - 1;
+            // 약세 R-N 로딩: bull이 R-N을 완료해야 bear가 R-N을 시작할 수 있음
+            const isBearThisRound =
+              bearAgent.status === "running" &&
+              !bearMsg &&
+              round === completedBearRounds + 1 &&
+              completedBullRounds === round;
 
             if (!bullMsg && !isBullThisRound && !bearMsg && !isBearThisRound) return null;
 
@@ -316,6 +329,14 @@ function DebateSection({
 function FinalVerdictCard({ data }: { data: FinalDecision }) {
   const bullish = isBullishVerdict(data.verdict);
   const bearish = isBearishVerdict(data.verdict);
+  const accentColor = bullish ? "red" : bearish ? "blue" : "slate";
+
+  const statCx = (color: "emerald" | "red" | "slate") => cn(
+    "flex flex-col items-center justify-center rounded-xl p-3 gap-0.5",
+    color === "emerald" && "bg-emerald-50 dark:bg-emerald-950/20",
+    color === "red"     && "bg-red-50 dark:bg-red-950/20",
+    color === "slate"   && "bg-slate-100 dark:bg-slate-800/60",
+  );
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -325,6 +346,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
         bearish && "border-blue-500",
         !bullish && !bearish && "border-slate-300 dark:border-slate-700",
       )}>
+        {/* 최종결정 뱃지 */}
         <div className={cn(
           "absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl",
           bullish && "bg-red-500",
@@ -334,6 +356,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           {COPY.verdict.badge}
         </div>
 
+        {/* ── 섹션 1: verdict 헤더 + reasoning ─────────────────────── */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-start gap-4">
             <div className={cn(
@@ -362,11 +385,77 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
               </div>
             </div>
           </div>
-          <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+          <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
             {data.reasoning}
           </p>
         </div>
 
+        {/* ── 섹션 2: 매매 실행 가이드 ─────────────────────────────── */}
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 space-y-3">
+          <h4 className={cn(
+            "text-xs font-bold flex items-center gap-1.5",
+            accentColor === "red"   && "text-red-600 dark:text-red-400",
+            accentColor === "blue"  && "text-blue-600 dark:text-blue-400",
+            accentColor === "slate" && "text-slate-600 dark:text-slate-400",
+          )}>
+            {COPY.verdict.executionGuide}
+          </h4>
+
+          {/* 진입 전략 */}
+          {data.entry_strategy && (
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+              {data.entry_strategy}
+            </p>
+          )}
+
+          {/* 목표가 / 손절선 / 손익비 */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className={statCx("emerald")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.targetLabel}</span>
+              <span className={cn(
+                "text-base font-extrabold",
+                data.target_pct !== null ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400",
+              )}>
+                {data.target_pct !== null ? `+${data.target_pct}%` : "—"}
+              </span>
+            </div>
+            <div className={statCx("red")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.stopLossLabel}</span>
+              <span className="text-base font-extrabold text-red-600 dark:text-red-400">
+                {data.stop_loss_pct}%
+              </span>
+            </div>
+            <div className={statCx("slate")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.rrLabel}</span>
+              <span className={cn(
+                "text-base font-extrabold",
+                data.risk_reward_ratio !== null ? "text-slate-800 dark:text-slate-100" : "text-slate-400",
+              )}>
+                {data.risk_reward_ratio !== null ? `${data.risk_reward_ratio} : 1` : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 섹션 3: 단기·중기 전망 ────────────────────────────────── */}
+        {(data.short_term_outlook || data.mid_term_outlook) && (
+          <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+            {data.short_term_outlook && (
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{COPY.verdict.shortTermLabel}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{data.short_term_outlook}</p>
+              </div>
+            )}
+            {data.mid_term_outlook && (
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{COPY.verdict.midTermLabel}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{data.mid_term_outlook}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 섹션 4: 핵심 강점·리스크 ─────────────────────────────── */}
         <div className="p-5 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
           {data.key_strengths.length > 0 && (
             <div>
@@ -394,6 +483,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           )}
         </div>
 
+        {/* 면책 고지 */}
         <div className="px-5 py-3 bg-slate-100 dark:bg-slate-950 text-[10px] text-slate-400 flex items-start gap-1.5">
           <Info size={12} className="flex-shrink-0 mt-0.5" />
           <p>{COPY.verdict.disclaimer}</p>
