@@ -8,10 +8,16 @@
  * state에는 이전 실행에서 완료된 에이전트의 결과를 채워 넣는다.
  */
 
-import type { AgentKey, AIAnalysisEvent, ResumeState } from "@/lib/types/stock/aiAnalysis";
+import type {
+  AgentKey,
+  AIAnalysisEvent,
+  AIAnalysisProvider,
+  ResumeState,
+} from "@/lib/types/stock/aiAnalysis";
 
 export async function fetchAIAnalysisStream(
   ticker: string,
+  provider: AIAnalysisProvider,
   onEvent: (event: AIAnalysisEvent) => void,
   signal?: AbortSignal,
   startFrom?: AgentKey,
@@ -20,7 +26,7 @@ export async function fetchAIAnalysisStream(
   const res = await fetch("/api/stock/ai-analysis", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker, startFrom, state: preState }),
+    body: JSON.stringify({ ticker, provider, startFrom, state: preState }),
     signal,
   });
 

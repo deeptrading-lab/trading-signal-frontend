@@ -445,6 +445,7 @@ function CardDetailOverlay({
 
 export function AIAnalysisPanel({
   ticker,
+  provider,
   isOpen,
   isRunning,
   isMinimized,
@@ -456,12 +457,12 @@ export function AIAnalysisPanel({
   final,
   error,
   resumeFrom,
-  open: _open,
   run,
   resume,
   stop,
   close,
   toggleMinimize,
+  selectProvider,
   dismissReanalysisPrompt,
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -537,13 +538,37 @@ export function AIAnalysisPanel({
             role="complementary"
           >
             {/* ── 헤더 ──────────────────────────────────────────────────── */}
-            <div className="flex-none flex items-center justify-between px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
+            <div className="flex-none flex flex-wrap items-center justify-between gap-sm px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-2">
                 <Sparkles className="text-blue-600 dark:text-blue-400" size={18} />
                 <h2 className="font-bold text-base text-slate-900 dark:text-white">{COPY.panel.title}</h2>
                 <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                   {ticker}
                 </span>
+                <div
+                  className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden"
+                  aria-label={COPY.provider.select}
+                  title={isRunning ? COPY.provider.changeDisabled : undefined}
+                >
+                  {(["claude", "codex"] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => selectProvider(item)}
+                      disabled={isRunning}
+                      className={cn(
+                        "px-sm py-xs text-[11px] font-bold transition-colors",
+                        item === provider
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white text-slate-500 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800",
+                        isRunning ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                      )}
+                      aria-pressed={item === provider}
+                    >
+                      {COPY.provider[item]}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex items-center gap-1">
                 {/* 중지 / 재개 버튼 */}
@@ -697,7 +722,9 @@ export function AIAnalysisPanel({
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{COPY.empty.title}</h3>
-                          <p className="text-xs text-slate-500 mt-1">{COPY.empty.description}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {COPY.empty.description(COPY.provider[provider])}
+                          </p>
                         </div>
                         <button
                           type="button"

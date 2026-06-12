@@ -1,7 +1,7 @@
 /**
  * `/api/stock/ai-analysis` — 8-에이전트 멀티에이전트 AI 분석 SSE 스트림.
  *
- * GET ?ticker=005930
+ * POST { ticker: "005930", provider: "claude" | "codex" }
  *
  * SSE 이벤트:
  *   { type:'progress',      agent, status:'running'|'done'|'error' }
@@ -18,14 +18,20 @@
  * ⚠️ 전체 타임아웃 300s.
  */
 
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
+import { invokeAgentCli } from "@/lib/server/ai/agentCli";
 import { evaluateSignal } from "@/lib/signal/engine";
 import { AXIS_LABEL } from "@/lib/copy/signal/labels";
 import type { AxisScore } from "@/lib/types/signal";
-import type { AgentKey, AIAnalysisEvent, FinalDecision, ResumeState } from "@/lib/types/stock/aiAnalysis";
+import type {
+  AgentKey,
+  AIAnalysisEvent,
+  AIAnalysisProvider,
+  FinalDecision,
+  ResumeState,
+} from "@/lib/types/stock/aiAnalysis";
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 
 const CHART_DAYS = 200;
@@ -33,7 +39,6 @@ const CHART_DAYS = 200;
 // market(5m)+news(6m)+fundamentals(6m)+bull(5m)×2+bear(5m)×2+manager(5m)+risk(5m)+pm(3m) ≈ 45m 이론상한
 // 실제 Opus 기준 평균은 절반 수준 → 40분으로 여유
 const TIMEOUT_TOTAL_MS = 2_400_000;
-const MAX_STDOUT = 4 * 1024 * 1024;
 
 // ─── Vercel guard ─────────────────────────────────────────────────────────────
 
@@ -51,94 +56,6 @@ const encoder = new TextEncoder();
 
 function sseEvent(data: AIAnalysisEvent): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
-}
-
-// ─── Claude CLI 호출 (execFile, 검증된 패턴) ─────────────────────────────────
-
-interface AgentCallOpts {
-  systemPrompt: string;
-  userPrompt: string;
-  tools: string[];
-  timeoutMs: number;
-}
-
-function invokeClaudeAgent(
-  bin: string,
-  model: string | undefined,
-  opts: AgentCallOpts,
-  signal: AbortSignal,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(Object.assign(new Error("AbortError"), { name: "AbortError" }));
-      return;
-    }
-
-    const args = [
-      "--print",
-      "--output-format", "json",
-      "--system-prompt", opts.systemPrompt,
-    ];
-    if (opts.tools.length > 0) {
-      args.push("--allowedTools", opts.tools.join(","));
-    }
-    if (model?.trim()) {
-      args.push("--model", model.trim());
-    }
-
-    const execOpts: ExecFileOptionsWithStringEncoding = {
-      encoding: "utf-8",
-      timeout: opts.timeoutMs,
-      maxBuffer: MAX_STDOUT,
-    };
-
-    const child = execFile(bin, args, execOpts, (error, stdout) => {
-      if (error) {
-        const err = error as NodeJS.ErrnoException & { killed?: boolean };
-        if (err.code === "ENOENT") {
-          reject(Object.assign(error, { message: "claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요." }));
-          return;
-        }
-        // killed=true → Node.js execFile 타임아웃으로 SIGTERM 전송됨
-        if (err.killed) {
-          reject(Object.assign(new Error(`에이전트 타임아웃 (${opts.timeoutMs / 1000}초 초과)`), { name: "TimeoutError" }));
-          return;
-        }
-        // stdout에 부분 결과가 있으면 그대로 사용
-        if (stdout?.trim()) {
-          resolve(extractText(stdout));
-        } else {
-          reject(error);
-        }
-        return;
-      }
-      resolve(extractText(stdout ?? ""));
-    });
-
-    if (child.stdin) {
-      child.stdin.on("error", () => {});
-      child.stdin.end(opts.userPrompt, "utf-8");
-    }
-
-    const onAbort = () => {
-      child.kill("SIGTERM");
-      reject(Object.assign(new Error("AbortError"), { name: "AbortError" }));
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-// ─── CLI JSON 출력에서 텍스트 추출 ───────────────────────────────────────────
-// --output-format json: {"type":"result","subtype":"success","result":"텍스트",...}
-
-function extractText(raw: string): string {
-  const text = raw.trim();
-  if (!text) return "";
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    if (typeof parsed.result === "string") return parsed.result;
-  } catch { /* fallthrough */ }
-  return text; // JSON 파싱 실패 시 raw 반환
 }
 
 // ─── JSON 파싱 헬퍼 (Portfolio Manager 응답) ─────────────────────────────────
@@ -497,8 +414,7 @@ async function runDebateLoop(
   state: AnalysisState,
   send: (e: AIAnalysisEvent) => void,
   combinedSignal: AbortSignal,
-  bin: string,
-  model: string | undefined,
+  provider: AIAnalysisProvider,
 ): Promise<"done" | "aborted" | "error"> {
   for (let round = 1; round <= DEBATE_ROUNDS; round++) {
     if (combinedSignal.aborted) return "aborted";
@@ -511,12 +427,14 @@ async function runDebateLoop(
 
     let bullText: string;
     try {
-      bullText = await invokeClaudeAgent(bin, model, {
+      bullText = await invokeAgentCli({
+        provider,
         systemPrompt: AGENT_PROMPTS.bull.system,
         userPrompt: bullPrompt,
-        tools: [],
+        webSearch: false,
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
-      }, combinedSignal);
+        signal: combinedSignal,
+      });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
       console.error(`[ai-analysis] ✗ bull R${round}`, err);
@@ -543,12 +461,14 @@ async function runDebateLoop(
 
     let bearText: string;
     try {
-      bearText = await invokeClaudeAgent(bin, model, {
+      bearText = await invokeAgentCli({
+        provider,
         systemPrompt: AGENT_PROMPTS.bear.system,
         userPrompt: bearPrompt,
-        tools: [],
+        webSearch: false,
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
-      }, combinedSignal);
+        signal: combinedSignal,
+      });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
       console.error(`[ai-analysis] ✗ bear R${round}`, err);
@@ -578,9 +498,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  // Body: { ticker, startFrom?, state? }
+  // Body: { ticker, provider, startFrom?, state? }
   const body = await req.json().catch(() => null) as {
     ticker?: unknown;
+    provider?: unknown;
     startFrom?: unknown;
     state?: unknown;
   } | null;
@@ -593,6 +514,12 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!ticker) {
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
   }
+
+  const rawProvider = body.provider ?? "claude";
+  if (rawProvider !== "claude" && rawProvider !== "codex") {
+    return NextResponse.json({ error: "지원하지 않는 AI 공급자입니다." }, { status: 400 });
+  }
+  const provider: AIAnalysisProvider = rawProvider;
 
   // startFrom 검증 + 정규화 (bear → bull: 토론은 항상 bull부터 재실행)
   const rawStartFrom: AgentKey | undefined =
@@ -609,9 +536,6 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!isKisConfigured()) {
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
   }
-
-  const bin = process.env.CLAUDE_CLI_PATH ?? "claude";
-  const model = process.env.CLAUDE_CLI_MODEL;
 
   // 클라이언트 disconnect + 서버 타임아웃 통합 signal
   const timeoutController = new AbortController();
@@ -693,7 +617,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           // ── 토론 구간: bull 도달 시 멀티라운드 루프 실행 ─────────────────
           if (agentKey === "bull") {
             console.log(`[ai-analysis] ▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
-            const result = await runDebateLoop(state, send, combinedSignal, bin, model);
+            const result = await runDebateLoop(state, send, combinedSignal, provider);
             if (result === "aborted") break;
             continue;
           }
@@ -707,12 +631,14 @@ export async function POST(req: NextRequest): Promise<Response> {
 
           let text: string;
           try {
-            text = await invokeClaudeAgent(bin, model, {
+            text = await invokeAgentCli({
+              provider,
               systemPrompt: prompts.system,
               userPrompt: prompts.user(state),
-              tools: prompts.tools,
+              webSearch: prompts.tools.length > 0,
               timeoutMs: prompts.timeoutMs,
-            }, combinedSignal);
+              signal: combinedSignal,
+            });
           } catch (err) {
             const errName = (err as { name?: string }).name;
             if (errName === "AbortError") {
