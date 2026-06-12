@@ -18,7 +18,8 @@
  * ⚠️ 전체 타임아웃 300s.
  */
 
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import { spawn } from "node:child_process";
+import readline from "node:readline";
 import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
@@ -33,7 +34,6 @@ const CHART_DAYS = 200;
 // market(5m)+news(6m)+fundamentals(6m)+bull(5m)×2+bear(5m)×2+manager(5m)+risk(5m)+pm(3m) ≈ 45m 이론상한
 // 실제 Opus 기준 평균은 절반 수준 → 40분으로 여유
 const TIMEOUT_TOTAL_MS = 2_400_000;
-const MAX_STDOUT = 4 * 1024 * 1024;
 
 // ─── Vercel guard ─────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ function sseEvent(data: AIAnalysisEvent): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// ─── Claude CLI 호출 (execFile, 검증된 패턴) ─────────────────────────────────
+// ─── Claude CLI 호출 (spawn + stream-json, 토큰 단위 스트리밍) ──────────────
 
 interface AgentCallOpts {
   systemPrompt: string;
@@ -62,11 +62,21 @@ interface AgentCallOpts {
   timeoutMs: number;
 }
 
-function invokeClaudeAgent(
+/**
+ * Claude CLI를 spawn으로 실행, --output-format stream-json NDJSON을 한 줄씩 파싱.
+ * onToken 콜백으로 토큰이 생성될 때마다 SSE에 즉시 forwarding 가능.
+ *
+ * stream-json 이벤트 포맷:
+ *   content_block_delta  → delta.type==="text_delta"  → delta.text (토큰)
+ *   assistant            → message.content[0].text    (누산 텍스트, diff로 토큰 추출)
+ *   result               → result 필드이 최종 권위 텍스트
+ */
+function invokeClaudeAgentStream(
   bin: string,
   model: string | undefined,
   opts: AgentCallOpts,
   signal: AbortSignal,
+  onToken: (token: string) => void,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -76,7 +86,7 @@ function invokeClaudeAgent(
 
     const args = [
       "--print",
-      "--output-format", "json",
+      "--output-format", "stream-json",
       "--system-prompt", opts.systemPrompt,
     ];
     if (opts.tools.length > 0) {
@@ -86,33 +96,9 @@ function invokeClaudeAgent(
       args.push("--model", model.trim());
     }
 
-    const execOpts: ExecFileOptionsWithStringEncoding = {
-      encoding: "utf-8",
-      timeout: opts.timeoutMs,
-      maxBuffer: MAX_STDOUT,
-    };
-
-    const child = execFile(bin, args, execOpts, (error, stdout) => {
-      if (error) {
-        const err = error as NodeJS.ErrnoException & { killed?: boolean };
-        if (err.code === "ENOENT") {
-          reject(Object.assign(error, { message: "claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요." }));
-          return;
-        }
-        // killed=true → Node.js execFile 타임아웃으로 SIGTERM 전송됨
-        if (err.killed) {
-          reject(Object.assign(new Error(`에이전트 타임아웃 (${opts.timeoutMs / 1000}초 초과)`), { name: "TimeoutError" }));
-          return;
-        }
-        // stdout에 부분 결과가 있으면 그대로 사용
-        if (stdout?.trim()) {
-          resolve(extractText(stdout));
-        } else {
-          reject(error);
-        }
-        return;
-      }
-      resolve(extractText(stdout ?? ""));
+    const child = spawn(bin, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1" },
     });
 
     if (child.stdin) {
@@ -120,26 +106,106 @@ function invokeClaudeAgent(
       child.stdin.end(opts.userPrompt, "utf-8");
     }
 
+    let accumulated = "";
+    let prevAssistantLen = 0;
+    let settled = false;
+
+    const settle = (fn: () => void) => {
+      if (!settled) { settled = true; fn(); }
+    };
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      settle(() => reject(Object.assign(
+        new Error(`에이전트 타임아웃 (${opts.timeoutMs / 1000}초 초과)`),
+        { name: "TimeoutError" },
+      )));
+    }, opts.timeoutMs);
+
     const onAbort = () => {
       child.kill("SIGTERM");
-      reject(Object.assign(new Error("AbortError"), { name: "AbortError" }));
+      settle(() => reject(Object.assign(new Error("AbortError"), { name: "AbortError" })));
     };
     signal.addEventListener("abort", onAbort, { once: true });
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+    };
+
+    const rl = readline.createInterface({ input: child.stdout!, crlfDelay: Infinity });
+
+    rl.on("line", (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      let event: Record<string, unknown>;
+      try { event = JSON.parse(trimmed) as Record<string, unknown>; }
+      catch { return; }
+
+      // ENOENT — CLI 실행 자체가 불가한 경우 system 이벤트에서 감지
+      if (event.type === "system" && (event as Record<string,unknown>).subtype === "error") {
+        cleanup();
+        settle(() => reject(new Error("claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요.")));
+        return;
+      }
+
+      // Format A: content_block_delta (델타 기반 스트리밍)
+      const delta = event.delta as Record<string, unknown> | undefined;
+      if (event.type === "content_block_delta" && delta?.type === "text_delta") {
+        const token = String(delta.text ?? "");
+        if (token) { accumulated += token; onToken(token); }
+        return;
+      }
+
+      // Format B: assistant message (누산 텍스트 diff)
+      if (event.type === "assistant") {
+        const msg = event.message as Record<string, unknown> | undefined;
+        const content = Array.isArray(msg?.content) ? msg!.content as Record<string,unknown>[] : [];
+        const tb = content.find(b => b?.type === "text");
+        if (tb && typeof tb.text === "string" && tb.text.length > prevAssistantLen) {
+          const newPart = tb.text.slice(prevAssistantLen);
+          prevAssistantLen = tb.text.length;
+          accumulated = tb.text;
+          onToken(newPart);
+        }
+        return;
+      }
+
+      // 최종 result 이벤트
+      if (event.type === "result") {
+        if (event.subtype === "success") {
+          const finalText = typeof event.result === "string" ? event.result : accumulated;
+          cleanup();
+          settle(() => resolve(finalText));
+        } else if (event.is_error) {
+          const errMsg = typeof event.result === "string" ? event.result : "Claude CLI 오류";
+          cleanup();
+          settle(() => reject(new Error(errMsg)));
+        }
+      }
+    });
+
+    child.on("close", (code) => {
+      cleanup();
+      if (settled) return;
+      // result 이벤트 없이 종료된 경우 — 누산 텍스트로 폴백
+      if (accumulated) settle(() => resolve(accumulated));
+      else settle(() => reject(new Error(`Claude CLI 비정상 종료 (code=${code})`)));
+    });
+
+    child.on("error", (err) => {
+      cleanup();
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === "ENOENT") {
+        settle(() => reject(Object.assign(err, { message: "claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요." })));
+      } else {
+        settle(() => reject(err));
+      }
+    });
   });
 }
 
-// ─── CLI JSON 출력에서 텍스트 추출 ───────────────────────────────────────────
-// --output-format json: {"type":"result","subtype":"success","result":"텍스트",...}
 
-function extractText(raw: string): string {
-  const text = raw.trim();
-  if (!text) return "";
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    if (typeof parsed.result === "string") return parsed.result;
-  } catch { /* fallthrough */ }
-  return text; // JSON 파싱 실패 시 raw 반환
-}
 
 // ─── JSON 파싱 헬퍼 (Portfolio Manager 응답) ─────────────────────────────────
 
@@ -535,12 +601,14 @@ async function runDebateLoop(
     let bullText: string;
     const bullT0 = Date.now();
     try {
-      bullText = await invokeClaudeAgent(bin, model, {
+      bullText = await invokeClaudeAgentStream(bin, model, {
         systemPrompt: AGENT_PROMPTS.bull.system,
         userPrompt: bullPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
-      }, combinedSignal);
+      }, combinedSignal, (token) => {
+        send({ type: "debate_stream", speaker: "bull", chunk: token, round });
+      });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
       console.error(`[ai-analysis] ✗ bull R${round}`, err);
@@ -551,7 +619,6 @@ async function runDebateLoop(
     state.bullArgument = state.bullArgument
       ? `${state.bullArgument}\n\n---\n\n${bullText}`
       : bullText;
-    send({ type: "debate_stream", speaker: "bull", chunk: bullText, round });
     send({ type: "debate", speaker: "bull", content: bullText, round });
     console.log(`[ai-analysis] ✓ bull R${round} len=${bullText.length} elapsed=${((Date.now()-bullT0)/1000).toFixed(1)}s`);
     if (round === DEBATE_ROUNDS) send({ type: "progress", agent: "bull", status: "done" });
@@ -568,12 +635,14 @@ async function runDebateLoop(
     let bearText: string;
     const bearT0 = Date.now();
     try {
-      bearText = await invokeClaudeAgent(bin, model, {
+      bearText = await invokeClaudeAgentStream(bin, model, {
         systemPrompt: AGENT_PROMPTS.bear.system,
         userPrompt: bearPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
-      }, combinedSignal);
+      }, combinedSignal, (token) => {
+        send({ type: "debate_stream", speaker: "bear", chunk: token, round });
+      });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
       console.error(`[ai-analysis] ✗ bear R${round}`, err);
@@ -584,7 +653,6 @@ async function runDebateLoop(
     state.bearArgument = state.bearArgument
       ? `${state.bearArgument}\n\n---\n\n${bearText}`
       : bearText;
-    send({ type: "debate_stream", speaker: "bear", chunk: bearText, round });
     send({ type: "debate", speaker: "bear", content: bearText, round });
     console.log(`[ai-analysis] ✓ bear R${round} len=${bearText.length} elapsed=${((Date.now()-bearT0)/1000).toFixed(1)}s`);
     if (round === DEBATE_ROUNDS) send({ type: "progress", agent: "bear", status: "done" });
@@ -718,12 +786,14 @@ export async function POST(req: NextRequest): Promise<Response> {
           const agentT0 = Date.now();
           let text: string;
           try {
-            text = await invokeClaudeAgent(bin, model, {
+            text = await invokeClaudeAgentStream(bin, model, {
               systemPrompt: prompts.system,
               userPrompt: prompts.user(state),
               tools: prompts.tools,
               timeoutMs: prompts.timeoutMs,
-            }, combinedSignal);
+            }, combinedSignal, (token) => {
+              send({ type: "stream", agent: agentKey, chunk: token });
+            });
           } catch (err) {
             const errName = (err as { name?: string }).name;
             if (errName === "AbortError") {
@@ -778,7 +848,6 @@ export async function POST(req: NextRequest): Promise<Response> {
               send({ type: "report", agent: agentKey, content: text });
             }
           } else {
-            send({ type: "stream", agent: agentKey, chunk: text });
             send({ type: "report", agent: agentKey, content: text });
           }
 
