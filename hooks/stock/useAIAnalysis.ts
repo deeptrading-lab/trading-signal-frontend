@@ -6,6 +6,7 @@ import { getRecentDecisions, saveDecision } from "@/lib/api/stock/aiDecisionStor
 import {
   AGENT_ORDER,
   INITIAL_AGENT_STATES,
+  getResumeKey,
   type AIAnalysisEvent,
   type AgentKey,
   type AgentState,
@@ -89,12 +90,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
           ),
         );
         if (event.status === "error") {
-          // bear → bull (토론은 항상 bull부터 재개), risk_neutral/risk_safe → risk_risky
-          const resumeKey: AgentKey =
-            event.agent === "bear" ? "bull" :
-            (event.agent === "risk_neutral" || event.agent === "risk_safe") ? "risk_risky" :
-            event.agent;
-          setResumeFrom((prev) => prev ?? resumeKey);
+          setResumeFrom((prev) => prev ?? getResumeKey(event.agent));
         }
         break;
 
@@ -291,13 +287,8 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setAgents((prev) => {
       const runningList = prev.filter((a) => a.status === "running");
       if (runningList.length === 0) return prev;
-      // 재개 기점: 가장 앞 에이전트 (bear→bull, risk_neutral/safe→risk_risky)
       const first = runningList[0];
-      const resumeKey: AgentKey =
-        first.key === "bear" ? "bull" :
-        (first.key === "risk_neutral" || first.key === "risk_safe") ? "risk_risky" :
-        first.key;
-      setResumeFrom((rf) => rf ?? resumeKey);
+      setResumeFrom((rf) => rf ?? getResumeKey(first.key));
       // 병렬 실행 중인 running 에이전트 전체를 error로 전환 (스피너 제거)
       const runningKeys = new Set(runningList.map((a) => a.key));
       return prev.map((a) =>

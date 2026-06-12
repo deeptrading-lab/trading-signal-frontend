@@ -127,6 +127,17 @@ export const AGENT_ORDER: AgentKey[] = [
 ];
 
 /**
+ * 에러가 발생한 에이전트의 재개 기점을 반환한다.
+ * - bear → bull (토론은 항상 bull부터 재개)
+ * - risk_neutral | risk_safe → risk_risky (3개 병렬 중 첫 번째)
+ */
+export function getResumeKey(agent: AgentKey): AgentKey {
+  if (agent === "bear") return "bull";
+  if (agent === "risk_neutral" || agent === "risk_safe") return "risk_risky";
+  return agent;
+}
+
+/**
  * 이전 실행에서 완료된 에이전트 결과를 재개 시 서버에 전달하는 구조체.
  * 각 필드는 해당 에이전트가 완료된 경우에만 채워진다.
  */
