@@ -17,6 +17,7 @@ import type {
   DebateMessage, FinalDecision, FinalVerdict,
 } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisHook } from "@/hooks/stock/useAIAnalysis";
+import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 
 interface AIAnalysisPanelProps extends AIAnalysisHook {
   ticker: string;
@@ -567,6 +568,8 @@ export function AIAnalysisPanel({
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string } | null>(null);
+  const { data: stockData } = useQueryStockPrice(ticker);
+  const displayName = stockData?.name ?? ticker;
 
   const isAllPending = agents.every((a) => a.status === "pending");
   const hasDebate = debate.length > 0
@@ -656,7 +659,7 @@ export function AIAnalysisPanel({
                 <Sparkles className="text-blue-600 dark:text-blue-400" size={18} />
                 <h2 className="font-bold text-base text-slate-900 dark:text-white">{COPY.panel.title}</h2>
                 <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                  {ticker}
+                  {displayName}
                 </span>
               </div>
               <div className="flex items-center gap-1">
