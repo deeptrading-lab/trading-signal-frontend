@@ -347,47 +347,50 @@ export function AIAnalysisPanel({
                       />
                     )}
 
-                    {/* ── Row 3: 리서치 매니저 (full width) ─────────────── */}
-                    {agents.find(a => a.key === "research_manager")?.status !== "pending" && (() => {
-                      const key: AgentKey = "research_manager";
-                      const meta = AGENT_META.find(m => m.key === key)!;
-                      const agentState = agents.find(a => a.key === key)!;
-                      return (
-                        <AnalystCard
-                          key={key}
-                          meta={meta}
-                          status={agentState.status}
-                          content={reports[key]}
-                          streamingChunk={agentState.streamingChunk}
-                          isRunning={isRunning}
-                          onExpand={handleExpand}
-                          onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                        />
-                      );
-                    })()}
-
-                    {/* ── Row 4: 트레이더 (full width, 심층 추론 배지) ────── */}
-                    {agents.find(a => a.key === "trader")?.status !== "pending" && (() => {
-                      const key: AgentKey = "trader";
-                      const meta = AGENT_META.find(m => m.key === key)!;
-                      const agentState = agents.find(a => a.key === key)!;
-                      return (
-                        <div className="relative">
-                          <span className="absolute -top-2 right-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
-                            🧠 심층 추론
-                          </span>
-                          <AnalystCard
-                            meta={meta}
-                            status={agentState.status}
-                            content={reports[key]}
-                            streamingChunk={agentState.streamingChunk}
-                            isRunning={isRunning}
-                            onExpand={handleExpand}
-                            onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                          />
-                        </div>
-                      );
-                    })()}
+                    {/* ── Row 3+4: 리서치 매니저 + 트레이더 (2-col) ──────── */}
+                    {(["research_manager", "trader"] as AgentKey[]).some(
+                      k => agents.find(a => a.key === k)?.status !== "pending"
+                    ) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(["research_manager", "trader"] as AgentKey[]).map((key) => {
+                          const meta = AGENT_META.find(m => m.key === key)!;
+                          const agentState = agents.find(a => a.key === key)!;
+                          if (agentState.status === "pending") {
+                            return <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />;
+                          }
+                          if (key === "trader") {
+                            return (
+                              <div key={key} className="relative">
+                                <span className="absolute -top-2 right-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                  🧠 심층 추론
+                                </span>
+                                <AnalystCard
+                                  meta={meta}
+                                  status={agentState.status}
+                                  content={reports[key]}
+                                  streamingChunk={agentState.streamingChunk}
+                                  isRunning={isRunning}
+                                  onExpand={handleExpand}
+                                  onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                                />
+                              </div>
+                            );
+                          }
+                          return (
+                            <AnalystCard
+                              key={key}
+                              meta={meta}
+                              status={agentState.status}
+                              content={reports[key]}
+                              streamingChunk={agentState.streamingChunk}
+                              isRunning={isRunning}
+                              onExpand={handleExpand}
+                              onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* ── Row 5: 리스크 3개 병렬 (3-col grid) ───────────────── */}
                     {(["risk_risky", "risk_neutral", "risk_safe"] as AgentKey[]).some(
