@@ -3716,3 +3716,41 @@
   - PRD AC-5: `buildBullR2Prompt`/`buildBearR2Prompt` 전문 삽입 → 요약/핵심 발췌 전달 방식으로 개선 (PRD §3-3 — 현재 미반영)
   - `_open` 미사용 변수 lint 경고 제거 (`AIAnalysisPanel.tsx` L572)
   - 실측 완주 검증 (AC-7): 로컬 환경에서 전체 파이프라인 실행 후 `✗` 로그 0건 확인
+
+### 2026-06-12 — refactor(stock): AI 분석 패널 코드 모듈화 — 컴포넌트 분리·서버 추출·훅 정리 (#118)
+
+- **slug**: `ai-panel-refactor` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/118
+- **요약**: refactor(stock): AI 분석 패널 코드 모듈화 — 컴포넌트 분리·서버 추출·훅 정리
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경 요약
+  > 
+  > 순수 리팩토링 PR — 동작 변경 없음.
+  > 
+  > - **Phase 1 — 컴포넌트 분리**: `AIAnalysisPanel.tsx` 1,059줄 → 461줄. 7개 인라인 컴포넌트를 `components/stock/ai-analysis/` 하위로 분리. `AnalystCard`에 `React.memo()`, `DebateSection`에 `useMemo(debate.filter)` 적용.
+  > - **Phase 2 — 서버 모듈화**: `route.ts` 1,115줄 → 411줄. `invokeClaudeAgentStream` → `lib/server/claudeAgent.ts`, `AGENT_PROMPTS`/`AnalysisState`/디베이트 유틸 → `lib/prompts/stock/aiAnalysis.ts` 추출.
+  > - **Phase 3 — 훅 정리**: `handleEvent`·`stop()` 중복 resumeKey 매핑을 `getResumeKey()` 순수 함수로 단일화(`lib/types/stock/aiAnalysis.ts`).
+  > 
+  > ## 파일 변경 요약
+  > 
+  > | 파일 | 전 | 후 |
+  > |------|---|---|
+  > | `components/stock/AIAnalysisPanel.tsx` | 1,059줄 | 461줄 (−57%) |
+  > | `app/api/stock/ai-analysis/route.ts` | 1,115줄 | 411줄 (−63%) |
+  > | `hooks/stock/useAIAnalysis.ts` | 333줄 | 324줄 |
+  > | `components/stock/ai-analysis/` (7개 신규) | — | 597줄 |
+  > | `lib/server/claudeAgent.ts` (신규) | — | 163줄 |
+  > | `lib/prompts/stock/aiAnalysis.ts` (신규) | — | 544줄 |
+  > 
+  > `npx tsc --noEmit` 에러 0 확인.
+  > 
+  > ## 다음 작업
+  > 
+  > - 차트 후속: W3 캔들바 wickRange Y좌표 육안 QA (장대봉/상한가)
+  > - MACD/RSI 워밍업 fetch 구현 (`WARMUP_DAYS` 앞당겨 지표 항상 표시)
+  > - investor flow `0억` 표시 버그 수정
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 차트 후속: W3 캔들바 wickRange Y좌표 육안 QA (장대봉/상한가)
+  - MACD/RSI 워밍업 fetch 구현 (`WARMUP_DAYS` 앞당겨 지표 항상 표시)
+  - investor flow `0억` 표시 버그 수정
