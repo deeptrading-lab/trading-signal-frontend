@@ -17,6 +17,7 @@ import type {
   DebateMessage, FinalDecision, FinalVerdict,
 } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisHook } from "@/hooks/stock/useAIAnalysis";
+import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 
 interface AIAnalysisPanelProps extends AIAnalysisHook {
   ticker: string;
@@ -69,6 +70,15 @@ function AnalystCard({
   const isError = status === "error";
   const displayText = isActive ? streamingChunk : (isDone ? content : undefined);
 
+  // 스트리밍 텍스트가 없을 때만 진행 메시지를 2.4초마다 순환
+  const messages = COPY.progress[meta.key as keyof typeof COPY.progress] ?? [COPY.card.analyzing];
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!isActive || streamingChunk) { setMsgIdx(0); return; }
+    const id = setInterval(() => setMsgIdx(i => (i + 1) % messages.length), 2400);
+    return () => clearInterval(id);
+  }, [isActive, streamingChunk, messages.length]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -99,7 +109,9 @@ function AnalystCard({
       <div className="flex-1 overflow-hidden px-3 py-2.5">
         {isActive && (
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            <span className="line-clamp-5 whitespace-pre-wrap">{displayText || COPY.card.analyzing}</span>
+            <span className="line-clamp-5 whitespace-pre-wrap">
+              {displayText || messages[msgIdx]}
+            </span>
             <span className="inline-block w-1 h-[14px] bg-blue-500 animate-pulse ml-0.5 align-middle" />
           </p>
         )}
@@ -223,6 +235,9 @@ function DebateSection({
   const bullMsgs = debate.filter(d => d.speaker === "bull");
   const bearMsgs = debate.filter(d => d.speaker === "bear");
   const currentRound = Math.max(bullMsgs.length, bearMsgs.length, 1);
+  // 완료(isStreaming:false)된 발화 수 — 루프 밖에서 1회만 계산
+  const completedBullRounds = bullMsgs.filter(m => !m.isStreaming).length;
+  const completedBearRounds = bearMsgs.filter(m => !m.isStreaming).length;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -254,8 +269,18 @@ function DebateSection({
             const bullMsg = bullMsgs.find(m => m.round === round);
             const bearMsg = bearMsgs.find(m => m.round === round);
 
-            const isBullThisRound = bullAgent.status === "running" && !bullMsg;
-            const isBearThisRound = bearAgent.status === "running" && !bearMsg && !!bullMsg;
+            // 강세 R-N 로딩: bear가 R(N-1)을 완료해야 bull이 R-N을 시작할 수 있음
+            const isBullThisRound =
+              bullAgent.status === "running" &&
+              !bullMsg &&
+              round === completedBullRounds + 1 &&
+              completedBearRounds === round - 1;
+            // 약세 R-N 로딩: bull이 R-N을 완료해야 bear가 R-N을 시작할 수 있음
+            const isBearThisRound =
+              bearAgent.status === "running" &&
+              !bearMsg &&
+              round === completedBearRounds + 1 &&
+              completedBullRounds === round;
 
             if (!bullMsg && !isBullThisRound && !bearMsg && !isBearThisRound) return null;
 
@@ -316,6 +341,15 @@ function DebateSection({
 function FinalVerdictCard({ data }: { data: FinalDecision }) {
   const bullish = isBullishVerdict(data.verdict);
   const bearish = isBearishVerdict(data.verdict);
+  const accentColor = bullish ? "red" : bearish ? "blue" : "slate";
+
+  const statCx = (color: "emerald" | "red" | "slate" | "blue") => cn(
+    "flex flex-col items-center justify-center rounded-xl p-3 gap-0.5",
+    color === "emerald" && "bg-emerald-50 dark:bg-emerald-950/20",
+    color === "red"     && "bg-red-50 dark:bg-red-950/20",
+    color === "slate"   && "bg-slate-100 dark:bg-slate-800/60",
+    color === "blue"    && "bg-blue-50 dark:bg-blue-950/20",
+  );
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -325,6 +359,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
         bearish && "border-blue-500",
         !bullish && !bearish && "border-slate-300 dark:border-slate-700",
       )}>
+        {/* 최종결정 뱃지 */}
         <div className={cn(
           "absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl",
           bullish && "bg-red-500",
@@ -334,6 +369,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           {COPY.verdict.badge}
         </div>
 
+        {/* ── 섹션 1: verdict 헤더 + reasoning ─────────────────────── */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-start gap-4">
             <div className={cn(
@@ -362,11 +398,87 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
               </div>
             </div>
           </div>
-          <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+          <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
             {data.reasoning}
           </p>
         </div>
 
+        {/* ── 섹션 2: 매매 실행 가이드 ─────────────────────────────── */}
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 space-y-3">
+          <h4 className={cn(
+            "text-xs font-bold flex items-center gap-1.5",
+            accentColor === "red"   && "text-red-600 dark:text-red-400",
+            accentColor === "blue"  && "text-blue-600 dark:text-blue-400",
+            accentColor === "slate" && "text-slate-600 dark:text-slate-400",
+          )}>
+            {COPY.verdict.executionGuide}
+          </h4>
+
+          {/* 진입 전략 */}
+          {data.entry_strategy && (
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+              {data.entry_strategy}
+            </p>
+          )}
+
+          {/* 목표가(양수) or 재진입 구간(음수) / 손절선 / 손익비 */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className={statCx(data.target_pct !== null && data.target_pct < 0 ? "blue" : "emerald")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                {data.target_pct !== null && data.target_pct < 0
+                  ? COPY.verdict.reentryLabel
+                  : COPY.verdict.targetLabel}
+              </span>
+              <span className={cn(
+                "text-base font-extrabold",
+                data.target_pct === null && "text-slate-400",
+                data.target_pct !== null && data.target_pct > 0 && "text-emerald-600 dark:text-emerald-400",
+                data.target_pct !== null && data.target_pct < 0 && "text-blue-600 dark:text-blue-400",
+              )}>
+                {data.target_pct === null
+                  ? "—"
+                  : data.target_pct > 0
+                    ? `+${data.target_pct}%`
+                    : `${data.target_pct}%`}
+              </span>
+            </div>
+            <div className={statCx("red")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.stopLossLabel}</span>
+              <span className="text-base font-extrabold text-red-600 dark:text-red-400">
+                {data.stop_loss_pct}%
+              </span>
+            </div>
+            <div className={statCx("slate")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.rrLabel}</span>
+              <span className={cn(
+                "text-base font-extrabold",
+                data.risk_reward_ratio !== null ? "text-slate-800 dark:text-slate-100" : "text-slate-400",
+              )}>
+                {data.risk_reward_ratio !== null ? `${data.risk_reward_ratio} : 1` : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 섹션 3: 단기·중기 전망 ────────────────────────────────── */}
+        {(data.short_term_outlook || data.mid_term_outlook) && (
+          <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+            {data.short_term_outlook && (
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{COPY.verdict.shortTermLabel}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{data.short_term_outlook}</p>
+              </div>
+            )}
+            {data.mid_term_outlook && (
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{COPY.verdict.midTermLabel}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{data.mid_term_outlook}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 섹션 4: 핵심 강점·리스크 ─────────────────────────────── */}
         <div className="p-5 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
           {data.key_strengths.length > 0 && (
             <div>
@@ -394,6 +506,7 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
           )}
         </div>
 
+        {/* 면책 고지 */}
         <div className="px-5 py-3 bg-slate-100 dark:bg-slate-950 text-[10px] text-slate-400 flex items-start gap-1.5">
           <Info size={12} className="flex-shrink-0 mt-0.5" />
           <p>{COPY.verdict.disclaimer}</p>
@@ -456,7 +569,6 @@ export function AIAnalysisPanel({
   final,
   error,
   resumeFrom,
-  open: _open,
   run,
   resume,
   stop,
@@ -466,6 +578,8 @@ export function AIAnalysisPanel({
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string } | null>(null);
+  const { data: stockData } = useQueryStockPrice(ticker);
+  const displayName = stockData?.name ?? ticker;
 
   const isAllPending = agents.every((a) => a.status === "pending");
   const hasDebate = debate.length > 0
@@ -489,21 +603,34 @@ export function AIAnalysisPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, close, expandedCard]);
 
-  // 새 에이전트 시작 시 자동 스크롤
+  // 새 에이전트 시작 / 토론 진행 시 자동 스크롤
   useEffect(() => {
-    if (!scrollRef.current || isMinimized) return;
+    if (!scrollRef.current || isMinimized || final) return;
     const hasRunning = agents.some((a) => a.status === "running");
-    if (hasRunning || final) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    }
-  }, [agents, final, debate.length, isMinimized]);
+    if (!hasRunning && debate.length === 0) return;
+    const el = scrollRef.current;
+    const id = requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [agents, debate.length, isMinimized, final]);
+
+  // 최종 결론 도착 시 맨 아래로 — DOM 렌더 후 스크롤
+  useEffect(() => {
+    if (!final || !scrollRef.current || isMinimized) return;
+    const el = scrollRef.current;
+    const id = setTimeout(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, 120);
+    return () => clearTimeout(id);
+  }, [final, isMinimized]);
 
   // 카드 상세 열기
   const handleExpand = (title: string, content: string) => setExpandedCard({ title, content });
 
-  // 에이전트 그룹 (Row 1: 분석가, Row 3: 매니저)
+  // 에이전트 그룹 (Row 1: 분석가, Row 3: 매니저 — portfolio_manager는 Row 4에서 최종 결론으로 표시)
   const analystKeys: AgentKey[] = ["market", "news", "fundamentals"];
-  const managerKeys: AgentKey[] = ["research_manager", "risk", "portfolio_manager"];
+  const managerKeys: AgentKey[] = ["research_manager", "risk"];
 
   return (
     <AnimatePresence>
@@ -542,7 +669,7 @@ export function AIAnalysisPanel({
                 <Sparkles className="text-blue-600 dark:text-blue-400" size={18} />
                 <h2 className="font-bold text-base text-slate-900 dark:text-white">{COPY.panel.title}</h2>
                 <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                  {ticker}
+                  {displayName}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -757,60 +884,15 @@ export function AIAnalysisPanel({
                       />
                     )}
 
-                    {/* ── Row 3: 매니저 3개 카드 ──────────────────────── */}
+                    {/* ── Row 3: 매니저 2개 카드 (research_manager, risk) ─ */}
                     {managerKeys.some(k => agents.find(a => a.key === k)?.status !== "pending") && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {managerKeys.map((key) => {
                           const meta = AGENT_META.find(m => m.key === key)!;
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
                             return (
                               <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />
-                            );
-                          }
-                          // portfolio_manager가 완료되고 final이 있으면 Row 4에서 표시 → 이 행은 "결과 확인 ↓" 표시
-                          if (key === "portfolio_manager") {
-                            if (final) {
-                              return (
-                                <motion.div
-                                  key={key}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800 overflow-hidden flex flex-col shadow-sm min-h-[180px]"
-                                >
-                                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/10 flex-none">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-none" />
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex-1">{meta.label}</span>
-                                    <Check size={12} className="text-emerald-500 flex-none" />
-                                  </div>
-                                  <div className="flex-1 flex items-center justify-center p-4">
-                                    <div className="text-center">
-                                      <div className={cn(
-                                        "text-2xl font-extrabold mb-1",
-                                        isBullishVerdict(final.verdict) && "text-red-600 dark:text-red-400",
-                                        isBearishVerdict(final.verdict) && "text-blue-600 dark:text-blue-400",
-                                        !isBullishVerdict(final.verdict) && !isBearishVerdict(final.verdict) && "text-slate-700",
-                                      )}>
-                                        {VERDICT_LABEL[final.verdict]}
-                                      </div>
-                                      <p className="text-[10px] text-slate-400">{COPY.verdict.portfolioSummary}</p>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              );
-                            }
-                            // 아직 final 없는 경우 (running or error)
-                            return (
-                              <AnalystCard
-                                key={key}
-                                meta={meta}
-                                status={agentState.status}
-                                content={reports[key]}
-                                streamingChunk={agentState.streamingChunk}
-                                isRunning={isRunning}
-                                onExpand={handleExpand}
-                                onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                              />
                             );
                           }
                           return (
@@ -829,8 +911,46 @@ export function AIAnalysisPanel({
                       </div>
                     )}
 
-                    {/* ── Row 4: 최종 결정 ─────────────────────────────── */}
-                    {final && <FinalVerdictCard data={final} />}
+                    {/* ── Row 4: 최종 결론 (portfolio_manager 결과) ──────── */}
+                    {(() => {
+                      const pmAgent = agents.find(a => a.key === "portfolio_manager")!;
+                      if (final) return <FinalVerdictCard data={final} />;
+                      if (pmAgent.status === "running") {
+                        return (
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-800 p-5 flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                                <RefreshCw size={18} className="text-blue-500 animate-spin" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">최종 결론 도출 중…</p>
+                                <p className="text-xs text-slate-400 mt-0.5">포트폴리오 매니저가 매매 판단을 내리고 있어요</p>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      }
+                      if (pmAgent.status === "error") {
+                        return (
+                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-5 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+                              <p className="text-sm font-medium text-red-600 dark:text-red-400">최종 결론 도출 실패</p>
+                            </div>
+                            {!isRunning && (
+                              <button
+                                type="button"
+                                onClick={() => resume("portfolio_manager")}
+                                className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1 cursor-pointer hover:opacity-70"
+                              >
+                                <RefreshCw size={11} /> {COPY.card.retry}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                   </div>
                 </div>

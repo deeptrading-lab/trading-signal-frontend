@@ -18,7 +18,8 @@
  * ⚠️ 전체 타임아웃 300s.
  */
 
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import { spawn } from "node:child_process";
+import readline from "node:readline";
 import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
@@ -33,7 +34,6 @@ const CHART_DAYS = 200;
 // market(5m)+news(6m)+fundamentals(6m)+bull(5m)×2+bear(5m)×2+manager(5m)+risk(5m)+pm(3m) ≈ 45m 이론상한
 // 실제 Opus 기준 평균은 절반 수준 → 40분으로 여유
 const TIMEOUT_TOTAL_MS = 2_400_000;
-const MAX_STDOUT = 4 * 1024 * 1024;
 
 // ─── Vercel guard ─────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ function sseEvent(data: AIAnalysisEvent): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// ─── Claude CLI 호출 (execFile, 검증된 패턴) ─────────────────────────────────
+// ─── Claude CLI 호출 (spawn + stream-json, 토큰 단위 스트리밍) ──────────────
 
 interface AgentCallOpts {
   systemPrompt: string;
@@ -62,11 +62,24 @@ interface AgentCallOpts {
   timeoutMs: number;
 }
 
-function invokeClaudeAgent(
+/**
+ * Claude CLI를 spawn으로 실행, --output-format stream-json NDJSON을 한 줄씩 파싱.
+ * onToken 콜백은 각 assistant 이벤트 도착 시 새 텍스트 부분을 forward.
+ *
+ * ⚠️ CLI는 응답 완료 후 전체 텍스트를 1개 assistant 이벤트로 emit — API 직접 호출처럼
+ *    토큰 단위 스트리밍이 아님. result 이벤트가 최종 권위 텍스트.
+ *
+ * stream-json 이벤트 포맷 (--verbose 필수):
+ *   system       → init 메타 (무시)
+ *   assistant    → message.content[0].text (누산 텍스트, diff로 새 부분 추출)
+ *   result       → 최종 완성 텍스트
+ */
+function invokeClaudeAgentStream(
   bin: string,
   model: string | undefined,
   opts: AgentCallOpts,
   signal: AbortSignal,
+  onToken: (token: string) => void,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -76,7 +89,8 @@ function invokeClaudeAgent(
 
     const args = [
       "--print",
-      "--output-format", "json",
+      "--output-format", "stream-json",
+      "--verbose",
       "--system-prompt", opts.systemPrompt,
     ];
     if (opts.tools.length > 0) {
@@ -86,33 +100,9 @@ function invokeClaudeAgent(
       args.push("--model", model.trim());
     }
 
-    const execOpts: ExecFileOptionsWithStringEncoding = {
-      encoding: "utf-8",
-      timeout: opts.timeoutMs,
-      maxBuffer: MAX_STDOUT,
-    };
-
-    const child = execFile(bin, args, execOpts, (error, stdout) => {
-      if (error) {
-        const err = error as NodeJS.ErrnoException & { killed?: boolean };
-        if (err.code === "ENOENT") {
-          reject(Object.assign(error, { message: "claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요." }));
-          return;
-        }
-        // killed=true → Node.js execFile 타임아웃으로 SIGTERM 전송됨
-        if (err.killed) {
-          reject(Object.assign(new Error(`에이전트 타임아웃 (${opts.timeoutMs / 1000}초 초과)`), { name: "TimeoutError" }));
-          return;
-        }
-        // stdout에 부분 결과가 있으면 그대로 사용
-        if (stdout?.trim()) {
-          resolve(extractText(stdout));
-        } else {
-          reject(error);
-        }
-        return;
-      }
-      resolve(extractText(stdout ?? ""));
+    const child = spawn(bin, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1" },
     });
 
     if (child.stdin) {
@@ -120,26 +110,106 @@ function invokeClaudeAgent(
       child.stdin.end(opts.userPrompt, "utf-8");
     }
 
+    let accumulated = "";
+    let prevAssistantLen = 0;
+    let settled = false;
+
+    const settle = (fn: () => void) => {
+      if (!settled) { settled = true; fn(); }
+    };
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      settle(() => reject(Object.assign(
+        new Error(`에이전트 타임아웃 (${opts.timeoutMs / 1000}초 초과)`),
+        { name: "TimeoutError" },
+      )));
+    }, opts.timeoutMs);
+
     const onAbort = () => {
       child.kill("SIGTERM");
-      reject(Object.assign(new Error("AbortError"), { name: "AbortError" }));
+      settle(() => reject(Object.assign(new Error("AbortError"), { name: "AbortError" })));
     };
     signal.addEventListener("abort", onAbort, { once: true });
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+    };
+
+    const rl = readline.createInterface({ input: child.stdout!, crlfDelay: Infinity });
+
+    rl.on("line", (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      let event: Record<string, unknown>;
+      try { event = JSON.parse(trimmed) as Record<string, unknown>; }
+      catch { return; }
+
+      // ENOENT — CLI 실행 자체가 불가한 경우 system 이벤트에서 감지
+      if (event.type === "system" && (event as Record<string,unknown>).subtype === "error") {
+        cleanup();
+        settle(() => reject(new Error("claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요.")));
+        return;
+      }
+
+      // Format A: content_block_delta (델타 기반 스트리밍)
+      const delta = event.delta as Record<string, unknown> | undefined;
+      if (event.type === "content_block_delta" && delta?.type === "text_delta") {
+        const token = String(delta.text ?? "");
+        if (token) { accumulated += token; onToken(token); }
+        return;
+      }
+
+      // Format B: assistant message (누산 텍스트 diff)
+      if (event.type === "assistant") {
+        const msg = event.message as Record<string, unknown> | undefined;
+        const content = Array.isArray(msg?.content) ? msg!.content as Record<string,unknown>[] : [];
+        const tb = content.find(b => b?.type === "text");
+        if (tb && typeof tb.text === "string" && tb.text.length > prevAssistantLen) {
+          const newPart = tb.text.slice(prevAssistantLen);
+          prevAssistantLen = tb.text.length;
+          accumulated = tb.text;
+          onToken(newPart);
+        }
+        return;
+      }
+
+      // 최종 result 이벤트
+      if (event.type === "result") {
+        if (event.subtype === "success") {
+          const finalText = typeof event.result === "string" ? event.result : accumulated;
+          cleanup();
+          settle(() => resolve(finalText));
+        } else if (event.is_error) {
+          const errMsg = typeof event.result === "string" ? event.result : "Claude CLI 오류";
+          cleanup();
+          settle(() => reject(new Error(errMsg)));
+        }
+      }
+    });
+
+    child.on("close", (code) => {
+      cleanup();
+      if (settled) return;
+      // result 이벤트 없이 종료된 경우 — 누산 텍스트로 폴백
+      if (accumulated) settle(() => resolve(accumulated));
+      else settle(() => reject(new Error(`Claude CLI 비정상 종료 (code=${code})`)));
+    });
+
+    child.on("error", (err) => {
+      cleanup();
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === "ENOENT") {
+        settle(() => reject(Object.assign(err, { message: "claude CLI를 찾을 수 없어요. 설치 후 재시도해 주세요." })));
+      } else {
+        settle(() => reject(err));
+      }
+    });
   });
 }
 
-// ─── CLI JSON 출력에서 텍스트 추출 ───────────────────────────────────────────
-// --output-format json: {"type":"result","subtype":"success","result":"텍스트",...}
 
-function extractText(raw: string): string {
-  const text = raw.trim();
-  if (!text) return "";
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    if (typeof parsed.result === "string") return parsed.result;
-  } catch { /* fallthrough */ }
-  return text; // JSON 파싱 실패 시 raw 반환
-}
 
 // ─── JSON 파싱 헬퍼 (Portfolio Manager 응답) ─────────────────────────────────
 
@@ -221,7 +291,7 @@ const T = {
   NO_TOOL:   300_000,  // 도구 없음 — 5분
   WEB_TOOL:  360_000,  // WebSearch/WebFetch — 6분
   PM:        180_000,  // Portfolio Manager (JSON만) — 3분
-  DEBATE_R2: 180_000,  // 토론 2라운드 (맥락 이미 확보) — 3분
+  DEBATE_R2: 300_000,  // 토론 2라운드 (R1 맥락 ~14K 추가) — 5분
 };
 
 const AGENT_PROMPTS: Record<AgentKey, AgentPrompts> = {
@@ -245,7 +315,9 @@ const AGENT_PROMPTS: Record<AgentKey, AgentPrompts> = {
 - 장기 추세 레짐이 단기 매매에 미치는 함의
 - 구체적·실행 가능한 트레이딩 인사이트 (진입/청산 관점)
 
-리포트 마지막에는 핵심 포인트를 정리한 마크다운 표를 반드시 포함하세요.${LANG_INSTRUCTION}`,
+리포트 마지막에는 핵심 포인트를 정리한 마크다운 표를 반드시 포함하세요.
+
+핵심 지표 최대 8개만 선별하고, 마크다운 표 1개를 포함해 총 2,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `다음 기술적 시그널 데이터를 분석해 상세한 기술 분석 리포트를 작성하세요:\n\n${s.signalSummary}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
@@ -269,7 +341,9 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 주요 기사 본문을 
 - 매크로 환경: 글로벌·국내 거시 요인이 해당 종목에 미치는 영향
 - 시장 심리: 기관/외국인/개인 수급 흐름, 주목할 이벤트
 
-리포트 마지막에는 핵심 뉴스를 날짜·헤드라인·영향도로 정리한 마크다운 표를 반드시 포함하세요.${LANG_INSTRUCTION}`,
+리포트 마지막에는 핵심 뉴스를 날짜·헤드라인·영향도로 정리한 마크다운 표를 반드시 포함하세요.
+
+주요 뉴스 최대 5개만 선별하고, 마크다운 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `종목 코드 ${s.ticker}에 대한 최신 뉴스·공시·업종 동향·거시경제 환경을 웹 검색으로 조사하고 포괄적인 리포트를 작성하세요.`,
     tools: ["WebSearch", "WebFetch"],
     timeoutMs: T.WEB_TOOL,
@@ -296,7 +370,9 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 세부 데이터를 확�
 - 성장 동력과 리스크 요인
 - 내재가치 대비 현 주가 수준 판단
 
-리포트 마지막에는 핵심 재무 지표를 정리한 마크다운 표를 반드시 포함하세요.${LANG_INSTRUCTION}`,
+리포트 마지막에는 핵심 재무 지표를 정리한 마크다운 표를 반드시 포함하세요.
+
+핵심 재무지표와 마크다운 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `종목 코드 ${s.ticker}의 재무제표, 펀더멘털, 밸류에이션을 웹 검색으로 상세히 조사하고 포괄적인 기본 분석 리포트를 작성하세요.`,
     tools: ["WebSearch", "WebFetch"],
     timeoutMs: T.WEB_TOOL,
@@ -314,7 +390,9 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 세부 데이터를 확�
 - 긍정적 신호: 재무 건전성, 업종 성장 추세, 최근 긍정적 뉴스·공시
 - 약세 측 반박: 약세 논거의 약점을 구체적 데이터로 반박하고, 왜 강세 관점이 더 타당한지 논리적으로 설명
 
-단순히 사실을 나열하지 말고, 대화형 토론 방식으로 약세 측의 우려에 직접 응답하며 강세 포지션의 강점을 역동적으로 제시하세요.${LANG_INSTRUCTION}`,
+단순히 사실을 나열하지 말고, 대화형 토론 방식으로 약세 측의 우려에 직접 응답하며 강세 포지션의 강점을 역동적으로 제시하세요.
+
+핵심 논거 3개와 구체적 데이터를 포함해 총 2,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `아래 분석 자료를 바탕으로 ${s.ticker}에 대한 강세(매수) 논거를 작성하세요. 각 분석의 긍정적 측면을 부각하고, 예상되는 약세 반론을 선제적으로 반박하세요.
 
 [기술 분석]
@@ -341,7 +419,9 @@ ${s.fundamentalsReport}`,
 - 부정적 신호: 재무 데이터·시장 추세·최근 악재 뉴스로 뒷받침되는 하락 근거
 - 강세 측 반박: 강세 논거의 과도하게 낙관적인 가정을 구체적 데이터로 지적하고 논리적으로 반박
 
-단순히 사실을 나열하지 말고, 대화형 토론 방식으로 강세 측의 각 주장에 직접 응답하며 약세 포지션의 타당성을 역동적으로 제시하세요.${LANG_INSTRUCTION}`,
+단순히 사실을 나열하지 말고, 대화형 토론 방식으로 강세 측의 각 주장에 직접 응답하며 약세 포지션의 타당성을 역동적으로 제시하세요.
+
+핵심 반박 논거 3개와 구체적 데이터를 포함해 총 2,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `아래 분석 자료와 강세 연구원의 논거를 검토한 뒤, ${s.ticker}에 대한 약세(매도/회피) 논거를 작성하세요. 강세 측의 각 주장을 항목별로 직접 반박하고, 그들이 간과하거나 과대평가한 부분을 지적하세요.
 
 [기술 분석]
@@ -378,7 +458,7 @@ ${s.bullArgument}`,
 - 투자 등급 결정 근거 (구체적 데이터 인용)
 - 실행 전략: 진입/청산 조건, 목표가 범위, 손절 기준
 - 모니터링 포인트: 투자 논거를 무효화할 이벤트나 지표
-마크다운 형식으로 작성하세요.${LANG_INSTRUCTION}`,
+마크다운 형식으로 작성하세요. 투자 계획 핵심만 담아 총 2,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `${s.ticker}에 대한 강세/약세 연구원의 토론을 평가하고, 명확한 투자 등급과 실행 가능한 투자 계획을 수립하세요.
 
 [강세 연구원 논거]
@@ -407,7 +487,7 @@ ${s.bearArgument}`,
 - 포지션 사이징 및 분할 매수 전략
 - 리스크 완화 방안 (헤지, 손절 기준, 스톱로스 레벨)
 - 리스크 대비 기대 수익률(Risk/Reward Ratio)
-마크다운 형식으로 작성하세요.${LANG_INSTRUCTION}`,
+마크다운 형식으로 작성하세요. 3관점 각 500자씩, 리스크 요약 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `${s.ticker}에 대한 다음 투자 계획을 공격적·보수적·중립적 세 가지 리스크 관점에서 종합 평가하세요.
 
 [투자 계획]
@@ -422,27 +502,40 @@ ${s.signalSummary}`,
   // ── 8. 포트폴리오 매니저 ────────────────────────────────────────────────────
   // TradingAgents 원본: trader/final decision + JSON schema
   portfolio_manager: {
-    system: `당신은 모든 분석과 리스크 평가를 종합해 최종 투자 결정을 내리는 포트폴리오 매니저입니다.
-기술 분석, 뉴스·공시, 펀더멘털, 토론 내용, 투자 계획, 리스크 평가를 바탕으로 최종 매매 결정을 내리세요.
+    system: `당신은 트레이더와 리스크 팀의 분석을 승인·조정하는 포트폴리오 매니저입니다.
+모든 분석(기술·뉴스·펀더멘털·토론·투자 계획·리스크 평가)을 종합해 **즉시 실행 가능한 매매 결정**을 내리세요.
 
 반드시 아래 JSON 스키마에 정확히 일치하는 단일 JSON 객체로만 응답하세요.
 마크다운 코드펜스(\`\`\`)·추가 설명 텍스트·주석을 절대 포함하지 마세요.
 
 {
   "verdict": "BUY" | "OVERWEIGHT" | "HOLD" | "UNDERWEIGHT" | "SELL",
-  "reasoning": "모든 분석을 종합한 최종 결정 근거 (2~4문장, 한국어)",
-  "key_strengths": ["투자 근거가 되는 핵심 강점 2~3개 (한국어)"],
-  "key_risks": ["반드시 모니터링해야 할 핵심 리스크 2~3개 (한국어)"],
+  "reasoning": "모든 분석을 종합한 최종 결정 근거 (2~4문장, 밸류에이션·기술적 신호·리스크/보상 핵심 포함)",
+  "entry_strategy": "진입 전략 — 언제·어떻게 매수/관망할지 구체적 조건 (1~2문장). SELL이면 보유 시 청산 조건.",
+  "target_pct": 목표 수익률 또는 재진입 구간(숫자). BUY/OVERWEIGHT/HOLD = 상방 목표(양수, 예: 15). UNDERWEIGHT = 재진입 고려 구간(음수 필수, 예: -12 = 현재가 대비 -12% 하락 시 재진입). SELL = null,
+  "stop_loss_pct": 손절선(음수 숫자, 예: -5 = -5%). 모든 verdict에 필수,
+  "risk_reward_ratio": 손익비(숫자, 예: 3.0 = 3:1). BUY/OVERWEIGHT/HOLD에만 설정. UNDERWEIGHT/SELL = null,
+  "short_term_outlook": "1~2주 단기 전망 (기술적 신호·수급·이벤트 중심 1~2문장)",
+  "mid_term_outlook": "1~3개월 중기 전망 (실적·밸류에이션·섹터 흐름 중심 1~2문장)",
+  "key_strengths": ["투자 근거가 되는 핵심 강점 2~3개"],
+  "key_risks": ["반드시 모니터링해야 할 핵심 리스크 2~3개"],
   "confidence": "HIGH" | "MEDIUM" | "LOW",
   "time_horizon": "단기" | "중기" | "장기"
 }
 
 verdict 기준:
-- BUY: 강한 매수 신호 — 즉각적 포지션 진입
-- OVERWEIGHT: 비중 확대 — 점진적·분할 매수
-- HOLD: 보유 유지 — 현 포지션 관망
-- UNDERWEIGHT: 비중 축소 — 일부 매도 또는 신규 진입 자제
-- SELL: 매도·회피 — 즉각적 청산 또는 공매도 고려`,
+- BUY: 강한 매수 신호 — 즉각적 포지션 진입 (target_pct = 상방 목표, 양수 필수)
+- OVERWEIGHT: 비중 확대 — 점진적·분할 매수 (target_pct = 상방 목표, 양수 필수)
+- HOLD: 보유 유지 — 현 포지션 관망 (target_pct = 상방 목표, 양수)
+- UNDERWEIGHT: 비중 축소 — 신규 진입 자제 (target_pct = 재진입 고려 구간, 음수 필수. 예: 현재 과매수 상태라 -12% 하락 후 재진입)
+- SELL: 매도·회피 — 즉각적 청산 (target_pct = null)
+
+stop_loss_pct 설정 기준:
+- BUY/OVERWEIGHT: 기술적 지지선 또는 -5%~-8% 수준
+- HOLD: -5%~-10% 수준
+- UNDERWEIGHT/SELL: 보유 시 손절 기준 (없으면 -3%~-5%)
+
+반드시 구체적인 숫자를 포함하세요. "추후 결정" 또는 모호한 표현 금지.`,
     user: (s) => `${s.ticker}에 대한 모든 분석을 종합해 최종 투자 결정을 JSON으로 출력하세요.
 
 [기술 분석]
@@ -467,26 +560,32 @@ ${s.riskAssessment}`,
 // ─── 2라운드 토론 프롬프트 빌더 ────────────────────────────────────────────────
 
 function buildBullR2Prompt(state: AnalysisState): string {
+  const prevBull = state.bullArgument.slice(0, 1500);
+  const prevBear = state.bearArgument.slice(0, 1500);
   return `약세 연구원의 반론이 나왔습니다. 이에 맞서 강세 입장을 강화하세요.
+이전 발화는 핵심 논점 파악에만 사용하고, 전문을 그대로 재인용하지 마세요.
 
-[당신의 1라운드 강세 논거]
-${state.bullArgument}
+[당신의 1라운드 강세 논거 — 핵심만]
+${prevBull}
 
-[약세 연구원의 반론]
-${state.bearArgument}
+[약세 연구원의 반론 — 핵심만]
+${prevBear}
 
 약세 측의 각 핵심 주장을 항목별로 직접 반박하고, 새로운 데이터나 논거를 추가해 강세 포지션이 여전히 타당함을 더 강력하게 주장하세요. 단순 반복이 아닌 심화된 분석으로 응답하세요.`;
 }
 
 // latestBullText: bull R2에서 방금 생성된 텍스트만 수신 (R1 누적 포함 금지)
 function buildBearR2Prompt(state: AnalysisState, latestBullText: string): string {
+  const prevBear = state.bearArgument.slice(0, 1500);
+  const bullR2 = latestBullText.slice(0, 1500);
   return `강세 연구원의 재반론이 나왔습니다. 최종 입장으로 마무리하세요.
+이전 발화는 핵심 논점 파악에만 사용하고, 전문을 그대로 재인용하지 마세요.
 
-[당신의 1라운드 약세 논거]
-${state.bearArgument}
+[당신의 1라운드 약세 논거 — 핵심만]
+${prevBear}
 
-[강세 연구원의 재반론 (2라운드)]
-${latestBullText}
+[강세 연구원의 재반론 (2라운드) — 핵심만]
+${bullR2}
 
 강세 측의 재반론을 항목별로 반박하고, 약세 포지션의 핵심 위험 요인이 여전히 상존함을 설득력 있게 강조하며 최종 입장을 제시하세요.`;
 }
@@ -510,13 +609,16 @@ async function runDebateLoop(
       : buildBullR2Prompt(state);
 
     let bullText: string;
+    const bullT0 = Date.now();
     try {
-      bullText = await invokeClaudeAgent(bin, model, {
+      bullText = await invokeClaudeAgentStream(bin, model, {
         systemPrompt: AGENT_PROMPTS.bull.system,
         userPrompt: bullPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
-      }, combinedSignal);
+      }, combinedSignal, (token) => {
+        send({ type: "debate_stream", speaker: "bull", chunk: token, round });
+      });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
       console.error(`[ai-analysis] ✗ bull R${round}`, err);
@@ -527,9 +629,8 @@ async function runDebateLoop(
     state.bullArgument = state.bullArgument
       ? `${state.bullArgument}\n\n---\n\n${bullText}`
       : bullText;
-    send({ type: "debate_stream", speaker: "bull", chunk: bullText, round });
     send({ type: "debate", speaker: "bull", content: bullText, round });
-    console.log(`[ai-analysis] ✓ bull R${round} len=${bullText.length}`);
+    console.log(`[ai-analysis] ✓ bull R${round} len=${bullText.length} elapsed=${((Date.now()-bullT0)/1000).toFixed(1)}s`);
     if (round === DEBATE_ROUNDS) send({ type: "progress", agent: "bull", status: "done" });
 
     if (combinedSignal.aborted) return "aborted";
@@ -542,13 +643,16 @@ async function runDebateLoop(
       : buildBearR2Prompt(state, bullText);
 
     let bearText: string;
+    const bearT0 = Date.now();
     try {
-      bearText = await invokeClaudeAgent(bin, model, {
+      bearText = await invokeClaudeAgentStream(bin, model, {
         systemPrompt: AGENT_PROMPTS.bear.system,
         userPrompt: bearPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
-      }, combinedSignal);
+      }, combinedSignal, (token) => {
+        send({ type: "debate_stream", speaker: "bear", chunk: token, round });
+      });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
       console.error(`[ai-analysis] ✗ bear R${round}`, err);
@@ -559,9 +663,8 @@ async function runDebateLoop(
     state.bearArgument = state.bearArgument
       ? `${state.bearArgument}\n\n---\n\n${bearText}`
       : bearText;
-    send({ type: "debate_stream", speaker: "bear", chunk: bearText, round });
     send({ type: "debate", speaker: "bear", content: bearText, round });
-    console.log(`[ai-analysis] ✓ bear R${round} len=${bearText.length}`);
+    console.log(`[ai-analysis] ✓ bear R${round} len=${bearText.length} elapsed=${((Date.now()-bearT0)/1000).toFixed(1)}s`);
     if (round === DEBATE_ROUNDS) send({ type: "progress", agent: "bear", status: "done" });
   }
 
@@ -639,6 +742,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         riskAssessment:      preState.riskAssessment      ?? "",
       };
 
+      const runStart = Date.now();
       try {
         // 1. 시세 & 시그널 계산 (재개 시에도 항상 최신 데이터 사용) ──────────
         const today = new Date();
@@ -675,68 +779,57 @@ export async function POST(req: NextRequest): Promise<Response> {
           signalResult.asOf,
         );
 
-        // 2. 에이전트 순차 실행 ─────────────────────────────────────────────
+        // 2. 에이전트 실행 — 3-phase ──────────────────────────────────────────
         const startIndex = startFrom ? AGENT_ORDER.indexOf(startFrom) : 0;
         if (startFrom) {
           console.log(`[ai-analysis] ↩ 재개: ${startFrom}(index=${startIndex})부터`);
         }
 
-        for (const agentKey of AGENT_ORDER) {
-          const agentIndex = AGENT_ORDER.indexOf(agentKey);
-          // startFrom 이전 에이전트는 이전 결과 그대로 사용, SSE 이벤트 생략
-          if (agentIndex < startIndex) continue;
-          if (combinedSignal.aborted) {
-            console.log(`[ai-analysis] 중지 요청 — ${agentKey} 이후 건너뜀`);
-            break;
-          }
+        // ── 공통 헬퍼: 일반 에이전트 1개 실행 ─────────────────────────────
+        async function runOneAgent(agentKey: AgentKey): Promise<"ok" | "aborted" | "error"> {
+          if (combinedSignal.aborted) return "aborted";
 
-          // ── 토론 구간: bull 도달 시 멀티라운드 루프 실행 ─────────────────
-          if (agentKey === "bull") {
-            console.log(`[ai-analysis] ▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
-            const result = await runDebateLoop(state, send, combinedSignal, bin, model);
-            if (result === "aborted") break;
-            continue;
-          }
-          // bear는 runDebateLoop 내부에서 처리 — 외부 루프에서 건너뜀
-          if (agentKey === "bear") continue;
-
-          // ── 일반 에이전트 ─────────────────────────────────────────────────
           const prompts = AGENT_PROMPTS[agentKey];
           console.log(`[ai-analysis] ▶ ${agentKey} 시작`);
           send({ type: "progress", agent: agentKey, status: "running" });
 
+          const agentT0 = Date.now();
           let text: string;
           try {
-            text = await invokeClaudeAgent(bin, model, {
+            text = await invokeClaudeAgentStream(bin, model, {
               systemPrompt: prompts.system,
               userPrompt: prompts.user(state),
               tools: prompts.tools,
               timeoutMs: prompts.timeoutMs,
-            }, combinedSignal);
+            }, combinedSignal, (token) => {
+              send({ type: "stream", agent: agentKey, chunk: token });
+            });
           } catch (err) {
             const errName = (err as { name?: string }).name;
             if (errName === "AbortError") {
               console.log(`[ai-analysis] 중지 — ${agentKey}`);
-              break;
+              return "aborted";
             }
             if (errName === "TimeoutError") {
-              console.warn(`[ai-analysis] ⏱ ${agentKey} 타임아웃`);
+              console.warn(`[ai-analysis] ⏱ ${agentKey} 타임아웃 elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
             } else {
               console.error(`[ai-analysis] ✗ ${agentKey}`, err);
             }
             send({ type: "progress", agent: agentKey, status: "error" });
-            continue;
+            return "error";
           }
 
-          console.log(`[ai-analysis] ✓ ${agentKey} 완료 len=${text.length}`);
+          console.log(`[ai-analysis] ✓ ${agentKey} 완료 len=${text.length} elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
 
-          // 포트폴리오 매니저: JSON 파싱 시도
+          // 포트폴리오 매니저: JSON 파싱
           if (agentKey === "portfolio_manager") {
             const parsed = parseLooseJson(text);
             if (parsed && typeof parsed === "object") {
               const d = parsed as Record<string, unknown>;
               const VERDICTS = new Set(["BUY", "OVERWEIGHT", "HOLD", "UNDERWEIGHT", "SELL"]);
               if (VERDICTS.has(d.verdict as string)) {
+                const rawTarget = typeof d.target_pct === "number" ? d.target_pct : null;
+                const rawStop = typeof d.stop_loss_pct === "number" ? d.stop_loss_pct : -5;
                 const finalDecision: FinalDecision = {
                   verdict: d.verdict as FinalDecision["verdict"],
                   reasoning: typeof d.reasoning === "string" ? d.reasoning : "",
@@ -747,11 +840,15 @@ export async function POST(req: NextRequest): Promise<Response> {
                     ? d.key_risks.filter((x): x is string => typeof x === "string")
                     : [],
                   confidence: (["HIGH", "MEDIUM", "LOW"].includes(d.confidence as string)
-                    ? d.confidence
-                    : "MEDIUM") as FinalDecision["confidence"],
+                    ? d.confidence : "MEDIUM") as FinalDecision["confidence"],
                   time_horizon: (["단기", "중기", "장기"].includes(d.time_horizon as string)
-                    ? d.time_horizon
-                    : "중기") as FinalDecision["time_horizon"],
+                    ? d.time_horizon : "중기") as FinalDecision["time_horizon"],
+                  entry_strategy: typeof d.entry_strategy === "string" ? d.entry_strategy : "",
+                  target_pct: rawTarget,
+                  stop_loss_pct: rawStop > 0 ? -rawStop : rawStop,
+                  risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
+                  short_term_outlook: typeof d.short_term_outlook === "string" ? d.short_term_outlook : "",
+                  mid_term_outlook: typeof d.mid_term_outlook === "string" ? d.mid_term_outlook : "",
                 };
                 send({ type: "final", data: finalDecision });
               } else {
@@ -761,11 +858,10 @@ export async function POST(req: NextRequest): Promise<Response> {
               send({ type: "report", agent: agentKey, content: text });
             }
           } else {
-            send({ type: "stream", agent: agentKey, chunk: text });
             send({ type: "report", agent: agentKey, content: text });
           }
 
-          // 상태 업데이트
+          // state 업데이트
           switch (agentKey) {
             case "market":           state.marketReport = text; break;
             case "news":             state.newsReport = text; break;
@@ -775,8 +871,41 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
 
           send({ type: "progress", agent: agentKey, status: "done" });
+          return "ok";
         }
 
+        // ── Phase A: 분석가 3개 병렬 ────────────────────────────────────────
+        // market·news·fundamentals는 서로 독립적 → Promise.allSettled로 동시 실행
+        {
+          const ANALYST: AgentKey[] = ["market", "news", "fundamentals"];
+          const toRun = ANALYST.filter(k => AGENT_ORDER.indexOf(k) >= startIndex);
+          if (toRun.length > 0 && !combinedSignal.aborted) {
+            console.log(`[ai-analysis] ▶ 분석가 ${toRun.join("+")} 병렬 시작`);
+            await Promise.allSettled(toRun.map(k => runOneAgent(k)));
+          }
+        }
+
+        // ── Phase B: 토론 (bull → bear × DEBATE_ROUNDS) ─────────────────────
+        if (!combinedSignal.aborted && AGENT_ORDER.indexOf("bull") >= startIndex) {
+          console.log(`[ai-analysis] ▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
+          const result = await runDebateLoop(state, send, combinedSignal, bin, model);
+          if (result === "aborted") {
+            console.log("[ai-analysis] 토론 중단 (abort)");
+          }
+        }
+
+        // ── Phase C: 매니저 체인 (순차) ─────────────────────────────────────
+        {
+          const MANAGER: AgentKey[] = ["research_manager", "risk", "portfolio_manager"];
+          for (const agentKey of MANAGER) {
+            if (AGENT_ORDER.indexOf(agentKey) < startIndex) continue;
+            if (combinedSignal.aborted) break;
+            const result = await runOneAgent(agentKey);
+            if (result === "aborted") break;
+          }
+        }
+
+        console.log(`[ai-analysis] 전체 완료 total=${((Date.now()-runStart)/1000).toFixed(1)}s`);
         send({ type: "done" });
         controller.close();
       } catch (err) {
