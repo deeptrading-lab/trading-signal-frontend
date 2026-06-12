@@ -19,11 +19,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isKisConfigured } from "@/lib/api/kis";
+import { isKisConfigured, fetchStockPrice, fetchInvestorTrend } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
 import { evaluateSignal } from "@/lib/signal/engine";
 import { AXIS_LABEL } from "@/lib/copy/signal/labels";
-import type { AxisScore } from "@/lib/types/signal";
+import type { AxisScore, SignalResult } from "@/lib/types/signal";
+import type { StockPrice, StockDailyCandle } from "@/lib/api/kis/types";
+import type { StockInvestorTrend } from "@/lib/types/stock/investors";
 import type { AgentKey, AIAnalysisEvent, FinalDecision, ResumeState } from "@/lib/types/stock/aiAnalysis";
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionEntry } from "@/lib/api/stock/aiDecisionStore";
@@ -105,6 +107,97 @@ function formatSignalForPrompt(
     axesText,
   ].join("\n");
 }
+// ─── 가격·수급 컨텍스트 포매터 ────────────────────────────────────────────────
+
+function formatPriceContextForPrompt(
+  candles: StockDailyCandle[],
+  signal: SignalResult,
+  price: StockPrice | null,
+  investor: StockInvestorTrend | null,
+): string {
+  const n = candles.length;
+  if (n === 0) return "";
+
+  const last = candles[n - 1];
+  const cur = price?.price ?? last.close;
+  const lines: string[] = [];
+
+  // ── 현재가 ──────────────────────────────────────────────────────────────────
+  const priceStr = `${cur.toLocaleString("ko-KR")}원`;
+  const changeStr = price
+    ? ` (${price.changePercent >= 0 ? "+" : ""}${price.changePercent.toFixed(2)}%, ${price.change >= 0 ? "+" : ""}${price.change.toLocaleString("ko-KR")}원)`
+    : "";
+  lines.push(`현재가: ${priceStr}${changeStr}`);
+
+  // 업종 / 외국인 지분율
+  const meta: string[] = [];
+  if (price?.sector) meta.push(`업종: ${price.sector}`);
+  if (price?.foreignRatio != null) meta.push(`외국인 지분율: ${price.foreignRatio.toFixed(1)}%`);
+  if (meta.length) lines.push(meta.join(" | "));
+
+  lines.push("");
+
+  // ── 주가 성과 ────────────────────────────────────────────────────────────────
+  const ret = (daysBack: number): string => {
+    if (n <= daysBack) return "N/A";
+    const base = candles[n - 1 - daysBack].close;
+    const pct = ((cur - base) / base) * 100;
+    return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+  };
+  lines.push(`주가 성과 (영업일 기준): 5일 ${ret(5)} | 20일 ${ret(20)} | 60일 ${ret(60)}`);
+
+  // 52주 고저
+  const year = candles.slice(-252);
+  const hi52 = Math.max(...year.map(c => c.high));
+  const lo52 = Math.min(...year.map(c => c.low));
+  const fromHi = ((cur - hi52) / hi52) * 100;
+  const fromLo = ((cur - lo52) / lo52) * 100;
+  lines.push(`52주 고가: ${hi52.toLocaleString("ko-KR")}원 (현재가 대비 ${fromHi.toFixed(1)}%) | 52주 저가: ${lo52.toLocaleString("ko-KR")}원 (+${fromLo.toFixed(1)}%)`);
+
+  // 평균 거래량
+  const vol20 = candles.slice(-21, -1).reduce((s, c) => s + c.volume, 0) / 20;
+  const volRatio = vol20 > 0 ? ((last.volume / vol20 - 1) * 100) : 0;
+  lines.push(`평균 거래량(20일): ${Math.round(vol20).toLocaleString("ko-KR")}주 | 최근 거래량: ${last.volume.toLocaleString("ko-KR")}주 (${volRatio >= 0 ? "+" : ""}${volRatio.toFixed(0)}%)`);
+
+  // 시그널 요약 1줄 (중복 피해 짧게)
+  lines.push(`기술 시그널: ${signal.action} | 점수 ${signal.score.toFixed(0)}/100 | 동의도 ${Math.round(signal.confidence * 100)}%`);
+
+  lines.push("");
+
+  // ── 주체별 수급 ──────────────────────────────────────────────────────────────
+  if (investor && investor.days.length > 0) {
+    const days = investor.days.slice(0, 10);
+    const sumFgn = days.reduce((s, d) => s + d.foreignNetBuyAmount, 0);
+    const sumOrg = days.reduce((s, d) => s + d.orgNetBuyAmount, 0);
+    const sumPer = days.reduce((s, d) => s + d.personNetBuyAmount, 0);
+
+    const fmt = (v: number) => {
+      const abs = Math.abs(v) / 100; // 백만원 → 억원
+      return `${v >= 0 ? "+" : "−"}${abs.toFixed(0)}억`;
+    };
+
+    // 연속 매수/매도 방향
+    const streak = (field: "foreignNetBuyAmount" | "orgNetBuyAmount" | "personNetBuyAmount"): string => {
+      let cnt = 0;
+      for (const d of days) {
+        if (cnt === 0) { cnt = d[field] >= 0 ? 1 : -1; continue; }
+        if (cnt > 0 && d[field] >= 0) cnt++;
+        else if (cnt < 0 && d[field] < 0) cnt--;
+        else break;
+      }
+      if (Math.abs(cnt) < 2) return "";
+      return cnt > 0 ? ` (${cnt}일 연속 순매수)` : ` (${Math.abs(cnt)}일 연속 순매도)`;
+    };
+
+    lines.push(`주체별 수급 (최근 ${days.length}일 합산, 단위: 억원):`);
+    lines.push(`  외국인: ${fmt(sumFgn)}${streak("foreignNetBuyAmount")}`);
+    lines.push(`  기관:   ${fmt(sumOrg)}${streak("orgNetBuyAmount")}`);
+    lines.push(`  개인:   ${fmt(sumPer)}${streak("personNetBuyAmount")}`);
+  }
+
+  return lines.join("\n");
+}
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -180,6 +273,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       const state: AnalysisState = {
         ticker,
         signalSummary: "",
+        priceContext: "",
         // 이전 실행 결과로 초기화 (startFrom 이전 에이전트들은 재실행 안 함)
         marketReport:        preState.marketReport        ?? "",
         newsReport:          preState.newsReport          ?? "",
@@ -231,7 +325,16 @@ export async function POST(req: NextRequest): Promise<Response> {
           signalResult.asOf,
         );
 
-        // 2. 에이전트 실행 — 3-phase ──────────────────────────────────────────
+        // 2. 가격·수급 컨텍스트 — 병렬 페치 (실패해도 분석 계속) ──────────────
+        const [priceSettled, investorSettled] = await Promise.allSettled([
+          fetchStockPrice(ticker),
+          fetchInvestorTrend(ticker),
+        ]);
+        const priceData = priceSettled.status === "fulfilled" ? priceSettled.value : null;
+        const investorData = investorSettled.status === "fulfilled" ? investorSettled.value : null;
+        state.priceContext = formatPriceContextForPrompt(sorted, signalResult, priceData, investorData);
+
+        // 3. 에이전트 실행 — 3-phase ──────────────────────────────────────────
         const startIndex = startFrom ? AGENT_ORDER.indexOf(startFrom) : 0;
         if (startFrom) {
           console.log(`[ai-analysis] ↩ 재개: ${startFrom}(index=${startIndex})부터`);

@@ -15,6 +15,8 @@ import { DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 export interface AnalysisState {
   ticker: string;
   signalSummary: string;
+  /** 현재가·성과·52주·수급 등 정량 컨텍스트 — 에이전트 환각 방지용 그라운딩 데이터. */
+  priceContext: string;
   marketReport: string;
   newsReport: string;
   fundamentalsReport: string;
@@ -76,7 +78,7 @@ export const AGENT_PROMPTS: Record<AgentKey, AgentPrompts> = {
 리포트 마지막에는 핵심 포인트를 정리한 마크다운 표를 반드시 포함하세요.
 
 핵심 지표 최대 8개만 선별하고, 마크다운 표 1개를 포함해 총 2,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `다음 기술적 시그널 데이터를 분석해 상세한 기술 분석 리포트를 작성하세요:\n\n${s.signalSummary}`,
+    user: (s) => `다음 기술적 시그널 데이터와 시장 스냅샷을 분석해 상세한 기술 분석 리포트를 작성하세요:\n\n[기술적 시그널]\n${s.signalSummary}\n\n[시장 스냅샷 — 현재가·성과·수급]\n${s.priceContext}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -101,7 +103,7 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 주요 기사 본문을 
 리포트 마지막에는 핵심 뉴스를 날짜·헤드라인·영향도로 정리한 마크다운 표를 반드시 포함하세요.
 
 주요 뉴스 최대 5개만 선별하고, 마크다운 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `종목 코드 ${s.ticker}에 대한 최신 뉴스·공시·업종 동향·거시경제 환경을 웹 검색으로 조사하고 포괄적인 리포트를 작성하세요.`,
+    user: (s) => `종목 코드 ${s.ticker}에 대한 최신 뉴스·공시·업종 동향·거시경제 환경을 웹 검색으로 조사하고 포괄적인 리포트를 작성하세요.\n\n[참고 — 현재 시장 스냅샷]\n${s.priceContext}`,
     tools: ["WebSearch", "WebFetch"],
     timeoutMs: T.WEB_TOOL,
   },
@@ -129,7 +131,7 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 세부 데이터를 확�
 리포트 마지막에는 핵심 재무 지표를 정리한 마크다운 표를 반드시 포함하세요.
 
 핵심 재무지표와 마크다운 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `종목 코드 ${s.ticker}의 재무제표, 펀더멘털, 밸류에이션을 웹 검색으로 상세히 조사하고 포괄적인 기본 분석 리포트를 작성하세요.`,
+    user: (s) => `종목 코드 ${s.ticker}의 재무제표, 펀더멘털, 밸류에이션을 웹 검색으로 상세히 조사하고 포괄적인 기본 분석 리포트를 작성하세요.\n\n[참고 — 현재 시장 스냅샷]\n${s.priceContext}`,
     tools: ["WebSearch", "WebFetch"],
     timeoutMs: T.WEB_TOOL,
   },
@@ -154,7 +156,7 @@ WebSearch 도구로 다음을 검색하세요:
 리포트 마지막에는 감성 지표를 정리한 마크다운 표를 반드시 포함하세요.
 
 핵심 신호 최대 5개와 마크다운 표 1개를 포함해 총 2,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `종목 코드 ${s.ticker}에 대한 SNS·온라인 커뮤니티 투자 심리를 웹 검색으로 조사하고 감성 분석 리포트를 작성하세요.`,
+    user: (s) => `종목 코드 ${s.ticker}에 대한 SNS·온라인 커뮤니티 투자 심리를 웹 검색으로 조사하고 감성 분석 리포트를 작성하세요.\n\n[참고 — 주체별 수급·가격 스냅샷 (정량 데이터, 웹 검색 없이 바로 활용 가능)]\n${s.priceContext}`,
     tools: ["WebSearch", "WebFetch"],
     timeoutMs: T.WEB_TOOL,
   },
@@ -174,6 +176,9 @@ WebSearch 도구로 다음을 검색하세요:
 
 핵심 논거 3개와 구체적 데이터를 포함해 총 2,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `아래 분석 자료를 바탕으로 ${s.ticker}에 대한 강세(매수) 논거를 작성하세요. 각 분석의 긍정적 측면을 부각하고, 예상되는 약세 반론을 선제적으로 반박하세요.
+
+[시장 스냅샷 — 현재가·성과·수급]
+${s.priceContext}
 
 [기술 분석]
 ${s.marketReport}
@@ -205,6 +210,9 @@ ${s.socialReport}`,
 
 핵심 반박 논거 3개와 구체적 데이터를 포함해 총 2,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `아래 분석 자료와 강세 연구원의 논거를 검토한 뒤, ${s.ticker}에 대한 약세(매도/회피) 논거를 작성하세요. 강세 측의 각 주장을 항목별로 직접 반박하고, 그들이 간과하거나 과대평가한 부분을 지적하세요.
+
+[시장 스냅샷 — 현재가·성과·수급]
+${s.priceContext}
 
 [기술 분석]
 ${s.marketReport}
@@ -245,6 +253,9 @@ ${s.bullArgument}`,
 마크다운 형식으로 작성하세요. 투자 계획 핵심만 담아 총 2,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `${s.ticker}에 대한 강세/약세 연구원의 토론을 평가하고, 명확한 투자 등급과 실행 가능한 투자 계획을 수립하세요.
 
+[시장 스냅샷 — 현재가·성과·수급]
+${s.priceContext}
+
 [강세 연구원 논거]
 ${s.bullArgument}
 
@@ -270,6 +281,9 @@ ${s.bearArgument}`,
 강세/약세 논거를 모두 검토했음을 반영해 균형 잡힌 제안을 만들되, 결론에서는 명확한 방향을 제시하세요. 모호한 표현("경우에 따라", "상황 봐서" 등) 금지.
 총 1,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s: AnalysisState) => `${s.ticker}에 대한 다음 분석 결과를 바탕으로 구체적인 매매 제안서를 작성하세요.
+
+[시장 스냅샷 — 현재가·성과·수급]
+${s.priceContext}
 
 [투자 계획 (리서치 매니저 결론)]
 ${s.researchPlan}
@@ -297,6 +311,9 @@ ${s.marketReport.slice(0, 800)}`,
 1,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s: AnalysisState) => `${s.ticker}에 대한 트레이더 제안을 공격적 관점에서 평가하세요.
 
+[시장 스냅샷]
+${s.priceContext}
+
 [트레이더 제안]
 ${s.traderProposal}
 
@@ -317,6 +334,9 @@ ${s.signalSummary.slice(0, 500)}`,
 1,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s: AnalysisState) => `${s.ticker}에 대한 트레이더 제안을 중립적 관점에서 평가하세요.
 
+[시장 스냅샷]
+${s.priceContext}
+
 [트레이더 제안]
 ${s.traderProposal}
 
@@ -336,6 +356,9 @@ ${s.signalSummary.slice(0, 500)}`,
 주요 리스크 요인, 시나리오 분석(최선/기본/최악), 손실 한도와 헤지 전략을 포함하세요.
 1,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s: AnalysisState) => `${s.ticker}에 대한 트레이더 제안을 보수적 관점에서 평가하세요.
+
+[시장 스냅샷]
+${s.priceContext}
 
 [트레이더 제안]
 ${s.traderProposal}
@@ -390,6 +413,9 @@ stop_loss_pct 설정 기준:
 
 반드시 구체적인 숫자를 포함하세요. "추후 결정" 또는 모호한 표현 금지.`,
     user: (s: AnalysisState) => `${s.ticker}에 대한 모든 분석을 종합해 최종 투자 결정을 JSON으로 출력하세요.
+
+[시장 스냅샷 — 현재가·성과·수급 (목표가·손절가 산정 시 기준)]
+${s.priceContext}
 
 [기술 분석]
 ${s.marketReport}
