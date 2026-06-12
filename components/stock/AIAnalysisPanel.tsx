@@ -115,11 +115,7 @@ export function AIAnalysisPanel({
               ? <Loader2 size={16} className="animate-spin" />
               : <Sparkles size={16} />
             }
-            <span className="text-xs font-bold leading-snug text-center">
-              <span className="block">AI</span>
-              <span className="block">분</span>
-              <span className="block">석</span>
-            </span>
+            <span className="text-xs font-bold leading-snug text-center">AI<br />분<br />석</span>
           </motion.button>
         )}
       </AnimatePresence>
