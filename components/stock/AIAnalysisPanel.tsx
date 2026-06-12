@@ -12,6 +12,7 @@ import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisHook } from "@/hooks/stock/useAIAnalysis";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
+import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
@@ -47,15 +48,16 @@ export function AIAnalysisPanel({
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
 
+  const { isMobile } = useBreakpoint();
   const isAllPending = agents.every((a) => a.status === "pending");
   const hasDebate = debate.length > 0
     || agents.some(a => (a.key === "bull" || a.key === "bear") && a.status !== "pending");
 
-  // 배경 스크롤 잠금 (minimized이면 해제)
+  // 모바일에서만 배경 스크롤 잠금 (데스크탑은 사이드패널이라 잠금 불필요)
   useEffect(() => {
-    document.body.style.overflow = (isOpen && !isMinimized) ? "hidden" : "";
+    document.body.style.overflow = (isOpen && !isMinimized && isMobile) ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [isOpen, isMinimized]);
+  }, [isOpen, isMinimized, isMobile]);
 
   // ESC 닫기
   useEffect(() => {
@@ -99,8 +101,8 @@ export function AIAnalysisPanel({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* 스크림 — minimized면 숨김 */}
-          {!isMinimized && (
+          {/* 스크림 — 모바일에서만, minimized면 숨김 */}
+          {!isMinimized && isMobile && (
             <motion.div
               key="scrim"
               initial={{ opacity: 0 }}
@@ -120,7 +122,7 @@ export function AIAnalysisPanel({
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
               "fixed top-0 right-0 z-[70] bg-slate-50 dark:bg-slate-950 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden",
-              "w-full md:w-[calc(100vw-48px)]",
+              "w-full md:w-[480px]",
               isMinimized ? "" : "h-full",
             )}
             aria-label="AI 종합분석"

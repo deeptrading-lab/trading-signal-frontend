@@ -283,29 +283,36 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     startStream(effectiveFrom, preState);
   }, [startStream]);
 
-  const stop = useCallback(() => {
+  // running 에이전트 → error 전환 + 스트리밍 토론 메시지 정리 (stop·close 공용)
+  const haltRunning = useCallback(() => {
     setAgents((prev) => {
       const runningList = prev.filter((a) => a.status === "running");
       if (runningList.length === 0) return prev;
       const first = runningList[0];
       setResumeFrom((rf) => rf ?? getResumeKey(first.key));
-      // 병렬 실행 중인 running 에이전트 전체를 error로 전환 (스피너 제거)
       const runningKeys = new Set(runningList.map((a) => a.key));
       return prev.map((a) =>
         runningKeys.has(a.key) ? { ...a, status: "error", streamingChunk: "" } : a,
       );
     });
-    abortRef.current?.abort();
-    setIsRunning(false);
+    setDebate((prev) => prev.map((d) => d.isStreaming ? { ...d, isStreaming: false } : d));
+    setDebatingSide(null);
   }, []);
 
+  const stop = useCallback(() => {
+    haltRunning();
+    abortRef.current?.abort();
+    setIsRunning(false);
+  }, [haltRunning]);
+
   const close = useCallback(() => {
+    haltRunning();
     abortRef.current?.abort();
     setIsOpen(false);
     setIsRunning(false);
     setIsMinimized(false);
     setShowReanalysisPrompt(false);
-  }, []);
+  }, [haltRunning]);
 
   const toggleMinimize = useCallback(() => {
     setIsMinimized((m) => !m);
