@@ -629,7 +629,7 @@ export function AIAnalysisPanel({
   const handleExpand = (title: string, content: string) => setExpandedCard({ title, content });
 
   // 에이전트 그룹 (Row 1: 분석가, Row 3: 매니저 — portfolio_manager는 Row 4에서 최종 결론으로 표시)
-  const analystKeys: AgentKey[] = ["market", "news", "fundamentals"];
+  const analystKeys: AgentKey[] = ["market", "news", "fundamentals", "social"];
   const managerKeys: AgentKey[] = ["research_manager", "risk"];
 
   return (
@@ -848,7 +848,7 @@ export function AIAnalysisPanel({
 
                     {/* ── Row 1: 분석가 3개 카드 ─────────────────────── */}
                     {analystKeys.some(k => agents.find(a => a.key === k)?.status !== "pending") && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {analystKeys.map((key) => {
                           const meta = AGENT_META.find(m => m.key === key)!;
                           const agentState = agents.find(a => a.key === key)!;

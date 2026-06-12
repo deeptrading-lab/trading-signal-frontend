@@ -9,6 +9,7 @@ export type AgentKey =
   | "market"
   | "news"
   | "fundamentals"
+  | "social"
   | "bull"
   | "bear"
   | "research_manager"
@@ -27,6 +28,7 @@ export const AGENT_META: AgentMeta[] = [
   { key: "market",            label: "기술 분석가",     description: "기술적 지표·차트 패턴 분석" },
   { key: "news",              label: "뉴스 분석가",      description: "최신 뉴스·공시 수집 및 정리" },
   { key: "fundamentals",      label: "기본 분석가",      description: "재무제표·실적·밸류에이션 조사" },
+  { key: "social",            label: "SNS 분석가",       description: "Reddit·커뮤니티 투자 심리 분석" },
   { key: "bull",              label: "강세 연구원",      description: "매수 논거 작성" },
   { key: "bear",              label: "약세 연구원",      description: "매도 논거 작성" },
   { key: "research_manager",  label: "리서치 매니저",    description: "토론 종합 후 투자 계획 수립" },
@@ -111,7 +113,7 @@ export const DEBATE_ROUNDS = 2;
 
 /** 에이전트 실행 순서 (서버·클라이언트 공용) */
 export const AGENT_ORDER: AgentKey[] = [
-  "market", "news", "fundamentals",
+  "market", "news", "fundamentals", "social",
   "bull", "bear",
   "research_manager", "risk", "portfolio_manager",
 ];
@@ -124,6 +126,7 @@ export interface ResumeState {
   marketReport?: string;
   newsReport?: string;
   fundamentalsReport?: string;
+  socialReport?: string;
   bullArgument?: string;
   bearArgument?: string;
   researchPlan?: string;

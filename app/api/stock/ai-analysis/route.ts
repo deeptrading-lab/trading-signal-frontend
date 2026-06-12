@@ -276,6 +276,7 @@ interface AnalysisState {
   marketReport: string;
   newsReport: string;
   fundamentalsReport: string;
+  socialReport: string;
   bullArgument: string;
   bearArgument: string;
   researchPlan: string;
@@ -378,7 +379,33 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 세부 데이터를 확�
     timeoutMs: T.WEB_TOOL,
   },
 
-  // ── 4. 강세 연구원 ──────────────────────────────────────────────────────────
+  // ── 4. SNS 분석가 ───────────────────────────────────────────────────────────
+  // TradingAgents 원본: Social Media Analyst — Reddit, Twitter/X, community sentiment
+  social: {
+    system: `당신은 SNS·온라인 커뮤니티의 투자 심리를 분석하는 리서처입니다.
+Reddit, 네이버 종목 토론, 주요 투자 커뮤니티(클리앙, 에펨코리아, 주식갤러리 등) 및 X(트위터) 공개 게시물을 검색해 해당 종목에 대한 개인 투자자 심리와 시장 감성을 분석하고 리포트를 작성하세요.
+
+WebSearch 도구로 다음을 검색하세요:
+1. Reddit r/korea, r/stocks, r/investing 등에서 해당 종목 관련 게시물·댓글
+2. 네이버 종목토론실 또는 다음 카페 등 국내 커뮤니티 최근 여론
+3. X(트위터) 공개 포스트에서 종목 코드 또는 기업명 언급
+4. 개인 투자자 심리 지표 (공매도 비율, 신용잔고, 외국인/기관 수급 등)
+
+분석 내용:
+- 감성 요약: 개인 투자자 전반적 심리 (강세/중립/약세 비율 추정)
+- 주요 논점: 커뮤니티에서 반복되는 긍정·부정 테마
+- 과열/공포 신호: 과도한 낙관 또는 공포가 감지되는지 여부
+- 수급 심리: 개인·기관·외국인 수급 흐름에서 읽히는 심리
+
+리포트 마지막에는 감성 지표를 정리한 마크다운 표를 반드시 포함하세요.
+
+핵심 신호 최대 5개와 마크다운 표 1개를 포함해 총 2,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
+    user: (s) => `종목 코드 ${s.ticker}에 대한 SNS·온라인 커뮤니티 투자 심리를 웹 검색으로 조사하고 감성 분석 리포트를 작성하세요.`,
+    tools: ["WebSearch", "WebFetch"],
+    timeoutMs: T.WEB_TOOL,
+  },
+
+  // ── 5. 강세 연구원 ──────────────────────────────────────────────────────────
   // TradingAgents 원본: advocate + engage/debate + counter bear arguments
   bull: {
     system: `당신은 ${"{target}"}에 투자할 것을 적극 주장하는 강세 연구원(Bull Analyst)입니다.
@@ -402,12 +429,15 @@ ${s.marketReport}
 ${s.newsReport}
 
 [펀더멘털]
-${s.fundamentalsReport}`,
+${s.fundamentalsReport}
+
+[SNS·커뮤니티 심리]
+${s.socialReport}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
 
-  // ── 5. 약세 연구원 ──────────────────────────────────────────────────────────
+  // ── 6. 약세 연구원 ──────────────────────────────────────────────────────────
   // TradingAgents 원본: advocate against + engage/debate + counter bull arguments
   bear: {
     system: `당신은 ${"{target}"}에 투자하는 것을 반대하는 약세 연구원(Bear Analyst)입니다.
@@ -432,6 +462,9 @@ ${s.newsReport}
 
 [펀더멘털]
 ${s.fundamentalsReport}
+
+[SNS·커뮤니티 심리]
+${s.socialReport}
 
 [강세 측 논거 — 직접 반박 대상]
 ${s.bullArgument}`,
@@ -601,8 +634,10 @@ async function runDebateLoop(
 ): Promise<"done" | "aborted" | "error"> {
   for (let round = 1; round <= DEBATE_ROUNDS; round++) {
     if (combinedSignal.aborted) return "aborted";
+    console.log(`[ai-analysis] ── 토론 ${round}라운드 시작 ──`);
 
     // ── Bull turn ─────────────────────────────────────────────────────────────
+    console.log(`[ai-analysis] ▶ bull R${round} 시작`);
     send({ type: "progress", agent: "bull", status: "running" });
     const bullPrompt = round === 1
       ? AGENT_PROMPTS.bull.user(state)
@@ -636,6 +671,7 @@ async function runDebateLoop(
     if (combinedSignal.aborted) return "aborted";
 
     // ── Bear turn ─────────────────────────────────────────────────────────────
+    console.log(`[ai-analysis] ▶ bear R${round} 시작`);
     send({ type: "progress", agent: "bear", status: "running" });
     // R2는 bull의 최신 라운드 텍스트만 전달 (누적값 사용 금지)
     const bearPrompt = round === 1
@@ -736,6 +772,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         marketReport:        preState.marketReport        ?? "",
         newsReport:          preState.newsReport          ?? "",
         fundamentalsReport:  preState.fundamentalsReport  ?? "",
+        socialReport:        preState.socialReport        ?? "",
         bullArgument:        preState.bullArgument        ?? "",
         bearArgument:        preState.bearArgument        ?? "",
         researchPlan:        preState.researchPlan        ?? "",
@@ -866,6 +903,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             case "market":           state.marketReport = text; break;
             case "news":             state.newsReport = text; break;
             case "fundamentals":     state.fundamentalsReport = text; break;
+            case "social":           state.socialReport = text; break;
             case "research_manager": state.researchPlan = text; break;
             case "risk":             state.riskAssessment = text; break;
           }
@@ -874,10 +912,10 @@ export async function POST(req: NextRequest): Promise<Response> {
           return "ok";
         }
 
-        // ── Phase A: 분석가 3개 병렬 ────────────────────────────────────────
-        // market·news·fundamentals는 서로 독립적 → Promise.allSettled로 동시 실행
+        // ── Phase A: 분석가 4개 병렬 ────────────────────────────────────────
+        // market·news·fundamentals·social은 서로 독립적 → Promise.allSettled로 동시 실행
         {
-          const ANALYST: AgentKey[] = ["market", "news", "fundamentals"];
+          const ANALYST: AgentKey[] = ["market", "news", "fundamentals", "social"];
           const toRun = ANALYST.filter(k => AGENT_ORDER.indexOf(k) >= startIndex);
           if (toRun.length > 0 && !combinedSignal.aborted) {
             console.log(`[ai-analysis] ▶ 분석가 ${toRun.join("+")} 병렬 시작`);

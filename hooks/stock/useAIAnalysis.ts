@@ -230,6 +230,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
       marketReport:       fromIndex > AGENT_ORDER.indexOf("market")           ? currentReports["market"]           : undefined,
       newsReport:         fromIndex > AGENT_ORDER.indexOf("news")             ? currentReports["news"]             : undefined,
       fundamentalsReport: fromIndex > AGENT_ORDER.indexOf("fundamentals")     ? currentReports["fundamentals"]     : undefined,
+      socialReport:       fromIndex > AGENT_ORDER.indexOf("social")           ? currentReports["social"]           : undefined,
       bullArgument:       fromIndex > AGENT_ORDER.indexOf("bull")             ? (accBull || undefined)             : undefined,
       bearArgument:       fromIndex > AGENT_ORDER.indexOf("bear")             ? (accBear || undefined)             : undefined,
       researchPlan:       fromIndex > AGENT_ORDER.indexOf("research_manager") ? currentReports["research_manager"] : undefined,
