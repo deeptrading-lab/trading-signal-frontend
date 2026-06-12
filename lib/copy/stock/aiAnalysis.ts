@@ -37,6 +37,7 @@ export const COPY = {
       "본 AI 분석 결과는 투자 참고용이며, 최종 투자 결정과 책임은 투자자 본인에게 있습니다.",
     executionGuide: "매매 실행 가이드",
     targetLabel: "목표가",
+    reentryLabel: "재진입 구간",
     stopLossLabel: "손절선",
     rrLabel: "손익비",
     shortTermLabel: "단기 전망 (1~2주)",

@@ -508,9 +508,9 @@ ${s.signalSummary}`,
   "verdict": "BUY" | "OVERWEIGHT" | "HOLD" | "UNDERWEIGHT" | "SELL",
   "reasoning": "모든 분석을 종합한 최종 결정 근거 (2~4문장, 밸류에이션·기술적 신호·리스크/보상 핵심 포함)",
   "entry_strategy": "진입 전략 — 언제·어떻게 매수/관망할지 구체적 조건 (1~2문장). SELL이면 보유 시 청산 조건.",
-  "target_pct": 목표 수익률(숫자, 예: 15 = +15%). BUY/OVERWEIGHT/HOLD에만 설정. UNDERWEIGHT/SELL은 null,
+  "target_pct": 목표 수익률 또는 재진입 구간(숫자). BUY/OVERWEIGHT/HOLD = 상방 목표(양수, 예: 15). UNDERWEIGHT = 재진입 고려 구간(음수 필수, 예: -12 = 현재가 대비 -12% 하락 시 재진입). SELL = null,
   "stop_loss_pct": 손절선(음수 숫자, 예: -5 = -5%). 모든 verdict에 필수,
-  "risk_reward_ratio": 손익비(숫자, 예: 3.0 = 3:1). target_pct가 null이면 null,
+  "risk_reward_ratio": 손익비(숫자, 예: 3.0 = 3:1). BUY/OVERWEIGHT/HOLD에만 설정. UNDERWEIGHT/SELL = null,
   "short_term_outlook": "1~2주 단기 전망 (기술적 신호·수급·이벤트 중심 1~2문장)",
   "mid_term_outlook": "1~3개월 중기 전망 (실적·밸류에이션·섹터 흐름 중심 1~2문장)",
   "key_strengths": ["투자 근거가 되는 핵심 강점 2~3개"],
@@ -520,10 +520,10 @@ ${s.signalSummary}`,
 }
 
 verdict 기준:
-- BUY: 강한 매수 신호 — 즉각적 포지션 진입 (target_pct 필수)
-- OVERWEIGHT: 비중 확대 — 점진적·분할 매수 (target_pct 필수)
-- HOLD: 보유 유지 — 현 포지션 관망 (target_pct = 상방 목표)
-- UNDERWEIGHT: 비중 축소 — 신규 진입 자제 (target_pct = null)
+- BUY: 강한 매수 신호 — 즉각적 포지션 진입 (target_pct = 상방 목표, 양수 필수)
+- OVERWEIGHT: 비중 확대 — 점진적·분할 매수 (target_pct = 상방 목표, 양수 필수)
+- HOLD: 보유 유지 — 현 포지션 관망 (target_pct = 상방 목표, 양수)
+- UNDERWEIGHT: 비중 축소 — 신규 진입 자제 (target_pct = 재진입 고려 구간, 음수 필수. 예: 현재 과매수 상태라 -12% 하락 후 재진입)
 - SELL: 매도·회피 — 즉각적 청산 (target_pct = null)
 
 stop_loss_pct 설정 기준:

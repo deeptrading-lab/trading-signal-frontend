@@ -331,11 +331,12 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
   const bearish = isBearishVerdict(data.verdict);
   const accentColor = bullish ? "red" : bearish ? "blue" : "slate";
 
-  const statCx = (color: "emerald" | "red" | "slate") => cn(
+  const statCx = (color: "emerald" | "red" | "slate" | "blue") => cn(
     "flex flex-col items-center justify-center rounded-xl p-3 gap-0.5",
     color === "emerald" && "bg-emerald-50 dark:bg-emerald-950/20",
     color === "red"     && "bg-red-50 dark:bg-red-950/20",
     color === "slate"   && "bg-slate-100 dark:bg-slate-800/60",
+    color === "blue"    && "bg-blue-50 dark:bg-blue-950/20",
   );
 
   return (
@@ -408,15 +409,25 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
             </p>
           )}
 
-          {/* 목표가 / 손절선 / 손익비 */}
+          {/* 목표가(양수) or 재진입 구간(음수) / 손절선 / 손익비 */}
           <div className="grid grid-cols-3 gap-2">
-            <div className={statCx("emerald")}>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.targetLabel}</span>
+            <div className={statCx(data.target_pct !== null && data.target_pct < 0 ? "blue" : "emerald")}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                {data.target_pct !== null && data.target_pct < 0
+                  ? COPY.verdict.reentryLabel
+                  : COPY.verdict.targetLabel}
+              </span>
               <span className={cn(
                 "text-base font-extrabold",
-                data.target_pct !== null ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400",
+                data.target_pct === null && "text-slate-400",
+                data.target_pct !== null && data.target_pct > 0 && "text-emerald-600 dark:text-emerald-400",
+                data.target_pct !== null && data.target_pct < 0 && "text-blue-600 dark:text-blue-400",
               )}>
-                {data.target_pct !== null ? `+${data.target_pct}%` : "—"}
+                {data.target_pct === null
+                  ? "—"
+                  : data.target_pct > 0
+                    ? `+${data.target_pct}%`
+                    : `${data.target_pct}%`}
               </span>
             </div>
             <div className={statCx("red")}>
@@ -579,14 +590,27 @@ export function AIAnalysisPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, close, expandedCard]);
 
-  // 새 에이전트 시작 시 자동 스크롤
+  // 새 에이전트 시작 / 토론 진행 시 자동 스크롤
   useEffect(() => {
-    if (!scrollRef.current || isMinimized) return;
+    if (!scrollRef.current || isMinimized || final) return;
     const hasRunning = agents.some((a) => a.status === "running");
-    if (hasRunning || final) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    }
-  }, [agents, final, debate.length, isMinimized]);
+    if (!hasRunning && debate.length === 0) return;
+    const el = scrollRef.current;
+    const id = requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [agents, debate.length, isMinimized, final]);
+
+  // 최종 결론 도착 시 맨 아래로 — DOM 렌더 후 스크롤
+  useEffect(() => {
+    if (!final || !scrollRef.current || isMinimized) return;
+    const el = scrollRef.current;
+    const id = setTimeout(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, 120);
+    return () => clearTimeout(id);
+  }, [final, isMinimized]);
 
   // 카드 상세 열기
   const handleExpand = (title: string, content: string) => setExpandedCard({ title, content });
