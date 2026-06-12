@@ -3805,3 +3805,28 @@
   > 없음
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   없음
+
+### 2026-06-12 — feat(stock): AI 패널 토론 구분선 강화 + PM 핵심 정보 볼드 (#121)
+
+- **slug**: `ai-panel-debate-bold-ui` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/121
+- **요약**: feat(stock): AI 패널 토론 구분선 강화 + PM 핵심 정보 볼드
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경 요약
+  > 
+  > **토론 UI**
+  > - R1/R2 라벨: `text-[9px] text-slate-300` → `text-[10px] text-slate-500` (더 진하게)
+  > - 세로 구분선: `w-px bg-slate-200` → `w-0.5 bg-slate-400` (굵고 진하게)
+  > - 그리드 행: `items-start` → `items-stretch` → 선이 카드 높이 전체만큼 연장
+  > 
+  > **PM 결과 볼드**
+  > - `FinalVerdictCard`에 `InlineBold` 헬퍼 추가 — `**text**` → `<strong>` 인라인 렌더링
+  > - `reasoning`, `entry_strategy`, `short_term_outlook`, `mid_term_outlook` 4개 필드에 적용
+  > - PM 시스템 프롬프트에 핵심 정보(매수/매도 판단·목표가·손절) `**굵게**` 표기 지시 추가
+  > 
+  > ## 다음 작업
+  > 
+  > 없음
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  없음
