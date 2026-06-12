@@ -507,12 +507,17 @@ function FinalVerdictCard({ data }: { data: FinalDecision }) {
             </div>
             <div className={statCx("slate")}>
               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{COPY.verdict.rrLabel}</span>
-              <span className={cn(
-                "text-base font-extrabold",
-                data.risk_reward_ratio !== null ? "text-slate-800 dark:text-slate-100" : "text-slate-400",
-              )}>
-                {data.risk_reward_ratio !== null ? `${data.risk_reward_ratio} : 1` : "—"}
-              </span>
+              {data.risk_reward_ratio !== null ? (
+                <span className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+                  {data.risk_reward_ratio} : 1
+                </span>
+              ) : (
+                <span className="text-xs font-medium text-slate-400 dark:text-slate-500 leading-tight">
+                  {data.verdict === "UNDERWEIGHT" || data.verdict === "SELL"
+                    ? "진입 없음"
+                    : "—"}
+                </span>
+              )}
             </div>
           </div>
         </div>

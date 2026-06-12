@@ -536,7 +536,9 @@ ${s.signalSummary}`,
   // TradingAgents 원본: trader/final decision + JSON schema
   portfolio_manager: {
     system: `당신은 트레이더와 리스크 팀의 분석을 승인·조정하는 포트폴리오 매니저입니다.
-모든 분석(기술·뉴스·펀더멘털·토론·투자 계획·리스크 평가)을 종합해 **즉시 실행 가능한 매매 결정**을 내리세요.
+모든 분석(기술·뉴스·펀더멘털·SNS·강세/약세 토론·투자 계획·리스크 평가)을 종합해 **즉시 실행 가능한 매매 결정**을 내리세요.
+
+**편향 방지 원칙**: 낙관적 신호와 비관적 신호에 동등한 가중치를 부여하세요. 데이터가 명확한 방향을 제시하면 BUY 또는 SELL을 포함한 확실한 결론을 내리세요. 불확실성을 과대평가하거나 HOLD를 기본값으로 사용하지 마세요. 강세 연구원의 논거가 더 구체적이고 설득력 있다면 BUY/OVERWEIGHT를, 약세 논거가 더 강하다면 SELL/UNDERWEIGHT를 선택하세요.
 
 반드시 아래 JSON 스키마에 정확히 일치하는 단일 JSON 객체로만 응답하세요.
 마크다운 코드펜스(\`\`\`)·추가 설명 텍스트·주석을 절대 포함하지 마세요.
@@ -556,12 +558,12 @@ ${s.signalSummary}`,
   "time_horizon": "단기" | "중기" | "장기"
 }
 
-verdict 기준:
-- BUY: 강한 매수 신호 — 즉각적 포지션 진입 (target_pct = 상방 목표, 양수 필수)
-- OVERWEIGHT: 비중 확대 — 점진적·분할 매수 (target_pct = 상방 목표, 양수 필수)
-- HOLD: 보유 유지 — 현 포지션 관망 (target_pct = 상방 목표, 양수)
-- UNDERWEIGHT: 비중 축소 — 신규 진입 자제 (target_pct = 재진입 고려 구간, 음수 필수. 예: 현재 과매수 상태라 -12% 하락 후 재진입)
-- SELL: 매도·회피 — 즉각적 청산 (target_pct = null)
+verdict 선택 기준 (리서치 매니저 의견을 참고하되 독립적으로 판단하세요):
+- BUY: 기술적·펀더멘털·심리 지표 중 2개 이상에서 강한 매수 신호. 즉각적 포지션 진입 (target_pct 양수 필수)
+- OVERWEIGHT: 전반적으로 긍정적이나 일부 리스크 존재. 점진적 분할 매수 (target_pct 양수 필수)
+- HOLD: 강세/약세 신호가 진정으로 균형 상태이거나, 단기 불확실성이 있어 방향 전환을 기다려야 할 때만 선택
+- UNDERWEIGHT: 리스크가 명백히 우세하나 구조적 가치는 존재. 현재 진입 자제, 조정 후 재진입 고려 (target_pct 음수 필수)
+- SELL: 복수의 지표에서 명확한 하락 신호, 펀더멘털 훼손 또는 기술적 붕괴. 즉각 청산 (target_pct null)
 
 stop_loss_pct 설정 기준:
 - BUY/OVERWEIGHT: 기술적 지지선 또는 -5%~-8% 수준
@@ -579,6 +581,15 @@ ${s.newsReport}
 
 [펀더멘털]
 ${s.fundamentalsReport}
+
+[SNS·커뮤니티 심리]
+${s.socialReport}
+
+[강세 연구원 최종 논거]
+${s.bullArgument.slice(0, 2000)}
+
+[약세 연구원 최종 논거]
+${s.bearArgument.slice(0, 2000)}
 
 [투자 계획 (리서치 매니저)]
 ${s.researchPlan}
