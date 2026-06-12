@@ -70,6 +70,15 @@ function AnalystCard({
   const isError = status === "error";
   const displayText = isActive ? streamingChunk : (isDone ? content : undefined);
 
+  // 스트리밍 텍스트가 없을 때만 진행 메시지를 2.4초마다 순환
+  const messages = COPY.progress[meta.key as keyof typeof COPY.progress] ?? [COPY.card.analyzing];
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!isActive || streamingChunk) { setMsgIdx(0); return; }
+    const id = setInterval(() => setMsgIdx(i => (i + 1) % messages.length), 2400);
+    return () => clearInterval(id);
+  }, [isActive, streamingChunk, messages.length]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -100,7 +109,9 @@ function AnalystCard({
       <div className="flex-1 overflow-hidden px-3 py-2.5">
         {isActive && (
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            <span className="line-clamp-5 whitespace-pre-wrap">{displayText || COPY.card.analyzing}</span>
+            <span className="line-clamp-5 whitespace-pre-wrap">
+              {displayText || messages[msgIdx]}
+            </span>
             <span className="inline-block w-1 h-[14px] bg-blue-500 animate-pulse ml-0.5 align-middle" />
           </p>
         )}
