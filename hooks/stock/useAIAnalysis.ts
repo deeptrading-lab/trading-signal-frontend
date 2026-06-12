@@ -265,17 +265,17 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   const stop = useCallback(() => {
     setAgents((prev) => {
-      const running = prev.find((a) => a.status === "running");
-      if (running) {
-        // 토론 에이전트는 bull부터 재개
-        const resumeKey: AgentKey = running.key === "bear" ? "bull" : running.key;
-        setResumeFrom((rf) => rf ?? resumeKey);
-        // 중지된 에이전트를 error로 전환 (스피너 제거 + 재시도 버튼 표시)
-        return prev.map((a) =>
-          a.key === running.key ? { ...a, status: "error", streamingChunk: "" } : a,
-        );
-      }
-      return prev;
+      const runningList = prev.filter((a) => a.status === "running");
+      if (runningList.length === 0) return prev;
+      // 재개 기점: 가장 앞 에이전트 (bear면 bull부터)
+      const first = runningList[0];
+      const resumeKey: AgentKey = first.key === "bear" ? "bull" : first.key;
+      setResumeFrom((rf) => rf ?? resumeKey);
+      // 병렬 실행 중인 running 에이전트 전체를 error로 전환 (스피너 제거)
+      const runningKeys = new Set(runningList.map((a) => a.key));
+      return prev.map((a) =>
+        runningKeys.has(a.key) ? { ...a, status: "error", streamingChunk: "" } : a,
+      );
     });
     abortRef.current?.abort();
     setIsRunning(false);
