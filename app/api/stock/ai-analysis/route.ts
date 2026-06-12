@@ -29,9 +29,10 @@ import type { AgentKey, AIAnalysisEvent, FinalDecision, ResumeState } from "@/li
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 
 const CHART_DAYS = 200;
-// 8에이전트 순차 실행 최대 허용 시간 (20분)
-// market(3m)+news(5m)+fundamentals(5m)+bull(3m)+bear(3m)+manager(3m)+risk(3m)+pm(2m) ≈ 27m 상한
-const TIMEOUT_TOTAL_MS = 1_200_000;
+// 8에이전트 순차 실행 최대 허용 시간 (40분)
+// market(5m)+news(6m)+fundamentals(6m)+bull(5m)×2+bear(5m)×2+manager(5m)+risk(5m)+pm(3m) ≈ 45m 이론상한
+// 실제 Opus 기준 평균은 절반 수준 → 40분으로 여유
+const TIMEOUT_TOTAL_MS = 2_400_000;
 const MAX_STDOUT = 4 * 1024 * 1024;
 
 // ─── Vercel guard ─────────────────────────────────────────────────────────────
@@ -214,12 +215,13 @@ interface AnalysisState {
 const LANG_INSTRUCTION = "\n\n모든 응답은 반드시 한국어로 작성하세요.";
 
 // ─── 에이전트별 타임아웃 (execFile SIGTERM 기준) ──────────────────────────────
-// CLI 기동·인증 오버헤드(~10s) + API 응답(~30-120s) + 출력 포맷(~5s) 고려
+// CLI 기동·인증 오버헤드(~10s) + API 응답(~60-240s) + 출력 포맷(~5s) 고려
+// Opus 4.x 기준 상세 리포트 생성에 최대 4분 소요 가능 → 5분으로 여유 확보
 const T = {
-  NO_TOOL:   180_000,  // 도구 없음 — 3분
-  WEB_TOOL:  300_000,  // WebSearch/WebFetch — 5분
-  PM:        120_000,  // Portfolio Manager (JSON만) — 2분
-  DEBATE_R2: 120_000,  // 토론 2라운드 (맥락 이미 확보) — 2분
+  NO_TOOL:   300_000,  // 도구 없음 — 5분
+  WEB_TOOL:  360_000,  // WebSearch/WebFetch — 6분
+  PM:        180_000,  // Portfolio Manager (JSON만) — 3분
+  DEBATE_R2: 180_000,  // 토론 2라운드 (맥락 이미 확보) — 3분
 };
 
 const AGENT_PROMPTS: Record<AgentKey, AgentPrompts> = {
