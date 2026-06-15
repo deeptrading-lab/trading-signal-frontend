@@ -78,7 +78,8 @@ export type AIAnalysisEvent =
 
 // ─── 최종 결정 ───────────────────────────────────────────────────────────────
 
-export type FinalVerdict = "BUY" | "OVERWEIGHT" | "HOLD" | "UNDERWEIGHT" | "SELL";
+// 강세→약세 6단계: 적극 매수 · 분할 매수 · 중립 · 신규 진입 주의 · 분할 매도 · 매도/회피
+export type FinalVerdict = "BUY" | "OVERWEIGHT" | "HOLD" | "UNDERWEIGHT" | "REDUCE" | "SELL";
 
 export interface FinalDecision {
   verdict: FinalVerdict;
@@ -87,9 +88,11 @@ export interface FinalDecision {
   key_risks: string[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
   time_horizon: "단기" | "중기" | "장기";
-  /** 진입 전략 — 분할 매수 조건, 관망 이유 등 1~2문장 */
-  entry_strategy: string;
-  /** 목표 수익률 % (예: 15 = +15%). SELL/UNDERWEIGHT 시 null */
+  /** 신규 진입자용 가이드 — 현재가 기준 진입/관망 조건·트리거 (1~2문장) */
+  new_entry_strategy: string;
+  /** 기존 보유자용 가이드 — 포지션 비율·가격 레벨 기준 (수익률 표현 금지, 1~2문장) */
+  holder_strategy: string;
+  /** 목표 수익률 또는 재진입 구간 % (현재가 대비). BUY/OVERWEIGHT/HOLD=양수 목표, UNDERWEIGHT/REDUCE=음수 재진입 구간, SELL=null */
   target_pct: number | null;
   /** 손절선 % (예: -5 = -5%). 항상 음수 */
   stop_loss_pct: number;

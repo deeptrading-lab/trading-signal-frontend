@@ -20,12 +20,15 @@ function InlineBold({ text }: { text: string }) {
   );
 }
 
+// 행동형 라벨 — 기관 비중 용어 대신 개인 투자자 행동 중심(강세→약세 6단계).
 const VERDICT_LABEL: Record<FinalVerdict, string> = {
-  BUY: "강력 매수", OVERWEIGHT: "비중 확대", HOLD: "보유 유지",
-  UNDERWEIGHT: "비중 축소", SELL: "매도·회피",
+  BUY: "적극 매수", OVERWEIGHT: "분할 매수", HOLD: "중립",
+  UNDERWEIGHT: "신규 진입 주의", REDUCE: "분할 매도", SELL: "매도 / 회피",
 };
 const isBullishVerdict = (v: FinalVerdict) => v === "BUY" || v === "OVERWEIGHT";
-const isBearishVerdict = (v: FinalVerdict) => v === "SELL" || v === "UNDERWEIGHT";
+const isBearishVerdict = (v: FinalVerdict) => v === "SELL" || v === "REDUCE" || v === "UNDERWEIGHT";
+/** 신규 진입(롱) 자체가 없는 등급 — 손익비 "진입 없음" 표기용 */
+const isNoEntryVerdict = (v: FinalVerdict) => v === "UNDERWEIGHT" || v === "REDUCE" || v === "SELL";
 
 export function FinalVerdictCard({ data }: { data: FinalDecision }) {
   const bullish = isBullishVerdict(data.verdict);
@@ -74,15 +77,18 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
                 {VERDICT_LABEL[data.verdict]}
               </h3>
               <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" title={COPY.verdict.confidenceBasis}>
                   <BadgeCheck size={14} className="text-emerald-500" />
                   {COPY.verdict.confidence(data.confidence)}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <TrendingUp size={14} /> {data.time_horizon}
+                  <TrendingUp size={14} /> {COPY.verdict.horizon(data.time_horizon)}
                 </span>
               </div>
+              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                {COPY.verdict.confidenceBasis}
+              </p>
             </div>
           </div>
           <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
@@ -100,10 +106,22 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
             {COPY.verdict.executionGuide}
           </h4>
 
-          {data.entry_strategy && (
-            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
-              <InlineBold text={data.entry_strategy} />
-            </p>
+          {/* 신규 진입자 / 기존 보유자 가이드 분리 */}
+          {data.new_entry_strategy && (
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">{COPY.verdict.newEntryLabel}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <InlineBold text={data.new_entry_strategy} />
+              </p>
+            </div>
+          )}
+          {data.holder_strategy && (
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">{COPY.verdict.holderLabel}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <InlineBold text={data.holder_strategy} />
+              </p>
+            </div>
           )}
 
           <div className="grid grid-cols-3 gap-2">
@@ -112,14 +130,17 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
                 {data.target_pct !== null && data.target_pct < 0
                   ? COPY.verdict.reentryLabel
                   : COPY.verdict.targetLabel}
+                {!!data.target_pct && (
+                  <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-normal">{COPY.verdict.targetHint}</span>
+                )}
               </span>
               <span className={cn(
                 "text-base font-extrabold",
-                data.target_pct === null && "text-slate-400",
-                data.target_pct !== null && data.target_pct > 0 && "text-emerald-600 dark:text-emerald-400",
-                data.target_pct !== null && data.target_pct < 0 && "text-blue-600 dark:text-blue-400",
+                !data.target_pct && "text-slate-400",
+                !!data.target_pct && data.target_pct > 0 && "text-emerald-600 dark:text-emerald-400",
+                !!data.target_pct && data.target_pct < 0 && "text-blue-600 dark:text-blue-400",
               )}>
-                {data.target_pct === null
+                {!data.target_pct
                   ? "—"
                   : data.target_pct > 0
                     ? `+${data.target_pct}%`
@@ -140,7 +161,7 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
                 </span>
               ) : (
                 <span className="text-xs font-medium text-slate-400 dark:text-slate-500 leading-tight">
-                  {data.verdict === "UNDERWEIGHT" || data.verdict === "SELL"
+                  {isNoEntryVerdict(data.verdict)
                     ? "진입 없음"
                     : "—"}
                 </span>
@@ -174,7 +195,7 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
               </h4>
               <ul className="text-sm space-y-1 text-slate-600 dark:text-slate-300">
                 {data.key_strengths.map((s, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-red-500 font-bold shrink-0">↑</span>{s}</li>
+                  <li key={i} className="flex gap-2"><span className="text-red-500 font-bold shrink-0">↑</span><span><InlineBold text={s} /></span></li>
                 ))}
               </ul>
             </div>
@@ -186,7 +207,7 @@ export function FinalVerdictCard({ data }: { data: FinalDecision }) {
               </h4>
               <ul className="text-sm space-y-1 text-slate-600 dark:text-slate-300">
                 {data.key_risks.map((r, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-blue-500 font-bold shrink-0">↓</span>{r}</li>
+                  <li key={i} className="flex gap-2"><span className="text-blue-500 font-bold shrink-0">↓</span><span><InlineBold text={r} /></span></li>
                 ))}
               </ul>
             </div>

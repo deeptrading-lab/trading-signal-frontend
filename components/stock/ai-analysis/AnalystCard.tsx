@@ -4,6 +4,7 @@ import { memo, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { RefreshCw, Check, AlertCircle, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { stripMarkdown } from "@/lib/utils/stripMarkdown";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AgentMeta, AgentStatus } from "@/lib/types/stock/aiAnalysis";
 
@@ -30,6 +31,8 @@ export const AnalystCard = memo(function AnalystCard({
   const isDone = status === "done";
   const isError = status === "error";
   const displayText = isActive ? streamingChunk : (isDone ? content : undefined);
+  // 미리보기는 마크다운 기호를 제거한 평문 teaser(전체보기는 원문 그대로 마크다운 렌더).
+  const previewText = displayText ? stripMarkdown(displayText) : displayText;
 
   const messages = COPY.progress[meta.key as keyof typeof COPY.progress] ?? [COPY.card.analyzing];
   const [msgIdx, setMsgIdx] = useState(0);
@@ -43,39 +46,52 @@ export const AnalystCard = memo(function AnalystCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm min-h-[180px]"
+      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm min-h-[120px]"
     >
       <div className={cn(
         "flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 flex-none",
         isActive && "bg-blue-50/60 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30",
         isDone && "bg-emerald-50/40 dark:bg-emerald-950/10",
       )}>
-        <div className={cn(
-          "w-1.5 h-1.5 rounded-full flex-none",
-          isActive && "bg-blue-500 animate-pulse",
-          isDone && "bg-emerald-500",
-          isError && "bg-red-500",
-        )} />
+        {/* 완료 시 점 → 체크 */}
+        {isDone ? (
+          <Check size={13} className="text-emerald-500 flex-none" />
+        ) : (
+          <div className={cn(
+            "w-1.5 h-1.5 rounded-full flex-none",
+            isActive && "bg-blue-500 animate-pulse",
+            isError && "bg-red-500",
+          )} />
+        )}
         <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex-1 truncate">
           {meta.label}
         </span>
         {isActive && <RefreshCw size={11} className="text-blue-500 animate-spin flex-none" />}
-        {isDone && <Check size={12} className="text-emerald-500 flex-none" />}
         {isError && <AlertCircle size={12} className="text-red-500 flex-none" />}
+        {/* 완료 시 — 원래 체크 자리에 전체보기 */}
+        {isDone && displayText && (
+          <button
+            type="button"
+            onClick={() => onExpand(meta.label, displayText)}
+            className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium cursor-pointer flex items-center gap-0.5 flex-none"
+          >
+            {COPY.card.viewFull} <ChevronRight size={10} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden px-3 py-2.5">
         {isActive && (
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            <span className="line-clamp-5 whitespace-pre-wrap">
-              {displayText || messages[msgIdx]}
+            <span className="line-clamp-3 whitespace-pre-wrap">
+              {previewText || messages[msgIdx]}
             </span>
             <span className="inline-block w-1 h-[14px] bg-blue-500 animate-pulse ml-0.5 align-middle" />
           </p>
         )}
         {isDone && displayText && (
-          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-5 whitespace-pre-wrap">
-            {displayText}
+          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 whitespace-pre-wrap">
+            {previewText}
           </p>
         )}
         {isError && (
@@ -83,28 +99,18 @@ export const AnalystCard = memo(function AnalystCard({
         )}
       </div>
 
-      <div className="flex-none px-3 py-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-        <div>
-          {isError && !globalRunning && onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="text-[10px] text-red-500 hover:text-red-600 font-medium cursor-pointer flex items-center gap-1"
-            >
-              <RefreshCw size={10} /> {COPY.card.retry}
-            </button>
-          )}
-        </div>
-        {isDone && displayText && (
+      {/* 오류 재시도 전용 푸터 (전체보기는 헤더로 이동) */}
+      {isError && !globalRunning && onRetry && (
+        <div className="flex-none px-3 py-2 border-t border-slate-100 dark:border-slate-800">
           <button
             type="button"
-            onClick={() => onExpand(meta.label, displayText)}
-            className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium cursor-pointer flex items-center gap-1 ml-auto"
+            onClick={onRetry}
+            className="text-[10px] text-red-500 hover:text-red-600 font-medium cursor-pointer flex items-center gap-1"
           >
-            {COPY.card.viewFull} <ChevronRight size={10} />
+            <RefreshCw size={10} /> {COPY.card.retry}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </motion.div>
   );
 });

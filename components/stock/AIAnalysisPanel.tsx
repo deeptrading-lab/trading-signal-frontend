@@ -46,6 +46,7 @@ export function AIAnalysisPanel({
   dismissReanalysisPrompt,
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string } | null>(null);
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
@@ -55,10 +56,23 @@ export function AIAnalysisPanel({
     || agents.some(a => (a.key === "bull" || a.key === "bear") && a.status !== "pending");
 
   // 분석 중 헤더 상태 — 현재 진행 중인 에이전트 기준 한 줄 메시지.
+  // 토론 중에는 running 에이전트(bull로 고정)보다 실제 발언 측(debatingSide)을 우선한다.
   const runningAgent = agents.find((a) => a.status === "running");
-  const runningStatus = runningAgent
-    ? (COPY.panel.runningStatus[runningAgent.key] ?? COPY.panel.runningFallback)
+  const runningStatusKey = debatingSide ?? runningAgent?.key;
+  const runningStatus = runningStatusKey
+    ? (COPY.panel.runningStatus[runningStatusKey] ?? COPY.panel.runningFallback)
     : COPY.panel.runningFallback;
+
+  // 진행 중인 분석가 칩을 칩 캐러셀 맨 왼쪽으로 자동 스크롤(모바일 한 줄 스크롤 대응).
+  useEffect(() => {
+    const container = chipsRef.current;
+    if (!container) return;
+    const chip = container.querySelector<HTMLElement>('[data-running="true"]');
+    if (!chip) return;
+    const cRect = container.getBoundingClientRect();
+    const chipRect = chip.getBoundingClientRect();
+    container.scrollTo({ left: container.scrollLeft + (chipRect.left - cRect.left) - 16, behavior: "smooth" });
+  }, [runningAgent?.key, isOpen]);
 
   // 배경 스크롤 잠금
   useEffect(() => {
@@ -164,7 +178,7 @@ export function AIAnalysisPanel({
                 {!isAllPending && (
                   <span
                     className={cn(
-                      "shrink-0 px-2 py-0.5 rounded-md text-[11px] font-bold",
+                      "shrink-0 px-2 py-0.5 rounded-md text-[11px] font-bold hidden md:inline-block",
                       provider === "claude"
                         ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                         : "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
@@ -187,9 +201,10 @@ export function AIAnalysisPanel({
                   <button
                     type="button"
                     onClick={stop}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
+                    aria-label={COPY.panel.stop}
+                    className="flex items-center gap-1.5 p-1.5 text-red-500 border border-slate-200 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-slate-700 dark:hover:text-red-300 dark:hover:bg-red-900/30 rounded-md transition-colors cursor-pointer md:px-2.5 md:py-1.5 md:text-[11px] md:font-medium md:text-red-600 md:bg-red-50 md:hover:bg-red-100 md:dark:text-red-400 md:dark:bg-red-900/30 md:dark:hover:bg-red-900/50"
                   >
-                    <Square size={11} fill="currentColor" /> {COPY.panel.stop}
+                    <Square size={11} fill="currentColor" /> <span className="hidden md:inline">{COPY.panel.stop}</span>
                   </button>
                 ) : !isAllPending && (
                   <>
@@ -216,7 +231,7 @@ export function AIAnalysisPanel({
                 <button
                   type="button"
                   onClick={close}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
+                  className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
                   aria-label={COPY.panel.close}
                 >
                   <X size={18} />
@@ -226,7 +241,10 @@ export function AIAnalysisPanel({
 
                 {/* ── 에이전트 진행 바 ────────────────────────────────── */}
                 <div className="flex-none px-5 py-2.5 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div
+                    ref={chipsRef}
+                    className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide-mobile -mx-5 px-5 md:mx-0 md:px-0 md:flex-wrap md:overflow-x-visible"
+                  >
                     {AGENT_META.map((meta) => {
                       const agentStatus = agents.find((a) => a.key === meta.key)?.status ?? "pending";
                       const isError = agentStatus === "error";
@@ -234,6 +252,7 @@ export function AIAnalysisPanel({
                       return (
                         <div
                           key={meta.key}
+                          data-running={agentStatus === "running" ? "true" : undefined}
                           role={isClickable ? "button" : undefined}
                           tabIndex={isClickable ? 0 : undefined}
                           onClick={isClickable ? () => resume(meta.key) : undefined}
@@ -245,7 +264,7 @@ export function AIAnalysisPanel({
                           } : undefined}
                           title={isClickable ? COPY.card.resumeTitle(meta.label) : undefined}
                           className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors",
+                            "flex items-center gap-1 shrink-0 px-2 py-1 rounded-full text-[10px] font-bold transition-colors",
                             agentStatus === "pending" && "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
                             agentStatus === "running" && "bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
                             agentStatus === "done" && "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
@@ -265,20 +284,8 @@ export function AIAnalysisPanel({
                   </div>
                 </div>
 
-                {/* ── 스크롤 영역 (relative: 카드 상세 오버레이 기준점) ─ */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
-                  {/* 카드 상세 오버레이 */}
-                  <AnimatePresence>
-                    {expandedCard && (
-                      <CardDetailOverlay
-                        key="detail"
-                        title={expandedCard.title}
-                        content={expandedCard.content}
-                        onClose={() => setExpandedCard(null)}
-                      />
-                    )}
-                  </AnimatePresence>
-
+                {/* ── 스크롤 영역 ───────────────────────────────────── */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto">
                   <div className="p-4 space-y-4">
                     {/* 재분석 프롬프트 */}
                     <AnimatePresence>
@@ -336,7 +343,7 @@ export function AIAnalysisPanel({
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
                             return (
-                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />
+                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[120px]" />
                             );
                           }
                           return (
@@ -370,17 +377,17 @@ export function AIAnalysisPanel({
                     {(["research_manager", "trader"] as AgentKey[]).some(
                       k => agents.find(a => a.key === k)?.status !== "pending"
                     ) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 pt-2">
                         {(["research_manager", "trader"] as AgentKey[]).map((key) => {
                           const meta = AGENT_META.find(m => m.key === key)!;
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
-                            return <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[180px]" />;
+                            return <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[120px]" />;
                           }
                           if (key === "trader") {
                             return (
                               <div key={key} className="relative">
-                                <span className="absolute -top-2 right-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                <span className="absolute -top-3.5 right-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
                                   🧠 심층 추론
                                 </span>
                                 <AnalystCard
@@ -411,28 +418,32 @@ export function AIAnalysisPanel({
                       </div>
                     )}
 
-                    {/* ── Row 5: 리스크 3개 병렬 (3-col grid) ───────────────── */}
+                    {/* ── Row 5: 리스크 3개 병렬 ─────────────────────────────
+                        모바일: 가로 스냅 캐러셀(다음 카드 peek) — 3개 스트림을 모두 살려둠.
+                        md+: 3-col grid. */}
                     {(["risk_risky", "risk_neutral", "risk_safe"] as AgentKey[]).some(
                       k => agents.find(a => a.key === k)?.status !== "pending"
                     ) && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide-mobile md:grid md:grid-cols-3 md:overflow-visible">
                         {(["risk_risky", "risk_neutral", "risk_safe"] as AgentKey[]).map((key) => {
                           const meta = AGENT_META.find(m => m.key === key)!;
                           const agentState = agents.find(a => a.key === key)!;
-                          if (agentState.status === "pending") {
-                            return <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[160px]" />;
-                          }
                           return (
-                            <AnalystCard
-                              key={key}
-                              meta={meta}
-                              status={agentState.status}
-                              content={reports[key]}
-                              streamingChunk={agentState.streamingChunk}
-                              isRunning={isRunning}
-                              onExpand={handleExpand}
-                              onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                            />
+                            <div key={key} className="snap-start shrink-0 w-[78%] sm:w-[46%] md:w-auto">
+                              {agentState.status === "pending" ? (
+                                <div className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[120px] h-full" />
+                              ) : (
+                                <AnalystCard
+                                  meta={meta}
+                                  status={agentState.status}
+                                  content={reports[key]}
+                                  streamingChunk={agentState.streamingChunk}
+                                  isRunning={isRunning}
+                                  onExpand={handleExpand}
+                                  onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                                />
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -473,6 +484,19 @@ export function AIAnalysisPanel({
 
                   </div>
                 </div>
+
+                {/* 카드 상세 오버레이 — 스크롤 컨테이너 밖에서 패널 전체를 덮어
+                    배경 스크롤 위치와 무관하게 항상 풀하이트로 표시(자체 내부 스크롤). */}
+                <AnimatePresence>
+                  {expandedCard && (
+                    <CardDetailOverlay
+                      key="detail"
+                      title={expandedCard.title}
+                      content={expandedCard.content}
+                      onClose={() => setExpandedCard(null)}
+                    />
+                  )}
+                </AnimatePresence>
           </motion.aside>
         </>
       )}
