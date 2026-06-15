@@ -84,16 +84,24 @@ export const COPY = {
     badge: "최종 결정",
     confidence: (level: "HIGH" | "MEDIUM" | "LOW") =>
       `확신도: ${level === "HIGH" ? "높음" : level === "MEDIUM" ? "보통" : "낮음"}`,
+    /** 확신도 산출 근거 — 무엇 기준인지 보조 설명 */
+    confidenceBasis: "분석가 합의·데이터 명확성 기준",
+    /** verdict 유효 기간 라벨 prefix */
+    horizon: (h: "단기" | "중기" | "장기") => `유효 기간: ${h}`,
     strengths: "핵심 강점",
     risks: "핵심 리스크",
     portfolioSummary: "아래에서 전체 결과 확인 ↓",
     disclaimer:
       "본 AI 분석 결과는 투자 참고용이며, 최종 투자 결정과 책임은 투자자 본인에게 있습니다.",
     executionGuide: "매매 실행 가이드",
+    /** 신규 진입자 / 기존 보유자 가이드 블록 헤더 */
+    newEntryLabel: "🆕 신규 진입 시",
+    holderLabel: "📊 이미 보유 중이면",
     targetLabel: "목표가",
     reentryLabel: "재진입 구간",
     stopLossLabel: "손절선",
     rrLabel: "손익비",
+    targetHint: "현재가 대비",
     shortTermLabel: "단기 전망 (1~2주)",
     midTermLabel: "중기 전망 (1~3개월)",
   },

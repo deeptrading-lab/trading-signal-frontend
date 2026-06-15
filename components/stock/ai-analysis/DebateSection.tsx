@@ -74,14 +74,14 @@ export function DebateSection({
             if (!bullMsg && !isBullThisRound && !bearMsg && !isBearThisRound) return null;
 
             return (
-              <div key={round} className="grid grid-cols-[1fr_28px_1fr] gap-2 items-stretch">
+              <div key={round} className="grid grid-cols-[1fr_28px_1fr] gap-1 items-stretch">
                 <div>
                   {bullMsg && (
                     <DebateMsgCard msg={bullMsg} debatingSide={debatingSide} onExpand={onExpand} />
                   )}
                   {isBullThisRound && !bullMsg && <DebateLoadingCard side="bull" />}
                 </div>
-                <div className="flex flex-col items-center gap-1 pt-2">
+                <div className="flex flex-col items-center gap-1 py-1">
                   <span className="text-[10px] font-black text-slate-500 dark:text-slate-400">R{round}</span>
                   <div className="flex-1 w-0.5 bg-slate-400 dark:bg-slate-500 min-h-[20px]" />
                 </div>

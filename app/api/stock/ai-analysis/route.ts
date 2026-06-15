@@ -253,7 +253,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const pastDecisionContext = prevDecisions.length > 0
     ? `\n\n**과거 결정 참고** (같은 종목 이전 AI 분석 결과 — 패턴 학습용):\n${
         prevDecisions.map(d =>
-          `- ${d.date.slice(0, 10)}: ${d.verdict} (확신도: ${d.confidence}) / 목표: ${d.target_pct != null ? `+${d.target_pct}%` : "없음"} / 손절: ${d.stop_loss_pct}%`
+          `- ${d.date.slice(0, 10)}: ${d.verdict} (확신도: ${d.confidence}) / 목표: ${d.target_pct != null ? `${d.target_pct > 0 ? "+" : ""}${d.target_pct}%` : "없음"} / 손절: ${d.stop_loss_pct}%`
         ).join("\n")
       }\n과거 결정의 논리를 반복하지 말고, 현재 데이터에 기반해 독립적으로 판단하세요.`
     : "";
@@ -390,7 +390,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             const parsed = parseLooseJson(text);
             if (parsed && typeof parsed === "object") {
               const d = parsed as Record<string, unknown>;
-              const VERDICTS = new Set(["BUY", "OVERWEIGHT", "HOLD", "UNDERWEIGHT", "SELL"]);
+              const VERDICTS = new Set(["BUY", "OVERWEIGHT", "HOLD", "UNDERWEIGHT", "REDUCE", "SELL"]);
               if (VERDICTS.has(d.verdict as string)) {
                 const rawTarget = typeof d.target_pct === "number" ? d.target_pct : null;
                 const rawStop = typeof d.stop_loss_pct === "number" ? d.stop_loss_pct : -5;
@@ -407,7 +407,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                     ? d.confidence : "MEDIUM") as FinalDecision["confidence"],
                   time_horizon: (["단기", "중기", "장기"].includes(d.time_horizon as string)
                     ? d.time_horizon : "중기") as FinalDecision["time_horizon"],
-                  entry_strategy: typeof d.entry_strategy === "string" ? d.entry_strategy : "",
+                  new_entry_strategy: typeof d.new_entry_strategy === "string" ? d.new_entry_strategy : "",
+                  holder_strategy: typeof d.holder_strategy === "string" ? d.holder_strategy : "",
                   target_pct: rawTarget,
                   stop_loss_pct: rawStop > 0 ? -rawStop : rawStop,
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
