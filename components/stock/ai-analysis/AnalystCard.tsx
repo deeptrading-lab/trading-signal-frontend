@@ -6,7 +6,8 @@ import { RefreshCw, Check, AlertCircle, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { stripMarkdown } from "@/lib/utils/stripMarkdown";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import type { AgentMeta, AgentStatus } from "@/lib/types/stock/aiAnalysis";
+import type { AgentMeta, AgentStatus, SentimentReport } from "@/lib/types/stock/aiAnalysis";
+import { SentimentBadge } from "./SentimentBadge";
 
 interface AnalystCardProps {
   meta: AgentMeta;
@@ -16,6 +17,8 @@ interface AnalystCardProps {
   isRunning: boolean;
   onExpand: (title: string, content: string) => void;
   onRetry?: () => void;
+  /** SNS 분석가(social) 카드 전용 — 정형 감성. 그 외 카드에는 전달하지 않음. */
+  sentiment?: SentimentReport | null;
 }
 
 export const AnalystCard = memo(function AnalystCard({
@@ -26,6 +29,7 @@ export const AnalystCard = memo(function AnalystCard({
   isRunning: globalRunning,
   onExpand,
   onRetry,
+  sentiment,
 }: AnalystCardProps) {
   const isActive = status === "running";
   const isDone = status === "done";
@@ -81,6 +85,12 @@ export const AnalystCard = memo(function AnalystCard({
       </div>
 
       <div className="flex-1 overflow-hidden px-3 py-2.5">
+        {/* SNS 분석가 카드 전용 감성 배지 — done + 파싱 성공 시에만(폴백 시 미표시). */}
+        {isDone && sentiment && (
+          <div className="mb-2">
+            <SentimentBadge report={sentiment} />
+          </div>
+        )}
         {isActive && (
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
             <span className="line-clamp-3 whitespace-pre-wrap">
