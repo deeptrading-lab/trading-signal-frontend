@@ -11,7 +11,9 @@ import type {
   AgentKey,
   AIAnalysisEvent,
   AIAnalysisProvider,
+  SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
+import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 
 // ─── 서버 전용 파이프라인 상태 ────────────────────────────────────────────────
@@ -32,6 +34,18 @@ export interface AnalysisState {
   riskRisky: string;
   riskNeutral: string;
   riskSafe: string;
+  /** SNS 분석가 응답에서 파싱한 정형 감성 — 없으면 undefined(PM 주입 시 "데이터 없음" 분기). */
+  sentiment?: SentimentReport;
+}
+
+/** PM 프롬프트에 주입할 정형 감성 한 줄 컨텍스트(없으면 "데이터 없음"). */
+export function buildSentimentContext(sentiment?: SentimentReport): string {
+  if (!sentiment) {
+    return "\n[SNS 정형 감성] 데이터 없음 (자유서술 리포트만 참고)";
+  }
+  const bandLabel = COPY.sentiment.bandLabel[sentiment.band];
+  const confLabel = COPY.sentiment.confidenceLabel[sentiment.confidence];
+  return `\n[SNS 정형 감성] 밴드: ${bandLabel} · 점수: ${sentiment.score}/10 · 신뢰도: ${confLabel}`;
 }
 
 // ─── 에이전트 프롬프트 정의 타입 ─────────────────────────────────────────────
@@ -46,6 +60,20 @@ export type AgentPrompts = {
 };
 
 const LANG_INSTRUCTION = "\n\n모든 응답은 반드시 한국어로 작성하세요.";
+
+/**
+ * 7단계 감성 밴드 한글 라벨(부정→긍정 순). social 프롬프트의 파싱 블록 지시에 노출하고,
+ * route.ts의 `parseSentimentBlock`이 동일 라벨 화이트리스트로 역매핑한다.
+ */
+const SENTIMENT_BAND_LABELS = [
+  COPY.sentiment.bandLabel.VERY_NEGATIVE,
+  COPY.sentiment.bandLabel.NEGATIVE,
+  COPY.sentiment.bandLabel.SLIGHTLY_NEGATIVE,
+  COPY.sentiment.bandLabel.NEUTRAL,
+  COPY.sentiment.bandLabel.SLIGHTLY_POSITIVE,
+  COPY.sentiment.bandLabel.POSITIVE,
+  COPY.sentiment.bandLabel.VERY_POSITIVE,
+];
 
 /** %가 비중인지 등락률(수익률)인지 모호하지 않게 — 트레이더·PM 공용 규칙 */
 const PCT_CLARITY =
@@ -165,7 +193,25 @@ WebSearch 도구로 다음을 검색하세요:
 - 과열/공포 신호: 과도한 낙관 또는 공포가 감지되는지 여부
 - 수급 심리: 개인·기관·외국인 수급 흐름에서 읽히는 심리
 
+**내러티브 품질 가이드 (반드시 준수)**:
+- 비율(예: "강세 70%")을 단정하지 말고, 검색에서 실제로 읽힌 정도를 근거로 추정임을 밝히세요.
+- 표본 출처를 밝히세요 — 어떤 커뮤니티에서 얼마나 많은 언급을 확인했는지(표본이 적으면 그 한계를 명시).
+- 과열/공포 신호와 단순 노이즈(소수 의견·도배)를 구분하세요.
+- 근거 없는 확신은 금지합니다. 데이터가 빈약하면 신뢰도를 낮게 표기하세요.
+
 리포트 마지막에는 감성 지표를 정리한 마크다운 표를 반드시 포함하세요.
+
+**그리고 리포트의 맨 끝에**, 기계가 파싱할 수 있도록 아래 형식의 감성 요약 블록을 정확히 한 번 출력하세요(HTML 주석 형태 — 화면에는 보이지 않습니다):
+
+<!-- SENTIMENT
+band: ${SENTIMENT_BAND_LABELS.join(" | ")} 중 하나
+score: 0~10 사이 정수
+confidence: low | medium | high
+summary: 한 줄 요약(80자 이내, 한글)
+-->
+
+- band/score는 **주가 전망이 아니라** 현재 SNS·커뮤니티에서 읽힌 개인 투자자 군중 심리의 긍정/부정 방향·강도입니다(과신 방지). score는 0=매우 부정, 5=중립, 10=매우 긍정으로 중앙정렬하고 band 라벨과 일관되게 맞추세요.
+- confidence는 검색으로 확보한 표본의 양·일관성입니다. 표본이 적거나 의견이 상충하면 low로 표기하세요.
 
 핵심 신호 최대 5개와 마크다운 표 1개를 포함해 총 2,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
     user: (s) => `종목 코드 ${s.ticker}에 대한 SNS·온라인 커뮤니티 투자 심리를 웹 검색으로 조사하고 감성 분석 리포트를 작성하세요.\n\n[참고 — 주체별 수급·가격 스냅샷 (정량 데이터, 웹 검색 없이 바로 활용 가능)]\n${s.priceContext}`,
