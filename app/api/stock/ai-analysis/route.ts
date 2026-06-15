@@ -36,6 +36,7 @@ import type {
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionEntry } from "@/lib/api/stock/aiDecisionStore";
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
+import { isVercelEnv } from "@/lib/server/env";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 
@@ -45,15 +46,6 @@ const CHART_DAYS = 200;
 //   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
 const TIMEOUT_TOTAL_MS = 3_000_000;
 
-// ─── Vercel guard ─────────────────────────────────────────────────────────────
-
-function isVercelEnv(): boolean {
-  return (
-    process.env.VERCEL === "1" ||
-    typeof process.env.VERCEL_ENV === "string" ||
-    typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string"
-  );
-}
 
 // ─── SSE 헬퍼 ─────────────────────────────────────────────────────────────────
 

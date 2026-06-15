@@ -35,6 +35,8 @@ export const queryKeys = {
     investors: (ticker: string) => ["stock", "investors", ticker] as const,
     /** 종목 "회사 소개"(자유 텍스트, 외부 출처) — 거의 변하지 않는 정적 정보. */
     description: (ticker: string) => ["stock", "description", ticker] as const,
+    /** 로컬 AI CLI(claude·codex) 가용성 — AI 분석 진입 화면이 참조. 종목 무관 단일 키. */
+    aiProviders: ["stock", "ai-providers"] as const,
   },
   flow: {
     /** 시장 전체 외국인/기관 순매수 Top10(수급 표면 A) — 당일/7일누적 모드별 분리 캐시. */

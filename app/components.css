@@ -385,7 +385,7 @@
    * 높이를 잡아주므로 본 클래스에서 명시 height 제거. 시안 (`Stock and Coin Analysis App/
    * src/app/components/Sidebar.tsx`) 의 `px-6 py-6` 정합 — `py-2xl px-lg` (24px / 14px). */
   .sidebar {
-    @apply hidden lg:flex flex-col w-sidebar-w bg-surface text-text-strong border-r border-border-line py-2xl px-lg overflow-y-auto;
+    @apply hidden lg:flex flex-col w-sidebar-w bg-surface text-text-strong border-r border-border-line pt-md pb-2xl px-lg overflow-y-auto;
   }
   .sidebar-section-header {
     @apply px-sm py-xs text-sidebar-section text-text-muted uppercase;

@@ -1,18 +1,51 @@
 export const COPY = {
+  /** 종목 헤더의 AI 분석 진입 버튼 라벨. */
+  trigger: "AI 종합분석",
   provider: {
     claude: "Claude",
     codex: "Codex",
-    select: "AI 공급자 선택",
-    current: (label: string) => `${label}로 분석`,
-    changeDisabled: "분석 중에는 공급자를 바꿀 수 없어요.",
+  },
+  /** AI 분석 진입 화면(ProviderChooser) — 설치된 로컬 CLI 기반 공급자 선택. */
+  chooser: {
+    title: "분석에 사용할 AI를 선택하세요",
+    loading: "사용 가능한 AI를 확인하는 중...",
+    // 공급자 이름만 강조 렌더하려고 이름/나머지를 분리한다(ProviderChooser).
+    singleSuffix: "로 분석할 수 있어요. 시작할까요?",
+    start: "분석 시작",
+    noneLocal:
+      "사용 가능한 AI CLI가 없어요. claude 또는 codex CLI를 설치한 뒤 다시 시도해 주세요.",
+    vercel: "AI 종합분석은 로컬 환경(next dev)에서만 사용할 수 있어요.",
+    // 조회 자체가 실패한 경우(네트워크/서버 오류) — "미설치"와 구분해 재시도를 유도.
+    error: "사용 가능한 AI를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.",
+    retry: "다시 시도",
+    desc: {
+      claude: "깊이 있는 추론으로 신중하게 분석",
+      codex: "빠르고 간결하게 핵심을 분석",
+    },
   },
   panel: {
     title: "AI 종합분석",
+    /** 분석 중 헤더에 노출 — 현재 진행 중인 에이전트 기준 상태 한 줄. */
+    runningStatus: {
+      market:            "기술적 지표 분석 중",
+      news:              "뉴스·공시 살펴보는 중",
+      fundamentals:      "재무·실적 뜯어보는 중",
+      social:            "투자 심리 살피는 중",
+      bull:              "강세 논거 정리 중",
+      bear:              "약세 논거 정리 중",
+      research_manager:  "토론 종합하는 중",
+      trader:            "매매 전략 짜는 중",
+      risk_risky:        "공격적 리스크 점검 중",
+      risk_neutral:      "중립적 리스크 점검 중",
+      risk_safe:         "보수적 리스크 점검 중",
+      portfolio_manager: "최종 결론 내리는 중",
+    } as Record<string, string>,
+    /** 진행 중이나 특정 에이전트가 아직 안 잡힐 때 폴백. */
+    runningFallback: "분석 중",
     stop: "중지",
     resumeFrom: (label: string) => `${label}부터`,
-    restartAll: "처음부터",
-    minimize: "접기",
-    expand: "펼치기",
+    // restartAll 도 공급자 선택 화면으로 돌아간다(다른 AI로 다시 선택).
+    restartAll: "다시 선택",
     close: "닫기",
   },
   progress: {
@@ -68,14 +101,10 @@ export const COPY = {
     back: "돌아가기",
   },
   reanalysis: {
-    prompt: "이전 분석 결과가 있습니다. AI로 재분석할까요?",
-    confirm: "재분석하기",
+    // confirm 은 즉시 재실행이 아니라 공급자 선택 화면으로 돌아가 다시 고르게 한다.
+    prompt: "이전 분석 결과가 있습니다. 새로 분석할까요?",
+    confirm: "새로 분석",
     dismiss: "유지하기",
-  },
-  empty: {
-    title: "AI 에이전트들이 대기 중입니다",
-    description: (provider: string) => `${provider} 에이전트로 분석을 시작할 수 있어요`,
-    start: "분석 시작하기",
   },
   errorState: {
     retry: "다시 시도",

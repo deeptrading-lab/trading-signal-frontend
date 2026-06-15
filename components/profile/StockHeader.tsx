@@ -36,11 +36,11 @@ import {
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 
 export interface StockHeaderProps {
   ticker: string;
-  onAIAnalysis?: (provider: AIAnalysisProvider) => void;
+  /** AI 종합분석 패널 열기. 공급자 선택은 패널 안 진입 화면(ProviderChooser)에서 한다. */
+  onAIAnalysis?: () => void;
 }
 
 export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
@@ -110,28 +110,14 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
         </h1>
         <WatchlistStarButton added={added} onToggle={toggleWatch} />
         {onAIAnalysis && (
-          <div className="ml-sm inline-flex items-center rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 overflow-hidden shadow-sm">
-            <span className="inline-flex items-center gap-xs px-sm text-label font-bold text-indigo-600 dark:text-indigo-400">
-              <Sparkles size={16} className="text-indigo-500" />
-              AI 분석
-            </span>
-            {(["claude", "codex"] as const).map((provider) => (
-              <button
-                key={provider}
-                type="button"
-                onClick={() => onAIAnalysis(provider)}
-                className={cn(
-                  "px-sm py-xs text-label font-bold transition-colors cursor-pointer border-l border-indigo-200 dark:border-indigo-800",
-                  provider === "claude"
-                    ? "text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/30"
-                    : "text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/30",
-                )}
-                aria-label={COPY.provider.current(COPY.provider[provider])}
-              >
-                {COPY.provider[provider]}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={onAIAnalysis}
+            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 rounded-lg text-sm font-bold transition-colors border border-indigo-200 dark:border-indigo-800 shadow-sm cursor-pointer"
+          >
+            <Sparkles size={16} className="text-indigo-500" />
+            {COPY.trigger}
+          </button>
         )}
       </div>
 

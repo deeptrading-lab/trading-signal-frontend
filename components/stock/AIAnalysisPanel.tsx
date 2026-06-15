@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X, Sparkles, Check, RefreshCw, Square,
-  ChevronDown, ChevronUp, AlertCircle, Loader2,
+  AlertCircle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { AGENT_META } from "@/lib/types/stock/aiAnalysis";
@@ -17,6 +17,7 @@ import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
 import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
+import { ProviderChooser } from "./ai-analysis/ProviderChooser";
 
 interface AIAnalysisPanelProps extends AIAnalysisHook {
   ticker: string;
@@ -27,7 +28,6 @@ export function AIAnalysisPanel({
   provider,
   isOpen,
   isRunning,
-  isMinimized,
   showReanalysisPrompt,
   agents,
   reports,
@@ -37,12 +37,12 @@ export function AIAnalysisPanel({
   error,
   resumeFrom,
   open,
+  start,
+  chooseAgain,
   run,
   resume,
   stop,
   close,
-  toggleMinimize,
-  selectProvider,
   dismissReanalysisPrompt,
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -54,11 +54,17 @@ export function AIAnalysisPanel({
   const hasDebate = debate.length > 0
     || agents.some(a => (a.key === "bull" || a.key === "bear") && a.status !== "pending");
 
-  // 배경 스크롤 잠금 (minimized이면 해제)
+  // 분석 중 헤더 상태 — 현재 진행 중인 에이전트 기준 한 줄 메시지.
+  const runningAgent = agents.find((a) => a.status === "running");
+  const runningStatus = runningAgent
+    ? (COPY.panel.runningStatus[runningAgent.key] ?? COPY.panel.runningFallback)
+    : COPY.panel.runningFallback;
+
+  // 배경 스크롤 잠금
   useEffect(() => {
-    document.body.style.overflow = (isOpen && !isMinimized) ? "hidden" : "";
+    document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [isOpen, isMinimized]);
+  }, [isOpen]);
 
   // ESC 닫기
   useEffect(() => {
@@ -74,7 +80,7 @@ export function AIAnalysisPanel({
 
   // 새 에이전트 시작 / 토론 진행 시 자동 스크롤
   useEffect(() => {
-    if (!scrollRef.current || isMinimized || final) return;
+    if (!scrollRef.current || final) return;
     const hasRunning = agents.some((a) => a.status === "running");
     if (!hasRunning && debate.length === 0) return;
     const el = scrollRef.current;
@@ -82,17 +88,17 @@ export function AIAnalysisPanel({
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     });
     return () => cancelAnimationFrame(id);
-  }, [agents, debate.length, isMinimized, final]);
+  }, [agents, debate.length, final]);
 
   // 최종 결론 도착 시 맨 아래로 — DOM 렌더 후 스크롤
   useEffect(() => {
-    if (!final || !scrollRef.current || isMinimized) return;
+    if (!final || !scrollRef.current) return;
     const el = scrollRef.current;
     const id = setTimeout(() => {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }, 120);
     return () => clearTimeout(id);
-  }, [final, isMinimized]);
+  }, [final]);
 
   const handleExpand = (title: string, content: string) => setExpandedCard({ title, content });
 
@@ -125,19 +131,17 @@ export function AIAnalysisPanel({
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* 스크림 — minimized면 숨김 */}
-          {!isMinimized && (
+            {/* 스크림 — 상단 navbar(지수·테마토글)는 가리지 않도록 navbar 높이 아래에서 시작 */}
             <motion.div
               key="scrim"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={close}
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[65]"
+              className="fixed top-[56px] inset-x-0 bottom-0 bg-slate-900/60 backdrop-blur-sm z-[65]"
             />
-          )}
 
-          {/* 패널 */}
+          {/* 패널 — navbar 아래에서 시작(상단 지수·테마토글 노출 유지) */}
           <motion.aside
             key="panel"
             initial={{ x: "100%" }}
@@ -145,45 +149,37 @@ export function AIAnalysisPanel({
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
-              "fixed top-0 right-0 z-[70] bg-slate-50 dark:bg-slate-950 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden",
+              "fixed top-[56px] right-0 bottom-0 z-[70] bg-slate-50 dark:bg-slate-950 shadow-2xl border-t border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden",
               "w-full",
-              isMinimized ? "" : "h-full",
             )}
-            aria-label="AI 종합분석"
+            aria-label={COPY.panel.title}
             role="complementary"
           >
             {/* ── 헤더 ──────────────────────────────────────────────────── */}
-            <div className="flex-none flex items-center justify-between px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="text-blue-500 dark:text-blue-400 shrink-0" size={20} />
-                <div className="flex flex-col">
-                  <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{displayName}</h2>
-                  <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 leading-none mt-0.5">{COPY.panel.title}</span>
-                </div>
-                <div
-                  className="inline-flex overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
-                  aria-label={COPY.provider.select}
-                  title={isRunning ? COPY.provider.changeDisabled : undefined}
-                >
-                  {(["claude", "codex"] as const).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => selectProvider(item)}
-                      disabled={isRunning}
-                      className={cn(
-                        "px-2 py-1 text-[11px] font-bold transition-colors",
-                        item === provider
-                          ? "bg-blue-600 text-white dark:bg-blue-500"
-                          : "bg-white text-slate-500 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800",
-                        isRunning && "cursor-not-allowed opacity-60",
-                      )}
-                      aria-pressed={item === provider}
-                    >
-                      {COPY.provider[item]}
-                    </button>
-                  ))}
-                </div>
+            <div className="flex-none flex items-center justify-between px-5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Sparkles className="text-blue-500 dark:text-blue-400 shrink-0" size={18} />
+                <h2 className="font-bold text-base leading-tight text-slate-900 dark:text-white shrink-0">{displayName}</h2>
+                {/* 분석에 사용 중인 공급자 표시(읽기 전용) — 공급자 선택은 진입 화면에서만. */}
+                {!isAllPending && (
+                  <span
+                    className={cn(
+                      "shrink-0 px-2 py-0.5 rounded-md text-[11px] font-bold",
+                      provider === "claude"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                        : "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                    )}
+                  >
+                    {COPY.provider[provider]}
+                  </span>
+                )}
+                {/* 분석 중 — 현재 진행 에이전트 기준 상태 */}
+                {isRunning && (
+                  <span className="inline-flex items-center gap-1.5 min-w-0 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                    <Loader2 size={12} className="animate-spin shrink-0" />
+                    <span className="truncate">{runningStatus}…</span>
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 {/* 중지 / 재개 버튼 */}
@@ -209,22 +205,13 @@ export function AIAnalysisPanel({
                     )}
                     <button
                       type="button"
-                      onClick={run}
+                      onClick={chooseAgain}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                     >
                       <RefreshCw size={11} /> {COPY.panel.restartAll}
                     </button>
                   </>
                 )}
-                {/* 접기/펼치기 */}
-                <button
-                  type="button"
-                  onClick={toggleMinimize}
-                  title={isMinimized ? COPY.panel.expand : COPY.panel.minimize}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
-                >
-                  {isMinimized ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-                </button>
                 {/* 닫기 */}
                 <button
                   type="button"
@@ -237,9 +224,6 @@ export function AIAnalysisPanel({
               </div>
             </div>
 
-            {/* ── 접힌 상태면 나머지 숨김 ──────────────────────────────── */}
-            {!isMinimized && (
-              <>
                 {/* ── 에이전트 진행 바 ────────────────────────────────── */}
                 <div className="flex-none px-5 py-2.5 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -312,7 +296,7 @@ export function AIAnalysisPanel({
                           <div className="flex gap-2 flex-none">
                             <button
                               type="button"
-                              onClick={run}
+                              onClick={chooseAgain}
                               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
                             >
                               {COPY.reanalysis.confirm}
@@ -329,26 +313,9 @@ export function AIAnalysisPanel({
                       )}
                     </AnimatePresence>
 
-                    {/* 시작 전 빈 상태 */}
+                    {/* 시작 전 — 공급자 선택 화면(로컬 CLI 가용성 기반) */}
                     {isAllPending && !error && !isRunning && (
-                      <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-20 opacity-70">
-                        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                          <Sparkles className="text-slate-400 w-8 h-8" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{COPY.empty.title}</h3>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {COPY.empty.description(COPY.provider[provider])}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={run}
-                          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
-                        >
-                          {COPY.empty.start}
-                        </button>
-                      </div>
+                      <ProviderChooser onSelect={start} />
                     )}
 
                     {/* 오류 */}
@@ -506,8 +473,6 @@ export function AIAnalysisPanel({
 
                   </div>
                 </div>
-              </>
-            )}
           </motion.aside>
         </>
       )}
