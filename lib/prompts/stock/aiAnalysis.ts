@@ -466,6 +466,7 @@ ${PCT_CLARITY}
 
 confidence 산출 기준 (이 verdict 판단에 대한 확신 정도):
 - 근거: 4개 분석가(기술·뉴스·펀더멘털·심리) + 강세/약세 토론 + 리스크 3팀의 **방향 합의 정도 + 데이터 명확성**.
+- SNS 정형 감성(밴드/점수/신뢰도)이 verdict 방향과 일치하면 확신을 강화하고, 상충하면 확신을 낮추세요. 단 감성 confidence가 low면 가중을 약하게 두세요. (감성은 보조 신호이므로 verdict 자체 방향 선택은 바꾸지 말고 confidence만 보정하세요.)
 - HIGH: 다수가 같은 방향을 가리키고 데이터가 명확함
 - MEDIUM: 방향은 잡히나 일부 이견 또는 불확실성 존재
 - LOW: 신호가 서로 상충하거나 데이터가 부족함
@@ -509,6 +510,7 @@ ${s.fundamentalsReport}
 
 [SNS·커뮤니티 심리]
 ${s.socialReport}
+${buildSentimentContext(s.sentiment)}
 
 [강세 연구원 최종 논거]
 ${s.bullArgument.slice(0, 2000)}
