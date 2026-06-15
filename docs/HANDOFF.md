@@ -3898,3 +3898,45 @@
   - codex CLI 실제 설치 환경에서 2개 분기 end-to-end(실분석) 검증 — 현재 로컬엔 claude만 설치.
   - 공급자 3개 이상 확장 시 chooser `grid-cols-2` 및 `PROVIDER_STYLE` 재검토.
   - chooser 로딩/안내 상태 `aria-live` 보강(스크린리더 전이 안내) — 우선순위 낮음.
+
+### 2026-06-15 — feat(ai-analysis): 구조화 감성(SNS 정형 감성 + PM confidence 정량 반영) (#124)
+
+- **slug**: `ai-sentiment-structured` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/124
+- **요약**: feat(ai-analysis): 구조화 감성(SNS 정형 감성 + PM confidence 정량 반영)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 레퍼런스 `TauricResearch/TradingAgents`의 `SentimentReport` 패턴을 우리 멀티에이전트 AI 분석에 이식한다. SNS 분석가(`social`)가 자유서술 리포트 끝에 **파싱 가능한 정형 감성 블록**(7단계 밴드 · 0~10 점수 · 신뢰도 · 한줄요약)을 동봉하고, 서버가 정규식으로 파싱해 새 `sentiment` SSE 이벤트로 발행한다. 별도 LLM 호출·외부 API 추가 0(토큰·레이턴시 증가 0), 블록 누락 시 graceful 폴백.
+  > 
+  > PRD: `docs/prd/ai-sentiment-structured.md` · DESIGN: `docs/design/ai-sentiment-structured.md`
+  > 
+  > ## 변경 내용
+  > 
+  > - **구조화 감성 풀 파이프라인**
+  >   - social 프롬프트: 정형 감성 블록(`<!-- SENTIMENT ... -->`) 출력 지시 + 내러티브 품질 가이드
+  >   - route.ts: `parseSentimentBlock`/`stripSentimentBlock`(한글 라벨 화이트리스트→코드, score 0~10 clamp) → `sentiment` 이벤트 발행, 마커 strip 후 clean report 발행, 재개 시 재파싱 복원
+  >   - 타입: `SentimentBand`(7단계)·`SentimentConfidence`·`SentimentReport` + `AIAnalysisEvent` variant
+  >   - PM 프롬프트: 정형 감성 한 줄 주입 + confidence 산출에 "감성↔verdict 정합" 반영 (**verdict 가중 X — confidence에만**)
+  >   - UI: `SentimentBadge`(밴드 라벨 1차 + 점수/10 보조 + 신뢰도 병기, 과신 방지·신뢰도 low 약화), social 카드에만 연결
+  >   - 카피: `COPY.sentiment` (7단계 한글 라벨·신뢰도·과신 방지 문구), 인라인 한글 0
+  >   - 회고: `aiDecisionStore`에 `sentiment_score`/`sentiment_band` 동반 저장
+  > - **시세 신선도 가드** (부가): 최신 일봉이 `STALE_MAX_DAYS=10` 초과 노후면 분석 조기 중단(콜드스타트·휴장 시 옛 가격 분석 방지)
+  > - **bull/bear 프롬프트 버그 수정** (부가): 깨진 템플릿 `${"{target}"}` 리터럴 노출 제거
+  > 
+  > ## 결정 사항 (PRD §9 RESOLVED)
+  > 
+  > - q1 밴드 단계 = **7단계** (색은 5톤으로 묶고 라벨로 세분, 한국 관례 긍정=빨강/부정=파랑)
+  > - q2 표기 = **점수+신뢰도 병기** (과신 방지)
+  > - q3 PM 연결 = **confidence에만** (감성=역지표 가능 보조신호, over-weighting 방지)
+  > - q4 회고 저장 = **MVP 포함** (저장만)
+  > 
+  > ## 품질 게이트
+  > 
+  > - `typecheck` ✅ · `lint` ✅ · `build` ✅ · `test` 202통과 (실패 1건은 사전존재 `app/api/market/indices` 라이브 네트워크 테스트, 본 변경 무관)
+  > - **미검증**: 실제 LLM 라운드트립(블록 형식 준수·배지 렌더)은 로컬 `next dev` + AI CLI 환경 필요 → QA 단계 라이브 확인 권장
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - QA: 로컬 `next dev` + claude/codex CLI로 감성 블록 라이브 발행률·배지 렌더(두 뷰포트)·PM confidence 정합·신선도 가드 회귀 스폿체크 (AC-3/8/12)
+  - 후속: 감성 추이 차트화(회고 데이터 누적 후 별도 PRD), 외부 감성 데이터 소스 연동, 다른 분석가(news/fundamentals) 정형화 트랙
+  - 신선도 가드 임계값(`STALE_MAX_DAYS=10`) 실운영 모니터링 — 연휴 직후 오탐 시 영업일 기준으로 조정
