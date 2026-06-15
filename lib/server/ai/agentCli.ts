@@ -1,4 +1,8 @@
 import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import {
+  invokeClaudeAgentStream,
+  type AgentCallOpts,
+} from "@/lib/server/claudeAgent";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 
 const MAX_STDOUT = 4 * 1024 * 1024;
@@ -147,4 +151,36 @@ export function invokeAgentCli(request: AgentCliRequest): Promise<string> {
     }
     request.signal.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+export interface AgentCliStreamRequest extends AgentCallOpts {
+  model?: string;
+}
+
+export async function invokeAgentCliStream(
+  provider: AIAnalysisProvider,
+  request: AgentCliStreamRequest,
+  signal: AbortSignal,
+  onToken: (token: string) => void,
+): Promise<string> {
+  if (provider === "claude") {
+    return invokeClaudeAgentStream(
+      process.env.CLAUDE_CLI_PATH ?? "claude",
+      request.model ?? process.env.CLAUDE_CLI_MODEL,
+      request,
+      signal,
+      onToken,
+    );
+  }
+
+  const text = await invokeAgentCli({
+    provider,
+    systemPrompt: request.systemPrompt,
+    userPrompt: request.userPrompt,
+    webSearch: request.tools.length > 0,
+    timeoutMs: request.timeoutMs,
+    signal,
+  });
+  if (text) onToken(text);
+  return text;
 }

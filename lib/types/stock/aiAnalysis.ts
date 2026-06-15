@@ -1,7 +1,7 @@
 /**
  * AI 멀티에이전트 분석 타입.
- * - AgentKey: 8개 에이전트 식별자
- * - AIAnalysisEvent: SSE 이벤트 유니온 (progress / stream / report / debate_stream / debate / final / error / done)
+ * - AgentKey: 12개 에이전트 식별자 (TradingAgents 아키텍처 정합)
+ * - AIAnalysisEvent: SSE 이벤트 유니온
  * - FinalDecision: Portfolio Manager 최종 결정 구조체
  */
 
@@ -9,10 +9,14 @@ export type AgentKey =
   | "market"
   | "news"
   | "fundamentals"
+  | "social"
   | "bull"
   | "bear"
   | "research_manager"
-  | "risk"
+  | "trader"
+  | "risk_risky"
+  | "risk_neutral"
+  | "risk_safe"
   | "portfolio_manager";
 
 export type AIAnalysisProvider = "claude" | "codex";
@@ -26,13 +30,17 @@ export interface AgentMeta {
 }
 
 export const AGENT_META: AgentMeta[] = [
-  { key: "market",            label: "기술 분석가",     description: "기술적 지표·차트 패턴 분석" },
-  { key: "news",              label: "뉴스 분석가",      description: "최신 뉴스·공시 수집 및 정리" },
-  { key: "fundamentals",      label: "기본 분석가",      description: "재무제표·실적·밸류에이션 조사" },
-  { key: "bull",              label: "강세 연구원",      description: "매수 논거 작성" },
-  { key: "bear",              label: "약세 연구원",      description: "매도 논거 작성" },
-  { key: "research_manager",  label: "리서치 매니저",    description: "토론 종합 후 투자 계획 수립" },
-  { key: "risk",              label: "리스크 매니저",    description: "리스크 평가 및 하방 시나리오" },
+  { key: "market",            label: "기술 분석가",      description: "기술적 지표·차트 패턴 분석" },
+  { key: "news",              label: "뉴스 분석가",       description: "최신 뉴스·공시 수집 및 정리" },
+  { key: "fundamentals",      label: "기본 분석가",       description: "재무제표·실적·밸류에이션 조사" },
+  { key: "social",            label: "SNS 분석가",        description: "Reddit·커뮤니티 투자 심리 분석" },
+  { key: "bull",              label: "강세 연구원",       description: "매수 논거 작성" },
+  { key: "bear",              label: "약세 연구원",       description: "매도 논거 작성" },
+  { key: "research_manager",  label: "리서치 매니저",     description: "토론 종합 후 투자 계획 수립" },
+  { key: "trader",            label: "트레이더",          description: "투자 계획 기반 구체적 매매 제안" },
+  { key: "risk_risky",        label: "공격적 리스크",     description: "고수익 기회 옹호, 보수적 가정 반박" },
+  { key: "risk_neutral",      label: "중립적 리스크",     description: "성장 vs 리스크 균형 분석" },
+  { key: "risk_safe",         label: "보수적 리스크",     description: "자산 보호, 하방 리스크 집중" },
   { key: "portfolio_manager", label: "포트폴리오 매니저", description: "최종 매매 결정" },
 ];
 
@@ -67,6 +75,18 @@ export interface FinalDecision {
   key_risks: string[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
   time_horizon: "단기" | "중기" | "장기";
+  /** 진입 전략 — 분할 매수 조건, 관망 이유 등 1~2문장 */
+  entry_strategy: string;
+  /** 목표 수익률 % (예: 15 = +15%). SELL/UNDERWEIGHT 시 null */
+  target_pct: number | null;
+  /** 손절선 % (예: -5 = -5%). 항상 음수 */
+  stop_loss_pct: number;
+  /** 손익비 (예: 3.0 = 3:1). target_pct null이면 null */
+  risk_reward_ratio: number | null;
+  /** 1~2주 단기 전망 1~2문장 */
+  short_term_outlook: string;
+  /** 1~3개월 중기 전망 1~2문장 */
+  mid_term_outlook: string;
 }
 
 // ─── 훅 내부 상태 ────────────────────────────────────────────────────────────
@@ -93,15 +113,31 @@ export const INITIAL_AGENT_STATES: AgentState[] = AGENT_META.map((m) => ({
   streamingChunk: "",
 }));
 
-/** 강세↔약세 토론 라운드 수 (서버·클라이언트 공용) */
+/**
+ * 강세↔약세 토론 라운드 수 (서버·클라이언트 공용).
+ * bull+bear 교대 1쌍 = 1라운드. DEBATE_ROUNDS=2는 bull R1→bear R1→bull R2→bear R2의 4발화를 의미한다.
+ */
 export const DEBATE_ROUNDS = 2;
 
 /** 에이전트 실행 순서 (서버·클라이언트 공용) */
 export const AGENT_ORDER: AgentKey[] = [
-  "market", "news", "fundamentals",
+  "market", "news", "fundamentals", "social",
   "bull", "bear",
-  "research_manager", "risk", "portfolio_manager",
+  "research_manager", "trader",
+  "risk_risky", "risk_neutral", "risk_safe",
+  "portfolio_manager",
 ];
+
+/**
+ * 에러가 발생한 에이전트의 재개 기점을 반환한다.
+ * - bear → bull (토론은 항상 bull부터 재개)
+ * - risk_neutral | risk_safe → risk_risky (3개 병렬 중 첫 번째)
+ */
+export function getResumeKey(agent: AgentKey): AgentKey {
+  if (agent === "bear") return "bull";
+  if (agent === "risk_neutral" || agent === "risk_safe") return "risk_risky";
+  return agent;
+}
 
 /**
  * 이전 실행에서 완료된 에이전트 결과를 재개 시 서버에 전달하는 구조체.
@@ -111,8 +147,12 @@ export interface ResumeState {
   marketReport?: string;
   newsReport?: string;
   fundamentalsReport?: string;
+  socialReport?: string;
   bullArgument?: string;
   bearArgument?: string;
   researchPlan?: string;
-  riskAssessment?: string;
+  traderProposal?: string;
+  riskRisky?: string;
+  riskNeutral?: string;
+  riskSafe?: string;
 }

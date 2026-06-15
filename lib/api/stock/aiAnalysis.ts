@@ -14,6 +14,7 @@ import type {
   AIAnalysisProvider,
   ResumeState,
 } from "@/lib/types/stock/aiAnalysis";
+import type { AIDecisionEntry } from "./aiDecisionStore";
 
 export async function fetchAIAnalysisStream(
   ticker: string,
@@ -22,11 +23,12 @@ export async function fetchAIAnalysisStream(
   signal?: AbortSignal,
   startFrom?: AgentKey,
   preState?: ResumeState,
+  prevDecisions?: AIDecisionEntry[],
 ): Promise<void> {
   const res = await fetch("/api/stock/ai-analysis", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker, provider, startFrom, state: preState }),
+    body: JSON.stringify({ ticker, provider, startFrom, state: preState, prevDecisions }),
     signal,
   });
 

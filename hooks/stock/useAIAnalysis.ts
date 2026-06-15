@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
+import { getRecentDecisions, saveDecision } from "@/lib/api/stock/aiDecisionStore";
 import {
   AGENT_ORDER,
   INITIAL_AGENT_STATES,
+  getResumeKey,
   type AIAnalysisEvent,
   type AIAnalysisProvider,
   type AgentKey,
@@ -66,10 +68,12 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const debateRef = useRef<DebateMessage[]>([]);
   const agentsRef = useRef<AgentState[]>(INITIAL_AGENT_STATES);
   const isRunningRef = useRef(false);
+  const finalRef = useRef<FinalDecision | null>(null);
   useEffect(() => { reportsRef.current = reports; }, [reports]);
   useEffect(() => { debateRef.current = debate; }, [debate]);
   useEffect(() => { agentsRef.current = agents; }, [agents]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+  useEffect(() => { finalRef.current = final; }, [final]);
   useEffect(() => { providerRef.current = provider; }, [provider]);
 
   const resetResults = useCallback(() => {
@@ -103,9 +107,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
           ),
         );
         if (event.status === "error") {
-          // 토론 에이전트(bear 포함) 에러는 bull부터 재개
-          const resumeKey: AgentKey = event.agent === "bear" ? "bull" : event.agent;
-          setResumeFrom((prev) => prev ?? resumeKey);
+          setResumeFrom((prev) => prev ?? getResumeKey(event.agent));
         }
         break;
 
@@ -160,10 +162,23 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         break;
 
       case "done":
+        if (finalRef.current) {
+          saveDecision({
+            ticker,
+            date: new Date().toISOString(),
+            verdict: finalRef.current.verdict,
+            confidence: finalRef.current.confidence,
+            reasoning: finalRef.current.reasoning,
+            target_pct: finalRef.current.target_pct,
+            stop_loss_pct: finalRef.current.stop_loss_pct,
+            short_term_outlook: finalRef.current.short_term_outlook,
+            mid_term_outlook: finalRef.current.mid_term_outlook,
+          });
+        }
         setIsRunning(false);
         break;
     }
-  }, []);
+  }, [ticker]);
 
   // ── 스트림 시작 공통 로직 ──────────────────────────────────────────────────
 
@@ -183,11 +198,20 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setIsMinimized(false);
     setShowReanalysisPrompt(false);
 
-    fetchAIAnalysisStream(ticker, requestedProvider, handleEvent, abort.signal, fromAgent, preState)
+    const prevDecisions = getRecentDecisions(ticker);
+    fetchAIAnalysisStream(
+      ticker,
+      requestedProvider,
+      handleEvent,
+      abort.signal,
+      fromAgent,
+      preState,
+      prevDecisions,
+    )
       .catch((err: unknown) => {
         if ((err as { name?: string })?.name === "AbortError") return;
         const msg = (err as { message?: string })?.message ?? "분석 중 오류가 발생했어요.";
-        console.warn("[AIAnalysis] fetch 오류:", msg);
+        console.error("[AIAnalysis] fetch 오류:", msg);
         setError(msg);
         setIsRunning(false);
       });
@@ -252,10 +276,14 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
       marketReport:       fromIndex > AGENT_ORDER.indexOf("market")           ? currentReports["market"]           : undefined,
       newsReport:         fromIndex > AGENT_ORDER.indexOf("news")             ? currentReports["news"]             : undefined,
       fundamentalsReport: fromIndex > AGENT_ORDER.indexOf("fundamentals")     ? currentReports["fundamentals"]     : undefined,
+      socialReport:       fromIndex > AGENT_ORDER.indexOf("social")           ? currentReports["social"]           : undefined,
       bullArgument:       fromIndex > AGENT_ORDER.indexOf("bull")             ? (accBull || undefined)             : undefined,
       bearArgument:       fromIndex > AGENT_ORDER.indexOf("bear")             ? (accBear || undefined)             : undefined,
       researchPlan:       fromIndex > AGENT_ORDER.indexOf("research_manager") ? currentReports["research_manager"] : undefined,
-      riskAssessment:     fromIndex > AGENT_ORDER.indexOf("risk")             ? currentReports["risk"]             : undefined,
+      traderProposal:     fromIndex > AGENT_ORDER.indexOf("trader")           ? currentReports["trader"]           : undefined,
+      riskRisky:          fromIndex > AGENT_ORDER.indexOf("risk_risky")       ? currentReports["risk_risky"]       : undefined,
+      riskNeutral:        fromIndex > AGENT_ORDER.indexOf("risk_neutral")     ? currentReports["risk_neutral"]     : undefined,
+      riskSafe:           fromIndex > AGENT_ORDER.indexOf("risk_safe")        ? currentReports["risk_safe"]        : undefined,
     };
 
     // fromAgent 이후 UI 상태 리셋
@@ -285,28 +313,31 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     startStream(effectiveFrom, preState);
   }, [startStream]);
 
-  const stop = useCallback(() => {
+  // running 에이전트 → error 전환 + 스트리밍 토론 메시지 정리 (stop·close 공용)
+  const haltRunning = useCallback(() => {
     setAgents((prev) => {
-      const running = prev.find((a) => a.status === "running");
-      if (running) {
-        // 토론 에이전트는 bull부터 재개
-        const resumeKey: AgentKey = running.key === "bear" ? "bull" : running.key;
-        setResumeFrom((rf) => rf ?? resumeKey);
-        // 중지된 에이전트를 error로 전환 (스피너 제거 + 재시도 버튼 표시)
-        return prev.map((a) =>
-          a.key === running.key ? { ...a, status: "error", streamingChunk: "" } : a,
-        );
-      }
-      return prev;
+      const runningList = prev.filter((a) => a.status === "running");
+      if (runningList.length === 0) return prev;
+      const first = runningList[0];
+      setResumeFrom((rf) => rf ?? getResumeKey(first.key));
+      const runningKeys = new Set(runningList.map((a) => a.key));
+      return prev.map((a) =>
+        runningKeys.has(a.key) ? { ...a, status: "error", streamingChunk: "" } : a,
+      );
     });
-    abortRef.current?.abort();
-    setIsRunning(false);
+    setDebate((prev) => prev.map((d) => d.isStreaming ? { ...d, isStreaming: false } : d));
+    setDebatingSide(null);
   }, []);
 
-  const close = useCallback(() => {
+  const stop = useCallback(() => {
+    haltRunning();
     abortRef.current?.abort();
-    setIsOpen(false);
     setIsRunning(false);
+  }, [haltRunning]);
+
+  // 패널 숨기기 — 분석은 백그라운드에서 계속, 스트림 중단 없음
+  const close = useCallback(() => {
+    setIsOpen(false);
     setIsMinimized(false);
     setShowReanalysisPrompt(false);
   }, []);
