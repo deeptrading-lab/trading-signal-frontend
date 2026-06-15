@@ -45,6 +45,8 @@ import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 
 const CHART_DAYS = 200;
+/** 최신 일봉이 기준일로부터 이 일수를 초과해 노후하면 분석 조기 중단(콜드스타트·휴장 옛 가격 방지). */
+const STALE_MAX_DAYS = 10;
 // 12-에이전트 파이프라인 최대 허용 시간 (50분)
 // Phase A(6m) + Phase B(20m) + research_manager(5m) + trader/effort:high(6m)
 //   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
@@ -376,6 +378,21 @@ export async function POST(req: NextRequest): Promise<Response> {
           send({ type: "error", message: "데이터가 부족해 시그널을 계산할 수 없어요. (최소 130봉 필요)" });
           controller.close();
           return;
+        }
+
+        // 신선도 가드 — 최신 봉이 STALE_MAX_DAYS 초과 노후면 옛 가격 분석 방지(콜드스타트·휴장).
+        const latestCandleDate = sorted[sorted.length - 1]?.date; // "YYYY-MM-DD"
+        if (latestCandleDate) {
+          const latestMs = new Date(`${latestCandleDate}T00:00:00`).getTime();
+          if (Number.isFinite(latestMs)) {
+            const ageDays = (today.getTime() - latestMs) / 86_400_000;
+            if (ageDays > STALE_MAX_DAYS) {
+              console.warn(`[ai-analysis] 시세 노후 — 최신봉 ${latestCandleDate} (${ageDays.toFixed(0)}일 경과)`);
+              send({ type: "error", message: "최신 시세를 불러오지 못해 분석을 중단했어요. 잠시 후 다시 시도해 주세요." });
+              controller.close();
+              return;
+            }
+          }
         }
 
         state.signalSummary = formatSignalForPrompt(
