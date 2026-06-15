@@ -3856,3 +3856,45 @@
   - `docs/prd/codex-ai-analysis.md`
   - `docs/design/codex-ai-analysis.md`
   - `docs/qa/codex-ai-analysis.md`
+
+### 2026-06-15 — feat(stock): AI 분석 진입 공급자 선택(chooser) + 로컬 CLI 감지 (#122)
+
+- **slug**: `ai-provider-chooser` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/122
+- **요약**: feat(stock): AI 분석 진입 공급자 선택(chooser) + 로컬 CLI 감지
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 종목 상세(`/stock/[ticker]`)의 AI 종합분석 진입 UX를 개편한다. 기존 `[AI 분석 | Claude | Codex]` 세그먼트 컨트롤(3개가 다 버튼처럼 보이고, 누르면 즉시 실행)을 **단일 "AI 종합분석" 버튼 → 패널 내 공급자 선택(chooser)** 흐름으로 바꾸고, 로컬에 설치된 CLI만 선택지로 제시한다.
+  > 
+  > ## 변경 내용
+  > 
+  > **진입 흐름**
+  > - 헤더: 세그먼트 → 단일 "AI 종합분석" 버튼(#114 원본 톤 복원). 클릭 시 패널만 열고 자동 실행 X.
+  > - `ProviderChooser`: 로딩 / 조회실패(재시도) / Vercel·미설치(안내) / 1개(확인) / 2개(카드) 분기. PC 가로형·모바일 세로 2열 반응형.
+  > - 공급자 선택은 chooser로 일원화 → 패널 헤더 토글 제거.
+  > 
+  > **서버**
+  > - `lib/server/ai/detectCli`: PATH/경로 기반 fs 감지(프로세스 spawn 없음, 30s TTL, 실제 호출 경로와 동일 env 기본값). 응답은 boolean/키만 노출(경로 미노출).
+  > - `GET /api/stock/ai-analysis/providers`: `{vercel, providers, available}`, `no-store`. Vercel은 항상 0개.
+  > - `isVercelEnv` 4곳 중복 → `lib/server/env`로 공용화(503 가드 동작 무회귀).
+  > 
+  > **패널 폴리시**
+  > - 접기/펼치기 제거(X만), 헤더 바 높이 축소, "AI 종합분석" 서브타이틀 제거.
+  > - 실행 중 공급자 배지(amber/emerald) + 현재 진행 에이전트 기준 상태 메시지.
+  > - 패널/스크림이 상단 navbar(지수·테마토글)를 안 가리게 위치 조정(미세 4px 겹침).
+  > - 종목 간 이동 시 진행 스트림 abort + 상태 초기화(잘못된 종목에 결정 저장 방지).
+  > 
+  > ## 점검
+  > - 역할별 순차 점검(UX·FE·QA·Reviewer) 반영, QA 리포트: `docs/qa/ai-provider-chooser.md`(경량 트랙).
+  > - `tsc` / `lint` / `build` 통과. `GET /providers` 실호출 계약 확인. 단일/2개 분기 dev 시각 확인(codex env 임시 주입).
+  > 
+  > ## 다음 작업
+  > - codex CLI 실제 설치 환경에서 2개 분기 end-to-end(실분석) 검증 — 현재 로컬엔 claude만 설치.
+  > - 공급자 3개 이상 확장 시 chooser `grid-cols-2` 및 `PROVIDER_STYLE` 재검토.
+  > - chooser 로딩/안내 상태 `aria-live` 보강(스크린리더 전이 안내) — 우선순위 낮음.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - codex CLI 실제 설치 환경에서 2개 분기 end-to-end(실분석) 검증 — 현재 로컬엔 claude만 설치.
+  - 공급자 3개 이상 확장 시 chooser `grid-cols-2` 및 `PROVIDER_STYLE` 재검토.
+  - chooser 로딩/안내 상태 `aria-live` 보강(스크린리더 전이 안내) — 우선순위 낮음.
