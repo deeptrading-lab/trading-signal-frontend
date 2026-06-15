@@ -1,3 +1,5 @@
+import type { SentimentBand, SentimentConfidence } from "@/lib/types/stock/aiAnalysis";
+
 export const COPY = {
   /** 종목 헤더의 AI 분석 진입 버튼 라벨. */
   trigger: "AI 종합분석",
@@ -104,6 +106,35 @@ export const COPY = {
     targetHint: "현재가 대비",
     shortTermLabel: "단기 전망 (1~2주)",
     midTermLabel: "중기 전망 (1~3개월)",
+  },
+  /** SNS 분석가 카드 구조화 감성 배지 — 밴드 1차 · 점수 보조 · 신뢰도 병기(과신 방지). */
+  sentiment: {
+    /** 7단계 밴드 코드 → 한글 라벨. */
+    bandLabel: {
+      VERY_NEGATIVE:     "매우 부정적",
+      NEGATIVE:          "부정적",
+      SLIGHTLY_NEGATIVE: "약간 부정적",
+      NEUTRAL:           "중립",
+      SLIGHTLY_POSITIVE: "약간 긍정적",
+      POSITIVE:          "긍정적",
+      VERY_POSITIVE:     "매우 긍정적",
+    } as Record<SentimentBand, string>,
+    /** 신뢰도 코드 → 한글 라벨. */
+    confidenceLabel: {
+      low:    "낮음",
+      medium: "보통",
+      high:   "높음",
+    } as Record<SentimentConfidence, string>,
+    /** 신뢰도 prefix(예: "신뢰도 보통"). */
+    confidencePrefix: "신뢰도",
+    /** 점수 접미 — `7/10`. */
+    scoreSuffix: "/10",
+    /** 점수·신뢰도 사이 구분점. */
+    separator: "·",
+    /** 배지 전체에 대한 보조 설명(접근성·과신 방지). */
+    caption: "커뮤니티 심리 추정",
+    /** 신뢰도 '낮음'일 때 덧붙이는 약화 카피. */
+    lowNote: "표본 적음 · 참고",
   },
   overlay: {
     back: "돌아가기",
