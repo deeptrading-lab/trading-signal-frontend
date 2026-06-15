@@ -14,6 +14,7 @@ import {
   type DebateMessage,
   type FinalDecision,
   type ResumeState,
+  type SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
 
 export interface AIAnalysisHook {
@@ -26,6 +27,8 @@ export interface AIAnalysisHook {
   debate: DebateMessage[];
   debatingSide: "bull" | "bear" | null;
   final: FinalDecision | null;
+  /** SNS 분석가 정형 감성 — 파싱 성공 시에만, 아니면 null(배지 미표시). */
+  sentiment: SentimentReport | null;
   error: string | null;
   /** 재개 가능한 에이전트 — 실패하거나 중지된 첫 에이전트 */
   resumeFrom: AgentKey | null;
@@ -54,6 +57,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const [debate, setDebate] = useState<DebateMessage[]>([]);
   const [debatingSide, setDebatingSide] = useState<"bull" | "bear" | null>(null);
   const [final, setFinal] = useState<FinalDecision | null>(null);
+  const [sentiment, setSentiment] = useState<SentimentReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resumeFrom, setResumeFrom] = useState<AgentKey | null>(null);
 
@@ -70,11 +74,13 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const agentsRef = useRef<AgentState[]>(INITIAL_AGENT_STATES);
   const isRunningRef = useRef(false);
   const finalRef = useRef<FinalDecision | null>(null);
+  const sentimentRef = useRef<SentimentReport | null>(null);
   useEffect(() => { reportsRef.current = reports; }, [reports]);
   useEffect(() => { debateRef.current = debate; }, [debate]);
   useEffect(() => { agentsRef.current = agents; }, [agents]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
   useEffect(() => { finalRef.current = final; }, [final]);
+  useEffect(() => { sentimentRef.current = sentiment; }, [sentiment]);
   useEffect(() => { providerRef.current = provider; }, [provider]);
 
   const resetResults = useCallback(() => {
@@ -83,6 +89,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setDebate([]);
     setDebatingSide(null);
     setFinal(null);
+    setSentiment(null);
     setError(null);
     setResumeFrom(null);
     setShowReanalysisPrompt(false);
@@ -165,6 +172,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         });
         break;
 
+      case "sentiment":
+        setSentiment(event.report);
+        break;
+
       case "final":
         setFinal(event.data);
         break;
@@ -186,6 +197,8 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
             stop_loss_pct: finalRef.current.stop_loss_pct,
             short_term_outlook: finalRef.current.short_term_outlook,
             mid_term_outlook: finalRef.current.mid_term_outlook,
+            sentiment_score: sentimentRef.current?.score ?? null,
+            sentiment_band: sentimentRef.current?.band ?? null,
           });
         }
         setIsRunning(false);
@@ -311,6 +324,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
       }
       return next;
     });
+    // social 이전(포함)에서 재개하면 감성도 다시 산출되므로 초기화.
+    if (fromIndex <= AGENT_ORDER.indexOf("social")) {
+      setSentiment(null);
+    }
     if (fromIndex <= AGENT_ORDER.indexOf("bull")) {
       setDebate([]);
     } else if (fromIndex <= AGENT_ORDER.indexOf("bear")) {
@@ -359,7 +376,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     provider,
     isOpen, isRunning, showReanalysisPrompt,
     agents, reports, debate, debatingSide,
-    final, error, resumeFrom,
+    final, sentiment, error, resumeFrom,
     open, start, chooseAgain, run, resume, stop, close, dismissReanalysisPrompt,
   };
 }

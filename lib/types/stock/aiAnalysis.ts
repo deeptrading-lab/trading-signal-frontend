@@ -21,6 +21,38 @@ export type AgentKey =
 
 export type AIAnalysisProvider = "claude" | "codex";
 
+// ─── 구조화 감성 (SNS 분석가 정형 출력) ───────────────────────────────────────
+
+/**
+ * 7단계 감성 밴드 (코드값). 한글 라벨↔코드 매핑은 `lib/copy/stock/aiAnalysis.ts`.
+ * score 0~10(5=중립) 중앙정렬: 0=매우 부정 … 5=중립 … 10=매우 긍정.
+ */
+export type SentimentBand =
+  | "VERY_NEGATIVE"
+  | "NEGATIVE"
+  | "SLIGHTLY_NEGATIVE"
+  | "NEUTRAL"
+  | "SLIGHTLY_POSITIVE"
+  | "POSITIVE"
+  | "VERY_POSITIVE";
+
+/** 감성 신뢰도 — 검색 표본의 양·일관성. */
+export type SentimentConfidence = "low" | "medium" | "high";
+
+/**
+ * SNS 분석가가 자유서술 리포트 말미에 동봉하는 정형 감성 요약.
+ * - band: 7단계 밴드(군중 심리 방향·강도, 주가 전망 아님)
+ * - score: 0~10 정수(현재 군중심리 긍정/부정 강도)
+ * - confidence: 표본 양·일관성 기반 신뢰도
+ * - summary: 한 줄 요약(80자 이내)
+ */
+export interface SentimentReport {
+  band: SentimentBand;
+  score: number;
+  confidence: SentimentConfidence;
+  summary: string;
+}
+
 /**
  * 로컬 AI CLI 가용성 — `/api/stock/ai-analysis/providers` 응답.
  * - `providers` — 공급자별 설치 여부.
@@ -69,6 +101,8 @@ export type AIAnalysisEvent =
   | { type: "debate_stream"; speaker: "bull" | "bear"; chunk: string; round: number }
   /** 토론 1회 발화 완료 텍스트 */
   | { type: "debate";        speaker: "bull" | "bear"; content: string; round: number }
+  /** SNS 분석가 정형 감성 — social 완료 후 파싱 성공 시 1회 발행 */
+  | { type: "sentiment";     report: SentimentReport }
   /** Portfolio Manager 최종 결정 */
   | { type: "final";         data: FinalDecision }
   /** 전체 오류 */

@@ -32,7 +32,11 @@ import type {
   AIAnalysisProvider,
   FinalDecision,
   ResumeState,
+  SentimentBand,
+  SentimentConfidence,
+  SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
+import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionEntry } from "@/lib/api/stock/aiDecisionStore";
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
@@ -41,6 +45,8 @@ import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 
 const CHART_DAYS = 200;
+/** 최신 일봉이 기준일로부터 이 일수를 초과해 노후하면 분석 조기 중단(콜드스타트·휴장 옛 가격 방지). */
+const STALE_MAX_DAYS = 10;
 // 12-에이전트 파이프라인 최대 허용 시간 (50분)
 // Phase A(6m) + Phase B(20m) + research_manager(5m) + trader/effort:high(6m)
 //   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
@@ -70,6 +76,53 @@ function parseLooseJson(raw: string): unknown | null {
     try { return JSON.parse(c); } catch { /* next */ }
   }
   return null;
+}
+
+// ─── 구조화 감성 파싱 헬퍼 (SNS 분석가 응답 말미 블록) ────────────────────────
+
+/** 한글 밴드 라벨 → 코드값 역매핑(프롬프트 노출 라벨과 동일 화이트리스트). */
+const BAND_LABEL_TO_CODE: Record<string, SentimentBand> = Object.fromEntries(
+  (Object.entries(COPY.sentiment.bandLabel) as [SentimentBand, string][])
+    .map(([code, label]) => [label, code]),
+);
+
+const SENTIMENT_BLOCK_RE = /<!--\s*SENTIMENT\b([\s\S]*?)-->/i;
+
+/** 감성 블록 마커를 제거한 깨끗한 텍스트(카드 미리보기·전체보기에 raw 주석 노출 방지). */
+function stripSentimentBlock(raw: string): string {
+  return raw.replace(SENTIMENT_BLOCK_RE, "").trimEnd();
+}
+
+/**
+ * social 응답 말미의 `<!-- SENTIMENT ... -->` 블록을 파싱한다.
+ * band(한글 라벨 화이트리스트)·score(0~10 clamp)가 둘 다 유효해야 반환, 아니면 null(graceful 폴백).
+ */
+function parseSentimentBlock(raw: string): SentimentReport | null {
+  const m = raw.match(SENTIMENT_BLOCK_RE);
+  if (!m) return null;
+  const body = m[1];
+
+  const field = (key: string): string | null => {
+    const fm = body.match(new RegExp(`^\\s*${key}\\s*:\\s*(.+)$`, "im"));
+    return fm ? fm[1].trim() : null;
+  };
+
+  const bandRaw = field("band");
+  const band = bandRaw ? BAND_LABEL_TO_CODE[bandRaw] : undefined;
+  if (!band) return null;
+
+  const scoreRaw = field("score");
+  const scoreNum = scoreRaw != null ? Number(scoreRaw.match(/-?\d+(?:\.\d+)?/)?.[0]) : NaN;
+  if (!Number.isFinite(scoreNum)) return null;
+  const score = Math.max(0, Math.min(10, Math.round(scoreNum)));
+
+  const confRaw = (field("confidence") ?? "").toLowerCase();
+  const confidence: SentimentConfidence =
+    confRaw === "low" || confRaw === "high" ? confRaw : "medium";
+
+  const summary = field("summary") ?? "";
+
+  return { band, score, confidence, summary };
 }
 
 // ─── 프롬프트 빌더 ────────────────────────────────────────────────────────────
@@ -293,6 +346,13 @@ export async function POST(req: NextRequest): Promise<Response> {
         riskSafe:            preState.riskSafe            ?? "",
       };
 
+      // 재개 시 social이 이미 완료됐다면 감성을 재파싱해 PM 주입용으로 복원.
+      // (재개 페이로드는 마커 strip 된 clean 텍스트일 수 있어 둘 다 안전하게 시도.)
+      if (preState.socialReport) {
+        const restored = parseSentimentBlock(preState.socialReport);
+        if (restored) state.sentiment = restored;
+      }
+
       const runStart = Date.now();
       try {
         // 1. 시세 & 시그널 계산 (재개 시에도 항상 최신 데이터 사용) ──────────
@@ -318,6 +378,21 @@ export async function POST(req: NextRequest): Promise<Response> {
           send({ type: "error", message: "데이터가 부족해 시그널을 계산할 수 없어요. (최소 130봉 필요)" });
           controller.close();
           return;
+        }
+
+        // 신선도 가드 — 최신 봉이 STALE_MAX_DAYS 초과 노후면 옛 가격 분석 방지(콜드스타트·휴장).
+        const latestCandleDate = sorted[sorted.length - 1]?.date; // "YYYY-MM-DD"
+        if (latestCandleDate) {
+          const latestMs = new Date(`${latestCandleDate}T00:00:00`).getTime();
+          if (Number.isFinite(latestMs)) {
+            const ageDays = (today.getTime() - latestMs) / 86_400_000;
+            if (ageDays > STALE_MAX_DAYS) {
+              console.warn(`[ai-analysis] 시세 노후 — 최신봉 ${latestCandleDate} (${ageDays.toFixed(0)}일 경과)`);
+              send({ type: "error", message: "최신 시세를 불러오지 못해 분석을 중단했어요. 잠시 후 다시 시도해 주세요." });
+              controller.close();
+              return;
+            }
+          }
         }
 
         state.signalSummary = formatSignalForPrompt(
@@ -422,6 +497,21 @@ export async function POST(req: NextRequest): Promise<Response> {
             } else {
               send({ type: "report", agent: agentKey, content: text });
             }
+          } else if (agentKey === "social") {
+            // SNS 분석가: 감성 블록 파싱 + 마커 제거한 깨끗한 텍스트로 report 발행.
+            const sentiment = parseSentimentBlock(text);
+            const cleanText = stripSentimentBlock(text);
+            send({ type: "report", agent: agentKey, content: cleanText });
+            if (sentiment) {
+              state.sentiment = sentiment;
+              send({ type: "sentiment", report: sentiment });
+            } else {
+              console.log("[ai-analysis] social 감성 블록 파싱 실패 — 배지 미표시, 분석 계속");
+            }
+            // 마커 제거된 텍스트를 state에 저장(PM·재개 재파싱은 sentiment를 직접 사용).
+            state.socialReport = cleanText;
+            send({ type: "progress", agent: agentKey, status: "done" });
+            return "ok";
           } else {
             send({ type: "report", agent: agentKey, content: text });
           }
@@ -431,7 +521,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             case "market":           state.marketReport    = text; break;
             case "news":             state.newsReport      = text; break;
             case "fundamentals":     state.fundamentalsReport = text; break;
-            case "social":           state.socialReport    = text; break;
+            // social: 위 social 분기에서 마커 strip 후 state·이벤트 처리하고 early return.
             case "research_manager": state.researchPlan    = text; break;
             case "trader":           state.traderProposal  = text; break;
             case "risk_risky":       state.riskRisky       = text; break;

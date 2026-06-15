@@ -34,6 +34,7 @@ export function AIAnalysisPanel({
   debate,
   debatingSide,
   final,
+  sentiment,
   error,
   resumeFrom,
   open,
@@ -356,6 +357,7 @@ export function AIAnalysisPanel({
                               isRunning={isRunning}
                               onExpand={handleExpand}
                               onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                              sentiment={key === "social" ? sentiment : undefined}
                             />
                           );
                         })}
