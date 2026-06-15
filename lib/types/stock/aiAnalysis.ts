@@ -19,6 +19,8 @@ export type AgentKey =
   | "risk_safe"
   | "portfolio_manager";
 
+export type AIAnalysisProvider = "claude" | "codex";
+
 export type AgentStatus = "pending" | "running" | "done" | "error";
 
 export interface AgentMeta {

@@ -34,6 +34,30 @@ npm run dev
 http://localhost:3000
 ```
 
+### AI 종합분석을 Codex CLI로 실행
+
+AI 종합분석은 로컬 `next dev`에서만 CLI subprocess를 실행합니다.
+
+```bash
+cp .env.local.example .env.local
+codex login
+```
+
+`.env.local`에 KIS 키와 Codex CLI 경로를 설정합니다.
+
+```bash
+KIS_APP_KEY=...
+KIS_APP_SECRET=...
+KIS_ACCOUNT_NO=...
+KIS_ACCOUNT_PRODUCT_CD=01
+
+CODEX_CLI_PATH=/Applications/Codex.app/Contents/Resources/codex
+CODEX_CLI_WORKDIR=/tmp
+# CODEX_CLI_MODEL=gpt-5.4
+```
+
+`npm run dev` 후 `/stock/005930`에서 `Codex` 버튼을 누르면 Codex 기반 AI 종합분석이 시작됩니다. Claude CLI를 사용하려면 같은 위치의 `Claude` 버튼을 선택합니다.
+
 ## 환경변수
 
 ```bash

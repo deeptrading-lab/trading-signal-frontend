@@ -1,4 +1,11 @@
 export const COPY = {
+  provider: {
+    claude: "Claude",
+    codex: "Codex",
+    select: "AI 공급자 선택",
+    current: (label: string) => `${label}로 분석`,
+    changeDisabled: "분석 중에는 공급자를 바꿀 수 없어요.",
+  },
   panel: {
     title: "AI 종합분석",
     stop: "중지",
@@ -67,7 +74,7 @@ export const COPY = {
   },
   empty: {
     title: "AI 에이전트들이 대기 중입니다",
-    description: "버튼을 눌러 분석을 시작하세요",
+    description: (provider: string) => `${provider} 에이전트로 분석을 시작할 수 있어요`,
     start: "분석 시작하기",
   },
   errorState: {

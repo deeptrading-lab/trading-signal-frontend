@@ -24,6 +24,7 @@ interface AIAnalysisPanelProps extends AIAnalysisHook {
 
 export function AIAnalysisPanel({
   ticker,
+  provider,
   isOpen,
   isRunning,
   isMinimized,
@@ -41,6 +42,7 @@ export function AIAnalysisPanel({
   stop,
   close,
   toggleMinimize,
+  selectProvider,
   dismissReanalysisPrompt,
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -107,7 +109,7 @@ export function AIAnalysisPanel({
             animate={{ x: 0 }}
             exit={{ x: 56 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            onClick={open}
+            onClick={() => open()}
             className="fixed right-0 top-1/2 -translate-y-1/2 z-[70] flex flex-col items-center gap-2 px-2.5 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-l-2xl shadow-xl transition-colors cursor-pointer"
             aria-label="AI 분석 패널 열기"
           >
@@ -157,6 +159,30 @@ export function AIAnalysisPanel({
                 <div className="flex flex-col">
                   <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{displayName}</h2>
                   <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 leading-none mt-0.5">{COPY.panel.title}</span>
+                </div>
+                <div
+                  className="inline-flex overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
+                  aria-label={COPY.provider.select}
+                  title={isRunning ? COPY.provider.changeDisabled : undefined}
+                >
+                  {(["claude", "codex"] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => selectProvider(item)}
+                      disabled={isRunning}
+                      className={cn(
+                        "px-2 py-1 text-[11px] font-bold transition-colors",
+                        item === provider
+                          ? "bg-blue-600 text-white dark:bg-blue-500"
+                          : "bg-white text-slate-500 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800",
+                        isRunning && "cursor-not-allowed opacity-60",
+                      )}
+                      aria-pressed={item === provider}
+                    >
+                      {COPY.provider[item]}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -311,7 +337,9 @@ export function AIAnalysisPanel({
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{COPY.empty.title}</h3>
-                          <p className="text-xs text-slate-500 mt-1">{COPY.empty.description}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {COPY.empty.description(COPY.provider[provider])}
+                          </p>
                         </div>
                         <button
                           type="button"

@@ -1,7 +1,7 @@
 /**
- * `/api/stock/ai-analysis` — 8-에이전트 멀티에이전트 AI 분석 SSE 스트림.
+ * `/api/stock/ai-analysis` — 12-에이전트 멀티에이전트 AI 분석 SSE 스트림.
  *
- * GET ?ticker=005930
+ * POST { ticker: "005930", provider: "claude" | "codex" }
  *
  * SSE 이벤트:
  *   { type:'progress',      agent, status:'running'|'done'|'error' }
@@ -26,10 +26,16 @@ import { AXIS_LABEL } from "@/lib/copy/signal/labels";
 import type { AxisScore, SignalResult } from "@/lib/types/signal";
 import type { StockPrice, StockDailyCandle } from "@/lib/api/kis/types";
 import type { StockInvestorTrend } from "@/lib/types/stock/investors";
-import type { AgentKey, AIAnalysisEvent, FinalDecision, ResumeState } from "@/lib/types/stock/aiAnalysis";
+import type {
+  AgentKey,
+  AIAnalysisEvent,
+  AIAnalysisProvider,
+  FinalDecision,
+  ResumeState,
+} from "@/lib/types/stock/aiAnalysis";
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionEntry } from "@/lib/api/stock/aiDecisionStore";
-import { invokeClaudeAgentStream } from "@/lib/server/claudeAgent";
+import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 
@@ -208,9 +214,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  // Body: { ticker, startFrom?, state?, prevDecisions? }
+  // Body: { ticker, provider?, startFrom?, state?, prevDecisions? }
   const body = await req.json().catch(() => null) as {
     ticker?: unknown;
+    provider?: unknown;
     startFrom?: unknown;
     state?: unknown;
     prevDecisions?: unknown;
@@ -224,6 +231,11 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!ticker) {
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
   }
+
+  const provider: AIAnalysisProvider =
+    body.provider === "codex" || body.provider === "claude"
+      ? body.provider
+      : "claude";
 
   // startFrom 검증 + 정규화 (bear → bull: 토론은 항상 bull부터 재실행)
   const rawStartFrom: AgentKey | undefined =
@@ -253,9 +265,6 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!isKisConfigured()) {
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
   }
-
-  const bin = process.env.CLAUDE_CLI_PATH ?? "claude";
-  const model = process.env.CLAUDE_CLI_MODEL;
 
   // 클라이언트 disconnect + 서버 타임아웃 통합 signal
   const timeoutController = new AbortController();
@@ -351,7 +360,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           const agentT0 = Date.now();
           let text: string;
           try {
-            text = await invokeClaudeAgentStream(bin, prompts.model ?? model, {
+            text = await invokeAgentCliStream(provider, {
               systemPrompt: agentKey === "portfolio_manager"
                 ? prompts.system + pastDecisionContext
                 : prompts.system,
@@ -359,6 +368,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               tools: prompts.tools,
               timeoutMs: prompts.timeoutMs,
               effort: prompts.effort,
+              model: prompts.model,
             }, combinedSignal, (token) => {
               send({ type: "stream", agent: agentKey, chunk: token });
             });
@@ -450,7 +460,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // ── Phase B: 토론 (bull → bear × DEBATE_ROUNDS) ─────────────────────
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("bull") >= startIndex) {
           console.log(`[ai-analysis] ▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
-          const result = await runDebateLoop(state, send, combinedSignal, bin, model);
+          const result = await runDebateLoop(state, send, combinedSignal, provider);
           if (result === "aborted") {
             console.log("[ai-analysis] 토론 중단 (abort)");
           }

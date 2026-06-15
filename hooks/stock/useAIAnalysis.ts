@@ -8,6 +8,7 @@ import {
   INITIAL_AGENT_STATES,
   getResumeKey,
   type AIAnalysisEvent,
+  type AIAnalysisProvider,
   type AgentKey,
   type AgentState,
   type DebateMessage,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/types/stock/aiAnalysis";
 
 export interface AIAnalysisHook {
+  provider: AIAnalysisProvider;
   isOpen: boolean;
   isRunning: boolean;
   isMinimized: boolean;
@@ -29,17 +31,19 @@ export interface AIAnalysisHook {
   /** 재개 가능한 에이전트 — 실패하거나 중지된 첫 에이전트 */
   resumeFrom: AgentKey | null;
   /** 처음 열기 또는 기존 결과 패널 재열기. 결과 없으면 자동 분석 시작. */
-  open: () => void;
+  open: (provider?: AIAnalysisProvider) => void;
   run: () => void;
   /** fromAgent부터 재개 — 이전 완료 결과는 유지 */
   resume: (fromAgent: AgentKey) => void;
   stop: () => void;
   close: () => void;
   toggleMinimize: () => void;
+  selectProvider: (provider: AIAnalysisProvider) => void;
   dismissReanalysisPrompt: () => void;
 }
 
 export function useAIAnalysis(ticker: string): AIAnalysisHook {
+  const [provider, setProvider] = useState<AIAnalysisProvider>("codex");
   const [isOpen, setIsOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -53,6 +57,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const [resumeFrom, setResumeFrom] = useState<AgentKey | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const providerRef = useRef<AIAnalysisProvider>("codex");
 
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
@@ -69,6 +74,18 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   useEffect(() => { agentsRef.current = agents; }, [agents]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
   useEffect(() => { finalRef.current = final; }, [final]);
+  useEffect(() => { providerRef.current = provider; }, [provider]);
+
+  const resetResults = useCallback(() => {
+    setAgents(INITIAL_AGENT_STATES);
+    setReports({});
+    setDebate([]);
+    setDebatingSide(null);
+    setFinal(null);
+    setError(null);
+    setResumeFrom(null);
+    setShowReanalysisPrompt(false);
+  }, []);
 
   // ── 공통 이벤트 핸들러 ─────────────────────────────────────────────────────
 
@@ -161,13 +178,14 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         setIsRunning(false);
         break;
     }
-  }, []);
+  }, [ticker]);
 
   // ── 스트림 시작 공통 로직 ──────────────────────────────────────────────────
 
   const startStream = useCallback((
     fromAgent?: AgentKey,
     preState?: ResumeState,
+    requestedProvider: AIAnalysisProvider = providerRef.current,
   ) => {
     abortRef.current?.abort();
     const abort = new AbortController();
@@ -181,7 +199,15 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setShowReanalysisPrompt(false);
 
     const prevDecisions = getRecentDecisions(ticker);
-    fetchAIAnalysisStream(ticker, handleEvent, abort.signal, fromAgent, preState, prevDecisions)
+    fetchAIAnalysisStream(
+      ticker,
+      requestedProvider,
+      handleEvent,
+      abort.signal,
+      fromAgent,
+      preState,
+      prevDecisions,
+    )
       .catch((err: unknown) => {
         if ((err as { name?: string })?.name === "AbortError") return;
         const msg = (err as { message?: string })?.message ?? "분석 중 오류가 발생했어요.";
@@ -195,21 +221,25 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   /** 처음부터 전체 재실행 */
   const run = useCallback(() => {
-    setAgents(INITIAL_AGENT_STATES);
-    setReports({});
-    setDebate([]);
-    setDebatingSide(null);
-    setFinal(null);
-    setShowReanalysisPrompt(false);
-    startStream();
-  }, [startStream]);
+    resetResults();
+    startStream(undefined, undefined, providerRef.current);
+  }, [resetResults, startStream]);
 
   /**
    * 패널 열기.
    * - 분석 이력 없으면 자동 시작
    * - 이력 있으면 패널 열고 재분석 프롬프트 표시
    */
-  const open = useCallback(() => {
+  const open = useCallback((requestedProvider: AIAnalysisProvider = providerRef.current) => {
+    if (requestedProvider !== providerRef.current) {
+      abortRef.current?.abort();
+      providerRef.current = requestedProvider;
+      setProvider(requestedProvider);
+      resetResults();
+      startStream(undefined, undefined, requestedProvider);
+      return;
+    }
+
     const allPending = agentsRef.current.every(a => a.status === "pending");
     if (allPending) {
       run();
@@ -221,7 +251,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         setShowReanalysisPrompt(true);
       }
     }
-  }, [run]);
+  }, [resetResults, run, startStream]);
 
   /**
    * fromAgent부터 재개.
@@ -316,14 +346,22 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setIsMinimized((m) => !m);
   }, []);
 
+  const selectProvider = useCallback((nextProvider: AIAnalysisProvider) => {
+    if (isRunningRef.current || nextProvider === providerRef.current) return;
+    providerRef.current = nextProvider;
+    setProvider(nextProvider);
+    resetResults();
+  }, [resetResults]);
+
   const dismissReanalysisPrompt = useCallback(() => {
     setShowReanalysisPrompt(false);
   }, []);
 
   return {
+    provider,
     isOpen, isRunning, isMinimized, showReanalysisPrompt,
     agents, reports, debate, debatingSide,
     final, error, resumeFrom,
-    open, run, resume, stop, close, toggleMinimize, dismissReanalysisPrompt,
+    open, run, resume, stop, close, toggleMinimize, selectProvider, dismissReanalysisPrompt,
   };
 }

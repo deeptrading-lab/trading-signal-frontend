@@ -6,8 +6,12 @@
  * - `runDebateLoop`: bull ↔ bear DEBATE_ROUNDS 라운드 실행
  */
 
-import { invokeClaudeAgentStream } from "@/lib/server/claudeAgent";
-import type { AgentKey, AIAnalysisEvent } from "@/lib/types/stock/aiAnalysis";
+import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
+import type {
+  AgentKey,
+  AIAnalysisEvent,
+  AIAnalysisProvider,
+} from "@/lib/types/stock/aiAnalysis";
 import { DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 
 // ─── 서버 전용 파이프라인 상태 ────────────────────────────────────────────────
@@ -494,8 +498,7 @@ export async function runDebateLoop(
   state: AnalysisState,
   send: (e: AIAnalysisEvent) => void,
   combinedSignal: AbortSignal,
-  bin: string,
-  model: string | undefined,
+  provider: AIAnalysisProvider,
 ): Promise<"done" | "aborted" | "error"> {
   for (let round = 1; round <= DEBATE_ROUNDS; round++) {
     if (combinedSignal.aborted) return "aborted";
@@ -511,7 +514,7 @@ export async function runDebateLoop(
     let bullText: string;
     const bullT0 = Date.now();
     try {
-      bullText = await invokeClaudeAgentStream(bin, model, {
+      bullText = await invokeAgentCliStream(provider, {
         systemPrompt: AGENT_PROMPTS.bull.system,
         userPrompt: bullPrompt,
         tools: [],
@@ -545,7 +548,7 @@ export async function runDebateLoop(
     let bearText: string;
     const bearT0 = Date.now();
     try {
-      bearText = await invokeClaudeAgentStream(bin, model, {
+      bearText = await invokeAgentCliStream(provider, {
         systemPrompt: AGENT_PROMPTS.bear.system,
         userPrompt: bearPrompt,
         tools: [],
