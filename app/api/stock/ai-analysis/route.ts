@@ -232,10 +232,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
   }
 
-  const provider: AIAnalysisProvider =
-    body.provider === "codex" || body.provider === "claude"
-      ? body.provider
-      : "claude";
+  const rawProvider = body.provider ?? "claude";
+  if (rawProvider !== "claude" && rawProvider !== "codex") {
+    return NextResponse.json(
+      { error: "지원하지 않는 AI 공급자입니다." },
+      { status: 400 },
+    );
+  }
+  const provider: AIAnalysisProvider = rawProvider;
 
   // startFrom 검증 + 정규화 (bear → bull: 토론은 항상 bull부터 재실행)
   const rawStartFrom: AgentKey | undefined =
