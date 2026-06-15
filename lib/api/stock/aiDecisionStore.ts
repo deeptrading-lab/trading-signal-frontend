@@ -3,7 +3,7 @@
  * ticker당 최근 3개 유지. PM 프롬프트에 과거 결정 컨텍스트 주입용.
  */
 
-import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
+import type { FinalDecision, SentimentBand } from "@/lib/types/stock/aiAnalysis";
 
 export interface AIDecisionEntry {
   ticker: string;
@@ -15,6 +15,10 @@ export interface AIDecisionEntry {
   stop_loss_pct: number;
   short_term_outlook: string;
   mid_term_outlook: string;
+  /** SNS 정형 감성 점수(0~10) — 회고용. 감성 미파싱 시 null/undefined(하위호환). */
+  sentiment_score?: number | null;
+  /** SNS 정형 감성 밴드 — 회고용. */
+  sentiment_band?: SentimentBand | null;
 }
 
 const STORAGE_KEY = "ai-decision-log";
