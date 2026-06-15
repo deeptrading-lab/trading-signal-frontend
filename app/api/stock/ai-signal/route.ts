@@ -21,20 +21,11 @@ import { evaluateSignal } from "@/lib/signal/engine";
 import { AXIS_LABEL } from "@/lib/copy/signal/labels";
 import type { AISignalResponse, AISignalVerdict } from "@/lib/types/stock/aiSignal";
 import type { AxisScore } from "@/lib/types/signal";
+import { isVercelEnv } from "@/lib/server/env";
 
 const TIMEOUT_MS = 120_000;
 const MAX_STDOUT_BYTES = 4 * 1024 * 1024;
 const CHART_DAYS = 200;
-
-// ─── Vercel guard ────────────────────────────────────────────────────────────
-
-function isVercelEnv(): boolean {
-  return (
-    process.env.VERCEL === "1" ||
-    typeof process.env.VERCEL_ENV === "string" ||
-    typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string"
-  );
-}
 
 // ─── SSE 헬퍼 ────────────────────────────────────────────────────────────────
 

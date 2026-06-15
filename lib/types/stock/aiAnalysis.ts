@@ -21,6 +21,18 @@ export type AgentKey =
 
 export type AIAnalysisProvider = "claude" | "codex";
 
+/**
+ * 로컬 AI CLI 가용성 — `/api/stock/ai-analysis/providers` 응답.
+ * - `providers` — 공급자별 설치 여부.
+ * - `available` — 그중 설치된 공급자 키 배열(진입 화면이 선택지로 사용).
+ * - `vercel` — Vercel 환경이면 true(항상 0개, 로컬 전용 안내 표면).
+ */
+export interface AIProviderAvailability {
+  providers: Record<AIAnalysisProvider, boolean>;
+  available: AIAnalysisProvider[];
+  vercel: boolean;
+}
+
 export type AgentStatus = "pending" | "running" | "done" | "error";
 
 export interface AgentMeta {

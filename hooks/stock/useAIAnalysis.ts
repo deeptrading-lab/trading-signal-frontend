@@ -20,7 +20,6 @@ export interface AIAnalysisHook {
   provider: AIAnalysisProvider;
   isOpen: boolean;
   isRunning: boolean;
-  isMinimized: boolean;
   showReanalysisPrompt: boolean;
   agents: AgentState[];
   reports: Partial<Record<AgentKey, string>>;
@@ -30,15 +29,18 @@ export interface AIAnalysisHook {
   error: string | null;
   /** 재개 가능한 에이전트 — 실패하거나 중지된 첫 에이전트 */
   resumeFrom: AgentKey | null;
-  /** 처음 열기 또는 기존 결과 패널 재열기. 결과 없으면 자동 분석 시작. */
-  open: (provider?: AIAnalysisProvider) => void;
+  /** 패널만 연다(자동 실행 X). 결과 없으면 빈 상태에 공급자 선택 화면, 결과 있으면 재분석 프롬프트. */
+  open: () => void;
+  /** 공급자 선택 화면에서 공급자를 고르면 처음부터 분석 시작. */
+  start: (provider: AIAnalysisProvider) => void;
+  /** 결과를 비우고 공급자 선택 화면으로 복귀(다른 AI로 재선택). */
+  chooseAgain: () => void;
+  /** 직전 공급자로 처음부터 재실행 — 에러 재시도 전용. */
   run: () => void;
   /** fromAgent부터 재개 — 이전 완료 결과는 유지 */
   resume: (fromAgent: AgentKey) => void;
   stop: () => void;
   close: () => void;
-  toggleMinimize: () => void;
-  selectProvider: (provider: AIAnalysisProvider) => void;
   dismissReanalysisPrompt: () => void;
 }
 
@@ -46,7 +48,6 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const [provider, setProvider] = useState<AIAnalysisProvider>("codex");
   const [isOpen, setIsOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [showReanalysisPrompt, setShowReanalysisPrompt] = useState(false);
   const [agents, setAgents] = useState<AgentState[]>(INITIAL_AGENT_STATES);
   const [reports, setReports] = useState<Partial<Record<AgentKey, string>>>({});
@@ -86,6 +87,18 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setResumeFrom(null);
     setShowReanalysisPrompt(false);
   }, []);
+
+  // 종목이 바뀌면(같은 페이지에서 다른 ticker 로 라우팅) 진행 중 스트림을 끊고 상태를 초기화한다.
+  //   이전 종목의 분석이 새 종목 화면에 남거나, done 이벤트가 잘못된 ticker 로 saveDecision 되는 것을 막는다.
+  const prevTickerRef = useRef(ticker);
+  useEffect(() => {
+    if (prevTickerRef.current === ticker) return;
+    prevTickerRef.current = ticker;
+    abortRef.current?.abort();
+    setIsRunning(false);
+    setIsOpen(false);
+    resetResults();
+  }, [ticker, resetResults]);
 
   // ── 공통 이벤트 핸들러 ─────────────────────────────────────────────────────
 
@@ -195,7 +208,6 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setResumeFrom(null);
     setIsRunning(true);
     setIsOpen(true);
-    setIsMinimized(false);
     setShowReanalysisPrompt(false);
 
     const prevDecisions = getRecentDecisions(ticker);
@@ -219,39 +231,37 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   // ── 공개 API ───────────────────────────────────────────────────────────────
 
-  /** 처음부터 전체 재실행 */
+  /** 직전 공급자로 처음부터 전체 재실행 — 에러 재시도 전용 */
   const run = useCallback(() => {
     resetResults();
     startStream(undefined, undefined, providerRef.current);
   }, [resetResults, startStream]);
 
   /**
-   * 패널 열기.
-   * - 분석 이력 없으면 자동 시작
-   * - 이력 있으면 패널 열고 재분석 프롬프트 표시
+   * 패널 열기 — 자동 실행하지 않는다.
+   * - 분석 이력 없으면 빈 상태에 공급자 선택 화면(ProviderChooser)이 렌더된다.
+   * - 이력 있으면(진행 중 아님) 패널 열고 재분석 프롬프트 표시.
    */
-  const open = useCallback((requestedProvider: AIAnalysisProvider = providerRef.current) => {
-    if (requestedProvider !== providerRef.current) {
-      abortRef.current?.abort();
-      providerRef.current = requestedProvider;
-      setProvider(requestedProvider);
-      resetResults();
-      startStream(undefined, undefined, requestedProvider);
-      return;
-    }
-
+  const open = useCallback(() => {
+    setIsOpen(true);
     const allPending = agentsRef.current.every(a => a.status === "pending");
-    if (allPending) {
-      run();
-    } else {
-      setIsOpen(true);
-      setIsMinimized(false);
-      // 분석 진행 중에는 재분석 배너 표시 안 함
-      if (!isRunningRef.current) {
-        setShowReanalysisPrompt(true);
-      }
+    if (!allPending && !isRunningRef.current) {
+      setShowReanalysisPrompt(true);
     }
-  }, [resetResults, run, startStream]);
+  }, []);
+
+  /** 공급자 선택 화면에서 공급자 확정 → 처음부터 분석 시작 */
+  const start = useCallback((nextProvider: AIAnalysisProvider) => {
+    providerRef.current = nextProvider;
+    setProvider(nextProvider);
+    resetResults();
+    startStream(undefined, undefined, nextProvider);
+  }, [resetResults, startStream]);
+
+  /** 결과를 비워 공급자 선택 화면으로 복귀(다른 AI로 재선택) */
+  const chooseAgain = useCallback(() => {
+    resetResults();
+  }, [resetResults]);
 
   /**
    * fromAgent부터 재개.
@@ -338,20 +348,8 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   // 패널 숨기기 — 분석은 백그라운드에서 계속, 스트림 중단 없음
   const close = useCallback(() => {
     setIsOpen(false);
-    setIsMinimized(false);
     setShowReanalysisPrompt(false);
   }, []);
-
-  const toggleMinimize = useCallback(() => {
-    setIsMinimized((m) => !m);
-  }, []);
-
-  const selectProvider = useCallback((nextProvider: AIAnalysisProvider) => {
-    if (isRunningRef.current || nextProvider === providerRef.current) return;
-    providerRef.current = nextProvider;
-    setProvider(nextProvider);
-    resetResults();
-  }, [resetResults]);
 
   const dismissReanalysisPrompt = useCallback(() => {
     setShowReanalysisPrompt(false);
@@ -359,9 +357,9 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   return {
     provider,
-    isOpen, isRunning, isMinimized, showReanalysisPrompt,
+    isOpen, isRunning, showReanalysisPrompt,
     agents, reports, debate, debatingSide,
     final, error, resumeFrom,
-    open, run, resume, stop, close, toggleMinimize, selectProvider, dismissReanalysisPrompt,
+    open, start, chooseAgain, run, resume, stop, close, dismissReanalysisPrompt,
   };
 }

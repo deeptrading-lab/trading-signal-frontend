@@ -8,13 +8,29 @@
  * state에는 이전 실행에서 완료된 에이전트의 결과를 채워 넣는다.
  */
 
+import { httpClient } from "@/lib/api/client";
 import type {
   AgentKey,
   AIAnalysisEvent,
   AIAnalysisProvider,
+  AIProviderAvailability,
   ResumeState,
 } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionEntry } from "./aiDecisionStore";
+
+/**
+ * 로컬에 설치된 AI CLI 가용성 조회.
+ * SSE 스트림과 달리 단순 GET 이라 공용 axios 인스턴스(`httpClient`, baseURL `/api`)를 사용한다.
+ */
+export async function fetchAIProviderAvailability(
+  signal?: AbortSignal,
+): Promise<AIProviderAvailability> {
+  const res = await httpClient.get<AIProviderAvailability>(
+    "/stock/ai-analysis/providers",
+    { signal },
+  );
+  return res.data;
+}
 
 export async function fetchAIAnalysisStream(
   ticker: string,

@@ -32,6 +32,7 @@ import type {
   AnalyzeResponse,
 } from "@/lib/types/workbench/analyze";
 import { CLAUDE_CLI_FALLBACKS } from "@/lib/copy/workbench/errorMessages";
+import { isVercelEnv } from "@/lib/server/env";
 
 import { buildUserPrompt, getSystemPrompt } from "./prompt";
 import type { AdapterResult, AnalyzeAdapter } from "./types";
@@ -434,14 +435,6 @@ function errorCode(err: unknown): string | undefined {
     if (typeof code === "string") return code;
   }
   return undefined;
-}
-
-function isVercelEnv(): boolean {
-  return (
-    process.env.VERCEL === "1" ||
-    typeof process.env.VERCEL_ENV === "string" ||
-    typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string"
-  );
 }
 
 /**

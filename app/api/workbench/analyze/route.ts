@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAnalyzeAdapter, resolveBackend } from "../_adapters";
+import { isVercelEnv } from "@/lib/server/env";
 
 import type { AnalyzeRequest } from "@/lib/types/workbench/analyze";
 
@@ -50,12 +51,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result.data, { status: 200 });
   }
   return NextResponse.json({ error: result.error }, { status: result.status });
-}
-
-function isVercelEnv(): boolean {
-  return (
-    process.env.VERCEL === "1" ||
-    typeof process.env.VERCEL_ENV === "string" ||
-    typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string"
-  );
 }
