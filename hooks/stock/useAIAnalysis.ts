@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
-import { getRecentDecisions, saveDecision } from "@/lib/api/stock/aiDecisionStore";
 import {
   AGENT_ORDER,
   INITIAL_AGENT_STATES,
@@ -73,14 +72,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   const debateRef = useRef<DebateMessage[]>([]);
   const agentsRef = useRef<AgentState[]>(INITIAL_AGENT_STATES);
   const isRunningRef = useRef(false);
-  const finalRef = useRef<FinalDecision | null>(null);
-  const sentimentRef = useRef<SentimentReport | null>(null);
   useEffect(() => { reportsRef.current = reports; }, [reports]);
   useEffect(() => { debateRef.current = debate; }, [debate]);
   useEffect(() => { agentsRef.current = agents; }, [agents]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
-  useEffect(() => { finalRef.current = final; }, [final]);
-  useEffect(() => { sentimentRef.current = sentiment; }, [sentiment]);
   useEffect(() => { providerRef.current = provider; }, [provider]);
 
   const resetResults = useCallback(() => {
@@ -96,7 +91,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   }, []);
 
   // 종목이 바뀌면(같은 페이지에서 다른 ticker 로 라우팅) 진행 중 스트림을 끊고 상태를 초기화한다.
-  //   이전 종목의 분석이 새 종목 화면에 남거나, done 이벤트가 잘못된 ticker 로 saveDecision 되는 것을 막는다.
+  //   이전 종목의 분석이 새 종목 화면에 남지 않도록 티커 전환 시 런타임 상태를 초기화한다.
   const prevTickerRef = useRef(ticker);
   useEffect(() => {
     if (prevTickerRef.current === ticker) return;
@@ -186,25 +181,10 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         break;
 
       case "done":
-        if (finalRef.current) {
-          saveDecision({
-            ticker,
-            date: new Date().toISOString(),
-            verdict: finalRef.current.verdict,
-            confidence: finalRef.current.confidence,
-            reasoning: finalRef.current.reasoning,
-            target_pct: finalRef.current.target_pct,
-            stop_loss_pct: finalRef.current.stop_loss_pct,
-            short_term_outlook: finalRef.current.short_term_outlook,
-            mid_term_outlook: finalRef.current.mid_term_outlook,
-            sentiment_score: sentimentRef.current?.score ?? null,
-            sentiment_band: sentimentRef.current?.band ?? null,
-          });
-        }
         setIsRunning(false);
         break;
     }
-  }, [ticker]);
+  }, []);
 
   // ── 스트림 시작 공통 로직 ──────────────────────────────────────────────────
 
@@ -223,7 +203,6 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setIsOpen(true);
     setShowReanalysisPrompt(false);
 
-    const prevDecisions = getRecentDecisions(ticker);
     fetchAIAnalysisStream(
       ticker,
       requestedProvider,
@@ -231,7 +210,6 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
       abort.signal,
       fromAgent,
       preState,
-      prevDecisions,
     )
       .catch((err: unknown) => {
         if ((err as { name?: string })?.name === "AbortError") return;

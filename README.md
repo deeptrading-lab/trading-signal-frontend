@@ -58,6 +58,17 @@ CODEX_CLI_WORKDIR=/tmp
 
 `npm run dev` 후 `/stock/005930`에서 `Codex` 버튼을 누르면 Codex 기반 AI 종합분석이 시작됩니다. Claude CLI를 사용하려면 같은 위치의 `Claude` 버튼을 선택합니다.
 
+### AI 분석 결론 공유 저장
+
+Portfolio Manager 최종 결론은 Supabase `ai_analysis_decisions` 테이블에 종목 코드별 최신 1건으로 저장합니다. 설정이 없으면 분석은 계속 가능하고, 이전 결론 조회/저장만 비활성화됩니다.
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+테이블 스키마는 `docs/sql/ai-analysis-decisions.sql`을 적용합니다.
+
 ## 환경변수
 
 ```bash
@@ -71,4 +82,4 @@ Vercel 배포 시 같은 값을 Vercel Environment Variables에 등록합니다.
 - 지원 종목: Apple(`AAPL`), Bitcoin(`BTC`, `BTC-USD`)
 - 사용자 노출 문구: 한글 기본
 - 스타일 톤: 토스 서비스와 유사한 밝고 간결한 금융 UI
-- DB: 아직 없음. Supabase는 다음 단계에서 연결 예정
+- DB: Supabase 선택 연결. 현재는 AI 분석 최신 결론 공유 저장에 사용

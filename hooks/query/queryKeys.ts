@@ -37,6 +37,8 @@ export const queryKeys = {
     description: (ticker: string) => ["stock", "description", ticker] as const,
     /** 로컬 AI CLI(claude·codex) 가용성 — AI 분석 진입 화면이 참조. 종목 무관 단일 키. */
     aiProviders: ["stock", "ai-providers"] as const,
+    /** 종목별 저장된 최신 AI 분석 결론 — Supabase 공유 저장소 BFF. */
+    aiDecision: (ticker: string) => ["stock", "ai-decision", ticker] as const,
   },
   flow: {
     /** 시장 전체 외국인/기관 순매수 Top10(수급 표면 A) — 당일/7일누적 모드별 분리 캐시. */

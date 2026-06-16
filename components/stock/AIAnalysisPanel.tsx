@@ -12,15 +12,77 @@ import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisHook } from "@/hooks/stock/useAIAnalysis";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
+import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
 import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
 import { ProviderChooser } from "./ai-analysis/ProviderChooser";
+import type {
+  AIAnalysisDecisionSnapshot,
+  AIAnalysisProvider,
+} from "@/lib/types/stock/aiAnalysis";
 
 interface AIAnalysisPanelProps extends AIAnalysisHook {
   ticker: string;
+}
+
+function formatUpdatedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function PreviousDecisionIntro({
+  snapshot,
+  onAnalyze,
+  onChooseProvider,
+}: {
+  snapshot: AIAnalysisDecisionSnapshot;
+  onAnalyze: (provider: AIAnalysisProvider) => void;
+  onChooseProvider: () => void;
+}) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-4">
+      <div className="rounded-2xl border border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20 px-4 py-3">
+        <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
+          {COPY.previousDecision.title}
+        </p>
+        <p className="mt-1 text-xs text-blue-600/80 dark:text-blue-300/80 leading-relaxed">
+          {COPY.previousDecision.meta(
+            formatUpdatedAt(snapshot.updatedAt),
+            COPY.provider[snapshot.provider],
+          )}
+        </p>
+        <p className="mt-2 text-xs text-blue-600/80 dark:text-blue-300/80 leading-relaxed">
+          {COPY.previousDecision.pmOnly}
+        </p>
+      </div>
+
+      <FinalVerdictCard data={snapshot.decision} />
+
+      <div className="flex flex-col sm:flex-row justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => onAnalyze(snapshot.provider)}
+          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
+        >
+          {COPY.previousDecision.analyze}
+        </button>
+        <button
+          type="button"
+          onClick={onChooseProvider}
+          className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+        >
+          {COPY.previousDecision.chooseProvider}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function AIAnalysisPanel({
@@ -49,10 +111,17 @@ export function AIAnalysisPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string } | null>(null);
+  const [showProviderChooser, setShowProviderChooser] = useState(false);
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
 
   const isAllPending = agents.every((a) => a.status === "pending");
+  const shouldLoadPreviousDecision = isOpen && isAllPending && !isRunning && !error;
+  const {
+    data: previousDecisionData,
+    isLoading: isPreviousDecisionLoading,
+  } = useQueryAIDecision(ticker, shouldLoadPreviousDecision);
+  const previousDecision = previousDecisionData?.decision ?? null;
   const hasDebate = debate.length > 0
     || agents.some(a => (a.key === "bull" || a.key === "bear") && a.status !== "pending");
 
@@ -80,6 +149,10 @@ export function AIAnalysisPanel({
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !isAllPending) setShowProviderChooser(false);
+  }, [isOpen, isAllPending]);
 
   // ESC 닫기
   useEffect(() => {
@@ -323,7 +396,20 @@ export function AIAnalysisPanel({
 
                     {/* 시작 전 — 공급자 선택 화면(로컬 CLI 가용성 기반) */}
                     {isAllPending && !error && !isRunning && (
-                      <ProviderChooser onSelect={start} />
+                      isPreviousDecisionLoading ? (
+                        <div className="mx-auto w-full max-w-[22rem] px-6 py-16 text-center" role="status" aria-live="polite">
+                          <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-slate-400" />
+                          <p className="text-sm text-slate-400 break-keep">{COPY.previousDecision.loading}</p>
+                        </div>
+                      ) : previousDecision && !showProviderChooser ? (
+                        <PreviousDecisionIntro
+                          snapshot={previousDecision}
+                          onAnalyze={start}
+                          onChooseProvider={() => setShowProviderChooser(true)}
+                        />
+                      ) : (
+                        <ProviderChooser onSelect={start} />
+                      )
                     )}
 
                     {/* 오류 */}

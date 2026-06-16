@@ -25,6 +25,16 @@ export const COPY = {
       codex: "빠르고 간결하게 핵심을 분석",
     },
   },
+  previousDecision: {
+    title: "저장된 이전 분석",
+    loading: "저장된 이전 분석을 확인하는 중...",
+    meta: (updatedAt: string, provider: string) =>
+      `${updatedAt} · ${provider} 분석 결과`,
+    pmOnly:
+      "오늘 다시 분석하면 이 결론은 포트폴리오 매니저에게만 참고 자료로 전달돼요.",
+    analyze: "이전 결론 참고해 오늘 다시 분석",
+    chooseProvider: "다른 AI 선택",
+  },
   panel: {
     title: "AI 종합분석",
     /** 분석 중 헤더에 노출 — 현재 진행 중인 에이전트 기준 상태 한 줄. */

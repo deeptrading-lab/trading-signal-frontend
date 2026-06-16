@@ -65,6 +65,18 @@ export interface AIProviderAvailability {
   vercel: boolean;
 }
 
+/**
+ * 종목별 공유 AI 분석 결론 스냅샷.
+ * Supabase `ai_analysis_decisions` 테이블의 ticker PK row 를 BFF가 camelCase로 변환해 반환한다.
+ */
+export interface AIAnalysisDecisionSnapshot {
+  ticker: string;
+  provider: AIAnalysisProvider;
+  decision: FinalDecision;
+  sentiment: SentimentReport | null;
+  updatedAt: string;
+}
+
 export type AgentStatus = "pending" | "running" | "done" | "error";
 
 export interface AgentMeta {

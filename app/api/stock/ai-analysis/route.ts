@@ -15,7 +15,7 @@
  *
  * ⚠️ 로컬 전용(next dev) — Vercel 환경 감지 시 503.
  * ⚠️ KIS 미설정 시 400.
- * ⚠️ 전체 타임아웃 300s.
+ * ⚠️ 전체 타임아웃 50분.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -38,8 +38,11 @@ import type {
 } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
-import type { AIDecisionEntry } from "@/lib/api/stock/aiDecisionStore";
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
+import {
+  getLatestAIDecision,
+  upsertAIDecision,
+} from "@/lib/server/ai/decisionStore";
 import { isVercelEnv } from "@/lib/server/env";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
@@ -123,6 +126,34 @@ function parseSentimentBlock(raw: string): SentimentReport | null {
   const summary = field("summary") ?? "";
 
   return { band, score, confidence, summary };
+}
+
+// ─── 이전 PM 결론 컨텍스트 (Portfolio Manager 전용) ───────────────────────────
+
+function formatPreviousDecisionContext(
+  previous: Awaited<ReturnType<typeof getLatestAIDecision>>,
+): string {
+  if (!previous) return "";
+  const { decision, sentiment, provider, updatedAt } = previous;
+  const target = decision.target_pct == null
+    ? "없음"
+    : `${decision.target_pct > 0 ? "+" : ""}${decision.target_pct}%`;
+  const sentimentText = sentiment
+    ? `\n- 당시 SNS 감성: ${COPY.sentiment.bandLabel[sentiment.band]} / ${sentiment.score}/10 / 신뢰도 ${sentiment.confidence}`
+    : "";
+
+  return `\n\n[이전 Portfolio Manager 결론 — 참고·비교 자료]
+- 분석 시각: ${updatedAt}
+- 사용 AI: ${COPY.provider[provider]}
+- verdict: ${decision.verdict}
+- confidence: ${decision.confidence}
+- target_pct: ${target}
+- stop_loss_pct: ${decision.stop_loss_pct}%
+- 단기 전망: ${decision.short_term_outlook}
+- 중기 전망: ${decision.mid_term_outlook}
+- 기존 판단 근거: ${decision.reasoning}${sentimentText}
+
+위 이전 결론은 Portfolio Manager만 참고하세요. 그대로 반복하지 말고, 현재 데이터와 비교해 결론이 유지·강화·약화·변경됐는지 독립적으로 판단하세요. 결론이 달라졌다면 변경 이유를 reasoning에 명확히 포함하세요.`;
 }
 
 // ─── 프롬프트 빌더 ────────────────────────────────────────────────────────────
@@ -259,13 +290,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  // Body: { ticker, provider?, startFrom?, state?, prevDecisions? }
+  // Body: { ticker, provider?, startFrom?, state? }
   const body = await req.json().catch(() => null) as {
     ticker?: unknown;
     provider?: unknown;
     startFrom?: unknown;
     state?: unknown;
-    prevDecisions?: unknown;
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
@@ -298,22 +328,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     ? body.state as ResumeState
     : {};
 
-  // 과거 결정 이력 (Decision Memory — PM 프롬프트 주입용)
-  const prevDecisions: AIDecisionEntry[] = Array.isArray(body.prevDecisions)
-    ? (body.prevDecisions as AIDecisionEntry[]).slice(0, 3)
-    : [];
-
-  const pastDecisionContext = prevDecisions.length > 0
-    ? `\n\n**과거 결정 참고** (같은 종목 이전 AI 분석 결과 — 패턴 학습용):\n${
-        prevDecisions.map(d =>
-          `- ${d.date.slice(0, 10)}: ${d.verdict} (확신도: ${d.confidence}) / 목표: ${d.target_pct != null ? `${d.target_pct > 0 ? "+" : ""}${d.target_pct}%` : "없음"} / 손절: ${d.stop_loss_pct}%`
-        ).join("\n")
-      }\n과거 결정의 논리를 반복하지 말고, 현재 데이터에 기반해 독립적으로 판단하세요.`
-    : "";
-
   if (!isKisConfigured()) {
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
   }
+
+  const previousDecision = await getLatestAIDecision(ticker);
+  const previousDecisionContext = formatPreviousDecisionContext(previousDecision);
 
   // 클라이언트 disconnect + 서버 타임아웃 통합 signal
   const timeoutController = new AbortController();
@@ -433,7 +453,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           try {
             text = await invokeAgentCliStream(provider, {
               systemPrompt: agentKey === "portfolio_manager"
-                ? prompts.system + pastDecisionContext
+                ? prompts.system + previousDecisionContext
                 : prompts.system,
               userPrompt: prompts.user(state),
               tools: prompts.tools,
@@ -491,6 +511,17 @@ export async function POST(req: NextRequest): Promise<Response> {
                   mid_term_outlook: typeof d.mid_term_outlook === "string" ? d.mid_term_outlook : "",
                 };
                 send({ type: "final", data: finalDecision });
+                const saveResult = await upsertAIDecision({
+                  ticker,
+                  provider,
+                  decision: finalDecision,
+                  sentiment: state.sentiment ?? null,
+                });
+                if (saveResult.skipped) {
+                  console.log("[ai-analysis] PM 결론 저장 skip — Supabase 미설정");
+                } else if (!saveResult.ok) {
+                  console.warn(`[ai-analysis] PM 결론 저장 실패 — ${saveResult.error}`);
+                }
               } else {
                 send({ type: "report", agent: agentKey, content: text });
               }

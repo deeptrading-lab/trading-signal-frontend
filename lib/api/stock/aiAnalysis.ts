@@ -2,7 +2,7 @@
  * AI 멀티에이전트 분석 SSE 스트림 소비 함수.
  *
  * POST /api/stock/ai-analysis
- * Body: { ticker, startFrom?, state? }
+ * Body: { ticker, provider, startFrom?, state? }
  *
  * startFrom을 지정하면 해당 에이전트부터 재개한다.
  * state에는 이전 실행에서 완료된 에이전트의 결과를 채워 넣는다.
@@ -12,11 +12,11 @@ import { httpClient } from "@/lib/api/client";
 import type {
   AgentKey,
   AIAnalysisEvent,
+  AIAnalysisDecisionSnapshot,
   AIAnalysisProvider,
   AIProviderAvailability,
   ResumeState,
 } from "@/lib/types/stock/aiAnalysis";
-import type { AIDecisionEntry } from "./aiDecisionStore";
 
 /**
  * 로컬에 설치된 AI CLI 가용성 조회.
@@ -32,6 +32,23 @@ export async function fetchAIProviderAvailability(
   return res.data;
 }
 
+export async function fetchAIAnalysisDecision(
+  ticker: string,
+  signal?: AbortSignal,
+): Promise<{
+  configured: boolean;
+  decision: AIAnalysisDecisionSnapshot | null;
+}> {
+  const res = await httpClient.get<{
+    configured: boolean;
+    decision: AIAnalysisDecisionSnapshot | null;
+  }>("/stock/ai-analysis/decision", {
+    params: { ticker },
+    signal,
+  });
+  return res.data;
+}
+
 export async function fetchAIAnalysisStream(
   ticker: string,
   provider: AIAnalysisProvider,
@@ -39,12 +56,11 @@ export async function fetchAIAnalysisStream(
   signal?: AbortSignal,
   startFrom?: AgentKey,
   preState?: ResumeState,
-  prevDecisions?: AIDecisionEntry[],
 ): Promise<void> {
   const res = await fetch("/api/stock/ai-analysis", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker, provider, startFrom, state: preState, prevDecisions }),
+    body: JSON.stringify({ ticker, provider, startFrom, state: preState }),
     signal,
   });
 

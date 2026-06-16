@@ -3940,3 +3940,25 @@
   - QA: 로컬 `next dev` + claude/codex CLI로 감성 블록 라이브 발행률·배지 렌더(두 뷰포트)·PM confidence 정합·신선도 가드 회귀 스폿체크 (AC-3/8/12)
   - 후속: 감성 추이 차트화(회고 데이터 누적 후 별도 PRD), 외부 감성 데이터 소스 연동, 다른 분석가(news/fundamentals) 정형화 트랙
   - 신선도 가드 임계값(`STALE_MAX_DAYS=10`) 실운영 모니터링 — 연휴 직후 오탐 시 영업일 기준으로 조정
+
+### 2026-06-16 — feat(ai-analysis): 종목별 PM 최종 결론 공유 upsert (진행 중)
+
+- **slug**: `ai-decision-upsert` · **branch**: `feature/ai-decision-upsert`
+- **요약**: AI 종합분석의 포트폴리오 매니저 최종 결론을 Supabase `ai_analysis_decisions`에 ticker 기준 upsert하고, 저장된 이전 결론이 있으면 패널 첫 화면에서 먼저 보여준다.
+- **현재 상태**: 조건부 통과 — Supabase env/테이블 연결 확인 완료, 실제 PM final 저장 라운드트립은 분석 완료 후 확인 필요.
+- **주요 변경**
+  - 클라이언트 로컬 결정 저장소 제거, 공유 저장은 서버 BFF/Supabase REST로 이동.
+  - `GET /api/stock/ai-analysis/decision` 추가.
+  - 분석 POST route가 이전 결론을 서버에서 재조회해 PM system prompt에만 주입.
+  - PM final 이후 ticker 기준 upsert. Supabase 미설정/저장 실패는 분석 실패로 전파하지 않음.
+  - 패널 UI에 이전 결론 카드 + "이전 결론 참고해 오늘 다시 분석" / "다른 AI 선택" 액션 추가.
+- **검증**
+  - 단위 테스트: `lib/api/stock/__tests__/aiAnalysis.test.ts`, `lib/server/ai/__tests__/decisionStore.test.ts`, `lib/server/ai/__tests__/agentCli.test.ts` 통과.
+  - 전체 테스트: `npm test` 40 files passed, 257 tests passed, 1 skipped.
+  - `npm run typecheck`, `npm run lint`, `npm run build` 통과.
+  - `npm run dev` + `/stock/005930` 브라우저 확인: 이전 결론 없음 상태에서 기존 공급자 선택 UI 노출.
+  - `GET /api/stock/ai-analysis/decision?ticker=005930`: `200 OK`, `{"configured":true,"decision":null}`.
+  - Supabase REST `ai_analysis_decisions` 조회: `HTTP 200`, 빈 배열.
+  - 브라우저 패널: 저장된 이전 분석 조회 로딩 후 이전 결론 없음 상태에서 Codex 공급자 선택 UI 노출.
+- **다음 작업**
+  - 실제 AI 분석 완료 후 PM final upsert 및 저장 결론 있음 분기 라운드트립 확인.
