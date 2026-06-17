@@ -46,10 +46,15 @@ import {
 import { isVercelEnv } from "@/lib/server/env";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
+import { businessDaysBetween } from "@/lib/utils/businessDays";
 
 const CHART_DAYS = 200;
-/** 최신 일봉이 기준일로부터 이 일수를 초과해 노후하면 분석 조기 중단(콜드스타트·휴장 옛 가격 방지). */
-const STALE_MAX_DAYS = 10;
+/**
+ * 최신 일봉이 기준일로부터 이 **영업일(평일)** 수를 초과해 노후하면 분석 조기 중단
+ * (콜드스타트·휴장 옛 가격 방지). 주말은 카운트에서 제외되고, 긴 연휴의 소수 공휴일은
+ * 이 마진(7)이 흡수한다 — 설·추석 연휴(공휴일 ~3평일)에도 임계 미만이라 오탐 없음.
+ */
+const STALE_MAX_BUSINESS_DAYS = 7;
 // 12-에이전트 파이프라인 최대 허용 시간 (50분)
 // Phase A(6m) + Phase B(20m) + research_manager(5m) + trader/effort:high(6m)
 //   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
@@ -400,14 +405,15 @@ export async function POST(req: NextRequest): Promise<Response> {
           return;
         }
 
-        // 신선도 가드 — 최신 봉이 STALE_MAX_DAYS 초과 노후면 옛 가격 분석 방지(콜드스타트·휴장).
+        // 신선도 가드 — 최신 봉이 STALE_MAX_BUSINESS_DAYS(영업일) 초과 노후면 옛 가격 분석 방지
+        // (콜드스타트·휴장). 영업일 기준이라 주말·연휴 직후 정상 데이터를 오탐하지 않는다.
         const latestCandleDate = sorted[sorted.length - 1]?.date; // "YYYY-MM-DD"
         if (latestCandleDate) {
-          const latestMs = new Date(`${latestCandleDate}T00:00:00`).getTime();
-          if (Number.isFinite(latestMs)) {
-            const ageDays = (today.getTime() - latestMs) / 86_400_000;
-            if (ageDays > STALE_MAX_DAYS) {
-              console.warn(`[ai-analysis] 시세 노후 — 최신봉 ${latestCandleDate} (${ageDays.toFixed(0)}일 경과)`);
+          const latest = new Date(`${latestCandleDate}T00:00:00`);
+          if (!Number.isNaN(latest.getTime())) {
+            const staleBusinessDays = businessDaysBetween(latest, today);
+            if (staleBusinessDays > STALE_MAX_BUSINESS_DAYS) {
+              console.warn(`[ai-analysis] 시세 노후 — 최신봉 ${latestCandleDate} (${staleBusinessDays}영업일 경과)`);
               send({ type: "error", message: "최신 시세를 불러오지 못해 분석을 중단했어요. 잠시 후 다시 시도해 주세요." });
               controller.close();
               return;
