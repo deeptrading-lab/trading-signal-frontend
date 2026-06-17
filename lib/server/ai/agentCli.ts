@@ -2,8 +2,9 @@ import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_pro
 import {
   invokeClaudeAgentStream,
   type AgentCallOpts,
+  type AgentStreamResult,
 } from "@/lib/server/claudeAgent";
-import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
+import { type AIAnalysisProvider, UNMEASURED_USAGE } from "@/lib/types/stock/aiAnalysis";
 
 const MAX_STDOUT = 4 * 1024 * 1024;
 
@@ -162,7 +163,7 @@ export async function invokeAgentCliStream(
   request: AgentCliStreamRequest,
   signal: AbortSignal,
   onToken: (token: string) => void,
-): Promise<string> {
+): Promise<AgentStreamResult> {
   if (provider === "claude") {
     return invokeClaudeAgentStream(
       process.env.CLAUDE_CLI_PATH ?? "claude",
@@ -173,6 +174,10 @@ export async function invokeAgentCliStream(
     );
   }
 
+  // codex: 현재 호출(exec, --color never)은 stdout 텍스트만 반환 — 토큰 메타 없음.
+  // 토큰 캡처는 `exec --json` + usage 이벤트 파싱이 필요한데, codex 미설치로 스키마 검증 불가.
+  // 검증된 텍스트 추출 경로를 깨지 않기 위해 usage는 미측정(measured:false)으로 남긴다.
+  // TODO(codex-token): codex 설치 환경에서 --json usage 파싱 추가.
   const text = await invokeAgentCli({
     provider,
     systemPrompt: request.systemPrompt,
@@ -182,5 +187,5 @@ export async function invokeAgentCliStream(
     signal,
   });
   if (text) onToken(text);
-  return text;
+  return { text, usage: { ...UNMEASURED_USAGE } };
 }

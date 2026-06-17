@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { usePathname } from "next/navigation";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
 import {
   AGENT_ORDER,
@@ -16,8 +24,28 @@ import {
   type SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
 
-export interface AIAnalysisHook {
+/**
+ * AI 종목 분석 — 전역 컨텍스트.
+ *
+ * 분석 상태(에이전트·리포트·토론·결론)와 SSE 스트림을 `(main)` 레이아웃 한 곳에서 소유한다.
+ * 종목 상세 페이지가 아니라 셸(레이아웃)에 mount 되므로, 분석 도중 상단 navbar 로 다른 페이지
+ * (마이페이지 등)로 이동해도 컴포넌트가 unmount 되지 않아 스트림이 끊기지 않고 **백그라운드에서
+ * 계속 진행**된다. 진행 중 표시는 패널의 우측 재열기 탭(스피너+진행수)이 모든 페이지에서 담당한다.
+ *
+ * 두 종류의 ticker 를 구분한다:
+ *   - analyzingTicker: 실제 분석이 도는(또는 마지막으로 돈) 종목. 백그라운드 스트림의 주인.
+ *   - viewTicker:      패널이 현재 보여주는 종목. analyzingTicker 와 같으면 라이브 상태,
+ *                      다르면 그 종목의 idle 진입(공급자 선택/이전 결론)을 보여준다.
+ *
+ * 동시 분석은 1건 — 다른 종목 분석을 새로 시작하면(start) 진행 중이던 스트림은 중단된다.
+ */
+
+export interface AIAnalysisContextValue {
   provider: AIAnalysisProvider;
+  /** 분석이 도는(또는 마지막으로 돈) 종목. 없으면 null. */
+  analyzingTicker: string | null;
+  /** 패널이 현재 보여주는 종목. */
+  viewTicker: string | null;
   isOpen: boolean;
   isRunning: boolean;
   showReanalysisPrompt: boolean;
@@ -26,28 +54,37 @@ export interface AIAnalysisHook {
   debate: DebateMessage[];
   debatingSide: "bull" | "bear" | null;
   final: FinalDecision | null;
-  /** SNS 분석가 정형 감성 — 파싱 성공 시에만, 아니면 null(배지 미표시). */
   sentiment: SentimentReport | null;
   error: string | null;
-  /** 재개 가능한 에이전트 — 실패하거나 중지된 첫 에이전트 */
   resumeFrom: AgentKey | null;
-  /** 패널만 연다(자동 실행 X). 결과 없으면 빈 상태에 공급자 선택 화면, 결과 있으면 재분석 프롬프트. */
+  /** 진행 표시용 — 완료(done)된 에이전트 수. */
+  doneCount: number;
+  /** 패널을 ticker 기준으로 연다. analyzingTicker 와 다르면 그 종목 idle 진입을 보여준다. */
+  openFor: (ticker: string) => void;
+  /** 재열기 탭 — 현재 분석 중인 종목의 라이브 뷰를 연다. */
   open: () => void;
-  /** 공급자 선택 화면에서 공급자를 고르면 처음부터 분석 시작. */
+  /** 공급자 선택 → viewTicker 종목을 처음부터 분석. 다른 종목 진행 중이면 중단 후 시작. */
   start: (provider: AIAnalysisProvider) => void;
-  /** 결과를 비우고 공급자 선택 화면으로 복귀(다른 AI로 재선택). */
   chooseAgain: () => void;
-  /** 직전 공급자로 처음부터 재실행 — 에러 재시도 전용. */
   run: () => void;
-  /** fromAgent부터 재개 — 이전 완료 결과는 유지 */
   resume: (fromAgent: AgentKey) => void;
   stop: () => void;
   close: () => void;
   dismissReanalysisPrompt: () => void;
 }
 
-export function useAIAnalysis(ticker: string): AIAnalysisHook {
+const AIAnalysisContext = createContext<AIAnalysisContextValue | null>(null);
+
+export function useAIAnalysisContext(): AIAnalysisContextValue {
+  const ctx = useContext(AIAnalysisContext);
+  if (!ctx) throw new Error("useAIAnalysisContext must be used within <AIAnalysisProvider>");
+  return ctx;
+}
+
+export function AIAnalysisProvider({ children }: { children: React.ReactNode }) {
   const [provider, setProvider] = useState<AIAnalysisProvider>("codex");
+  const [analyzingTicker, setAnalyzingTicker] = useState<string | null>(null);
+  const [viewTicker, setViewTicker] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [showReanalysisPrompt, setShowReanalysisPrompt] = useState(false);
@@ -62,10 +99,24 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
 
   const abortRef = useRef<AbortController | null>(null);
   const providerRef = useRef<AIAnalysisProvider>("codex");
+  const analyzingTickerRef = useRef<string | null>(null);
+  const viewTickerRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
   }, []);
+
+  // 라우트 이동 시 패널 자동 접기 — 분석 스트림은 백그라운드에서 계속(중단 없음).
+  //   navbar 클릭 등으로 경로가 바뀌면 오버레이가 새 페이지를 덮은 채 남지 않도록 닫는다.
+  //   재열기 탭(우측)은 그대로 노출되어 언제든 다시 펼칠 수 있다.
+  const pathname = usePathname();
+  const prevPathRef = useRef(pathname);
+  useEffect(() => {
+    if (prevPathRef.current === pathname) return;
+    prevPathRef.current = pathname;
+    setIsOpen(false);
+    setShowReanalysisPrompt(false);
+  }, [pathname]);
 
   // stale closure 방지용 refs
   const reportsRef = useRef<Partial<Record<AgentKey, string>>>({});
@@ -77,6 +128,8 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   useEffect(() => { agentsRef.current = agents; }, [agents]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
   useEffect(() => { providerRef.current = provider; }, [provider]);
+  useEffect(() => { analyzingTickerRef.current = analyzingTicker; }, [analyzingTicker]);
+  useEffect(() => { viewTickerRef.current = viewTicker; }, [viewTicker]);
 
   const resetResults = useCallback(() => {
     setAgents(INITIAL_AGENT_STATES);
@@ -89,18 +142,6 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setResumeFrom(null);
     setShowReanalysisPrompt(false);
   }, []);
-
-  // 종목이 바뀌면(같은 페이지에서 다른 ticker 로 라우팅) 진행 중 스트림을 끊고 상태를 초기화한다.
-  //   이전 종목의 분석이 새 종목 화면에 남지 않도록 티커 전환 시 런타임 상태를 초기화한다.
-  const prevTickerRef = useRef(ticker);
-  useEffect(() => {
-    if (prevTickerRef.current === ticker) return;
-    prevTickerRef.current = ticker;
-    abortRef.current?.abort();
-    setIsRunning(false);
-    setIsOpen(false);
-    resetResults();
-  }, [ticker, resetResults]);
 
   // ── 공통 이벤트 핸들러 ─────────────────────────────────────────────────────
 
@@ -189,6 +230,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
   // ── 스트림 시작 공통 로직 ──────────────────────────────────────────────────
 
   const startStream = useCallback((
+    targetTicker: string,
     fromAgent?: AgentKey,
     preState?: ResumeState,
     requestedProvider: AIAnalysisProvider = providerRef.current,
@@ -197,6 +239,12 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     const abort = new AbortController();
     abortRef.current = abort;
 
+    // 분석·뷰 모두 대상 종목으로 고정(다른 종목 진행 중이었다면 위 abort 로 중단됨).
+    setAnalyzingTicker(targetTicker);
+    analyzingTickerRef.current = targetTicker;
+    setViewTicker(targetTicker);
+    viewTickerRef.current = targetTicker;
+
     setError(null);
     setResumeFrom(null);
     setIsRunning(true);
@@ -204,7 +252,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setShowReanalysisPrompt(false);
 
     fetchAIAnalysisStream(
-      ticker,
+      targetTicker,
       requestedProvider,
       handleEvent,
       abort.signal,
@@ -218,35 +266,50 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
         setError(msg);
         setIsRunning(false);
       });
-  }, [ticker, handleEvent]);
+  }, [handleEvent]);
 
   // ── 공개 API ───────────────────────────────────────────────────────────────
 
-  /** 직전 공급자로 처음부터 전체 재실행 — 에러 재시도 전용 */
+  /** 직전 공급자로 viewTicker(=analyzingTicker) 를 처음부터 전체 재실행 — 에러 재시도 전용 */
   const run = useCallback(() => {
+    const target = analyzingTickerRef.current;
+    if (!target) return;
     resetResults();
-    startStream(undefined, undefined, providerRef.current);
+    startStream(target, undefined, undefined, providerRef.current);
   }, [resetResults, startStream]);
 
   /**
-   * 패널 열기 — 자동 실행하지 않는다.
-   * - 분석 이력 없으면 빈 상태에 공급자 선택 화면(ProviderChooser)이 렌더된다.
-   * - 이력 있으면(진행 중 아님) 패널 열고 재분석 프롬프트 표시.
+   * 패널을 ticker 기준으로 연다 — 자동 실행하지 않는다.
+   * - ticker 가 분석 중인 종목과 같으면: 라이브 상태를 보여주고, 결과만 있고 진행 중이 아니면 재분석 프롬프트.
+   * - 다르면: 그 종목의 idle 진입(공급자 선택/이전 결론). 백그라운드 분석은 건드리지 않는다.
    */
-  const open = useCallback(() => {
+  const openFor = useCallback((ticker: string) => {
+    setViewTicker(ticker);
+    viewTickerRef.current = ticker;
     setIsOpen(true);
-    const allPending = agentsRef.current.every(a => a.status === "pending");
-    if (!allPending && !isRunningRef.current) {
-      setShowReanalysisPrompt(true);
+    if (ticker === analyzingTickerRef.current) {
+      const allPending = agentsRef.current.every(a => a.status === "pending");
+      if (!allPending && !isRunningRef.current) setShowReanalysisPrompt(true);
+    } else {
+      setShowReanalysisPrompt(false);
     }
   }, []);
 
-  /** 공급자 선택 화면에서 공급자 확정 → 처음부터 분석 시작 */
+  /** 재열기 탭 — 현재 분석 중인 종목의 라이브 뷰로 연다. */
+  const open = useCallback(() => {
+    const target = analyzingTickerRef.current ?? viewTickerRef.current;
+    if (!target) return;
+    openFor(target);
+  }, [openFor]);
+
+  /** 공급자 선택 화면에서 공급자 확정 → viewTicker 종목을 처음부터 분석 시작 */
   const start = useCallback((nextProvider: AIAnalysisProvider) => {
+    const target = viewTickerRef.current;
+    if (!target) return;
     providerRef.current = nextProvider;
     setProvider(nextProvider);
     resetResults();
-    startStream(undefined, undefined, nextProvider);
+    startStream(target, undefined, undefined, nextProvider);
   }, [resetResults, startStream]);
 
   /** 결과를 비워 공급자 선택 화면으로 복귀(다른 AI로 재선택) */
@@ -260,6 +323,8 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
    * 토론(bull/bear)은 항상 bull부터 재실행.
    */
   const resume = useCallback((fromAgent: AgentKey) => {
+    const target = analyzingTickerRef.current;
+    if (!target) return;
     // bear는 항상 bull부터 재실행
     const effectiveFrom: AgentKey = fromAgent === "bear" ? "bull" : fromAgent;
     const fromIndex = AGENT_ORDER.indexOf(effectiveFrom);
@@ -315,7 +380,7 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
       setFinal(null);
     }
 
-    startStream(effectiveFrom, preState);
+    startStream(target, effectiveFrom, preState);
   }, [startStream]);
 
   // running 에이전트 → error 전환 + 스트리밍 토론 메시지 정리 (stop·close 공용)
@@ -350,11 +415,20 @@ export function useAIAnalysis(ticker: string): AIAnalysisHook {
     setShowReanalysisPrompt(false);
   }, []);
 
-  return {
+  const doneCount = agents.filter((a) => a.status === "done").length;
+
+  const value: AIAnalysisContextValue = {
     provider,
+    analyzingTicker, viewTicker,
     isOpen, isRunning, showReanalysisPrompt,
     agents, reports, debate, debatingSide,
-    final, sentiment, error, resumeFrom,
-    open, start, chooseAgain, run, resume, stop, close, dismissReanalysisPrompt,
+    final, sentiment, error, resumeFrom, doneCount,
+    openFor, open, start, chooseAgain, run, resume, stop, close, dismissReanalysisPrompt,
   };
+
+  return (
+    <AIAnalysisContext.Provider value={value}>
+      {children}
+    </AIAnalysisContext.Provider>
+  );
 }

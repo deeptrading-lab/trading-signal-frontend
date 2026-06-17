@@ -16,6 +16,7 @@
 
 import { spawn } from "node:child_process";
 import readline from "node:readline";
+import { type AgentUsage, UNMEASURED_USAGE } from "@/lib/types/stock/aiAnalysis";
 
 export interface AgentCallOpts {
   systemPrompt: string;
@@ -25,14 +26,45 @@ export interface AgentCallOpts {
   effort?: "low" | "medium" | "high" | "xhigh" | "max";
 }
 
+/** 에이전트 스트림 호출 결과 — 텍스트 + (가능하면) 토큰 사용량. */
+export interface AgentStreamResult {
+  text: string;
+  usage: AgentUsage;
+}
+
+/** modelUsage 객체의 첫 키(=실제 사용 모델명)를 추출. 없으면 null. */
+function extractModel(modelUsage: unknown): string | null {
+  if (modelUsage && typeof modelUsage === "object") {
+    const keys = Object.keys(modelUsage as Record<string, unknown>);
+    if (keys.length > 0) return keys[0];
+  }
+  return null;
+}
+
+/** claude CLI result 이벤트에서 AgentUsage 를 구성. usage 누락 시 measured:false. */
+function buildClaudeUsage(event: Record<string, unknown>): AgentUsage {
+  const u = event.usage as Record<string, unknown> | undefined;
+  if (!u || typeof u !== "object") return { ...UNMEASURED_USAGE };
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
+  return {
+    inputTokens: num(u.input_tokens),
+    outputTokens: num(u.output_tokens),
+    cacheCreationInputTokens: num(u.cache_creation_input_tokens),
+    cacheReadInputTokens: num(u.cache_read_input_tokens),
+    costUsd: num(event.total_cost_usd),
+    model: extractModel(event.modelUsage),
+    measured: true,
+  };
+}
+
 export function invokeClaudeAgentStream(
   bin: string,
   model: string | undefined,
   opts: AgentCallOpts,
   signal: AbortSignal,
   onToken: (token: string) => void,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
+): Promise<AgentStreamResult> {
+  return new Promise<AgentStreamResult>((resolve, reject) => {
     if (signal.aborted) {
       reject(Object.assign(new Error("AbortError"), { name: "AbortError" }));
       return;
@@ -133,8 +165,9 @@ export function invokeClaudeAgentStream(
       if (event.type === "result") {
         if (event.subtype === "success") {
           const finalText = typeof event.result === "string" ? event.result : accumulated;
+          const usage = buildClaudeUsage(event);
           cleanup();
-          settle(() => resolve(finalText));
+          settle(() => resolve({ text: finalText, usage }));
         } else if (event.is_error) {
           const errMsg = typeof event.result === "string" ? event.result : "Claude CLI 오류";
           cleanup();
@@ -146,7 +179,8 @@ export function invokeClaudeAgentStream(
     child.on("close", (code) => {
       cleanup();
       if (settled) return;
-      if (accumulated) settle(() => resolve(accumulated));
+      // result 이벤트 없이 종료 — 텍스트만 폴백, 토큰은 미측정 처리.
+      if (accumulated) settle(() => resolve({ text: accumulated, usage: { ...UNMEASURED_USAGE } }));
       else settle(() => reject(new Error(`Claude CLI 비정상 종료 (code=${code})`)));
     });
 

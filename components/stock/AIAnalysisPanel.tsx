@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/cn";
 import { AGENT_META } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
-import type { AIAnalysisHook } from "@/hooks/stock/useAIAnalysis";
+import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
@@ -24,7 +24,7 @@ import type {
   AIAnalysisProvider,
 } from "@/lib/types/stock/aiAnalysis";
 
-interface AIAnalysisPanelProps extends AIAnalysisHook {
+interface AIAnalysisPanelProps extends AIAnalysisContextValue {
   ticker: string;
 }
 
@@ -99,6 +99,7 @@ export function AIAnalysisPanel({
   sentiment,
   error,
   resumeFrom,
+  doneCount,
   open,
   start,
   chooseAgain,
@@ -213,6 +214,12 @@ export function AIAnalysisPanel({
               : <Sparkles size={16} />
             }
             <span className="text-xs font-bold leading-snug text-center">AI<br />분<br />석</span>
+            {/* 진행 중 — 완료 에이전트 수를 모든 페이지에서 노출(백그라운드 진행 표시) */}
+            {isRunning && (
+              <span className="text-[10px] font-bold tabular-nums leading-none px-1 py-0.5 rounded bg-white/20">
+                {doneCount}/{agents.length}
+              </span>
+            )}
           </motion.button>
         )}
       </AnimatePresence>
