@@ -18,7 +18,7 @@ import {
   resolveKisEnv,
   type ForeignInstitutionSubject,
 } from "@/lib/api/kis";
-import { saveFlowSnapshot } from "@/lib/server/flowSnapshotStore";
+import { saveFlowSnapshot, saveFlowCronMeta } from "@/lib/server/flowSnapshotStore";
 import { delay, fetchWithTransientRetry } from "@/lib/server/bffUtils";
 
 const SUBJECT_DELAY_MS = 200; // 주체 2콜 간 지연 — EGW00201 회피.
@@ -32,12 +32,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const env = resolveKisEnv();
+
   // KIS 미설정/비-prod → 적립 skip(랭킹 TR 은 prod 전용 가능성). cron 재시도 폭주 막으려 200.
-  if (!isKisConfigured() || resolveKisEnv() !== "prod") {
-    return NextResponse.json(
-      { ok: false, reason: "kis-not-prod", env: resolveKisEnv() },
-      { status: 200 },
-    );
+  if (!isKisConfigured() || env !== "prod") {
+    // 헬스 마커 — 로그 없이도 cron 건강 확인용(/api/flow/cron-status).
+    await saveFlowCronMeta({ at: new Date().toISOString(), ok: false, reason: "kis-not-prod", env });
+    return NextResponse.json({ ok: false, reason: "kis-not-prod", env }, { status: 200 });
   }
 
   const saved: Record<string, number> = {};
@@ -56,5 +57,7 @@ export async function GET(request: NextRequest) {
     await delay(SUBJECT_DELAY_MS);
   }
 
+  // 헬스 마커 — 마지막 실행 시각/저장 결과. saved 가 비면 휴장/빈응답.
+  await saveFlowCronMeta({ at: new Date().toISOString(), ok: true, env, saved });
   return NextResponse.json({ ok: true, saved }, { status: 200 });
 }
