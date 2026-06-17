@@ -47,7 +47,8 @@ function PreviousDecisionIntro({
   onChooseProvider: () => void;
 }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-4">
+    // 라이브 분석 뷰(풀 width)와 동일하게 패널 폭을 꽉 채운다 — 데스크탑에서 좌우 여백 제거.
+    <div className="w-full space-y-4">
       <div className="rounded-2xl border border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20 px-4 py-3">
         <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
           {COPY.previousDecision.title}
