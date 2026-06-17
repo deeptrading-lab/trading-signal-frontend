@@ -21,12 +21,13 @@ function InlineBold({ text }: { text: string }) {
 }
 
 // 행동형 라벨 — 기관 비중 용어 대신 개인 투자자 행동 중심(강세→약세 6단계).
-const VERDICT_LABEL: Record<FinalVerdict, string> = {
+// 분석 결과 카드(components/analyze/AIDecisionCard)도 동일 라벨/방향 판정을 재사용한다.
+export const VERDICT_LABEL: Record<FinalVerdict, string> = {
   BUY: "적극 매수", OVERWEIGHT: "분할 매수", HOLD: "중립",
   UNDERWEIGHT: "신규 진입 주의", REDUCE: "분할 매도", SELL: "매도 / 회피",
 };
-const isBullishVerdict = (v: FinalVerdict) => v === "BUY" || v === "OVERWEIGHT";
-const isBearishVerdict = (v: FinalVerdict) => v === "SELL" || v === "REDUCE" || v === "UNDERWEIGHT";
+export const isBullishVerdict = (v: FinalVerdict) => v === "BUY" || v === "OVERWEIGHT";
+export const isBearishVerdict = (v: FinalVerdict) => v === "SELL" || v === "REDUCE" || v === "UNDERWEIGHT";
 /** 신규 진입(롱) 자체가 없는 등급 — 손익비 "진입 없음" 표기용 */
 const isNoEntryVerdict = (v: FinalVerdict) => v === "UNDERWEIGHT" || v === "REDUCE" || v === "SELL";
 

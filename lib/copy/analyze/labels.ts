@@ -3,8 +3,50 @@
  * ticker·API 필드·고유명사 외에는 한글 기본(AGENTS.md 작업 원칙).
  */
 
+/** 페이지 헤더 — 결과 카드 + 토큰 대시보드를 아우르는 상위 제목. */
+export const ANALYZE_PAGE_TITLE = "AI 분석";
+export const ANALYZE_PAGE_SUBTITLE =
+  "지금까지 분석한 종목의 결론과 토큰 사용량을 모아 봅니다.";
+
+/** 상위 탭 — 분석 결과 카드 / 토큰 사용량 대시보드 전환. */
+export const TAB_RESULTS = "분석 결과";
+export const TAB_USAGE = "토큰 사용량";
+
 export const USAGE_TITLE = "AI 분석 토큰 사용량";
 export const USAGE_SUBTITLE = "분석가별 토큰을 줄일 최적화 포인트를 찾기 위한 대시보드";
+
+// ─── 분석 결과 카드 목록 ─────────────────────────────────────────────────────
+export const RESULTS_LOADING = "분석 결과를 불러오는 중…";
+export const RESULTS_ERROR = "분석 결과를 불러오지 못했어요.";
+
+/** Supabase 미설정 시 안내. */
+export const RESULTS_NOT_CONFIGURED_TITLE = "분석 저장소가 아직 연결되지 않았어요";
+export const RESULTS_NOT_CONFIGURED_BODY =
+  "Supabase(SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY)를 설정하면 분석 실행 시 결론이 여기에 쌓입니다.";
+
+/** 연결됐지만 저장된 결론이 0건일 때. */
+export const RESULTS_EMPTY_TITLE = "아직 분석한 종목이 없어요";
+export const RESULTS_EMPTY_BODY =
+  "종목 상세에서 AI 종합 분석을 한 번 실행하면 결론 카드가 여기에 쌓입니다.";
+
+export const resultsCount = (n: number): string => `종목 ${n}개`;
+
+/** 결과 카드 검색. */
+export const RESULTS_SEARCH_PLACEHOLDER = "종목명 또는 코드로 검색";
+export const RESULTS_SEARCH_EMPTY_TITLE = "검색 결과가 없어요";
+export const RESULTS_SEARCH_EMPTY_BODY = "다른 종목명이나 코드로 검색해 보세요.";
+
+/** 카드 토큰 줄. */
+export const CARD_TOKENS_LABEL = "총 토큰";
+export const CARD_COST_LABEL = "비용";
+export const CARD_TOKENS_NONE = "토큰 기록 없음";
+export const CARD_VIEW_DETAIL = "상세 보기";
+/** 카드 호버 시 블러 오버레이 위에 뜨는 문구. */
+export const CARD_OVERLAY_VIEW = "전체 보기";
+
+/** 상세 시트. */
+export const DETAIL_CLOSE = "닫기";
+export const DETAIL_PROVIDER_PREFIX = "분석 엔진";
 
 export const USAGE_LOADING = "토큰 사용량을 불러오는 중…";
 export const USAGE_ERROR = "토큰 사용량을 불러오지 못했어요.";

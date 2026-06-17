@@ -58,6 +58,14 @@ export const queryConfig = {
       staleTime: 60 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * AI 분석 결론 카드 목록 — 로컬 분석 실행 시에만 갱신되는 공유 결론. 실시간성 낮아 staleTime 60s,
+     * 분석 1회 후 재진입 시 바로 반영. agentUsage 와 동일 정책.
+     */
+    aiDecisions: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   /**
    * 수급(외국인/기관 순매수) 도메인 TTL.
