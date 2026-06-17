@@ -24,7 +24,7 @@ export type AIAnalysisProvider = "claude" | "codex";
 /**
  * 에이전트 1회 호출의 토큰 사용량.
  * claude CLI는 result 이벤트(stream-json --verbose)에서 전 필드를 채운다.
- * codex 등 미측정 경로는 토큰 null + measured:false 로 남겨 평균 집계에서 구분한다.
+ * usage 누락·파싱 실패 경로는 토큰 null + measured:false 로 남겨 평균 집계에서 구분한다.
  */
 export interface AgentUsage {
   inputTokens: number | null;

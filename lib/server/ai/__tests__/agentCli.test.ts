@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   buildAgentCliInvocation,
   extractAgentCliText,
+  parseCodexAgentCliOutput,
 } from "@/lib/server/ai/agentCli";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -50,6 +51,7 @@ describe("buildAgentCliInvocation", () => {
       "--ask-for-approval", "never",
       "--model", "gpt-5.4",
       "exec",
+      "--json",
       "--ephemeral",
       "--ignore-user-config",
       "--skip-git-repo-check",
@@ -78,7 +80,59 @@ describe("extractAgentCliText", () => {
     expect(extractAgentCliText("claude", '{"result":"분석 결과"}')).toBe("분석 결과");
   });
 
-  it("Codex stdout은 최종 응답 그대로 사용한다", () => {
+  it("Codex JSONL의 최종 assistant 메시지를 추출한다", () => {
+    const raw = [
+      '{"type":"thread.started","thread_id":"thread-1"}',
+      '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"분석 결과"}}',
+      '{"type":"turn.completed","usage":{"input_tokens":8109,"cached_input_tokens":1920,"output_tokens":7,"reasoning_output_tokens":0}}',
+    ].join("\n");
+
+    expect(extractAgentCliText("codex", raw)).toBe("분석 결과");
+  });
+
+  it("Codex가 JSONL 대신 본문을 반환하면 텍스트를 보존한다", () => {
     expect(extractAgentCliText("codex", "  분석 결과\n")).toBe("분석 결과");
+  });
+});
+
+describe("parseCodexAgentCliOutput", () => {
+  it("신규 입력·캐시 입력·출력 토큰을 분리한다", () => {
+    const raw = [
+      '{"type":"item.completed","item":{"type":"agent_message","text":"안녕하세요!"}}',
+      '{"type":"turn.completed","usage":{"input_tokens":8109,"cached_input_tokens":1920,"output_tokens":7,"reasoning_output_tokens":0}}',
+    ].join("\n");
+
+    expect(parseCodexAgentCliOutput(raw)).toEqual({
+      text: "안녕하세요!",
+      usage: {
+        inputTokens: 6189,
+        outputTokens: 7,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: 1920,
+        costUsd: null,
+        model: null,
+        measured: true,
+      },
+    });
+  });
+
+  it("usage가 없으면 본문을 살리고 미측정으로 폴백한다", () => {
+    const raw = [
+      '{"type":"turn.started"}',
+      '{"type":"item.completed","item":{"type":"agent_message","text":"분석 결과"}}',
+    ].join("\n");
+
+    expect(parseCodexAgentCliOutput(raw)).toEqual({
+      text: "분석 결과",
+      usage: {
+        inputTokens: null,
+        outputTokens: null,
+        cacheCreationInputTokens: null,
+        cacheReadInputTokens: null,
+        costUsd: null,
+        model: null,
+        measured: false,
+      },
+    });
   });
 });
