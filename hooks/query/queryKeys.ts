@@ -39,6 +39,8 @@ export const queryKeys = {
     aiProviders: ["stock", "ai-providers"] as const,
     /** 종목별 저장된 최신 AI 분석 결론 — Supabase 공유 저장소 BFF. */
     aiDecision: (ticker: string) => ["stock", "ai-decision", ticker] as const,
+    /** AI 분석 에이전트별 토큰 사용량 집계 — Supabase 이력 BFF. 종목 무관 단일 키. */
+    agentUsage: ["stock", "ai-agent-usage"] as const,
   },
   flow: {
     /** 시장 전체 외국인/기관 순매수 Top10(수급 표면 A) — 당일/7일누적 모드별 분리 캐시. */

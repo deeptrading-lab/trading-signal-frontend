@@ -2,7 +2,7 @@
  * BottomNav — finsight 글로벌 셸 모바일(`< md`) 한정 하단 nav.
  *
  * PR3 (finsight-redesign) 신규. PRD §3.3 / §5.3 AC-L-3.
- * home-market-redesign PR2 — 메뉴 4개(홈/관심종목/종목분석/마이페이지) + AI분석 "준비 중".
+ * home-market-redesign PR2 / ai-usage-dashboard — NAV_ITEMS 5개(홈/관심종목/종목분석/AI분석/마이페이지).
  *
  * 분기: `useBreakpoint().isMobile` 로 모바일에서만 렌더. `window.innerWidth` 직접 검사 금지
  *       (`docs/rules/frontend.md` 반응형 룰). 데스크탑 / 태블릿(`>= md`) 에서는 null 반환.
@@ -10,7 +10,7 @@
  * 위치: viewport 하단 sticky (실제로는 `fixed bottom-0`), height `spacing.navbar-h` (60px).
  * 스타일: `bottom-nav` 합성 토큰 — backdrop-blur + bg-surface/80 + border-t border-border-line.
  *
- * 콘텐츠: NAV_ITEMS 4개 + AI분석 "준비 중"(`ComingSoonNavItem`, 말풍선 포함) 가로 균등 배치.
+ * 콘텐츠: NAV_ITEMS 5개 가로 균등 배치.
  *   "종목 분석" 클릭은 Sidebar 와 공유하는 `useStockNavClick` 훅으로 일원화.
  */
 
@@ -19,7 +19,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
-import { ComingSoonNavItem } from "@/components/layout/ComingSoonNavItem";
 import { NAV_ITEMS, isNavItemActive } from "@/components/layout/navItems";
 import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
 import { cn } from "@/lib/utils/cn";
@@ -55,9 +54,6 @@ export function BottomNav() {
           </Link>
         );
       })}
-
-      {/* AI 분석 "준비 중" — 클릭 불가 비활성 항목 + 안내 말풍선 (Sidebar 와 공유) */}
-      <ComingSoonNavItem variant="bottom" />
     </nav>
   );
 }

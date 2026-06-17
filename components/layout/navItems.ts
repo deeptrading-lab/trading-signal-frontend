@@ -3,9 +3,8 @@
  *
  * PR3 (finsight-redesign) 신규.
  * home-market-redesign PR2 — 6메뉴 → 3메뉴 + AI분석 "준비 중" 항목 분리.
- *   - 제거: /dashboard (PR1 에서 /profile redirect), /analyze (준비 중 별도), /market (/ 흡수)
- *   - 유지: / (홈), /watchlist (관심종목), /profile (마이페이지)
- *   - 분리: NAV_ITEM_ANALYZE — 클릭 불가 "준비 중" 전용 (Sidebar/BottomNav 하단 고정)
+ * ai-usage-dashboard — /analyze 를 토큰 사용량 대시보드로 활성화. "준비 중"(ComingSoonNavItem) 폐기,
+ *   AI분석을 NAV_ITEMS 의 정규 링크 항목으로 승격.
  *
  * `Sidebar` (데스크탑) / `BottomNav` (모바일) 양쪽이 이 파일에서 import → 메뉴 정의 1곳.
  *
@@ -42,17 +41,9 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/", label: NAV_MENU_HOME, icon: House },
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, icon: Star },
   { path: "/stock", label: NAV_MENU_STOCK, icon: BarChart2 },
+  { path: "/analyze", label: NAV_MENU_ANALYZE, icon: Compass },
   { path: "/profile", label: NAV_MENU_PROFILE, icon: User },
 ];
-
-/**
- * AI 분석 "준비 중" 항목 — 클릭 불가, Sidebar/BottomNav 하단 고정.
- * `path` 없음 — 링크가 아닌 비활성 div 로 렌더.
- */
-export const NAV_ITEM_ANALYZE = {
-  label: NAV_MENU_ANALYZE,
-  icon: Compass,
-} as const;
 
 /**
  * 활성 라우트 판별.

@@ -50,6 +50,14 @@ export const queryConfig = {
       staleTime: 1 * DAY,
       gcTime: 7 * DAY,
     },
+    /**
+     * AI 분석 토큰 사용량 집계 — 로컬 분석 실행 시에만 누적되는 이력. 수동 새로고침 + 짧은 stale.
+     * 자주 바뀌지 않으나 분석 1회 후 바로 반영되도록 60s.
+     */
+    agentUsage: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   /**
    * 수급(외국인/기관 순매수) 도메인 TTL.

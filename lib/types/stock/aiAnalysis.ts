@@ -21,6 +21,33 @@ export type AgentKey =
 
 export type AIAnalysisProvider = "claude" | "codex";
 
+/**
+ * 에이전트 1회 호출의 토큰 사용량.
+ * claude CLI는 result 이벤트(stream-json --verbose)에서 전 필드를 채운다.
+ * codex 등 미측정 경로는 토큰 null + measured:false 로 남겨 평균 집계에서 구분한다.
+ */
+export interface AgentUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheCreationInputTokens: number | null;
+  cacheReadInputTokens: number | null;
+  costUsd: number | null;
+  model: string | null;
+  /** false = 토큰 미측정(codex 미지원). null 토큰과 0 사용을 구분 */
+  measured: boolean;
+}
+
+/** 토큰 미측정 폴백(codex·비정상 종료 등). */
+export const UNMEASURED_USAGE: AgentUsage = {
+  inputTokens: null,
+  outputTokens: null,
+  cacheCreationInputTokens: null,
+  cacheReadInputTokens: null,
+  costUsd: null,
+  model: null,
+  measured: false,
+};
+
 // ─── 구조화 감성 (SNS 분석가 정형 출력) ───────────────────────────────────────
 
 /**

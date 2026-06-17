@@ -28,6 +28,7 @@ import type { StockPrice, StockDailyCandle } from "@/lib/api/kis/types";
 import type { StockInvestorTrend } from "@/lib/types/stock/investors";
 import type {
   AgentKey,
+  AgentUsage,
   AIAnalysisEvent,
   AIAnalysisProvider,
   FinalDecision,
@@ -43,10 +44,20 @@ import {
   getLatestAIDecision,
   upsertAIDecision,
 } from "@/lib/server/ai/decisionStore";
+import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { isVercelEnv } from "@/lib/server/env";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 import { businessDaysBetween } from "@/lib/utils/businessDays";
+
+/** 토큰 사용량 집계용 단계 분류: A=분석가, B=토론, C=매니저 체인. */
+const STAGE_BY_AGENT: Record<AgentKey, "A" | "B" | "C"> = {
+  market: "A", news: "A", fundamentals: "A", social: "A",
+  bull: "B", bear: "B",
+  research_manager: "C", trader: "C",
+  risk_risky: "C", risk_neutral: "C", risk_safe: "C",
+  portfolio_manager: "C",
+};
 
 const CHART_DAYS = 200;
 /**
@@ -321,6 +332,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const provider: AIAnalysisProvider = rawProvider;
 
+  // 토큰 사용량 이력에서 이 분석 1회(12 agent)를 묶는 키. 재개 시에도 새 run 으로 집계.
+  const runId = crypto.randomUUID();
+
   // startFrom 검증 + 정규화 (bear → bull: 토론은 항상 bull부터 재실행)
   const rawStartFrom: AgentKey | undefined =
     typeof body.startFrom === "string" && (AGENT_ORDER as string[]).includes(body.startFrom)
@@ -347,10 +361,22 @@ export async function POST(req: NextRequest): Promise<Response> {
     ? AbortSignal.any([req.signal, timeoutController.signal])
     : timeoutController.signal;
 
+  // 스트림이 cancel(클라이언트 disconnect)·정상 종료로 닫혔는지 추적.
+  // 클라이언트가 분석 도중 페이지를 떠나면 cancel()이 먼저 컨트롤러를 닫는데,
+  // start() 비동기 본문은 Promise.allSettled 단계를 빠져나오며 계속 흐르다 controller.close()를
+  // 다시 호출해 ERR_INVALID_STATE를 던졌다 → 닫힘 여부를 플래그로 가드한다.
+  let closed = false;
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: AIAnalysisEvent) => {
+        if (closed) return;
         try { controller.enqueue(sseEvent(event)); } catch { /* closed */ }
+      };
+      const safeClose = () => {
+        if (closed) return;
+        closed = true;
+        try { controller.close(); } catch { /* 이미 cancel로 닫힘 */ }
       };
 
       const state: AnalysisState = {
@@ -392,7 +418,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           candles = await fetchDailyChunked(ticker, fmt(from), fmt(today));
         } catch {
           send({ type: "error", message: "시세 데이터를 불러오는 데 실패했어요." });
-          controller.close();
+          safeClose();
           return;
         }
 
@@ -401,7 +427,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         if (!signalResult.warmupOk) {
           send({ type: "error", message: "데이터가 부족해 시그널을 계산할 수 없어요. (최소 130봉 필요)" });
-          controller.close();
+          safeClose();
           return;
         }
 
@@ -415,7 +441,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             if (staleBusinessDays > STALE_MAX_BUSINESS_DAYS) {
               console.warn(`[ai-analysis] 시세 노후 — 최신봉 ${latestCandleDate} (${staleBusinessDays}영업일 경과)`);
               send({ type: "error", message: "최신 시세를 불러오지 못해 분석을 중단했어요. 잠시 후 다시 시도해 주세요." });
-              controller.close();
+              safeClose();
               return;
             }
           }
@@ -456,8 +482,9 @@ export async function POST(req: NextRequest): Promise<Response> {
 
           const agentT0 = Date.now();
           let text: string;
+          let usage: AgentUsage;
           try {
-            text = await invokeAgentCliStream(provider, {
+            const result = await invokeAgentCliStream(provider, {
               systemPrompt: agentKey === "portfolio_manager"
                 ? prompts.system + previousDecisionContext
                 : prompts.system,
@@ -469,6 +496,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             }, combinedSignal, (token) => {
               send({ type: "stream", agent: agentKey, chunk: token });
             });
+            text = result.text;
+            usage = result.usage;
           } catch (err) {
             const errName = (err as { name?: string }).name;
             if (errName === "AbortError") {
@@ -485,6 +514,19 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
 
           console.log(`[ai-analysis] ✓ ${agentKey} 완료 len=${text.length} elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
+
+          // 토큰 사용량 이력 append (fail-soft — 분석 스트림을 막지 않음)
+          recordAgentUsage({
+            runId,
+            ticker,
+            agentKey,
+            stage: STAGE_BY_AGENT[agentKey],
+            round: null,
+            provider,
+            usage,
+            model: usage.model ?? prompts.model ?? null,
+            durationMs: Date.now() - agentT0,
+          });
 
           // 포트폴리오 매니저: JSON 파싱
           if (agentKey === "portfolio_manager") {
@@ -584,7 +626,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // ── Phase B: 토론 (bull → bear × DEBATE_ROUNDS) ─────────────────────
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("bull") >= startIndex) {
           console.log(`[ai-analysis] ▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
-          const result = await runDebateLoop(state, send, combinedSignal, provider);
+          const result = await runDebateLoop(state, send, combinedSignal, provider, runId, ticker);
           if (result === "aborted") {
             console.log("[ai-analysis] 토론 중단 (abort)");
           }
@@ -595,7 +637,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("research_manager") >= startIndex) {
           const r = await runOneAgent("research_manager");
           if (r === "aborted") {
-            send({ type: "done" }); controller.close(); clearTimeout(timeoutId); return;
+            send({ type: "done" }); safeClose(); clearTimeout(timeoutId); return;
           }
         }
 
@@ -603,7 +645,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("trader") >= startIndex) {
           const r = await runOneAgent("trader");
           if (r === "aborted") {
-            send({ type: "done" }); controller.close(); clearTimeout(timeoutId); return;
+            send({ type: "done" }); safeClose(); clearTimeout(timeoutId); return;
           }
         }
 
@@ -624,16 +666,24 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         console.log(`[ai-analysis] 전체 완료 total=${((Date.now()-runStart)/1000).toFixed(1)}s`);
         send({ type: "done" });
-        controller.close();
+        safeClose();
       } catch (err) {
-        console.error("[ai-analysis] 예상치 못한 예외", err);
-        send({ type: "error", message: "분석 중 예상치 못한 오류가 발생했어요." });
-        controller.close();
+        // 클라이언트 disconnect(closed)·abort로 인한 예외는 정상 종료로 간주 — 에러 노이즈 억제.
+        if (closed || combinedSignal.aborted || (err as { name?: string })?.name === "AbortError") {
+          console.log("[ai-analysis] 스트림 종료 (disconnect/abort)");
+        } else {
+          console.error("[ai-analysis] 예상치 못한 예외", err);
+          send({ type: "error", message: "분석 중 예상치 못한 오류가 발생했어요." });
+        }
+        safeClose();
       } finally {
         clearTimeout(timeoutId);
       }
     },
     cancel() {
+      // 클라이언트 disconnect → 컨트롤러는 이미 닫힘. 이후 start() 본문의 send/close가
+      // ERR_INVALID_STATE를 던지지 않도록 플래그를 세우고 진행 중 작업을 중단한다.
+      closed = true;
       timeoutController.abort();
     },
   });

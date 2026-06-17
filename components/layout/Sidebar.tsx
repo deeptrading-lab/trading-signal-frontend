@@ -2,12 +2,12 @@
  * Sidebar — finsight 글로벌 셸 데스크탑(`>= lg`) 좌측 사이드바.
  *
  * PR3 (finsight-redesign) 갱신. PRD §3.3 / §5.3 AC-L-1.
- * home-market-redesign PR2 — 메뉴 4개(홈/관심종목/종목분석/마이페이지) + AI분석 하단 "준비 중".
+ * home-market-redesign PR2 — 메뉴 4개 + AI분석.
+ * ai-usage-dashboard — AI분석(/analyze)을 정규 링크로 승격, "준비 중" 하단 항목 폐기.
  *
  * 구조:
  *   - 상단: FinSight 브랜드 wordmark
- *   - 중단: NAV_ITEMS 4개 링크 (/, /watchlist, /stock, /profile)
- *   - 하단(mt-auto): AI 분석 "준비 중" 비활성 항목 (`ComingSoonNavItem` — 말풍선 포함)
+ *   - 중단: NAV_ITEMS 5개 링크 (/, /watchlist, /stock, /analyze, /profile)
  *
  * "종목 분석" 클릭은 BottomNav 와 공유하는 `useStockNavClick` 훅으로 일원화(중복 제거 + 폴백 교정).
  */
@@ -17,7 +17,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
-import { ComingSoonNavItem } from "@/components/layout/ComingSoonNavItem";
 import { NAV_ITEMS, isNavItemActive } from "@/components/layout/navItems";
 import { NAV_BRAND_LABEL } from "@/lib/copy/layout/navCopy";
 import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
@@ -63,11 +62,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* AI 분석 "준비 중" — 하단 고정, 클릭 불가 + 안내 말풍선 */}
-      <div className="mt-auto pt-lg">
-        <ComingSoonNavItem variant="sidebar" />
-      </div>
     </aside>
   );
 }

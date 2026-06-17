@@ -7,6 +7,7 @@
  */
 
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
+import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import type {
   AgentKey,
   AIAnalysisEvent,
@@ -578,6 +579,8 @@ export async function runDebateLoop(
   send: (e: AIAnalysisEvent) => void,
   combinedSignal: AbortSignal,
   provider: AIAnalysisProvider,
+  runId: string,
+  ticker: string,
 ): Promise<"done" | "aborted" | "error"> {
   for (let round = 1; round <= DEBATE_ROUNDS; round++) {
     if (combinedSignal.aborted) return "aborted";
@@ -593,13 +596,18 @@ export async function runDebateLoop(
     let bullText: string;
     const bullT0 = Date.now();
     try {
-      bullText = await invokeAgentCliStream(provider, {
+      const bullResult = await invokeAgentCliStream(provider, {
         systemPrompt: AGENT_PROMPTS.bull.system,
         userPrompt: bullPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
       }, combinedSignal, (token) => {
         send({ type: "debate_stream", speaker: "bull", chunk: token, round });
+      });
+      bullText = bullResult.text;
+      recordAgentUsage({
+        runId, ticker, agentKey: "bull", stage: "B", round,
+        provider, usage: bullResult.usage, durationMs: Date.now() - bullT0,
       });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
@@ -627,13 +635,18 @@ export async function runDebateLoop(
     let bearText: string;
     const bearT0 = Date.now();
     try {
-      bearText = await invokeAgentCliStream(provider, {
+      const bearResult = await invokeAgentCliStream(provider, {
         systemPrompt: AGENT_PROMPTS.bear.system,
         userPrompt: bearPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
       }, combinedSignal, (token) => {
         send({ type: "debate_stream", speaker: "bear", chunk: token, round });
+      });
+      bearText = bearResult.text;
+      recordAgentUsage({
+        runId, ticker, agentKey: "bear", stage: "B", round,
+        provider, usage: bearResult.usage, durationMs: Date.now() - bearT0,
       });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
