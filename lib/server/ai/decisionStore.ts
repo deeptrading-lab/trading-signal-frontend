@@ -92,6 +92,46 @@ export async function getLatestAIDecision(
   return row ? toSnapshot(row) : null;
 }
 
+/**
+ * 저장된 모든 종목의 최신 결론을 updated_at 내림차순으로 조회한다(분석 결과 카드 목록용).
+ * ai_analysis_decisions 는 ticker PK upsert 라 종목당 1행 → 그대로 "최신순 분석 종목 목록"이 된다.
+ * 미설정/오류 시 빈 배열(fail-soft) — 카드 화면이 빈 상태로 graceful 하게 떨어진다.
+ */
+export async function getAllAIDecisions(
+  limit = 200,
+): Promise<AIAnalysisDecisionSnapshot[]> {
+  const config = supabaseConfig();
+  if (!config) return [];
+
+  const url = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
+  url.searchParams.set("select", "ticker,provider,decision,sentiment,updated_at");
+  url.searchParams.set("order", "updated_at.desc");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      ...headers(config.key),
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    console.warn("[ai-decision-store] 목록 조회 예외", error);
+    return null;
+  });
+
+  if (!res) return [];
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.warn(`[ai-decision-store] 목록 조회 실패 status=${res.status} ${text}`);
+    return [];
+  }
+
+  const rows = (await res.json().catch(() => [])) as SupabaseDecisionRow[];
+  return Array.isArray(rows) ? rows.map(toSnapshot) : [];
+}
+
 export async function upsertAIDecision(input: {
   ticker: string;
   provider: AIAnalysisProvider;
