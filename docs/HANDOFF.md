@@ -4030,3 +4030,46 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 운영 모니터링: 실제 연휴 직후 가드 오탐/누락 로그 확인. 만약 비정상 거래정지 종목 등에서 과탐이 보이면 임계(7) 조정.
   - 신선도 가드는 이제 영업일 기준 — 추가 공휴일 정밀화(캘린더)는 오탐 관측 시에만 검토.
+
+### 2026-06-17 — feat(ai-analysis): 토큰 사용량 대시보드 + 분석 패널 백그라운드 유지 (#129)
+
+- **slug**: `ai-usage-dashboard` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/129
+- **요약**: feat(ai-analysis): 토큰 사용량 대시보드 + 분석 패널 백그라운드 유지
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > > **이 PR은 두 작업을 묶는다** (같은 AI 분석 도메인): ① 토큰 사용량 대시보드, ② AI 분석 패널 백그라운드 유지.
+  > 
+  > ---
+  > 
+  > ## ① AI 분석 분석가별 토큰 사용량 측정·대시보드
+  > 
+  > ### 요약
+  > AI 종합 분석의 **분석가(agent)별 토큰 사용량을 측정·누적**하고 `/analyze` 대시보드에서 본다. 목적은 **토큰을 줄일 최적화 포인트 찾기**(모니터링은 수반).
+  > 
+  > claude CLI는 `result` 이벤트에 `usage`+`total_cost_usd`를 실어 보내는데 지금까지 버려지고 있었다 → 이걸 캡처해 기존 Supabase 연결로 누적한다.
+  > 
+  > ### 변경 사항
+  > - **캡처**: `claudeAgent.ts` result 이벤트에서 usage·비용·모델 추출(반환 `{text, usage}`), `agentCli.ts`로 전파. codex는 `measured:false`(텍스트 경로 보존).
+  > - **배선**: `route.ts`에 `runId`(분석 1회 묶음)·단계(A/B/C) 태깅, `runDebateLoop` bull/bear 라운드별 기록. 모두 fail-soft append(분석 스트림 차단 안 함).
+  > - **저장**: `agentUsageStore.ts`(decisionStore 패턴) + `docs/sql/ai-agent-usage.sql` 신규 이력 테이블.
+  > - **조회/화면**: BFF 집계 `GET /api/stock/ai-analysis/usage`(provider/agent별 평균·입력분해·캐시히트율) → `/analyze` 재활용. ★단계별 입력 추세(후단 누적 가시화) + 분석가별 막대 + 정렬 테이블 + provider 탭.
+  > - **메뉴**: "AI 분석" 사이드 메뉴를 `/analyze` 활성 링크로 승격, "준비 중"(ComingSoonNavItem) 폐기.
+  > - **문서**: `docs/ai-usage-dashboard.md` 인수 문서.
+  > 
+  > 대시보드는 Supabase 읽기 전용이라 **prod(Vercel)에서도 동작**. 분석 실행 자체는 기존대로 로컬 전용.
+  > 
+  > ### 수동 셋업 (머지 후/로컬)
+  > - Supabase SQL Editor에서 `docs/sql/ai-agent-usage.sql` 1회 실행(테이블 생성). env는 기존 `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` 재사용.
+  > 
+  > ### 알려진 제약
+  > - **codex 토큰 미측정** — codex CLI가 작업 머신에 없어 JSON usage 스키마 실측 불가. codex 실행분은 "측정 안 됨" 라벨(claude 평균에 안 섞임).
+  > - "분석 1회 평균 비용" 카드는 근사치(bull/bear 라운드 중복분). 분석가별 표/차트는 정확.
+  > 
+  > ---
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Codex 토큰 캡처**: codex 설치 환경에서 `exec --json` usage 이벤트 파싱 추가 → `agentCli.ts` codex 분기 `measured:true`. 절차는 `docs/ai-usage-dashboard.md` §3 참고. claude 경로·텍스트 추출은 건드리지 말 것.
+  - **Supabase 테이블 생성**: `docs/sql/ai-agent-usage.sql` 실행(미실행 시 토큰 저장만 skip, 분석은 정상).
+  - (선택) per-run 정확 비용: BFF에 `sum(cost)/runCount` 추가해 "분석 1회 평균 비용" 근사치 보정.
+  - (선택) 백그라운드 분석 진행 중 **다른 종목 패널을 연 상태**에서도 "다른 종목 분석 중" 인디케이터 노출(현재는 재열기 탭이 닫힘 상태에서만 진행 표시).
