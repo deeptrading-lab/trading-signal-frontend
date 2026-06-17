@@ -4106,3 +4106,44 @@
   - end-to-end QA: 로컬에서 한두 종목 AI 분석 실행 → `/analyze` "분석 결과" 탭 카드(종목명·판정·토큰) → 상세 모달 → "토큰 사용량" 탭 회귀 확인. 카드 토큰 합이 `ai_agent_usage` 해당 종목 최신 run 합과 일치하는지 교차검증.
   - (선택) 카드 토큰을 그 결론의 실행과 정확히 묶으려면 `ai_analysis_decisions.run_id` 추가(ALTER 먼저 → upsert/route 수정). 현재는 "종목별 최신 run" 휴리스틱.
   - 종목명 검색의 cold-start 갭(이름 로드 전 코드 검색만 매칭) 개선 여지.
+
+### 2026-06-17 — feat(ai-analysis): Codex 토큰 사용량 캡처 (#136)
+
+- **slug**: `codex-token-usage` · **author**: @devbob0701
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/136
+- **요약**: feat(ai-analysis): Codex 토큰 사용량 캡처
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PR #129 후속으로 Codex CLI의 실제 JSONL 이벤트를 파싱해 분석가별 토큰 사용량을 측정합니다.
+  > 
+  > ## 변경 사항
+  > 
+  > - `codex exec --json` 출력에서 최종 `agent_message` 본문 추출
+  > - `turn.completed.usage`의 전체 입력·캐시 입력·출력 토큰 분리 저장
+  > - 스키마 변경이나 usage 누락 시 본문 보존 + `measured:false` fail-soft 폴백
+  > - 실측 스키마 기반 단위 테스트 및 QA 문서 추가
+  > - Supabase `ai_agent_usage` DDL에 RLS 활성화 추가
+  > - 실제 Supabase 프로젝트에 테이블·인덱스 생성 및 RLS 적용 완료
+  > 
+  > ## 검증
+  > 
+  > - Codex CLI `0.140.0-alpha.19` JSONL 실측
+  > - `vitest run`: 267 passed / 1 skipped
+  > - `tsc --noEmit`: 통과
+  > - `eslint .`: 통과
+  > - `next build`: 통과
+  > - Supabase service-role REST 조회: HTTP 200
+  > - anon 요청: RLS로 행 미노출
+  > 
+  > ## 영향
+  > 
+  > Codex provider 분석도 `/analyze` 대시보드의 입력·캐시·출력 토큰 집계에 포함됩니다. Codex CLI가 비용을 제공하지 않아 `cost_usd`는 null로 유지됩니다.
+  > 
+  > ## 다음 작업
+  > 
+  > - Codex provider로 실제 종합 분석 1회를 실행해 `provider='codex'`, `measured=true` 적재와 `/analyze` 렌더링을 확인합니다.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - Codex provider로 실제 종합 분석 1회를 실행해 `provider='codex'`, `measured=true` 적재와 `/analyze` 렌더링을 확인합니다.
+  - 필요하면 Codex CLI가 비용 메타데이터를 제공하는 시점에 `cost_usd` 캡처를 추가합니다.
