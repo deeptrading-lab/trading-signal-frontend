@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/query/queryKeys";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
 import {
   AGENT_ORDER,
@@ -82,6 +84,7 @@ export function useAIAnalysisContext(): AIAnalysisContextValue {
 }
 
 export function AIAnalysisProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [provider, setProvider] = useState<AIAnalysisProvider>("codex");
   const [analyzingTicker, setAnalyzingTicker] = useState<string | null>(null);
   const [viewTicker, setViewTicker] = useState<string | null>(null);
@@ -223,9 +226,17 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
 
       case "done":
         setIsRunning(false);
+        // 분석 완료 → 저장된 결론/목록 캐시 무효화로 /analyze 카드를 자동 갱신.
+        //   서버는 final 직후 upsert 를 await 하므로 done 시점엔 Supabase 저장이 끝나 있다.
+        queryClient.invalidateQueries({ queryKey: queryKeys.stock.aiDecisions });
+        if (analyzingTickerRef.current) {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.stock.aiDecision(analyzingTickerRef.current),
+          });
+        }
         break;
     }
-  }, []);
+  }, [queryClient]);
 
   // ── 스트림 시작 공통 로직 ──────────────────────────────────────────────────
 

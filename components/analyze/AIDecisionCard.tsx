@@ -22,6 +22,7 @@ import {
 } from "@/components/stock/ai-analysis/FinalVerdictCard";
 import type { FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
+import { AIDecisionCardMenu } from "./AIDecisionCardMenu";
 import {
   CARD_OVERLAY_VIEW,
   CARD_TOKENS_LABEL,
@@ -120,7 +121,7 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
         </span>
       </div>
 
-      {/* 상단: 아이콘 + 종목명/판정 + 분석시각 */}
+      {/* 상단: 아이콘 + 종목명/판정 + 케밥 메뉴(우상단) */}
       <div className="flex items-center gap-md">
         <span
           className={cn(
@@ -142,16 +143,19 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
             {VERDICT_LABEL[verdict]}
           </div>
         </div>
-        <span className="flex-shrink-0 self-start text-caption text-text-muted">
-          {formatRelativeTime(item.updatedAt)}
-        </span>
+        <div className="flex-shrink-0 self-start">
+          <AIDecisionCardMenu item={item} name={name} />
+        </div>
       </div>
 
-      {/* 보조: 확신도 · 유효기간 · 토큰 */}
+      {/* 보조: 확신도 · 유효기간 · 토큰 + 분석시각(오른쪽 끝으로 내림) */}
       <div className="flex flex-wrap items-center gap-xs">
         <MetaChip>{COPY.verdict.confidence(item.decision.confidence)}</MetaChip>
         <MetaChip>{COPY.verdict.horizon(item.decision.time_horizon)}</MetaChip>
         <MetaChip>{tokenChipLabel(item)}</MetaChip>
+        <span className="ml-auto text-caption text-text-muted">
+          {formatRelativeTime(item.updatedAt)}
+        </span>
       </div>
     </div>
   );
