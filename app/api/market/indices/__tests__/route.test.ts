@@ -111,7 +111,9 @@ describe("GET /api/market/indices", () => {
     mocks.fetchIndexPrice.mockRejectedValue(
       makeApiError("server", { message: "전부 실패" }),
     );
-    const res = await GET(makeRequest());
+    // 국내 코드만 요청해 '전부 실패'를 실제로 재현한다. 기본값(SPX/COMP 포함)으로 호출하면
+    // 해외지수 경로(fetchOverseasIndexShared)는 mock 대상이 아니라 실네트워크로 성공해 200 이 돼버린다.
+    const res = await GET(makeRequest("?codes=0001,1001"));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(typeof body.error).toBe("string");
