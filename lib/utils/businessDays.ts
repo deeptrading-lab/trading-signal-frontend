@@ -29,13 +29,16 @@ function isWeekend(d: Date): boolean {
  */
 export function businessDaysBetween(from: Date, to: Date): number {
   const cursor = atMidnight(from);
-  const end = atMidnight(to);
+  const end = atMidnight(to).getTime();
   let count = 0;
   // from 자신은 제외하고 그 다음 날부터 센다(경과한 거래일 수).
+  // setDate 직후 매번 자정 재정규화 — DST 전환일에도 cursor 가 자정에서 드리프트하지 않게(범용 헬퍼라 KST 외 재사용 대비).
   cursor.setDate(cursor.getDate() + 1);
-  while (cursor.getTime() <= end.getTime()) {
+  cursor.setHours(0, 0, 0, 0);
+  while (cursor.getTime() <= end) {
     if (!isWeekend(cursor)) count += 1;
     cursor.setDate(cursor.getDate() + 1);
+    cursor.setHours(0, 0, 0, 0);
   }
   return count;
 }
