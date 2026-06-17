@@ -15,7 +15,7 @@ interface AnalystCardProps {
   content: string | undefined;
   streamingChunk: string;
   isRunning: boolean;
-  onExpand: (title: string, content: string) => void;
+  onExpand: (title: string, content: string, highlight?: string) => void;
   onRetry?: () => void;
   /** SNS 분석가(social) 카드 전용 — 정형 감성. 그 외 카드에는 전달하지 않음. */
   sentiment?: SentimentReport | null;
@@ -37,6 +37,9 @@ export const AnalystCard = memo(function AnalystCard({
   const displayText = isActive ? streamingChunk : (isDone ? content : undefined);
   // 미리보기는 마크다운 기호를 제거한 평문 teaser(전체보기는 원문 그대로 마크다운 렌더).
   const previewText = displayText ? stripMarkdown(displayText) : displayText;
+  // SNS 분석가는 리포트 서두 인사말 대신 '심리 한 줄 요약(summary)'을 미리보기로 노출(있을 때만).
+  const summary = sentiment?.summary?.trim() || undefined;
+  const donePreview = isDone && summary ? summary : previewText;
 
   const messages = COPY.progress[meta.key as keyof typeof COPY.progress] ?? [COPY.card.analyzing];
   const [msgIdx, setMsgIdx] = useState(0);
@@ -76,7 +79,7 @@ export const AnalystCard = memo(function AnalystCard({
         {isDone && displayText && (
           <button
             type="button"
-            onClick={() => onExpand(meta.label, displayText)}
+            onClick={() => onExpand(meta.label, displayText, summary)}
             className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium cursor-pointer flex items-center gap-0.5 flex-none"
           >
             {COPY.card.viewFull} <ChevronRight size={10} />
@@ -100,8 +103,14 @@ export const AnalystCard = memo(function AnalystCard({
           </p>
         )}
         {isDone && displayText && (
-          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 whitespace-pre-wrap">
-            {previewText}
+          <p className={cn(
+            "text-[11px] leading-relaxed line-clamp-3 whitespace-pre-wrap",
+            // summary 노출 시엔 '결론' 톤으로 약간 진하게, 일반 미리보기는 기존 톤.
+            summary
+              ? "text-slate-700 dark:text-slate-200 font-medium"
+              : "text-slate-600 dark:text-slate-300",
+          )}>
+            {donePreview}
           </p>
         )}
         {isError && (

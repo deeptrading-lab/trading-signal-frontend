@@ -145,6 +145,8 @@ export const COPY = {
     caption: "커뮤니티 심리 추정",
     /** 신뢰도 '낮음'일 때 덧붙이는 약화 카피. */
     lowNote: "표본 적음 · 참고",
+    /** 심리 한 줄 요약(summary) 콜아웃 라벨 — 전체보기 상단. */
+    summaryLabel: "심리 한 줄 요약",
   },
   overlay: {
     back: "돌아가기",
