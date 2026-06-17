@@ -4073,3 +4073,36 @@
   - **Supabase 테이블 생성**: `docs/sql/ai-agent-usage.sql` 실행(미실행 시 토큰 저장만 skip, 분석은 정상).
   - (선택) per-run 정확 비용: BFF에 `sum(cost)/runCount` 추가해 "분석 1회 평균 비용" 근사치 보정.
   - (선택) 백그라운드 분석 진행 중 **다른 종목 패널을 연 상태**에서도 "다른 종목 분석 중" 인디케이터 노출(현재는 재열기 탭이 닫힘 상태에서만 진행 표시).
+
+### 2026-06-17 — feat(analyze): 분석 결과 카드 탭 추가 (최신순 종목·상세 모달·카드별 토큰·검색) (#130)
+
+- **slug**: `analyze-decision-cards` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/130
+- **요약**: feat(analyze): 분석 결과 카드 탭 추가 (최신순 종목·상세 모달·카드별 토큰·검색)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 사이드 "AI 분석"(`/analyze`)의 역할을 넓혀, 기존 토큰 대시보드를 상위 탭 2개로 분리했습니다.
+  > - **분석 결과**(기본): 지금까지 분석한 종목을 최신순 카드로. 클릭 시 결론 상세 모달 + 카드별 토큰/비용.
+  > - **토큰 사용량**: 기존 분석가별 토큰 대시보드 그대로.
+  > 
+  > ## 변경
+  > - **BFF** `GET /api/stock/ai-analysis/decisions` — `ai_analysis_decisions`(종목당 최신 1건 upsert) + `ai_agent_usage`(종목별 최신 run 토큰 합산). **DB 스키마 변경 없음.**
+  > - **카드** — 방향 아이콘(강세 빨강/약세 파랑/중립 회색)·판정·확신도/유효기간/토큰 chip, 호버 시 `backdrop-blur` 오버레이 "전체 보기". 종목명은 `useQueryStockNames`(`stock.price` 쿼리키 공유로 중복호출 0)로 일괄 해석.
+  > - **상세** — 모달(모바일 풀스크린/PC 와이드), `FinalVerdictCard` + `SentimentBadge`(헤더 pin) 재사용. 추가 페치 없음(목록 응답에 결론 전체 포함).
+  > - **검색** — 공용 `@/components/ui/SearchInput` 재사용, 종목명·코드 클라이언트 필터. 탭 줄 우측 툴바(종목 수·새로고침)는 portal, 모바일 새로고침은 아이콘만.
+  > - 전부 Supabase 읽기 전용 → prod(Vercel) 동작(분석 실행만 로컬 전용).
+  > 
+  > ## 검증
+  > - `tsc --noEmit` · `eslint` · `next build` · `vitest`(264 passed) 통과.
+  > - 로컬 end-to-end(실제 분석 실행→저장→카드/상세)는 로컬 CLI+Supabase 필요 — QA에서 별도 확인 필요.
+  > 
+  > ## 다음 작업
+  > - end-to-end QA: 로컬에서 한두 종목 AI 분석 실행 → `/analyze` "분석 결과" 탭 카드(종목명·판정·토큰) → 상세 모달 → "토큰 사용량" 탭 회귀 확인. 카드 토큰 합이 `ai_agent_usage` 해당 종목 최신 run 합과 일치하는지 교차검증.
+  > - (선택) 카드 토큰을 그 결론의 실행과 정확히 묶으려면 `ai_analysis_decisions.run_id` 추가(ALTER 먼저 → upsert/route 수정). 현재는 "종목별 최신 run" 휴리스틱.
+  > - 종목명 검색의 cold-start 갭(이름 로드 전 코드 검색만 매칭) 개선 여지.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - end-to-end QA: 로컬에서 한두 종목 AI 분석 실행 → `/analyze` "분석 결과" 탭 카드(종목명·판정·토큰) → 상세 모달 → "토큰 사용량" 탭 회귀 확인. 카드 토큰 합이 `ai_agent_usage` 해당 종목 최신 run 합과 일치하는지 교차검증.
+  - (선택) 카드 토큰을 그 결론의 실행과 정확히 묶으려면 `ai_analysis_decisions.run_id` 추가(ALTER 먼저 → upsert/route 수정). 현재는 "종목별 최신 run" 휴리스틱.
+  - 종목명 검색의 cold-start 갭(이름 로드 전 코드 검색만 매칭) 개선 여지.
