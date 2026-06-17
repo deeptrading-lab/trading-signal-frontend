@@ -48,6 +48,25 @@ export const CARD_OVERLAY_VIEW = "AI 분석 전체보기";
 export const DETAIL_CLOSE = "닫기";
 export const DETAIL_PROVIDER_PREFIX = "분석 엔진";
 
+// ─── 재분석 ──────────────────────────────────────────────────────────────────
+/**
+ * 카드·상세에서 저장된 결론을 다시 분석. 확인하면 우측 AI 분석 패널이 열려
+ * (종목 상세의 "AI 종합 분석" 버튼과 동일) 공급자 선택→분석으로 이어진다.
+ * 실행이 끝나면 기존 결론은 새 결과로 교체된다(Supabase upsert).
+ */
+export const REANALYZE_LABEL = "재분석";
+export const REANALYZE_RUNNING = "분석 중…";
+/** 카드 우상단 케밥(⋮) 메뉴 — 현재 항목은 재분석 하나. */
+export const CARD_MENU_LABEL = "카드 메뉴";
+export const REANALYZE_CONFIRM_TITLE = "다시 분석할까요?";
+export const reanalyzeConfirmDesc = (name: string): string =>
+  `${name}의 기존 분석 결과는 사라지고 새 결과로 교체돼요.`;
+export const REANALYZE_CONFIRM_HINT =
+  "확인하면 우측 AI 분석 패널에서 분석 엔진을 골라 다시 분석합니다.";
+// 확인 시 즉시 분석이 아니라 우측 패널을 여는 진행 버튼이라 "확인"(재분석 X).
+export const REANALYZE_CONFIRM_OK = "확인";
+export const REANALYZE_CONFIRM_CANCEL = "취소";
+
 export const USAGE_LOADING = "토큰 사용량을 불러오는 중…";
 export const USAGE_ERROR = "토큰 사용량을 불러오지 못했어요.";
 export const USAGE_RETRY = "다시 시도";

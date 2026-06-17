@@ -16,6 +16,7 @@ import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { fmtCost, fmtTokens } from "./format";
 import { FinalVerdictCard } from "@/components/stock/ai-analysis/FinalVerdictCard";
 import { SentimentBadge } from "@/components/stock/ai-analysis/SentimentBadge";
+import { ReanalyzeButton } from "./ReanalyzeButton";
 import { PROVIDER_TAB_CLAUDE, PROVIDER_TAB_CODEX } from "@/lib/copy/analyze/labels";
 import {
   CARD_COST_LABEL,
@@ -93,17 +94,20 @@ export function AIDecisionDetailSheet({ item, name, onClose }: AIDecisionDetailS
             <div className="min-w-0 flex-1 text-display font-bold text-text-strong truncate tracking-tight leading-tight">
               {name}
             </div>
-            <button
-              type="button"
-              aria-label={DETAIL_CLOSE}
-              onClick={onClose}
-              className={cn(
-                "flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full",
-                "text-text-muted hover:text-text-strong hover:bg-surface-muted transition-colors",
-              )}
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
+            <div className="flex flex-shrink-0 items-center gap-xs">
+              <ReanalyzeButton item={item} name={name} onTriggered={onClose} />
+              <button
+                type="button"
+                aria-label={DETAIL_CLOSE}
+                onClick={onClose}
+                className={cn(
+                  "inline-flex items-center justify-center w-9 h-9 rounded-full",
+                  "text-text-muted hover:text-text-strong hover:bg-surface-muted transition-colors",
+                )}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-x-md gap-y-sm">
             <div className="flex flex-wrap items-center gap-x-sm gap-y-xs text-caption text-text-muted">
