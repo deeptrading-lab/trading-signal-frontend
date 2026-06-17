@@ -2,7 +2,7 @@
  * ISO 시각 → "방금 전 / N분 전 / N시간 전 / N일 전 / YYYY.MM.DD" 한글 상대 표기.
  *
  * 분석 결과 카드의 `updatedAt`(분석 시각)처럼 "얼마나 최신인지"가 중요한 값에 사용한다.
- * 7일을 넘기면 절대 날짜(로컬 YYYY.MM.DD)로 떨어뜨려 과장된 "수십 일 전"을 피한다.
+ * 3일을 넘기면 절대 날짜(로컬 YYYY.MM.DD)로 떨어뜨려, 며칠 지난 분석은 실제 날짜가 보이게 한다.
  */
 export function formatRelativeTime(iso: string | null | undefined): string {
   if (!iso) return "-";
@@ -19,7 +19,7 @@ export function formatRelativeTime(iso: string | null | undefined): string {
   if (hours < 24) return `${hours}시간 전`;
 
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}일 전`;
+  if (days < 3) return `${days}일 전`;
 
   const d = new Date(then);
   const yyyy = d.getFullYear();

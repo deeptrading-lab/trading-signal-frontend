@@ -34,6 +34,7 @@ import {
   CartesianGrid,
   ReferenceLine,
   ResponsiveContainer,
+  DefaultZIndexes,
 } from "recharts";
 import { type ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { useChartData } from "@/hooks/stock/useChartData";
@@ -49,11 +50,13 @@ import {
   STOCK_DETAIL_LOADING,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
-import { PERIOD_UNIT, type ChartType } from "./stockChartConfig";
+import { PERIOD_UNIT, CHART_AXIS_WIDTH, type ChartType } from "./stockChartConfig";
 import { useChartTheme, SYNC_ID } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
+import { LastPriceTag } from "./chart/LastPriceTag";
+import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
 
@@ -123,6 +126,28 @@ export function StockDailyChart({
     );
   }
 
+  // 최신 종가 — 우측 y축에 현재가 태그로 표시. 색은 한국식(직전 봉 대비 상승 빨강/하락 파랑).
+  const lastCandle = candleSeries.at(-1);
+  const lastClose = lastCandle?.close ?? null;
+  const lastUp = lastCandle
+    ? lastCandle.change != null
+      ? lastCandle.change >= 0
+      : lastCandle.isUp
+    : true;
+  const lastPriceColor = lastUp ? C.stroke : C.down;
+
+  // 최신가 알약과 겹치는 가장 가까운 y축 눈금을 숨길 가격 임계값 — 보이는 가격 폭의 ~10%.
+  // 기본 눈금 수(≈5개, 간격 ~20%)에서는 항상 최신가에 제일 가까운 눈금 하나만 숨겨진다.
+  const plotVals =
+    chartType === "candle"
+      ? candleSeries.flatMap((c) => [c.low, c.high])
+      : priceSeries.map((p) => p.price);
+  const priceSpan = plotVals.length ? Math.max(...plotVals) - Math.min(...plotVals) : 0;
+  const tickHideThreshold = priceSpan > 0 ? priceSpan * 0.1 : 0;
+  const priceTick = (
+    <PriceAxisTick tickFill={C.axisTick} hideNear={lastClose} hideThreshold={tickHideThreshold} />
+  );
+
   return (
     <ChartThemeProvider value={theme}>
     <ChartShell {...shellProps}>
@@ -133,9 +158,19 @@ export function StockDailyChart({
             <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
               <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
-              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={56} orientation="right" />
+              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip content={<CandleTooltip />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
+              {lastClose != null && (
+                <ReferenceLine
+                  y={lastClose}
+                  stroke={lastPriceColor}
+                  strokeDasharray="4 3"
+                  strokeOpacity={0.55}
+                  zIndex={DefaultZIndexes.axis + 1}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
+                />
+              )}
             </ComposedChart>
           ) : (
             <AreaChart data={priceSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
@@ -147,9 +182,19 @@ export function StockDailyChart({
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
               <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
-              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={56} orientation="right" />
+              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
+              {lastClose != null && (
+                <ReferenceLine
+                  y={lastClose}
+                  stroke={lastPriceColor}
+                  strokeDasharray="4 3"
+                  strokeOpacity={0.55}
+                  zIndex={DefaultZIndexes.axis + 1}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
+                />
+              )}
             </AreaChart>
           )}
         </ResponsiveContainer>
@@ -162,7 +207,7 @@ export function StockDailyChart({
           <BarChart data={volSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
-            <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={56} orientation="right" />
+            <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
             <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipVol} labelStyle={labelStyle} />
             <Bar dataKey="volume" maxBarSize={6} isAnimationActive={false}>
               {volSeries.map((entry, i) => (
@@ -182,7 +227,7 @@ export function StockDailyChart({
               <ComposedChart data={macdSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} hide />
-                <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={56} orientation="right" />
+                <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={CHART_AXIS_WIDTH} orientation="right" />
                 <ReferenceLine y={0} stroke={C.refMid} strokeOpacity={0.5} />
                 <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipMACD} labelStyle={labelStyle} />
                 <Bar dataKey="histogram" maxBarSize={4} isAnimationActive={false}>
@@ -211,7 +256,7 @@ export function StockDailyChart({
               <LineChart data={rsiSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} dy={6} hide />
-                <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={56} orientation="right" />
+                <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={CHART_AXIS_WIDTH} orientation="right" />
                 <ReferenceLine y={70} stroke={C.refOB} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "70", position: "right", fill: C.refOB, fontSize: 10 }} />
                 <ReferenceLine y={30} stroke={C.refOS} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "30", position: "right", fill: C.refOS, fontSize: 10 }} />
                 <ReferenceLine y={50} stroke={C.refMid} strokeOpacity={0.4} />

@@ -8,6 +8,12 @@
 
 import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 
+/**
+ * 우측 y축(가격·거래량·MACD·RSI) 공통 폭(px). 최신 종가 태그(LastPriceTag)가
+ * 이 폭만큼의 축 영역에 우정렬되므로, 축과 태그가 같은 상수를 공유해야 정렬이 맞는다.
+ */
+export const CHART_AXIS_WIDTH = 56;
+
 // ── 차트 타입 ───────────────────────────────────────────
 export type ChartType = "candle" | "line";
 
