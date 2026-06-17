@@ -32,6 +32,10 @@ comment on column public.ai_agent_usage.measured is
 comment on column public.ai_agent_usage.input_tokens is
   'fresh 입력(캐시 비적중). 캐시 적중분은 cache_read_input_tokens에 별도';
 
+-- PostgREST anon/authenticated 접근은 차단하고 service role 서버 접근만 허용한다.
+-- service role은 RLS를 우회하므로 저장·대시보드 BFF 동작에는 영향이 없다.
+alter table public.ai_agent_usage enable row level security;
+
 -- 대시보드 집계: provider/agent별 group-by + 최신순 조회 가속.
 create index if not exists ai_agent_usage_created_idx    on public.ai_agent_usage (created_at desc);
 create index if not exists ai_agent_usage_run_idx        on public.ai_agent_usage (run_id);

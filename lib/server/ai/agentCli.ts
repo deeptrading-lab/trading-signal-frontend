@@ -4,7 +4,11 @@ import {
   type AgentCallOpts,
   type AgentStreamResult,
 } from "@/lib/server/claudeAgent";
-import { type AIAnalysisProvider, UNMEASURED_USAGE } from "@/lib/types/stock/aiAnalysis";
+import {
+  type AgentUsage,
+  type AIAnalysisProvider,
+  UNMEASURED_USAGE,
+} from "@/lib/types/stock/aiAnalysis";
 
 const MAX_STDOUT = 4 * 1024 * 1024;
 
@@ -73,6 +77,7 @@ export function buildAgentCliInvocation(
   if (model) args.push("--model", model);
   args.push(
     "exec",
+    "--json",
     "--ephemeral",
     "--ignore-user-config",
     "--skip-git-repo-check",
@@ -86,9 +91,88 @@ export function buildAgentCliInvocation(
   };
 }
 
+interface CodexJsonEvent {
+  type?: unknown;
+  item?: {
+    type?: unknown;
+    text?: unknown;
+  };
+  usage?: {
+    input_tokens?: unknown;
+    cached_input_tokens?: unknown;
+    output_tokens?: unknown;
+  };
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Codex `exec --json` JSONL에서 최종 응답과 turn 단위 토큰을 추출한다.
+ * 스키마가 바뀌거나 usage가 누락돼도 본문은 최대한 보존하고 미측정으로 폴백한다.
+ */
+export function parseCodexAgentCliOutput(raw: string): AgentStreamResult {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { text: "", usage: { ...UNMEASURED_USAGE } };
+  }
+
+  let finalText: string | null = null;
+  let usage: AgentUsage | null = null;
+  let parsedEventCount = 0;
+
+  for (const line of trimmed.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+
+    let event: CodexJsonEvent;
+    try {
+      event = JSON.parse(line) as CodexJsonEvent;
+      parsedEventCount += 1;
+    } catch {
+      continue;
+    }
+
+    if (
+      event.type === "item.completed"
+      && event.item?.type === "agent_message"
+      && typeof event.item.text === "string"
+    ) {
+      finalText = event.item.text;
+    }
+
+    if (event.type === "turn.completed" && event.usage) {
+      const totalInputTokens = numberOrNull(event.usage.input_tokens);
+      const cacheReadInputTokens = numberOrNull(event.usage.cached_input_tokens);
+      const outputTokens = numberOrNull(event.usage.output_tokens);
+
+      if (totalInputTokens !== null && outputTokens !== null) {
+        usage = {
+          inputTokens: Math.max(
+            totalInputTokens - (cacheReadInputTokens ?? 0),
+            0,
+          ),
+          outputTokens,
+          cacheCreationInputTokens: null,
+          cacheReadInputTokens,
+          costUsd: null,
+          model: null,
+          measured: true,
+        };
+      }
+    }
+  }
+
+  return {
+    text: finalText ?? (parsedEventCount === 0 ? trimmed : ""),
+    usage: usage ?? { ...UNMEASURED_USAGE },
+  };
+}
+
 export function extractAgentCliText(provider: AIAnalysisProvider, raw: string): string {
   const text = raw.trim();
-  if (!text || provider === "codex") return text;
+  if (!text) return text;
+  if (provider === "codex") return parseCodexAgentCliOutput(raw).text;
 
   try {
     const parsed = JSON.parse(text) as Record<string, unknown>;
@@ -99,7 +183,7 @@ export function extractAgentCliText(provider: AIAnalysisProvider, raw: string): 
   return text;
 }
 
-export function invokeAgentCli(request: AgentCliRequest): Promise<string> {
+function executeAgentCli(request: AgentCliRequest): Promise<string> {
   return new Promise((resolve, reject) => {
     if (request.signal.aborted) {
       reject(Object.assign(new Error("AbortError"), { name: "AbortError" }));
@@ -132,13 +216,13 @@ export function invokeAgentCli(request: AgentCliRequest): Promise<string> {
           return;
         }
         if (stdout?.trim()) {
-          resolve(extractAgentCliText(request.provider, stdout));
+          resolve(stdout);
         } else {
           reject(error);
         }
         return;
       }
-      resolve(extractAgentCliText(request.provider, stdout ?? ""));
+      resolve(stdout ?? "");
     });
 
     if (child.stdin) {
@@ -152,6 +236,11 @@ export function invokeAgentCli(request: AgentCliRequest): Promise<string> {
     }
     request.signal.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+export async function invokeAgentCli(request: AgentCliRequest): Promise<string> {
+  const raw = await executeAgentCli(request);
+  return extractAgentCliText(request.provider, raw);
 }
 
 export interface AgentCliStreamRequest extends AgentCallOpts {
@@ -174,11 +263,7 @@ export async function invokeAgentCliStream(
     );
   }
 
-  // codex: 현재 호출(exec, --color never)은 stdout 텍스트만 반환 — 토큰 메타 없음.
-  // 토큰 캡처는 `exec --json` + usage 이벤트 파싱이 필요한데, codex 미설치로 스키마 검증 불가.
-  // 검증된 텍스트 추출 경로를 깨지 않기 위해 usage는 미측정(measured:false)으로 남긴다.
-  // TODO(codex-token): codex 설치 환경에서 --json usage 파싱 추가.
-  const text = await invokeAgentCli({
+  const raw = await executeAgentCli({
     provider,
     systemPrompt: request.systemPrompt,
     userPrompt: request.userPrompt,
@@ -186,6 +271,13 @@ export async function invokeAgentCliStream(
     timeoutMs: request.timeoutMs,
     signal,
   });
-  if (text) onToken(text);
-  return { text, usage: { ...UNMEASURED_USAGE } };
+  const result = parseCodexAgentCliOutput(raw);
+  if (result.text) onToken(result.text);
+  return {
+    text: result.text,
+    usage: {
+      ...result.usage,
+      model: result.usage.model ?? request.model ?? process.env.CODEX_CLI_MODEL ?? null,
+    },
+  };
 }
