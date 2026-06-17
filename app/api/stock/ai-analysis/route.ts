@@ -46,6 +46,7 @@ import {
 } from "@/lib/server/ai/decisionStore";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { isVercelEnv } from "@/lib/server/env";
+import { createLogger } from "@/lib/server/logTag";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 import { businessDaysBetween } from "@/lib/utils/businessDays";
@@ -75,6 +76,9 @@ const TIMEOUT_TOTAL_MS = 3_000_000;
 // ─── SSE 헬퍼 ─────────────────────────────────────────────────────────────────
 
 const encoder = new TextEncoder();
+
+/** `[ai-analysis]` 콘솔 로그 — 앞에 `HH:MM:SS.mmm(KST)` 시각 프리픽스 부착. */
+const aiLog = createLogger("ai-analysis");
 
 function sseEvent(data: AIAnalysisEvent): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -439,7 +443,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           if (!Number.isNaN(latest.getTime())) {
             const staleBusinessDays = businessDaysBetween(latest, today);
             if (staleBusinessDays > STALE_MAX_BUSINESS_DAYS) {
-              console.warn(`[ai-analysis] 시세 노후 — 최신봉 ${latestCandleDate} (${staleBusinessDays}영업일 경과)`);
+              aiLog.warn(`시세 노후 — 최신봉 ${latestCandleDate} (${staleBusinessDays}영업일 경과)`);
               send({ type: "error", message: "최신 시세를 불러오지 못해 분석을 중단했어요. 잠시 후 다시 시도해 주세요." });
               safeClose();
               return;
@@ -469,7 +473,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // 3. 에이전트 실행 — 3-phase ──────────────────────────────────────────
         const startIndex = startFrom ? AGENT_ORDER.indexOf(startFrom) : 0;
         if (startFrom) {
-          console.log(`[ai-analysis] ↩ 재개: ${startFrom}(index=${startIndex})부터`);
+          aiLog(`↩ 재개: ${startFrom}(index=${startIndex})부터`);
         }
 
         // ── 공통 헬퍼: 일반 에이전트 1개 실행 ─────────────────────────────
@@ -477,7 +481,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           if (combinedSignal.aborted) return "aborted";
 
           const prompts = AGENT_PROMPTS[agentKey];
-          console.log(`[ai-analysis] ▶ ${agentKey} 시작`);
+          aiLog(`▶ ${agentKey} 시작`);
           send({ type: "progress", agent: agentKey, status: "running" });
 
           const agentT0 = Date.now();
@@ -501,19 +505,19 @@ export async function POST(req: NextRequest): Promise<Response> {
           } catch (err) {
             const errName = (err as { name?: string }).name;
             if (errName === "AbortError") {
-              console.log(`[ai-analysis] 중지 — ${agentKey}`);
+              aiLog(`중지 — ${agentKey}`);
               return "aborted";
             }
             if (errName === "TimeoutError") {
-              console.warn(`[ai-analysis] ⏱ ${agentKey} 타임아웃 elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
+              aiLog.warn(`⏱ ${agentKey} 타임아웃 elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
             } else {
-              console.error(`[ai-analysis] ✗ ${agentKey}`, err);
+              aiLog.error(`✗ ${agentKey}`, err);
             }
             send({ type: "progress", agent: agentKey, status: "error" });
             return "error";
           }
 
-          console.log(`[ai-analysis] ✓ ${agentKey} 완료 len=${text.length} elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
+          aiLog(`✓ ${agentKey} 완료 len=${text.length} elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
 
           // 토큰 사용량 이력 append (fail-soft — 분석 스트림을 막지 않음)
           recordAgentUsage({
@@ -566,9 +570,9 @@ export async function POST(req: NextRequest): Promise<Response> {
                   sentiment: state.sentiment ?? null,
                 });
                 if (saveResult.skipped) {
-                  console.log("[ai-analysis] PM 결론 저장 skip — Supabase 미설정");
+                  aiLog("PM 결론 저장 skip — Supabase 미설정");
                 } else if (!saveResult.ok) {
-                  console.warn(`[ai-analysis] PM 결론 저장 실패 — ${saveResult.error}`);
+                  aiLog.warn(`PM 결론 저장 실패 — ${saveResult.error}`);
                 }
               } else {
                 send({ type: "report", agent: agentKey, content: text });
@@ -585,7 +589,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               state.sentiment = sentiment;
               send({ type: "sentiment", report: sentiment });
             } else {
-              console.log("[ai-analysis] social 감성 블록 파싱 실패 — 배지 미표시, 분석 계속");
+              aiLog("social 감성 블록 파싱 실패 — 배지 미표시, 분석 계속");
             }
             // 마커 제거된 텍스트를 state에 저장(PM·재개 재파싱은 sentiment를 직접 사용).
             state.socialReport = cleanText;
@@ -618,17 +622,17 @@ export async function POST(req: NextRequest): Promise<Response> {
           const ANALYST: AgentKey[] = ["market", "news", "fundamentals", "social"];
           const toRun = ANALYST.filter(k => AGENT_ORDER.indexOf(k) >= startIndex);
           if (toRun.length > 0 && !combinedSignal.aborted) {
-            console.log(`[ai-analysis] ▶ 분석가 ${toRun.join("+")} 병렬 시작`);
+            aiLog(`▶ 분석가 ${toRun.join("+")} 병렬 시작`);
             await Promise.allSettled(toRun.map(k => runOneAgent(k)));
           }
         }
 
         // ── Phase B: 토론 (bull → bear × DEBATE_ROUNDS) ─────────────────────
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("bull") >= startIndex) {
-          console.log(`[ai-analysis] ▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
+          aiLog(`▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
           const result = await runDebateLoop(state, send, combinedSignal, provider, runId, ticker);
           if (result === "aborted") {
-            console.log("[ai-analysis] 토론 중단 (abort)");
+            aiLog("토론 중단 (abort)");
           }
         }
 
@@ -651,7 +655,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         // C-3: risk 3개 병렬 (TradingAgents Risk Management — Risky/Neutral/Safe)
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("risk_risky") >= startIndex) {
-          console.log("[ai-analysis] ▶ risk 3개 병렬 시작");
+          aiLog("▶ risk 3개 병렬 시작");
           await Promise.allSettled([
             runOneAgent("risk_risky"),
             runOneAgent("risk_neutral"),
@@ -664,15 +668,15 @@ export async function POST(req: NextRequest): Promise<Response> {
           await runOneAgent("portfolio_manager");
         }
 
-        console.log(`[ai-analysis] 전체 완료 total=${((Date.now()-runStart)/1000).toFixed(1)}s`);
+        aiLog(`전체 완료 total=${((Date.now()-runStart)/1000).toFixed(1)}s`);
         send({ type: "done" });
         safeClose();
       } catch (err) {
         // 클라이언트 disconnect(closed)·abort로 인한 예외는 정상 종료로 간주 — 에러 노이즈 억제.
         if (closed || combinedSignal.aborted || (err as { name?: string })?.name === "AbortError") {
-          console.log("[ai-analysis] 스트림 종료 (disconnect/abort)");
+          aiLog("스트림 종료 (disconnect/abort)");
         } else {
-          console.error("[ai-analysis] 예상치 못한 예외", err);
+          aiLog.error("예상치 못한 예외", err);
           send({ type: "error", message: "분석 중 예상치 못한 오류가 발생했어요." });
         }
         safeClose();
