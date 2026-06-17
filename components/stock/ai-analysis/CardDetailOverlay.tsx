@@ -48,7 +48,7 @@ export function CardDetailOverlay({ title, content, highlight, onClose }: CardDe
       <div className="flex-1 overflow-y-auto p-5">
         {highlight && (
           <div className="mb-4 flex gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/40 px-3.5 py-3">
-            <MessageSquareQuote size={15} className="flex-none mt-0.5 text-slate-400 dark:text-slate-500" />
+            <MessageSquareQuote size={15} aria-hidden="true" className="flex-none mt-0.5 text-slate-400 dark:text-slate-500" />
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 {COPY.sentiment.summaryLabel}
