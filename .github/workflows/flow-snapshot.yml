@@ -1,0 +1,26 @@
+name: flow-snapshot
+
+# 수급 7일 누적의 일별 스냅샷 적립을 외부에서 안정적으로 트리거한다.
+#   Vercel Hobby 예약 cron 이 신뢰성이 낮아(등록·Enabled 여도 미발화) KV 가 비던 문제 대응.
+#   같은 날짜 키에 멱등 저장이라 Vercel cron 과 중복 실행돼도 무해(마지막 쓰기 승).
+#
+# 사전 설정: 저장소 Settings → Secrets and variables → Actions 에 `CRON_SECRET` 추가
+#   (Vercel Production 의 CRON_SECRET 과 같은 값).
+
+on:
+  schedule:
+    # 17:10 KST(평일) = 08:10 UTC. 장마감(15:30 KST) 후 수급 랭킹 적립.
+    # GitHub Actions 예약은 분 단위 지연이 있을 수 있음(허용 — 일 1회 적립).
+    - cron: "10 8 * * 1-5"
+  workflow_dispatch: {} # 수동 실행 허용(백필/점검용)
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger flow-snapshot cron
+        run: |
+          resp=$(curl -fsS -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://trading-signal-frontend.vercel.app/api/cron/flow-snapshot")
+          echo "response: $resp"
