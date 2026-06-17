@@ -69,7 +69,7 @@ export function HeaderMarketTicker() {
             <span
               className={cn(
                 "h-3",
-                t.code === "SPX" || t.code === "BTC"
+                t.code === "S&P 500" || t.code === "BTC"
                   ? "w-0.5 bg-text-muted"
                   : "w-px bg-border-line",
               )}

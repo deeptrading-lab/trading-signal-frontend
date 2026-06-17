@@ -110,7 +110,7 @@ export function AIAnalysisPanel({
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
-  const [expandedCard, setExpandedCard] = useState<{ title: string; content: string } | null>(null);
+  const [expandedCard, setExpandedCard] = useState<{ title: string; content: string; highlight?: string } | null>(null);
   const [showProviderChooser, setShowProviderChooser] = useState(false);
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
@@ -188,7 +188,8 @@ export function AIAnalysisPanel({
     return () => clearTimeout(id);
   }, [final]);
 
-  const handleExpand = (title: string, content: string) => setExpandedCard({ title, content });
+  const handleExpand = (title: string, content: string, highlight?: string) =>
+    setExpandedCard({ title, content, highlight });
 
   const analystKeys: AgentKey[] = ["market", "news", "fundamentals", "social"];
 
@@ -581,6 +582,7 @@ export function AIAnalysisPanel({
                       key="detail"
                       title={expandedCard.title}
                       content={expandedCard.content}
+                      highlight={expandedCard.highlight}
                       onClose={() => setExpandedCard(null)}
                     />
                   )}
