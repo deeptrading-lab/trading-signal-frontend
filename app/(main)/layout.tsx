@@ -28,6 +28,8 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { WorkbenchSessionProvider } from "@/hooks/workbench/useWorkbenchSession";
+import { AIAnalysisProvider } from "@/hooks/stock/aiAnalysisProvider";
+import { GlobalAIAnalysis } from "@/components/stock/GlobalAIAnalysis";
 
 export default function MainLayout({
   children,
@@ -36,6 +38,7 @@ export default function MainLayout({
 }) {
   return (
     <WorkbenchSessionProvider>
+      <AIAnalysisProvider>
       <div className="flex h-screen overflow-hidden bg-surface-muted">
         {/* 좌측 Sidebar — viewport 전체 높이 점유 (데스크탑 한정, `< lg` 에선 sidebar 합성
          *  토큰의 `hidden lg:flex` 가 미렌더). */}
@@ -53,7 +56,10 @@ export default function MainLayout({
           </main>
         </div>
         <BottomNav />
+        {/* AI 분석 패널·재열기 탭 — 셸에 두어 페이지 이동에도 백그라운드 분석이 끊기지 않게 한다. */}
+        <GlobalAIAnalysis />
       </div>
+      </AIAnalysisProvider>
     </WorkbenchSessionProvider>
   );
 }
