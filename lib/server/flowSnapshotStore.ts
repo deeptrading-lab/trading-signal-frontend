@@ -45,6 +45,56 @@ export async function saveFlowSnapshot(
   await getKisStore().set(snapKey(kstYyyymmdd(0), subject), rows, TTL_SEC);
 }
 
+// ─── cron 헬스 마커 ───────────────────────────────────────────────────────────
+// 로그 보존(Vercel Hobby)에 의존하지 않고 cron 건강을 확인하기 위한 KV 마커.
+// 날짜 스냅샷 키(`flow:snap:YYYYMMDD:*`)와 안 겹치는 `flow:snap:cron:meta` 사용 → 누적 조회 무영향.
+const CRON_META_KEY = `${KEY_PREFIX}:cron:meta`;
+const CRON_META_TTL_SEC = 30 * 24 * 60 * 60; // 30일 보존.
+
+export type FlowCronMeta = {
+  /** 마지막 cron 실행 시각(ISO, UTC). */
+  at: string;
+  /** 적립 성공 여부(인증 통과 후 핸들러가 끝까지 돈 경우 기록 — 401 은 기록 안 됨). */
+  ok: boolean;
+  /** 비-적립 사유(미설정/비-prod/빈응답). 정상 적립이면 생략. */
+  reason?: string;
+  /** 그 실행 시점의 KIS 환경(prod/mock 등). */
+  env?: string;
+  /** 주체별 저장 행 수(없으면 미저장 — 휴장/빈응답). */
+  saved?: Record<string, number>;
+};
+
+/** cron 실행 결과 마커 기록 — 다음 실행에서 덮어씀. fail-soft. */
+export async function saveFlowCronMeta(meta: FlowCronMeta): Promise<void> {
+  await getKisStore().set(CRON_META_KEY, meta, CRON_META_TTL_SEC);
+}
+
+/** 마지막 cron 실행 마커 조회(없으면 null — 한 번도 적립 단계에 도달 못 함). */
+export async function readFlowCronMeta(): Promise<FlowCronMeta | null> {
+  return getKisStore().get<FlowCronMeta>(CRON_META_KEY);
+}
+
+export type FlowSnapshotCoverage = {
+  /** 현재 KV 에 존재하는 스냅샷 영업일 수(≤ MAX_LOOKBACK_DAYS). */
+  daysCount: number;
+  /** 존재하는 스냅샷 날짜(YYYYMMDD, 최신→과거). */
+  dates: string[];
+};
+
+/** 주체별로 현재 KV 에 적립돼 있는 스냅샷 날짜 커버리지(진단용). */
+export async function readSnapshotCoverage(
+  subject: ForeignInstitutionSubject,
+): Promise<FlowSnapshotCoverage> {
+  const store = getKisStore();
+  const dates: string[] = [];
+  for (let offset = 0; offset < MAX_LOOKBACK_DAYS; offset += 1) {
+    const date = kstYyyymmdd(offset);
+    const snap = await store.get<InvestorFlowRow[]>(snapKey(date, subject));
+    if (snap && snap.length > 0) dates.push(date);
+  }
+  return { daysCount: dates.length, dates };
+}
+
 export type CumulativeResult = {
   /** 합산·재정렬된 순매수 상위 행(전체 — 상위 N slice 는 호출 측). */
   rows: InvestorFlowRow[];
