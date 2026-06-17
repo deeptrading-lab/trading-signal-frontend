@@ -12,6 +12,10 @@ import type {
   AgentUsage,
   AIAnalysisProvider,
 } from "@/lib/types/stock/aiAnalysis";
+import { createLogger } from "@/lib/server/logTag";
+
+/** `[ai-usage-store]` 콘솔 로그 — 앞에 `HH:MM:SS.mmm(KST)` 시각 프리픽스 부착. */
+const usageLog = createLogger("ai-usage-store");
 
 export type UsageStage = "A" | "B" | "C";
 
@@ -164,9 +168,9 @@ export async function insertAgentUsage(
 export function recordAgentUsage(input: AgentUsageInsert): void {
   void insertAgentUsage(input)
     .then((r) => {
-      if (!r.ok) console.warn(`[ai-usage-store] insert 실패 — ${r.error}`);
+      if (!r.ok) usageLog.warn(`insert 실패 — ${r.error}`);
     })
-    .catch((e: unknown) => console.warn("[ai-usage-store] insert 예외", e));
+    .catch((e: unknown) => usageLog.warn("insert 예외", e));
 }
 
 /** 최신순 토큰 이력 조회(집계용 raw). 미설정/오류 시 null. */
@@ -186,14 +190,14 @@ export async function getAgentUsageRows(
     headers: { ...headers(config.key), Accept: "application/json" },
     cache: "no-store",
   }).catch((error: unknown) => {
-    console.warn("[ai-usage-store] 조회 예외", error);
+    usageLog.warn("조회 예외", error);
     return null;
   });
 
   if (!res) return null;
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.warn(`[ai-usage-store] 조회 실패 status=${res.status} ${text}`);
+    usageLog.warn(`조회 실패 status=${res.status} ${text}`);
     return null;
   }
 
