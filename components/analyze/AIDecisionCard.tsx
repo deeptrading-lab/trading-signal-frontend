@@ -111,9 +111,10 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
         className={cn("absolute left-0 top-0 bottom-0 w-1", ACCENT_BAR[tone])}
       />
 
-      {/* 호버 오버레이 — 블러 + "전체 보기". 클릭은 카드로 통과(pointer-events-none) */}
-      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-surface/40 backdrop-blur-xs opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-        <span className="inline-flex items-center gap-xs text-body-strong text-text-strong">
+      {/* 호버 오버레이 — 블러 + 종목명 + "AI 분석 전체보기". 클릭은 카드로 통과(pointer-events-none) */}
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-xs bg-surface/90 backdrop-blur-sm opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="max-w-full truncate px-md text-h2 text-text-strong">{name}</span>
+        <span className="inline-flex items-center gap-xs text-body-strong text-accent-vivid">
           {CARD_OVERLAY_VIEW}
           <ArrowRight size={16} aria-hidden="true" />
         </span>

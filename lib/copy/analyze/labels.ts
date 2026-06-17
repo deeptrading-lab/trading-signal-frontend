@@ -41,8 +41,8 @@ export const CARD_TOKENS_LABEL = "총 토큰";
 export const CARD_COST_LABEL = "비용";
 export const CARD_TOKENS_NONE = "토큰 기록 없음";
 export const CARD_VIEW_DETAIL = "상세 보기";
-/** 카드 호버 시 블러 오버레이 위에 뜨는 문구. */
-export const CARD_OVERLAY_VIEW = "전체 보기";
+/** 카드 호버 시 블러 오버레이 위에 뜨는 문구(종목명 아래 줄). */
+export const CARD_OVERLAY_VIEW = "AI 분석 전체보기";
 
 /** 상세 시트. */
 export const DETAIL_CLOSE = "닫기";
