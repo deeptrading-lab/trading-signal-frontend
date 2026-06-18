@@ -4147,3 +4147,45 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - Codex provider로 실제 종합 분석 1회를 실행해 `provider='codex'`, `measured=true` 적재와 `/analyze` 렌더링을 확인합니다.
   - 필요하면 Codex CLI가 비용 메타데이터를 제공하는 시점에 `cost_usd` 캡처를 추가합니다.
+
+### 2026-06-18 — feat(stock): 경량 종목 스냅샷 엔드포인트 신설 (value-picks-validated PR-1) (#137)
+
+- **slug**: `value-picks-validated` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/137
+- **요약**: feat(stock): 경량 종목 스냅샷 엔드포인트 신설 (value-picks-validated PR-1)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇 / 왜
+  > 
+  > PRD `value-picks-validated` §3-A (PR-1, frontend 선행). value_picks 봇이 후보 종목별로 1회 호출해 **밸류트랩 룰**(유동성·수급추세·추세레짐)을 돌릴 결정적·저비용 read 스냅샷 엔드포인트 `GET /api/stock/snapshot?ticker=<6자리>` 신설. 기존 read 엔드포인트(`/price`·`/chart`·`/investors`)의 KIS 호출·매핑을 재사용·조합해 한 번에 반환한다.
+  > 
+  > PRD: `dev-manager-bot` 레포 `docs/prd/value-picks-validated.md` (§3-A, §5 AC-1~3).
+  > 
+  > ## AC-1~3 구현 위치
+  > 
+  > - **AC-1 (계약 충족)** — 최상위 필드(`ticker`/`name`/`market`/`asOf`/`price`/`valuation52w`/`marketCapKRW`/`foreignRatioPct`/`technical`/`investorTrend`) 전부 포함, 산출불가는 필드 생략이 아니라 `null`.
+  >   - `lib/server/stock/snapshot.ts` `assembleSnapshot` — group 결과를 `StockSnapshot`(`lib/types/stock/snapshot.ts`)으로 합성. null 규약 보장.
+  >   - 테스트: `lib/server/stock/__tests__/snapshot.test.ts` (`[AC-1]`), `app/api/stock/snapshot/__tests__/route.test.ts` (`[AC-1]`).
+  > - **AC-2 (유동성·수급 핵심필드)** — `price.tradeAmountKRW = current*volume` 파생, `investorTrend.orgNetBuyAmountKRW`·`orgConsecutiveSellDays` 가 `fetchInvestorTrend` 집계로 채워짐.
+  >   - `assembleSnapshot`(tradeAmountKRW·marketCapKRW), `aggregateInvestorTrend`(백만원→원 환산·연속 순매도 카운트).
+  >   - 테스트: snapshot.test.ts `[AC-2]`, route.test.ts `[AC-2]`(기관 5일 연속 순매도 → `orgConsecutiveSellDays=5`).
+  > - **AC-3 (컨벤션·폴백)** — 미설정 시 mock + `X-Data-Source: mock`, `ticker` 미지정 400, 부분 실패 시 200 + 산출 가능 필드만 + `X-Data-Source: kis-partial`.
+  >   - `app/api/stock/snapshot/route.ts` — `isKisConfigured()` 게이트, ticker 정규식 400, `Promise.allSettled` 그룹별 부분 실패 흡수, 가격 그룹 전체 실패만 502, 타임아웃 시 `mock-timeout`.
+  >   - 테스트: route.test.ts `[AC-3]` 7건(400 2종·mock·일봉/수급 부분실패·vts 시장 null·가격 그룹 전체 실패 502).
+  > 
+  > ## 라우트 전체 타임아웃 확정값
+  > 
+  > **8초** (`BFF_TIMEOUT_MS = 8_000`, `app/api/stock/snapshot/route.ts`). PRD §3-A-3 권장(8초 이내) + §3-B-2 봇 측 후보당 호출 타임아웃(8초)과 **정합**. 내부 KIS 호출은 `Promise.allSettled` 병렬, 타임아웃 시 mock degrade(`X-Data-Source: mock-timeout`).
+  > 
+  > ## 스냅샷이 묶는 KIS TR 수 (레이트리밋 고려)
+  > 
+  > 후보당 **최대 4 TR**:
+  > 1. `inquire-price`(FHKST01010100) — 현재가·거래량·외국인지분·상장주수(시총·foreignRatio).
+  > 2. `inquire-daily-itemchartprice`(FHKST03010100) — 일봉 ~400캘린더일(52주+이평/ADX 워밍업). 청크 분할 → 실제 **~3 콜**.
+  > 3. `inquire-investor`(FHKST01010900) — 종목별 N일 수급. 실전·모의 둘 다 동작.
+  > 4. `search-stock-info`(CTPF1002R) — 시장 구분(KOSPI/KOSDAQ). **prod 전용** → vts/미설정은 호출 생략·`market: null`.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR-2 (봇, 후행)**: 본 PR 머지 후 `dev-manager-bot` `feature/value-picks-validated` 에서 value_picks 검증·재탐색 루프 구현(§3-B, AC-4~9). 본 엔드포인트를 후보당 1회 호출(타임아웃 8초 정합) — 밸류트랩 임계값(§6)은 봇 코드 상수로 분리.
+  - **2차 후속 PRD(비범위)**: 재무비율(PER/PBR/ROE/배당/이익성장) 실데이터 소스 추가(§7-2). 본 스키마는 최상위 객체 확장이 쉬운 평면 구조 — 2차에서 `fundamentals` 블록 추가 가능.
+  - 운영 모니터링: prod 에서 후보당 ~6 KIS 콜 × 라운드 후보 수의 EGW00201(초당 한도) 빈도 관찰 — 잦으면 chart 청크/동시성 조정.
