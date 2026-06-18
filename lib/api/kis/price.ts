@@ -25,7 +25,7 @@ import type {
   KisInquireDailyPriceItem,
   KisInquirePriceOutput,
 } from "./types";
-import { mapDailyCandle, mapStockPrice } from "./mappers";
+import { mapDailyCandle, mapStockPrice, toNumber } from "./mappers";
 import type { StockDailyCandle, StockPrice } from "./types";
 
 type AuthHeaders = {
@@ -87,6 +87,66 @@ export async function fetchStockPrice(ticker: string): Promise<StockPrice> {
   }
 
   return mapStockPrice(data.output, ticker);
+}
+
+/** 현재가 + 상장주수(시총 산출용) — `fetchStockPrice` 의 스냅샷 변형. */
+export type StockPriceWithShares = {
+  price: StockPrice;
+  /** 상장 주수(주) — `lstn_stcn`. 시총 = price.price × listedShares. 없으면 null. */
+  listedShares: number | null;
+};
+
+/**
+ * 현재가 조회 + 상장주수 동시 반환.
+ *
+ * `fetchStockPrice` 는 클라이언트 친화 `StockPrice`(시총용 `lstn_stcn` 미보존)만 돌려준다.
+ * 스냅샷(`/api/stock/snapshot`)은 `marketCapKRW = current × lstn_stcn` 산출에 상장주수가 필요해
+ * 같은 inquire-price 호출에서 raw `lstn_stcn` 을 함께 추출한다(중복 호출 회피). 매핑·에러 정책은
+ * `fetchStockPrice` 와 동일.
+ */
+export async function fetchStockPriceWithShares(
+  ticker: string,
+): Promise<StockPriceWithShares> {
+  const client = getKisClient();
+  const headers = await buildAuthHeaders("FHKST01010100");
+
+  let response;
+  try {
+    response = await client.get<KisEnvelope<KisInquirePriceOutput>>(
+      "/uapi/domestic-stock/v1/quotations/inquire-price",
+      {
+        headers,
+        params: {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+        },
+      },
+    );
+  } catch (error) {
+    const status =
+      typeof (error as { response?: { status?: number } }).response?.status ===
+      "number"
+        ? (error as { response: { status: number } }).response.status
+        : undefined;
+    throw makeKisTransportError({
+      status,
+      message:
+        error instanceof Error
+          ? error.message
+          : "KIS 시세 조회 중 네트워크 오류가 발생했어요.",
+    });
+  }
+
+  const data = response.data;
+  if (data.rt_cd !== "0" || !data.output) {
+    throw makeKisBusinessError(data.msg1, data.msg_cd);
+  }
+
+  const listed = toNumber(data.output.lstn_stcn);
+  return {
+    price: mapStockPrice(data.output, ticker),
+    listedShares: listed > 0 ? listed : null,
+  };
 }
 
 /**
