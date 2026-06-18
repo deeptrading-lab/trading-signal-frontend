@@ -4,7 +4,7 @@ import {
   isAIDecisionStoreConfigured,
   upsertAIDecision,
 } from "@/lib/server/ai/decisionStore";
-import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
+import type { DecisionSignal, FinalDecision } from "@/lib/types/stock/aiAnalysis";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -22,6 +22,20 @@ const decision: FinalDecision = {
   risk_reward_ratio: 2.4,
   short_term_outlook: "단기",
   mid_term_outlook: "중기",
+};
+
+const signal: DecisionSignal = {
+  score: 72,
+  action: "BUY",
+  confidence: 0.75,
+  regime: 1,
+  axes: [
+    { axis: "trend", score: 78, direction: 1 },
+    { axis: "momentum", score: 70, direction: 1 },
+    { axis: "volume", score: 65, direction: 0 },
+    { axis: "volatility", score: 60, direction: 1 },
+  ],
+  asOf: "2026-06-16",
 };
 
 afterEach(() => {
@@ -47,6 +61,7 @@ describe("AI decision Supabase store", () => {
       provider: "codex",
       decision,
       sentiment: null,
+      signal: null,
     })).resolves.toEqual({ ok: true, skipped: true, reason: "not_configured" });
   });
 
@@ -59,6 +74,7 @@ describe("AI decision Supabase store", () => {
         provider: "codex",
         decision,
         sentiment: null,
+        signal,
         updated_at: "2026-06-16T00:00:00.000Z",
       }],
     });
@@ -77,6 +93,7 @@ describe("AI decision Supabase store", () => {
       provider: "codex",
       decision,
       sentiment: null,
+      signal,
       updatedAt: "2026-06-16T00:00:00.000Z",
     });
   });
@@ -91,6 +108,7 @@ describe("AI decision Supabase store", () => {
       provider: "claude",
       decision,
       sentiment: { band: "POSITIVE", score: 7, confidence: "medium", summary: "긍정" },
+      signal,
     });
 
     expect(result).toEqual({ ok: true, skipped: false });
@@ -102,7 +120,7 @@ describe("AI decision Supabase store", () => {
           Prefer: "resolution=merge-duplicates,return=minimal",
           Authorization: "Bearer service-role",
         }),
-        body: expect.stringContaining("\"ticker\":\"005930\""),
+        body: expect.stringContaining("\"signal\":{\"score\":72"),
       }),
     );
   });
@@ -119,6 +137,7 @@ describe("AI decision Supabase store", () => {
       provider: "codex",
       decision,
       sentiment: null,
+      signal: null,
     })).resolves.toEqual(expect.objectContaining({
       ok: false,
       skipped: false,

@@ -31,6 +31,7 @@ import type {
   AgentUsage,
   AIAnalysisEvent,
   AIAnalysisProvider,
+  DecisionSignal,
   FinalDecision,
   ResumeState,
   SentimentBand,
@@ -208,6 +209,18 @@ function formatSignalForPrompt(
     "축별 점수:",
     axesText,
   ].join("\n");
+}
+
+/** 결정론 시그널 엔진 결과를 저장·표시용 압축본으로 변환 (axes[].hits 등 무거운 필드 제거). */
+function toDecisionSignal(s: SignalResult): DecisionSignal {
+  return {
+    score: s.score,
+    action: s.action,
+    confidence: s.confidence,
+    regime: s.regime,
+    asOf: s.asOf,
+    axes: s.axes.map((a) => ({ axis: a.axis, score: a.score, direction: a.direction })),
+  };
 }
 // ─── 가격·수급 컨텍스트 포매터 ────────────────────────────────────────────────
 
@@ -568,6 +581,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                   provider,
                   decision: finalDecision,
                   sentiment: state.sentiment ?? null,
+                  signal: toDecisionSignal(signalResult),
                 });
                 if (saveResult.skipped) {
                   aiLog("PM 결론 저장 skip — Supabase 미설정");

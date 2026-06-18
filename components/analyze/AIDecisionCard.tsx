@@ -150,7 +150,9 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
 
       {/* 보조: 확신도 · 유효기간 · 토큰 + 분석시각(오른쪽 끝으로 내림) */}
       <div className="flex flex-wrap items-center gap-xs">
-        <MetaChip>{COPY.verdict.confidence(item.decision.confidence)}</MetaChip>
+        {item.signal && (
+          <MetaChip>{COPY.verdict.signalStrength(item.signal.score)}</MetaChip>
+        )}
         <MetaChip>{COPY.verdict.horizon(item.decision.time_horizon)}</MetaChip>
         <MetaChip>{tokenChipLabel(item)}</MetaChip>
         <span className="ml-auto text-caption text-text-muted">

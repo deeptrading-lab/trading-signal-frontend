@@ -98,6 +98,10 @@ export const COPY = {
       `확신도: ${level === "HIGH" ? "높음" : level === "MEDIUM" ? "보통" : "낮음"}`,
     /** 확신도 산출 근거 — 무엇 기준인지 보조 설명 */
     confidenceBasis: "분석가 합의·데이터 명확성 기준",
+    /** 결정론 시그널 강도 칩 — score(0~100) 표시. LLM 자기평가 확신도를 대체한다. */
+    signalStrength: (score: number) => `신호 강도 ${Math.round(score)}`,
+    /** 신호 강도 산출 근거 — 무엇 기준인지 보조 설명 */
+    signalStrengthBasis: "가격 기반 결정론 시그널(추세·모멘텀·거래량·변동성) 종합점수",
     /** verdict 유효 기간 라벨 prefix */
     horizon: (h: "단기" | "중기" | "장기") => `유효 기간: ${h}`,
     strengths: "핵심 강점",

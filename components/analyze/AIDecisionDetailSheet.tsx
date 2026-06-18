@@ -124,7 +124,7 @@ export function AIDecisionDetailSheet({ item, name, onClose }: AIDecisionDetailS
         {/* 본문 — 스크롤 영역. 결론 카드가 패널 폭을 꽉 채운다. */}
         <div className="flex-1 overflow-y-auto">
           <div className="flex w-full flex-col gap-md p-lg">
-            <FinalVerdictCard data={item.decision} />
+            <FinalVerdictCard data={item.decision} signal={item.signal} />
           </div>
         </div>
       </motion.div>
