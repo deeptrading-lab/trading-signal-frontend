@@ -20,6 +20,21 @@ export function fmtCost(n: number | null): string {
   return `$${n.toFixed(4)}`;
 }
 
+/** 토큰 근사 표기(카드 chip 용) — "약 76만"(1만 이상) / 1만 미만은 콤마. null = "—". */
+export function fmtTokensApprox(n: number | null): string {
+  if (n == null) return "—";
+  if (n < 10000) return fmtTokens(n);
+  const man = n / 10000;
+  const rounded = man >= 10 ? Math.round(man) : Math.round(man * 10) / 10;
+  return `약 ${rounded}만`;
+}
+
+/** USD 비용 근사 표기(카드 chip 용) — $1 이상 소수1자리 / 미만 소수2자리. null = "—". */
+export function fmtCostApprox(n: number | null): string {
+  if (n == null) return "—";
+  return n >= 1 ? `$${n.toFixed(1)}` : `$${n.toFixed(2)}`;
+}
+
 /** 0~1 비율 → 백분율 1자리. null = "—". */
 export function fmtRate(n: number | null): string {
   if (n == null) return "—";
