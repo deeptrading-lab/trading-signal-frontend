@@ -13,12 +13,14 @@ import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
+import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
 import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
 import { ProviderChooser } from "./ai-analysis/ProviderChooser";
+import { SlideToAnalyze } from "./ai-analysis/SlideToAnalyze";
 import type {
   AIAnalysisDecisionSnapshot,
   AIAnalysisProvider,
@@ -46,42 +48,65 @@ function PreviousDecisionIntro({
   onAnalyze: (provider: AIAnalysisProvider) => void;
   onChooseProvider: () => void;
 }) {
+  // 가용 provider 로 슬라이드 스위치를 그릴지 결정. 0개·조회 중·Vercel·실패는 슬라이드 대신 폴백.
+  const { data: providerData, isLoading: isProvidersLoading } = useQueryAIProviders();
+  const available = providerData?.available ?? [];
+  const canSlide =
+    !isProvidersLoading && !providerData?.vercel && available.length >= 1;
+
   return (
     // 라이브 분석 뷰(풀 width)와 동일하게 패널 폭을 꽉 채운다 — 데스크탑에서 좌우 여백 제거.
-    <div className="w-full space-y-4">
+    // 배치: 안내 박스 → 슬라이드 스위치 → 이전 결론 카드.
+    <div className="w-full space-y-3">
+      {/* 안내 박스 — 좌측 안내 텍스트 + 우측 슬라이드 스위치(한 박스 안에). */}
       <div className="rounded-2xl border border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20 px-4 py-3">
-        <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
-          {COPY.previousDecision.title}
-        </p>
-        <p className="mt-1 text-xs text-blue-600/80 dark:text-blue-300/80 leading-relaxed">
-          {COPY.previousDecision.meta(
-            formatUpdatedAt(snapshot.updatedAt),
-            COPY.provider[snapshot.provider],
-          )}
-        </p>
-        <p className="mt-2 text-xs text-blue-600/80 dark:text-blue-300/80 leading-relaxed">
-          {COPY.previousDecision.pmOnly}
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
+              {COPY.previousDecision.title}
+              <span className="ml-1.5 font-normal text-blue-600/70 dark:text-blue-300/70">
+                · {COPY.previousDecision.meta(
+                  formatUpdatedAt(snapshot.updatedAt),
+                  COPY.provider[snapshot.provider],
+                )}
+              </span>
+            </p>
+            <p className="mt-0.5 text-xs text-blue-600/70 dark:text-blue-300/70 leading-relaxed">
+              {COPY.previousDecision.pmOnly}
+            </p>
+          </div>
+
+          {/* 우측 슬라이드 스위치 — 드래그/클릭/키보드 동일하게 onAnalyze(provider) 실행(시안 A). */}
+          <div className="w-full shrink-0 sm:w-auto">
+            {canSlide ? (
+              <SlideToAnalyze
+                available={available}
+                defaultProvider={snapshot.provider}
+                onStart={onAnalyze}
+              />
+            ) : isProvidersLoading ? (
+              // 조회 중 — 활성 스위치 대신 스켈레톤(스펙 §S5).
+              <div
+                className="h-11 w-full sm:w-[22rem] animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"
+                role="status"
+                aria-live="polite"
+                aria-label={COPY.chooser.loading}
+              />
+            ) : (
+              // 가용 0개/Vercel/실패 — 슬라이드 전제가 안 됨. 기존 공급자 선택 화면으로 폴백.
+              <button
+                type="button"
+                onClick={onChooseProvider}
+                className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+              >
+                {COPY.previousDecision.chooseProvider}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <FinalVerdictCard data={snapshot.decision} />
-
-      <div className="flex flex-col sm:flex-row justify-center gap-2">
-        <button
-          type="button"
-          onClick={() => onAnalyze(snapshot.provider)}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
-        >
-          {COPY.previousDecision.analyze}
-        </button>
-        <button
-          type="button"
-          onClick={onChooseProvider}
-          className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
-        >
-          {COPY.previousDecision.chooseProvider}
-        </button>
-      </div>
     </div>
   );
 }

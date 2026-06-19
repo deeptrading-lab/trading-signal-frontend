@@ -152,6 +152,33 @@ function parseSentimentBlock(raw: string): SentimentReport | null {
 
 // ─── 이전 PM 결론 컨텍스트 (Portfolio Manager 전용) ───────────────────────────
 
+/** 이전 결론 시점으로부터의 경과 시간 — 사람이 읽는 라벨 + 경과 일수(불명 시 null). */
+function formatElapsedSince(updatedAt: string): { label: string; days: number | null } {
+  const then = new Date(updatedAt).getTime();
+  if (!Number.isFinite(then)) return { label: "시점 불명", days: null };
+  const diffMs = Date.now() - then;
+  if (diffMs < 0) return { label: "방금", days: 0 };
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days >= 1) return { label: `약 ${days}일 전`, days };
+  const hours = Math.floor(diffMs / 3_600_000);
+  if (hours >= 1) return { label: `약 ${hours}시간 전`, days: 0 };
+  return { label: "1시간 이내", days: 0 };
+}
+
+/** 경과 일수에 따른 시점 가중 가이드 — 오래될수록 약한 참고로 내린다. */
+function recencyGuide(days: number | null): string {
+  if (days == null) {
+    return "경과 시점을 알 수 없으니 이전 결론은 약한 참고로만 두고 이번 분석가 데이터를 우선하세요.";
+  }
+  if (days <= 1) {
+    return "1일 이내의 최신 결론이라 현재 시장 상황과 거의 동일합니다. 비교 기준으로 유효하되 그대로 답습하지 말고 이번 데이터로 재검증하세요.";
+  }
+  if (days <= 7) {
+    return `${days}일 경과했습니다. 그 사이 가격·뉴스·수급이 달라졌을 수 있으니 이전 결론은 비교용으로만 쓰고 이번 분석가 데이터로 반드시 재검증하세요.`;
+  }
+  return `${days}일 경과해 시점이 오래됐습니다. 시장 상황이 크게 바뀌었을 수 있으므로 이전 결론은 약한 참고로만 두고, 이번 분석가 데이터를 결정의 1차 근거로 삼으세요.`;
+}
+
 function formatPreviousDecisionContext(
   previous: Awaited<ReturnType<typeof getLatestAIDecision>>,
 ): string {
@@ -164,8 +191,10 @@ function formatPreviousDecisionContext(
     ? `\n- 당시 SNS 감성: ${COPY.sentiment.bandLabel[sentiment.band]} / ${sentiment.score}/10 / 신뢰도 ${sentiment.confidence}`
     : "";
 
-  return `\n\n[이전 Portfolio Manager 결론 — 참고·비교 자료]
-- 분석 시각: ${updatedAt}
+  const elapsed = formatElapsedSince(updatedAt);
+
+  return `\n\n[이전 Portfolio Manager 결론 — 보조 참고·비교 자료]
+- 분석 시각: ${updatedAt} (${elapsed.label})
 - 사용 AI: ${COPY.provider[provider]}
 - verdict: ${decision.verdict}
 - confidence: ${decision.confidence}
@@ -175,7 +204,11 @@ function formatPreviousDecisionContext(
 - 중기 전망: ${decision.mid_term_outlook}
 - 기존 판단 근거: ${decision.reasoning}${sentimentText}
 
-위 이전 결론은 Portfolio Manager만 참고하세요. 그대로 반복하지 말고, 현재 데이터와 비교해 결론이 유지·강화·약화·변경됐는지 독립적으로 판단하세요. 결론이 달라졌다면 변경 이유를 reasoning에 명확히 포함하세요.`;
+위 이전 결론 활용 원칙 (Portfolio Manager 전용):
+1) 시점 가중 — ${recencyGuide(elapsed.days)}
+2) 편향 방지 — 이전 결론은 보조 신호일 뿐입니다. 이번 분석의 기술·뉴스·펀더멘털·심리 분석가 데이터와 강세/약세 토론·리스크 3팀 평가를 1차 근거로 종합해 독립적으로 판단하고, 이전 verdict에 앵커링(고정·답습)하지 마세요.
+3) 객관 평가 — 데이터가 방향을 명확히 가리키면 확실한 결론을 내리되, 신호가 상충하거나 근거가 약하면 무리한 방향성 대신 관망(HOLD/UNDERWEIGHT)도 정당한 결론입니다.
+4) 변화 설명 — 이전과 결론이 유지·강화·약화·변경됐는지 reasoning에 명시하고, 달라졌다면 어떤 새 데이터 때문인지 이유를 분명히 쓰세요.`;
 }
 
 // ─── 프롬프트 빌더 ────────────────────────────────────────────────────────────

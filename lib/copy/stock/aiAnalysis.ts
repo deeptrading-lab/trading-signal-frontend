@@ -34,6 +34,25 @@ export const COPY = {
       "오늘 다시 분석하면 이 결론은 포트폴리오 매니저에게만 참고 자료로 전달돼요.",
     analyze: "이전 결론 참고해 오늘 다시 분석",
     chooseProvider: "다른 AI 선택",
+    // 밀어서 분석 슬라이드 스위치(SlideToAnalyze) 전용 — 짧은 카피. 기존 키는 폴백/회귀용으로 유지.
+    slide: {
+      /** 노브 라벨 — provider 이름 주입. 예: "Claude로 분석" */
+      knob: (provider: string) => `${provider}로 분석`,
+      /** 노브 단축 라벨(슬라이드 핸들). */
+      short: "재분석",
+      /** 트랙 idle 힌트 */
+      hint: "→ 밀어서 다시 분석",
+      /** 임계(85%) 도달 시 */
+      release: "놓으면 시작",
+      /** 진행 중(committing) aria-live 안내 */
+      starting: "분석을 시작했어요",
+      /** 키보드/클릭 보조 안내(헬퍼) */
+      helper: "밀거나 눌러서 시작하세요",
+      /** 분석 시작 컨트롤 aria-label — provider 이름 주입. */
+      ariaStart: (provider: string) => `${provider}로 분석 시작`,
+      /** 다중 AI 토글 그룹 aria-label */
+      pickProvider: "분석할 AI 선택",
+    },
   },
   panel: {
     title: "AI 종합분석",
