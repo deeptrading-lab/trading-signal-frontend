@@ -152,6 +152,16 @@ export const queryConfig = {
       gcTime: 5 * MINUTE,
     },
   },
+  scorecard: {
+    /**
+     * AI 판정 적중률 집계 — cron 이 하루 1회 채점하므로 장중 재호출 무의미. 내부 운영자 뷰라
+     * 실시간성 낮음 → staleTime 5분 + 수동 새로고침(PRD `signal-scorecard` §3-3-B).
+     */
+    summary: {
+      staleTime: 5 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
+  },
 } as const;
 
 export type QueryConfig = typeof queryConfig;

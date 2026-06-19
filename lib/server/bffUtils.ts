@@ -89,6 +89,33 @@ export async function fetchWithTransientRetry<T>(
 }
 
 /**
+ * `fetchWithTransientRetry` 의 **throw 전파** 변형 — 폴백 값을 두지 않는다.
+ *
+ * - transient 실패(EGW00201/네트워크) 는 backoff 후 1회 재시도하되, 재시도까지 실패하면 그대로 throw.
+ * - 비-transient 실패·타임아웃도 그대로 throw(흡수하지 않음).
+ *
+ * 호출부가 "조회 실패" 와 "성공했으나 빈 결과" 를 **구분해야 할 때** 쓴다. 예: 채점 cron 은
+ * 조회 실패를 horizon `skipped`(영구) 로 굳히면 안 되고 `pending` 으로 남겨 다음 실행에 재시도해야
+ * 하는데, 빈 배열 폴백을 쓰면 실패와 "성공한 빈 캔들(상폐)" 이 구분되지 않아 둘 다 skip 으로 오확정된다.
+ * 실패를 throw 로 올리면 호출부의 ticker 단위 catch 가 pending 을 유지한다.
+ */
+export async function fetchWithTransientRetryOrThrow<T>(
+  fn: () => Promise<T>,
+  backoffMs: number,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof Error && error.message === BFF_TIMEOUT_SENTINEL) {
+      throw error;
+    }
+    if (!isTransientError(error)) throw error;
+    await delay(backoffMs);
+    return await fn(); // 재시도 실패 시 폴백 없이 그대로 전파 → 호출부가 pending 재시도.
+  }
+}
+
+/**
  * 지수 등 외부 API 호출이 `Promise.allSettled` 에서 reject 되어 조용히 드롭될 때,
  * 그 사유를 한 줄 문자열로 요약한다(prod 로그 진단용).
  *

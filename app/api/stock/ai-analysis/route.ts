@@ -45,6 +45,7 @@ import {
   getLatestAIDecision,
   upsertAIDecision,
 } from "@/lib/server/ai/decisionStore";
+import { insertScorecardRow } from "@/lib/server/scorecard/scorecardStore";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
@@ -587,6 +588,36 @@ export async function POST(req: NextRequest): Promise<Response> {
                   aiLog("PM 결론 저장 skip — Supabase 미설정");
                 } else if (!saveResult.ok) {
                   aiLog.warn(`PM 결론 저장 실패 — ${saveResult.error}`);
+                }
+
+                // 채점 원장 append (PRD signal-scorecard §3-1 / §8.2) — 결정시점 가격 캡처.
+                // entry = signal.asOf 봉의 종가(D2). asOf 봉을 못 찾으면 마지막 봉 종가로 폴백.
+                // fail-soft — 실패해도 SSE 분석 스트림을 막지 않는다(upsertAIDecision 패턴 동일).
+                const asOfBar = sorted.find((c) => c.date === signalResult.asOf);
+                const entryClose = asOfBar?.close ?? sorted[sorted.length - 1]?.close ?? 0;
+                if (entryClose > 0) {
+                  const scoreResult = await insertScorecardRow({
+                    ticker,
+                    provider,
+                    verdict: finalDecision.verdict,
+                    decisionConfidence: finalDecision.confidence,
+                    signalScore: signalResult.score,
+                    signalAction: signalResult.action,
+                    targetPct: finalDecision.target_pct,
+                    stopLossPct: finalDecision.stop_loss_pct,
+                    entryClose,
+                    entryDate: signalResult.asOf,
+                    livePrice: priceData?.price ?? null,
+                    decidedAt: new Date().toISOString(),
+                    runId,
+                  });
+                  if (scoreResult.skipped) {
+                    aiLog("채점 원장 append skip — Supabase 미설정");
+                  } else if (!scoreResult.ok) {
+                    aiLog.warn(`채점 원장 append 실패 — ${scoreResult.error}`);
+                  }
+                } else {
+                  aiLog.warn("채점 원장 append skip — entry 종가 캡처 실패");
                 }
               } else {
                 send({ type: "report", agent: agentKey, content: text });

@@ -72,4 +72,8 @@ export const queryKeys = {
     info: (tickers: readonly string[]) =>
       ["watchlist", "info", normalizeTickers(tickers)] as const,
   },
+  scorecard: {
+    /** AI 판정 적중률 집계 — Supabase signal_scorecard BFF. 인자 없는 단일 키. */
+    summary: ["scorecard", "summary"] as const,
+  },
 } as const;
