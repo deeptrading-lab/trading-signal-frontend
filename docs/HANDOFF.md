@@ -4189,3 +4189,45 @@
   - **PR-2 (봇, 후행)**: 본 PR 머지 후 `dev-manager-bot` `feature/value-picks-validated` 에서 value_picks 검증·재탐색 루프 구현(§3-B, AC-4~9). 본 엔드포인트를 후보당 1회 호출(타임아웃 8초 정합) — 밸류트랩 임계값(§6)은 봇 코드 상수로 분리.
   - **2차 후속 PRD(비범위)**: 재무비율(PER/PBR/ROE/배당/이익성장) 실데이터 소스 추가(§7-2). 본 스키마는 최상위 객체 확장이 쉬운 평면 구조 — 2차에서 `fundamentals` 블록 추가 가능.
   - 운영 모니터링: prod 에서 후보당 ~6 KIS 콜 × 라운드 후보 수의 EGW00201(초당 한도) 빈도 관찰 — 잦으면 chart 청크/동시성 조정.
+
+### 2026-06-19 — feat(scorecard): AI 판정 채점·적중률 집계 backbone (signal-scorecard PRD+구현) (#140)
+
+- **slug**: `signal-scorecard` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/140
+- **요약**: feat(scorecard): AI 판정 채점·적중률 집계 backbone (signal-scorecard PRD+구현)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > AI 멀티에이전트 최종 판정(FinalDecision)이 실제로 적중했는지 채점·집계하는 **측정 backbone(phase-1)** 을 추가한다. 분석은 만들고 버려지던 루프를, 결정시점 가격 캡처 → 영업일 경과 후 채점 cron → 차원별 적중률 집계 → 운영자 표로 닫는다.
+  > 
+  > - PRD(단일 진실원): `docs/prd/signal-scorecard.md` (본 PR 에 포함)
+  > - 기존 `ai_analysis_decisions`(ticker PK upsert) 는 **비파괴 보존**, 채점은 신규 append 테이블 `signal_scorecard` 로 완전 분리.
+  > 
+  > ## 적중 판정 로직 (핵심)
+  > 
+  > 결정시점 대비 horizon 수익률 `r% = (horizon종가 − entry_close)/entry_close × 100` 와 임계 `T=2%` 로 **hit/miss/flat 3분류**(`lib/server/scorecard/scoring.ts`, 순수 함수):
+  > 
+  > | verdict 군 | hit | miss | 그 사이 |
+  > |---|---|---|---|
+  > | BUY · OVERWEIGHT | r ≥ +T | r ≤ −T | flat |
+  > | SELL · REDUCE | r ≤ −T | r ≥ +T | flat |
+  > | HOLD | \|r\| ≤ T | \|r\| > T | (flat 없음) |
+  > | UNDERWEIGHT | r ≤ 0 | r > +T | flat |
+  > 
+  > - `entry_close` = `signal.asOf` 봉의 종가(D2 — horizon 종가와 동일 KIS 일봉 출처라 재현·정합).
+  > - `hitRate = hit/(hit+miss)` — **flat 은 분모 제외**(방향은 맞췄으나 폭이 작은 케이스가 적중률을 왜곡하지 않게, D3).
+  > - horizon 평가일이 휴장이면 직후 가장 가까운 영업봉 종가 사용. 봉 부재(상폐·장기 휴장)면 `skipped`. 평가 미도래면 `pending` 유지(다음 cron 재시도).
+  > 
+  > ## 확정 결정 반영 (D1~D7)
+  > 
+  > - **D1** 별도 append 테이블 `signal_scorecard`(uuid PK) — 동일 ticker 재분석은 새 행. `ai_analysis_decisions` 무회귀.
+  > - **D2** entry = `signal.asOf` 봉 종가. 라이브가(`live_price`)는 보조 저장만(채점 미사용).
+  > - **D3** 3분류 hit/miss/flat, hitRate flat 제외.
+  > - **D4** **단일 디스패처** — `flow-snapshot` cron 슬롯 안에서 flow 스냅샷 후 scoring 순차 호출(`vercel.json` cron 1개 유지). 각 단계 독립 try/catch. 채점 로직은 `/api/cron/score-decisions` 독립 라우트로도 노출(공통 `runScoring`).
+  > - **D5** 단일 prod Supabase 전제.
+  > - **D6** 경량 내부 운영자 표 — `docs/rules/frontend.md` 컨벤션 준수(한글 카피·BFF·`cn`·디자인 토큰, 색/px 직타 0).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **QA(라이브)**: SQL 선적용 후 로컬 분석 1회 → `signal_scorecard` 행 확인(AC-1/2), `/dashboard/scorecard` 두 뷰포트 표·필터·빈/미설정 상태(AC-8), prod cron 1회 채점(AC-3~6) 라이브 검증.
+  - **운영 모니터링**: `scorecard:cron:meta`(KV) 헬스 마커로 디스패처 ②채점 단계 정상 동작 확인. flow-snapshot 무회귀 주시.
+  - **인접 slug**: phase-2 `proactive-briefing`(채점 결과 → 능동 브리핑·푸시 채널 결정)는 본 backbone 머지 후 별도 착수.
