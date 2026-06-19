@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import { TrendingDown, TrendingUp, Minus, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
-import { fmtCost, fmtTokens } from "./format";
+import { fmtCostApprox, fmtTokensApprox } from "./format";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import {
   VERDICT_LABEL,
@@ -25,7 +25,6 @@ import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { AIDecisionCardMenu } from "./AIDecisionCardMenu";
 import {
   CARD_OVERLAY_VIEW,
-  CARD_TOKENS_LABEL,
   CARD_TOKENS_NONE,
   MEASURE_BADGE_UNMEASURED,
 } from "@/lib/copy/analyze/labels";
@@ -66,14 +65,14 @@ function MetaChip({ children }: { children: ReactNode }) {
   );
 }
 
-/** 토큰 chip 문구 — "총 토큰 12,345 · $0.1234" / "측정 안 됨" / "토큰 기록 없음". */
+/** 토큰 chip 문구(근사) — "약 76만 토큰 · $2.8" / "측정 안 됨" / "토큰 기록 없음". */
 function tokenChipLabel(item: AIDecisionListItem): string {
   const { tokens } = item;
   if (!tokens) return CARD_TOKENS_NONE;
   if (!tokens.measured) return MEASURE_BADGE_UNMEASURED;
   const total = (tokens.totalInputTokens ?? 0) + (tokens.totalOutputTokens ?? 0);
-  const cost = tokens.totalCostUsd !== null ? ` · ${fmtCost(tokens.totalCostUsd)}` : "";
-  return `${CARD_TOKENS_LABEL} ${fmtTokens(total)}${cost}`;
+  const cost = tokens.totalCostUsd !== null ? ` · ${fmtCostApprox(tokens.totalCostUsd)}` : "";
+  return `${fmtTokensApprox(total)} 토큰${cost}`;
 }
 
 interface AIDecisionCardProps {
@@ -150,8 +149,10 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
 
       {/* 보조: 확신도 · 유효기간 · 토큰 + 분석시각(오른쪽 끝으로 내림) */}
       <div className="flex flex-wrap items-center gap-xs">
-        <MetaChip>{COPY.verdict.confidence(item.decision.confidence)}</MetaChip>
-        <MetaChip>{COPY.verdict.horizon(item.decision.time_horizon)}</MetaChip>
+        {item.signal && (
+          <MetaChip>{COPY.verdict.signalStrength(item.signal.score)}</MetaChip>
+        )}
+        <MetaChip>{item.decision.time_horizon}</MetaChip>
         <MetaChip>{tokenChipLabel(item)}</MetaChip>
         <span className="ml-auto text-caption text-text-muted">
           {formatRelativeTime(item.updatedAt)}

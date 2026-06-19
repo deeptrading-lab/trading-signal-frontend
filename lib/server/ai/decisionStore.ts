@@ -10,6 +10,7 @@
 import type {
   AIAnalysisDecisionSnapshot,
   AIAnalysisProvider,
+  DecisionSignal,
   FinalDecision,
   SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
@@ -19,6 +20,7 @@ type SupabaseDecisionRow = {
   provider: AIAnalysisProvider;
   decision: FinalDecision;
   sentiment: SentimentReport | null;
+  signal: DecisionSignal | null;
   updated_at: string;
 };
 
@@ -48,6 +50,7 @@ function toSnapshot(row: SupabaseDecisionRow): AIAnalysisDecisionSnapshot {
     provider: row.provider,
     decision: row.decision,
     sentiment: row.sentiment ?? null,
+    signal: row.signal ?? null,
     updatedAt: row.updated_at,
   };
 }
@@ -64,7 +67,7 @@ export async function getLatestAIDecision(
 
   const url = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
   url.searchParams.set("ticker", `eq.${ticker}`);
-  url.searchParams.set("select", "ticker,provider,decision,sentiment,updated_at");
+  url.searchParams.set("select", "ticker,provider,decision,sentiment,signal,updated_at");
   url.searchParams.set("limit", "1");
 
   const res = await fetch(url, {
@@ -104,7 +107,7 @@ export async function getAllAIDecisions(
   if (!config) return [];
 
   const url = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
-  url.searchParams.set("select", "ticker,provider,decision,sentiment,updated_at");
+  url.searchParams.set("select", "ticker,provider,decision,sentiment,signal,updated_at");
   url.searchParams.set("order", "updated_at.desc");
   url.searchParams.set("limit", String(limit));
 
@@ -137,6 +140,7 @@ export async function upsertAIDecision(input: {
   provider: AIAnalysisProvider;
   decision: FinalDecision;
   sentiment: SentimentReport | null;
+  signal: DecisionSignal | null;
 }): Promise<DecisionStoreWriteResult> {
   const config = supabaseConfig();
   if (!config) return { ok: true, skipped: true, reason: "not_configured" };
@@ -152,6 +156,7 @@ export async function upsertAIDecision(input: {
       provider: input.provider,
       decision: input.decision,
       sentiment: input.sentiment,
+      signal: input.signal,
       updated_at: new Date().toISOString(),
     }),
   }).catch((error: unknown) => ({

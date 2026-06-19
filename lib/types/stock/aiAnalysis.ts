@@ -5,6 +5,8 @@
  * - FinalDecision: Portfolio Manager 최종 결정 구조체
  */
 
+import type { SignalAction, RuleDirection, AxisKey } from "@/lib/types/signal";
+
 export type AgentKey =
   | "market"
   | "news"
@@ -93,6 +95,25 @@ export interface AIProviderAvailability {
 }
 
 /**
+ * 분석 시점 결정론 시그널 엔진(`lib/signal`) 산출물의 압축본 — 카드/모달 표시·재현용.
+ * `SignalResult` 전체(특히 `axes[].hits`)는 표시에 불필요해 경량 필드만 보존한다.
+ */
+export interface DecisionSignal {
+  /** 0~100 종합 점수 (축 가중평균). 카드 칩 1차 메트릭 — 연속값이라 종목마다 변별된다. */
+  score: number;
+  /** "BUY" | "HOLD" | "SELL". */
+  action: SignalAction;
+  /** 0~1 4축 동의도. 모달 보조. */
+  confidence: number;
+  /** +1 강세 / 0 중립 / -1 약세. */
+  regime: RuleDirection;
+  /** 4축 점수 분해 (모달 노출용) — hits 제외 경량화. */
+  axes: { axis: AxisKey; score: number; direction: RuleDirection }[];
+  /** 평가 기준 봉 날짜 (YYYY-MM-DD). */
+  asOf: string;
+}
+
+/**
  * 종목별 공유 AI 분석 결론 스냅샷.
  * Supabase `ai_analysis_decisions` 테이블의 ticker PK row 를 BFF가 camelCase로 변환해 반환한다.
  */
@@ -101,6 +122,8 @@ export interface AIAnalysisDecisionSnapshot {
   provider: AIAnalysisProvider;
   decision: FinalDecision;
   sentiment: SentimentReport | null;
+  /** 분석 시점 결정론 시그널 — legacy(이 컬럼 추가 이전) 행은 null. */
+  signal: DecisionSignal | null;
   updatedAt: string;
 }
 
