@@ -44,7 +44,7 @@ export function AgentTokenBarChart({ rows }: { rows: AgentUsageRow[] }) {
         <p className="text-caption text-text-muted mt-xs">{CHART_BAR_HINT}</p>
       </header>
       <div className="h-[320px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={320}>
           <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={theme.C.grid} vertical={false} />
             <XAxis

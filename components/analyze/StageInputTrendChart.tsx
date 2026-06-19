@@ -36,7 +36,7 @@ export function StageInputTrendChart({ rows }: { rows: AgentUsageRow[] }) {
         <p className="text-caption text-text-muted mt-xs">{CHART_TREND_HINT}</p>
       </header>
       <div className="h-[300px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={theme.C.grid} vertical={false} />
             <XAxis
