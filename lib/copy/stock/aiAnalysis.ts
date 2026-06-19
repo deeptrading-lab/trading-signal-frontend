@@ -38,6 +38,8 @@ export const COPY = {
     slide: {
       /** 노브 라벨 — provider 이름 주입. 예: "Claude로 분석" */
       knob: (provider: string) => `${provider}로 분석`,
+      /** 노브 단축 라벨(슬라이드 핸들). */
+      short: "재분석",
       /** 트랙 idle 힌트 */
       hint: "→ 밀어서 다시 분석",
       /** 임계(85%) 도달 시 */

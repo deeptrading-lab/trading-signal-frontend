@@ -20,7 +20,7 @@
  */
 
 import { useState } from "react";
-import { motion, useTransform } from "motion/react";
+import { motion } from "motion/react";
 import { Sparkles, Zap, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
@@ -60,25 +60,14 @@ export function SlideToAnalyze({
   // 마운트 후 available 이 도중에 바뀌는 케이스는 없다(호출부가 안정된 snapshot 으로 렌더).
   const [selected, setSelected] = useState<AIAnalysisProvider>(initialProvider);
 
-  const { phase, knobX, progress, isBusy, trackRef, knobRef, handlers } =
+  const { phase, knobX, isBusy, trackRef, knobRef, handlers } =
     useSlideToAnalyze({ provider: selected, onStart });
-
-  // 진행도(0~1) → 채움 폭(%) · 힌트 페이드.
-  const fillWidth = useTransform(progress, (v) => `${Math.round(v * 100)}%`);
-  const hintOpacity = useTransform(progress, [0, 0.4], [1, 0]);
 
   const accent = PROVIDER_ACCENT[selected];
   const KnobIcon = accent.icon;
 
   const isThreshold = phase === "threshold-reached";
   const isCommitting = phase === "committing";
-
-  // 트랙 채움 색 — 임계 도달 시 초록(go 신호), 그 외 진행 파랑.
-  const fillClass = isThreshold
-    ? "bg-green-700 dark:bg-green-600"
-    : "bg-blue-600 dark:bg-blue-600";
-
-  const knobLabel = COPY.previousDecision.slide.knob(COPY.provider[selected]);
 
   return (
     <div className="w-full">
@@ -118,8 +107,8 @@ export function SlideToAnalyze({
         </div>
       )}
 
-      {/* 슬라이드 트랙 — 가독 폭 제한(데스크탑/태블릿), 모바일 풀폭. */}
-      <div className="w-full md:max-w-[28rem]">
+      {/* 슬라이드 트랙 — 콘텐츠 폭(노브 + AI 텍스트)만큼만. 노브 좌측 → 우측(AI)으로 밀기. */}
+      <div className="w-full sm:w-auto">
         <button
           type="button"
           ref={trackRef}
@@ -127,76 +116,52 @@ export function SlideToAnalyze({
           aria-busy={isCommitting}
           {...handlers}
           className={cn(
-            "group relative block w-full select-none overflow-hidden rounded-full p-1",
-            "h-[3.25rem]",
-            "border border-blue-200 bg-blue-100 dark:border-blue-900 dark:bg-blue-950/40",
-            "transition-colors duration-200",
+            "group relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-full p-1 sm:w-auto",
+            "h-11",
+            "border transition-colors duration-200",
+            isThreshold
+              ? "border-green-300 bg-green-100 dark:border-green-900 dark:bg-green-950/40"
+              : "border-blue-200 bg-blue-100 dark:border-blue-900 dark:bg-blue-950/40",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950",
             "cursor-pointer touch-none",
           )}
         >
-          {/* 진행 채움 — 좌→우. 임계 도달 시 초록. */}
-          <motion.span
-            aria-hidden
-            style={{ width: fillWidth }}
-            className={cn(
-              "absolute inset-y-0 left-0 rounded-full transition-colors duration-200",
-              fillClass,
-            )}
-          />
-
-          {/* 트랙 힌트(중앙) — 진행할수록 페이드. idle/dragging 에서 표시. */}
-          <motion.span
-            aria-hidden
-            style={{ opacity: isCommitting || isThreshold ? 0 : hintOpacity }}
-            className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-blue-800/80 dark:text-blue-200/80"
-          >
-            {COPY.previousDecision.slide.hint}
-          </motion.span>
-
-          {/* threshold 도달 시 흰 텍스트로 "놓으면 시작"(초록 채움 위). */}
-          {isThreshold && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-white"
-            >
-              {COPY.previousDecision.slide.release}
-            </span>
-          )}
-
-          {/* 노브 — 흰 pill. provider 색 라벨. 좌측 시작 → 우측 끝. */}
+          {/* 노브 — 흰 pill "재분석". 좌측에서 우측(AI)으로 밀기. */}
           <motion.span
             ref={knobRef}
             aria-hidden
             style={{ x: knobX }}
             className={cn(
-              "relative z-10 inline-flex h-11 items-center gap-1.5 rounded-full bg-white px-4 dark:bg-slate-100",
-              "shadow-sm group-hover:shadow-md",
-              "transition-shadow duration-200",
+              "z-10 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-slate-50 px-3 dark:bg-slate-200",
+              "shadow-sm ring-1 ring-black/5 group-hover:shadow-md transition-shadow duration-200",
             )}
           >
-            {isCommitting ? (
-              <Loader2 size={14} className="animate-spin text-blue-600" />
-            ) : (
-              <KnobIcon size={14} className={accent.text} />
+            {isCommitting && (
+              <Loader2 size={13} className="animate-spin text-blue-600" />
             )}
-            <span className={cn("text-[13px] font-bold leading-none", accent.text)}>
-              {knobLabel}
+            <span className="whitespace-nowrap text-[12px] font-bold leading-none text-blue-700 dark:text-blue-800">
+              {COPY.previousDecision.slide.short}
             </span>
-            {/* 데스크탑 어포던스 — 호버 시 화살표 미세 이동(2px). */}
             <span
               aria-hidden
-              className="hidden text-blue-800/50 transition-transform duration-200 group-hover:translate-x-0.5 dark:text-blue-200/40 lg:inline-flex"
+              className="text-blue-400 transition-transform duration-200 group-hover:translate-x-0.5 dark:text-blue-500"
             >
-              <ArrowRight size={13} />
+              <ArrowRight size={14} />
             </span>
           </motion.span>
-        </button>
 
-        {/* 헬퍼 — 키보드/드래그 보조 안내. */}
-        <p className="mt-1.5 text-center text-[11px] text-slate-500 dark:text-slate-400 md:text-left">
-          {COPY.previousDecision.slide.helper}
-        </p>
+          {/* 도착점 — 우측 AI 이름. 노브가 이 자리로 이동해 시작한다. */}
+          <span
+            aria-hidden
+            className={cn(
+              "z-0 inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-bold",
+              isThreshold ? "text-green-700 dark:text-green-400" : accent.text,
+            )}
+          >
+            <KnobIcon size={14} />
+            {COPY.provider[selected]}
+          </span>
+        </button>
       </div>
 
       {/* 스크린리더 진행 안내 — committing 동안만. */}
