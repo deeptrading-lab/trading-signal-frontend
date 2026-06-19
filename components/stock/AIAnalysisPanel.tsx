@@ -13,12 +13,14 @@ import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
+import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
 import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
 import { ProviderChooser } from "./ai-analysis/ProviderChooser";
+import { SlideToAnalyze } from "./ai-analysis/SlideToAnalyze";
 import type {
   AIAnalysisDecisionSnapshot,
   AIAnalysisProvider,
@@ -46,8 +48,15 @@ function PreviousDecisionIntro({
   onAnalyze: (provider: AIAnalysisProvider) => void;
   onChooseProvider: () => void;
 }) {
+  // 가용 provider 로 슬라이드 스위치를 그릴지 결정. 0개·조회 중·Vercel·실패는 슬라이드 대신 폴백.
+  const { data: providerData, isLoading: isProvidersLoading } = useQueryAIProviders();
+  const available = providerData?.available ?? [];
+  const canSlide =
+    !isProvidersLoading && !providerData?.vercel && available.length >= 1;
+
   return (
     // 라이브 분석 뷰(풀 width)와 동일하게 패널 폭을 꽉 채운다 — 데스크탑에서 좌우 여백 제거.
+    // 배치: 안내 박스 → 슬라이드 스위치 → 이전 결론 카드.
     <div className="w-full space-y-4">
       <div className="rounded-2xl border border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20 px-4 py-3">
         <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
@@ -64,24 +73,35 @@ function PreviousDecisionIntro({
         </p>
       </div>
 
-      <FinalVerdictCard data={snapshot.decision} />
-
-      <div className="flex flex-col sm:flex-row justify-center gap-2">
-        <button
-          type="button"
-          onClick={() => onAnalyze(snapshot.provider)}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
-        >
-          {COPY.previousDecision.analyze}
-        </button>
-        <button
-          type="button"
-          onClick={onChooseProvider}
-          className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
-        >
-          {COPY.previousDecision.chooseProvider}
-        </button>
+      {/* 밀어서 분석 스위치 — 드래그/클릭/키보드 동일하게 onAnalyze(provider) 실행(시안 A). */}
+      <div className="flex justify-center md:justify-start">
+        {canSlide ? (
+          <SlideToAnalyze
+            available={available}
+            defaultProvider={snapshot.provider}
+            onStart={onAnalyze}
+          />
+        ) : isProvidersLoading ? (
+          // 조회 중 — 활성 스위치 대신 스켈레톤(스펙 §S5).
+          <div
+            className="h-[3.25rem] w-full md:max-w-[28rem] animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"
+            role="status"
+            aria-live="polite"
+            aria-label={COPY.chooser.loading}
+          />
+        ) : (
+          // 가용 0개/Vercel/실패 — 슬라이드 전제가 안 됨. 기존 공급자 선택 화면으로 폴백.
+          <button
+            type="button"
+            onClick={onChooseProvider}
+            className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+          >
+            {COPY.previousDecision.chooseProvider}
+          </button>
+        )}
       </div>
+
+      <FinalVerdictCard data={snapshot.decision} />
     </div>
   );
 }
