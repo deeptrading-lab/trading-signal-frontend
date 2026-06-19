@@ -203,9 +203,9 @@
 |------|------|-----------|
 | **KIS prod 미설정/비-prod cron 호출** | 채점 skip + 헬스 마커 + 200(`{ok:false,reason:"kis-not-prod"}`). 재시도 폭주 방지 | 코드 확인(route L32-40, 디스패처 L43-48) |
 | **CRON_SECRET 미설정/Bearer 오타** | 401 unauthorized(채점 미진입) | 코드 확인(L23-27) |
-| **KIS 레이트리밋(EGW00201)/네트워크 transient** | `fetchWithTransientRetry` 1회 backoff 재시도 후 빈 배열 폴백 → 해당 horizon pending 유지(다음 cron 재시도), 다른 ticker 무영향. ticker 간 200ms delay | runScoring 코드 + scoreDecisions throw 격리 테스트 |
+| **KIS 레이트리밋(EGW00201)/네트워크 transient** | `fetchWithTransientRetryOrThrow` 가 1회 backoff 재시도 후에도 실패하면 **throw 전파**(빈 배열 폴백 없음) → ticker 단위 catch 가 errors++ + 해당 horizon pending 유지(다음 cron 재시도), 다른 ticker 무영향. ticker 간 200ms delay | `bffUtils.test.ts`(throw 전파) + runScoring 코드 + scoreDecisions throw 격리 테스트 |
 | **거래소 서버 다운 / KIS 일봉 throw** | 해당 ticker try/catch → errors++ + pending 유지(재시도), 나머지 ticker 정상 채점, cron 200 | `scoreDecisions.test.ts` "한 ticker throw" 통과 |
-| **상폐/장기 거래정지(봉 0건)** | 빈 캔들 → 도래 horizon skipped(채점 불가 명시) | "빈 캔들" 테스트 통과 |
+| **상폐/장기 거래정지(KIS 가 성공적으로 봉 0건 반환)** | 조회 **성공**+빈 캔들만 → 도래 horizon skipped(채점 불가 명시). 조회 **실패**(throw)는 skip 아닌 pending 으로 분리(위 행) → 일시 장애가 영구 skip 으로 굳지 않음 | "빈 캔들" 테스트 + 하드닝 |
 | **평가일 휴장(공휴일/주말)** | 직후 가장 가까운 영업봉 종가 사용(LOOKAHEAD 7봉 흡수), 초과 시 skipped | "휴장 직후 영업봉" 테스트 통과 |
 | **데이터 미갱신(평가일 도래했으나 KIS 봉 아직 없음)** | last 봉이 today 기준 LOOKAHEAD 이내면 pending 유지(stale 아님), 초과면 skip | `findHorizonClose` stale 판정 코드 |
 | **entry_close 비정상(≤0/NaN)** | `computeReturnPct=null` → 해당 horizon skipped(채점 불가). 분석 append 단계도 `entryClose>0` 일 때만 insert(이중 가드) | scoreDecisions L223-235 + route L598 |
