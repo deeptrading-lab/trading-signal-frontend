@@ -51,8 +51,16 @@ export type SignalResult = {
   axes: AxisScore[];
   /** 평가 기준 봉 날짜 (마지막 캔들, YYYY-MM-DD). */
   asOf: string;
-  /** 지표 계산에 충분한 봉 수였는지. false 면 action=HOLD 안전 폴백. */
+  /** 지표 계산에 충분한 봉 수였는지(>= SOFT_MIN_BARS). false 면 action=HOLD 안전 폴백(분석 차단). */
   warmupOk: boolean;
+  /**
+   * 장기추세 미확보 여부 — SOFT_MIN_BARS(90) ≤ bars < MIN_BARS(130) 면 true.
+   * true 면 120일선·정배열·레짐이 미확보돼 결론의 불확실성이 크다(분석은 정상 제공하되 경고·confidence 캡 동반).
+   * false 면 풀 품질(bars >= MIN_BARS) 또는 하드 폴백(bars < SOFT_MIN_BARS — 평가 자체를 안 함).
+   */
+  limitedData: boolean;
+  /** 평가에 쓴 캔들 수(n). 로깅·디버그·QA 재현·프롬프트 경고 주입용. */
+  bars: number;
   /**
    * 장기추세 레짐 — +1 강세(120일선 우상향+가격 위) / -1 약세 / 0 중립.
    * 약세 레짐에서 BUY 는, 강세 레짐에서 SELL 은 HOLD 로 veto(추세 역행 진입 차단).

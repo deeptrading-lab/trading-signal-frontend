@@ -14,7 +14,16 @@ import { evaluateVolume } from "./factors/volume";
 import { evaluateVolatility } from "./factors/volatility";
 import { aggregateAxis, composite } from "./score";
 import { computeRegime } from "./regime";
-import { MIN_BARS } from "./weights";
+import { MIN_BARS, SOFT_MIN_BARS } from "./weights";
+
+/**
+ * limitedData(90~130봉) 시 numeric confidence(동의도) 상한.
+ * 0.6 = "최대 3/4 축이 동의해도 한 단계 낮춰 표기" 수준 — 장기추세(120일선·정배열·레짐)가
+ * 미확보된 상태에서 동의도가 높게 표기돼 과신을 유도하는 것을 막는 보조 신호.
+ * (verdict 라벨 HIGH 금지는 프롬프트가 1차 제어; 이 캡은 signalSummary 의 "동의도 N%" 를 눌러
+ *  LLM 에 데이터 제한을 간접 전달하는 결정적 보조 수단이다.)
+ */
+const LIMITED_DATA_CONFIDENCE_CAP = 0.6;
 
 /** 캔들 배열 마지막 봉 기준 신호 평가. */
 export function evaluateSignal(
@@ -24,10 +33,13 @@ export function evaluateSignal(
   const n = candles.length;
   const asOf = n > 0 ? candles[n - 1].date : "";
 
-  // 워밍업 부족 — 120일선·지표를 신뢰 못함 → HOLD 안전 폴백.
-  if (n < MIN_BARS) {
-    return { action: "HOLD", score: 50, confidence: 0, axes: [], asOf, warmupOk: false, regime: 0 };
+  // 워밍업 부족(< SOFT_MIN_BARS) — 60일선·골든크로스도 흔들려 분석 부적정 → HOLD 안전 폴백.
+  if (n < SOFT_MIN_BARS) {
+    return { action: "HOLD", score: 50, confidence: 0, axes: [], asOf, warmupOk: false, limitedData: false, bars: n, regime: 0 };
   }
+
+  // 90 <= n < 130 — 장기추세(120일선·정배열·레짐) 미확보. 분석은 정상 수행하되 limitedData 마킹.
+  const limitedData = n < MIN_BARS;
 
   const ctx = buildContext(candles);
 
@@ -45,9 +57,16 @@ export function evaluateSignal(
     aggregateAxis("volatility", evaluateVolatility(ctx, trendAxis.direction)),
   ];
 
-  const { action: rawAction, score, confidence } = composite(axes, opts);
+  const { action: rawAction, score, confidence: rawConfidence } = composite(axes, opts);
+
+  // limitedData 면 동의도(numeric confidence)에 상한 — 장기추세 미확보 과신 방지(보조 수단).
+  // n >= 130(풀 품질)은 절대 건드리지 않는다(회귀 가드, AC-3).
+  const confidence = limitedData
+    ? Math.min(rawConfidence, LIMITED_DATA_CONFIDENCE_CAP)
+    : rawConfidence;
 
   // 장기추세 레짐 — 항상 산출(투명성). 필터 on(기본)일 때만 역추세 진입 veto.
+  // (90~130봉은 SMA120 룩백 미확보로 computeRegime=0 중립 → veto 미적용. 정상 degrade.)
   const regime = computeRegime(ctx);
   let action = rawAction;
   if (opts?.regimeFilter !== false) {
@@ -55,5 +74,5 @@ export function evaluateSignal(
     else if (regime === 1 && rawAction === "SELL") action = "HOLD";
   }
 
-  return { action, score, confidence, axes, asOf, warmupOk: true, regime };
+  return { action, score, confidence, axes, asOf, warmupOk: true, limitedData, bars: n, regime };
 }

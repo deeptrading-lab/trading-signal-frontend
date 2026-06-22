@@ -19,8 +19,20 @@ export const AXIS_WEIGHTS: Record<AxisKey, number> = {
 export const BUY_THRESHOLD = 60;
 export const SELL_THRESHOLD = 40;
 
-/** 120일선 + 워밍업 여유. 미만이면 warmupOk=false → HOLD 폴백. */
+/**
+ * 풀 데이터 기준 봉수 — 120일선 + 레짐 기울기(140봉 룩백 여유)까지 전부 확보되는 경계.
+ * 이상이면 limitedData=false(풀 품질). SOFT_MIN_BARS 이상~MIN_BARS 미만은 limitedData=true
+ * (장기추세·레짐 일부 미확보)로 분석을 제공한다. (과거: "미만이면 분석 차단"이었으나
+ * 신규 상장주 분석 사각지대 해소를 위해 차단 경계는 SOFT_MIN_BARS 로 분리.)
+ */
 export const MIN_BARS = 130;
+
+/**
+ * 분석 제공 최소 봉수 — 90~130 구간은 limitedData(장기추세 미확보)로 진행.
+ * 미만이면 warmupOk=false → HOLD 안전 폴백(분석 차단). 90봉이면 5/20/60 이평·골든크로스·
+ * MACD·RSI·볼린저·ADX 가 확보돼 단기·중기 신뢰가 가능하다(SMA120·정배열·레짐은 미확보).
+ */
+export const SOFT_MIN_BARS = 90;
 
 /** 이동평균 기간. */
 export const MA_PERIODS = { short: 5, mid: 20, long: 60, base: 120 } as const;
