@@ -28,9 +28,9 @@ export function AnalyzeTabsContainer() {
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
 
   return (
-    <div className="flex flex-col gap-lg">
-      <div className="flex items-center justify-between gap-md flex-wrap">
-        <div className="flex items-center gap-xs" role="tablist" aria-label="AI 분석 화면">
+    <div className="flex flex-col gap-md">
+      <div className="flex items-center justify-between gap-md flex-wrap border-b border-border-line pb-md">
+        <div className="flex items-center gap-sm" role="tablist" aria-label="AI 분석 화면">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -39,10 +39,10 @@ export function AnalyzeTabsContainer() {
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                "rounded-pill px-md py-xs text-body-sm-strong transition-colors",
+                "cursor-pointer rounded-pill border px-md py-xs text-body-sm-strong transition-colors",
                 tab === t.key
-                  ? "bg-accent-vivid text-surface"
-                  : "bg-surface-muted text-text-muted hover:text-text-strong",
+                  ? "border-transparent bg-accent-vivid text-surface"
+                  : "border-border-line bg-surface text-text-muted hover:text-text-strong",
               )}
             >
               {t.label}

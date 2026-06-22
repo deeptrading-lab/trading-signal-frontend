@@ -78,7 +78,7 @@ export function AgentUsageContainer() {
     <div className="flex flex-col gap-md">
       {/* provider 탭 + run 수 + 새로고침 */}
       <div className="flex items-center justify-between gap-md flex-wrap">
-        <div className="flex items-center gap-xs" role="tablist" aria-label="AI 공급자">
+        <div className="flex items-center gap-sm" role="tablist" aria-label="AI 공급자">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -87,10 +87,10 @@ export function AgentUsageContainer() {
               aria-selected={provider === t.key}
               onClick={() => setProvider(t.key)}
               className={cn(
-                "rounded-pill px-md py-xs text-body-sm-strong transition-colors",
+                "cursor-pointer rounded-pill border px-md py-xs text-body-sm-strong transition-colors",
                 provider === t.key
-                  ? "bg-accent-vivid text-surface"
-                  : "bg-surface-muted text-text-muted hover:text-text-strong",
+                  ? "border-accent-vivid bg-accent-vivid-soft text-accent-vivid"
+                  : "border-border-line bg-surface text-text-muted hover:text-text-strong",
               )}
             >
               {t.label}

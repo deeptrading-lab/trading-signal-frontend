@@ -6,7 +6,8 @@
 "use client";
 
 import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
-import { fmtCost, fmtRate, fmtTokens } from "./format";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { fmtCostRounded, fmtRate, fmtTokens } from "./format";
 import {
   CARD_AVG_COST,
   CARD_CACHE_HINT,
@@ -30,9 +31,11 @@ function MetricCard({
 }) {
   return (
     <div className="card flex flex-col gap-xs">
-      <span className="text-caption text-text-muted">{label}</span>
+      <span className="flex items-center gap-xs text-caption text-text-muted">
+        {label}
+        {hint ? <InfoTooltip label={hint} /> : null}
+      </span>
       <strong className="text-h2 text-text-strong tabular-nums">{value}</strong>
-      {hint ? <span className="text-caption text-text-muted">{hint}</span> : null}
     </div>
   );
 }
@@ -47,7 +50,7 @@ export function CacheCostCards({ rows }: { rows: AgentUsageRow[] }) {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-md">
-      <MetricCard label={CARD_AVG_COST} value={fmtCost(totalCost > 0 ? totalCost : null)} />
+      <MetricCard label={CARD_AVG_COST} value={fmtCostRounded(totalCost > 0 ? totalCost : null)} />
       <MetricCard label={CARD_TOTAL_AVG_INPUT} value={fmtTokens(totalInput > 0 ? totalInput : null)} />
       <MetricCard label={CARD_TOTAL_AVG_OUTPUT} value={fmtTokens(totalOutput > 0 ? totalOutput : null)} />
       <MetricCard label={CARD_CACHE_HIT} value={fmtRate(cacheHit)} hint={CARD_CACHE_HINT} />
