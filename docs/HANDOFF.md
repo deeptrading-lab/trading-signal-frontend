@@ -4231,3 +4231,44 @@
   - **QA(라이브)**: SQL 선적용 후 로컬 분석 1회 → `signal_scorecard` 행 확인(AC-1/2), `/dashboard/scorecard` 두 뷰포트 표·필터·빈/미설정 상태(AC-8), prod cron 1회 채점(AC-3~6) 라이브 검증.
   - **운영 모니터링**: `scorecard:cron:meta`(KV) 헬스 마커로 디스패처 ②채점 단계 정상 동작 확인. flow-snapshot 무회귀 주시.
   - **인접 slug**: phase-2 `proactive-briefing`(채점 결과 → 능동 브리핑·푸시 채널 결정)는 본 backbone 머지 후 별도 착수.
+
+### 2026-06-22 — feat(signal): 90~130봉 graceful degradation — 불확실성 경고 + confidence 캡 (#143)
+
+- **slug**: `signal-degraded-warmup` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/143
+- **요약**: feat(signal): 90~130봉 graceful degradation — 불확실성 경고 + confidence 캡
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > 가격 데이터가 130봉 미만이어도 **90봉 이상이면 분석을 차단하지 않고** "데이터 부족·불확실" 경고와 함께 진행하고, confidence 를 낮춘다. 90봉 미만은 기존처럼 하드 에러. 신규 상장주(예: 케이뱅크)가 거래일 130일(~6개월)까지 분석을 전혀 못 받던 사각지대를 해소한다.
+  > 
+  > - PRD: `docs/prd/signal-degraded-warmup.md` (dev-manager-bot 레포)
+  > - 경계 규칙(동결): `n < 90` 에러 / `90 ≤ n < 130` limitedData 분석 / `130 ≤ n` 풀 품질
+  > 
+  > ## 변경 요약 (5곳 + 테스트, 모두 trading-signal-frontend)
+  > 
+  > | 파일 | 변경 |
+  > |---|---|
+  > | `lib/signal/weights.ts` | `SOFT_MIN_BARS = 90` 추가. `MIN_BARS = 130` 의미를 "분석 차단 경계"→"풀 품질 경계"로 주석 갱신 |
+  > | `lib/signal/engine.ts` | 하드 폴백 경계 `n < SOFT_MIN_BARS(90)`. `90 ≤ n < 130` 은 정상 평가 + `limitedData:true`. `n ≥ 130` 은 `limitedData:false`(기존 동일). limitedData 시 numeric confidence 에 상한 `Math.min(conf, 0.6)` 적용. **순수 함수 유지** |
+  > | `lib/types/signal/index.ts` | `SignalResult` 에 `limitedData: boolean`, `bars: number` 추가. 하드 폴백 리턴 포함 모든 리턴 지점이 두 필드를 채움 |
+  > | `app/api/stock/ai-analysis/route.ts` | `!warmupOk` 에러 문구 "데이터가 부족해 분석할 수 없어요. (최소 90봉 필요)" 로 갱신. `limitedData` 시 `signalSummary` 머리에 데이터 제한 경고 주입 + PM 에 `dataWarning` 직접 전달 |
+  > | `lib/prompts/stock/aiAnalysis.ts` | PM 시스템 프롬프트 confidence 기준에 "데이터 제한 시 HIGH 금지(≤MEDIUM) + reasoning 에 불확실성 명시" 규칙 추가. `buildDataWarningContext` 로 PM user 프롬프트에 경고 블록 주입. 방향(BUY/HOLD/SELL)은 강제하지 않음 |
+  > 
+  > ### 두 confidence 구분 (PRD §1.3)
+  > - **엔진 numeric confidence(0~1)**: engine.ts 의 `Math.min(conf, 0.6)` 캡 — 결정적 보조 수단. `signalSummary` 의 "동의도 N%" 를 눌러 LLM 에 데이터 제한을 간접 전달.
+  > - **verdict confidence 라벨(HIGH/MEDIUM/LOW)**: 프롬프트가 1차 제어 — limitedData 마커 시 HIGH 금지.
+  > - 둘은 상보적(중복 아님).
+  > 
+  > ## 테스트 결과
+  > 
+  > - 엔진 단위 테스트 18건 통과 (`lib/signal/__tests__/engine.test.ts`):
+  >   - 경계값: `n=89`(하드 에러), `n=90/119/129`(limitedData:true·warmupOk:true·verdict 산출), `n=130/160/230`(limitedData:false)
+  >   - confidence 캡: limitedData 시 `≤ 0.6`, 그리고 `= min(raw composite, 0.6)` 직접 대조(캡 의미 가드)
+  >   - n≥130 회귀: confidence 무캡(= raw composite), 순수성(동일 입력 동일 출력)
+  >   - 상수 가드: `SOFT_MIN_BARS=90`, `MIN_BARS=130` (off-by-one 방지)
+  > - 전체 스위트: **356 passed / 1 skipped(라이브 백테스트)**
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - QA: 라이브 검증 1건 — 케이뱅크 등 90~130봉 종목 실분석 → reasoning 불확실성 문구 + verdict confidence ≤ MEDIUM 육안 확인. QA 리포트는 dev-manager-bot `docs/qa/signal-degraded-warmup.md`.
+  - 인접 분기(별도 PRD, 본 건과 독립): (a) 신규 상장/데이터 제한 종목 분석 카드 배지 노출 UX(디자이너 합류 필요), (b) LLM 이 confidence 캡 지시를 반복 무시할 경우 서버에서 limitedData 시 verdict confidence ≤ MEDIUM 강제 clamp 후처리.

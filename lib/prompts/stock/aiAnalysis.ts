@@ -37,6 +37,11 @@ export interface AnalysisState {
   riskSafe: string;
   /** SNS 분석가 응답에서 파싱한 정형 감성 — 없으면 undefined(PM 주입 시 "데이터 없음" 분기). */
   sentiment?: SentimentReport;
+  /**
+   * 데이터 제한 경고(90~130봉 limitedData) — 있으면 PM 에 직접 주입해 reasoning 불확실성 명시 +
+   * verdict confidence ≤ MEDIUM 캡을 강제한다. 풀 데이터(빈 문자열)면 PM 프롬프트에서 분기로 제외.
+   */
+  dataWarning?: string;
 }
 
 /** PM 프롬프트에 주입할 정형 감성 한 줄 컨텍스트(없으면 "데이터 없음"). */
@@ -47,6 +52,21 @@ export function buildSentimentContext(sentiment?: SentimentReport): string {
   const bandLabel = COPY.sentiment.bandLabel[sentiment.band];
   const confLabel = COPY.sentiment.confidenceLabel[sentiment.confidence];
   return `\n[SNS 정형 감성] 밴드: ${bandLabel} · 점수: ${sentiment.score}/10 · 신뢰도: ${confLabel}`;
+}
+
+/**
+ * 데이터 제한(90~130봉 limitedData) 경고를 PM 프롬프트에 주입할 블록(없으면 빈 문자열).
+ * 있으면 reasoning 에 불확실성을 명시하고 verdict confidence 를 HIGH 로 두지 못하게(≤ MEDIUM) 강제한다.
+ */
+export function buildDataWarningContext(dataWarning?: string): string {
+  if (!dataWarning) return "";
+  return (
+    `\n\n[⚠️ 데이터 제한 — 필수 준수]\n${dataWarning}\n` +
+    `- 위 종목은 거래일이 부족(< 130봉)해 장기추세(120일선·정배열·레짐)가 미확보된 상태입니다.\n` +
+    `- reasoning(및 적절한 텍스트 필드)에 "데이터가 부족(N봉)해 장기추세 미확보, 결론의 불확실성이 크다"는 취지를 반드시 명시하세요.\n` +
+    `- confidence 는 절대 HIGH 로 두지 말고 LOW 또는 MEDIUM 으로만 표기하세요(데이터 제한 시 HIGH 금지).\n` +
+    `- 단, verdict 방향(BUY/HOLD/SELL 등)은 강제로 바꾸지 마세요 — 단기·중기 신호가 명확하면 방향은 유지하되 확신만 낮춥니다.`
+  );
 }
 
 // ─── 에이전트 프롬프트 정의 타입 ─────────────────────────────────────────────
@@ -471,6 +491,7 @@ confidence 산출 기준 (이 verdict 판단에 대한 확신 정도):
 - HIGH: 다수가 같은 방향을 가리키고 데이터가 명확함
 - MEDIUM: 방향은 잡히나 일부 이견 또는 불확실성 존재
 - LOW: 신호가 서로 상충하거나 데이터가 부족함
+- **데이터 제한 강제 규칙**: 입력에 "⚠️ 데이터 제한" 마커가 있으면(거래일 < 130봉, 장기추세 미확보), confidence 는 HIGH 를 절대 쓰지 말고 LOW 또는 MEDIUM 으로만 표기하고, reasoning 에 데이터 부족·불확실성을 반드시 명시하세요(방향은 강제하지 않음, 확신만 하향).
 
 time_horizon 산출 기준 (이 verdict가 유효한 투자 기간 — 아래 short/mid 전망과 별개):
 - 단기: 수일~수주 내 모멘텀/이벤트 중심 판단
@@ -532,7 +553,7 @@ ${s.riskRisky}
 ${s.riskNeutral}
 
 [보수적 리스크 평가]
-${s.riskSafe}`,
+${s.riskSafe}${buildDataWarningContext(s.dataWarning)}`,
     tools: [],
     timeoutMs: T.PM,
     effort: "high" as const,

@@ -477,7 +477,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         const signalResult = evaluateSignal(sorted);
 
         if (!signalResult.warmupOk) {
-          send({ type: "error", message: "데이터가 부족해 시그널을 계산할 수 없어요. (최소 130봉 필요)" });
+          send({ type: "error", message: "데이터가 부족해 분석할 수 없어요. (최소 90봉 필요)" });
           safeClose();
           return;
         }
@@ -507,6 +507,18 @@ export async function POST(req: NextRequest): Promise<Response> {
           signalResult.regime,
           signalResult.asOf,
         );
+
+        // 데이터 제한(90~130봉) — 장기추세 미확보 경고를 시그널 요약 머리에 주입하고
+        // PM 에 직접 전달(reasoning 불확실성 명시 + verdict confidence ≤ MEDIUM 캡 지시).
+        if (signalResult.limitedData) {
+          const warning =
+            `⚠️ 데이터 제한: 거래일 ${signalResult.bars}봉(< 130봉)으로 장기추세(120일선·정배열·레짐)가 미확보되었습니다. ` +
+            `단기·중기 지표 기반이므로 결론의 불확실성이 큽니다. ` +
+            `confidence 는 LOW/MEDIUM 로 제한하고 reasoning 에 데이터 부족을 명시하세요.`;
+          state.signalSummary = `${warning}\n\n${state.signalSummary}`;
+          state.dataWarning = warning;
+          aiLog.warn(`데이터 제한 분석 — ${ticker} ${signalResult.bars}봉(limitedData)`);
+        }
 
         // 2. 가격·수급 컨텍스트 — 병렬 페치 (실패해도 분석 계속) ──────────────
         const [priceSettled, investorSettled] = await Promise.allSettled([
