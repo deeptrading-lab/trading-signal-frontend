@@ -45,6 +45,36 @@ export const SCORE_TICKER_DELAY_MS = 200;
 /** transient(EGW00201/네트워크) 1회 재시도 backoff(ms). */
 export const SCORE_RETRY_BACKOFF_MS = 250;
 
+// ─── 자가교정 피드백(scorecard-feedback) 상수 ────────────────────────────────
+//
+// PRD `scorecard-feedback` §공통 — 캘리브레이션 표시·PM 프롬프트 성적 주입의 게이트를
+// 본 모듈 한 곳에서 조정한다. phase-1 채점(scoring.ts)·집계(summarize.ts)는 무변경.
+
+/**
+ * 캘리브레이션·프롬프트 주입에 쓰는 최소 표본수(hit+miss).
+ * - 표시(가): 한 confidence 버킷의 표본수가 이 값 미만이면 "표본 부족"으로 폴백(실측 적중률 미노출).
+ * - 주입(나): 이 값 미만 버킷은 성적 요약 문자열에서 제외(없으면 빈 문자열).
+ *
+ * 작은 표본의 적중률은 통계적으로 신뢰할 수 없어 과신·앵커링을 유발하므로 게이트한다.
+ * 코드 1줄로 조정(env 노출 불요 — 운영자 1인 MVP).
+ */
+export const MIN_SAMPLE_N = 20;
+
+/**
+ * PM 분석 프롬프트에 과거 판정 성적(적중률)을 주입할지 여부 — **기본 OFF**.
+ *
+ * PRD `scorecard-feedback` §(나). 운영자가 채점 표본을 충분히 신뢰한 뒤에만 켠다.
+ * - OFF(기본): PM 프롬프트 무변경 → 완전 무회귀.
+ * - ON: n≥MIN_SAMPLE_N 버킷이 있으면 성적 요약 블록을 PM system 프롬프트에 덧붙인다.
+ *
+ * env `SCORECARD_FEEDBACK_PROMPT` = "1"·"true"·"on"(대소문자 무시) 이면 ON, 그 외/미설정은 OFF.
+ * 서버 전용(NEXT_PUBLIC_ 금지) — 프롬프트는 route handler 안에서만 조립된다.
+ */
+export function isScorecardFeedbackPromptEnabled(): boolean {
+  const raw = process.env.SCORECARD_FEEDBACK_PROMPT?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "on";
+}
+
 /**
  * horizon 평가 시점 종가를 찾을 때, 임계 영업일 시점부터 미래로 탐색할 최대 봉 수.
  * 평가일이 휴장이면 그 직후 가장 가까운 영업봉 종가를 쓴다(연속 휴장 흡수). 이를 넘으면 skipped.

@@ -45,7 +45,13 @@ import {
   getLatestAIDecision,
   upsertAIDecision,
 } from "@/lib/server/ai/decisionStore";
-import { insertScorecardRow } from "@/lib/server/scorecard/scorecardStore";
+import {
+  insertScorecardRow,
+  getAllScorecardRows,
+} from "@/lib/server/scorecard/scorecardStore";
+import { summarizeScorecard } from "@/lib/server/scorecard/summarize";
+import { buildScorecardFeedbackSummary } from "@/lib/server/scorecard/calibration";
+import { isScorecardFeedbackPromptEnabled } from "@/lib/server/scorecard/constants";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
@@ -405,6 +411,24 @@ export async function POST(req: NextRequest): Promise<Response> {
   const previousDecision = await getLatestAIDecision(ticker);
   const previousDecisionContext = formatPreviousDecisionContext(previousDecision);
 
+  // 과거 판정 성적 주입(scorecard-feedback (나)) — **플래그 OFF(기본)면 완전 skip**.
+  // OFF 면 DB 조회·문자열 조립을 아예 하지 않아 프롬프트·비용 모두 무변경(무회귀).
+  // ON 이라도 n≥MIN_SAMPLE_N 버킷이 없으면 빌더가 빈 문자열 반환 → 주입 안 함(graceful no-op).
+  // 무거운 분석은 로컬 Claude CLI 라 토큰 과금 아님 → 주입 추가 비용 ~0.
+  let scorecardFeedbackContext = "";
+  if (isScorecardFeedbackPromptEnabled()) {
+    try {
+      const rows = await getAllScorecardRows();
+      scorecardFeedbackContext = buildScorecardFeedbackSummary(summarizeScorecard(rows));
+      if (scorecardFeedbackContext) {
+        aiLog("PM 프롬프트에 과거 판정 성적 주입(scorecard-feedback ON)");
+      }
+    } catch (error) {
+      // 성적 조회 실패는 분석을 막지 않는다(fail-soft) — 주입만 skip.
+      aiLog.warn("과거 판정 성적 조회 실패 — 주입 skip", error);
+    }
+  }
+
   // 클라이언트 disconnect + 서버 타임아웃 통합 signal
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), TIMEOUT_TOTAL_MS);
@@ -549,7 +573,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           try {
             const result = await invokeAgentCliStream(provider, {
               systemPrompt: agentKey === "portfolio_manager"
-                ? prompts.system + previousDecisionContext
+                ? prompts.system + previousDecisionContext + scorecardFeedbackContext
                 : prompts.system,
               userPrompt: prompts.user(state),
               tools: prompts.tools,

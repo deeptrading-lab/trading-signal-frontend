@@ -4300,3 +4300,45 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) 이미 저장된 분석 카드의 영문 잔여 용어를 렌더 시점에 한글로 치환하는 정규화 유틸 검토 — `(Overweight)` 괄호 병기 제거 처리가 까다로워 이번 PR에서는 보류.
+
+### 2026-06-22 — feat(scorecard): 채점 결과 자가교정 — 신뢰도 캘리브레이션 표시 + PM 프롬프트 성적 주입(플래그 기본 OFF) (#147)
+
+- **slug**: `scorecard-feedback` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/147
+- **요약**: feat(scorecard): 채점 결과 자가교정 — 신뢰도 캘리브레이션 표시 + PM 프롬프트 성적 주입(플래그 기본 OFF)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > phase-1 `signal-scorecard`(PR #140) 가 쌓는 채점 적중률을 **판정으로 되먹여 자가교정 루프를 닫는다.** 확정 스코프: **(가) 신뢰도 캘리브레이션 [표시]** + **(나) PM 프롬프트 성적 주입 [플래그 뒤, 기본 OFF]**. 둘 다 min-n 게이트 + 데이터 게이팅(표본 부족 시 graceful no-op).
+  > 
+  > - PRD: [`docs/prd/scorecard-feedback.md`](docs/prd/scorecard-feedback.md)
+  > - 상위: `signal-scorecard`(phase-1, 머지됨) 후속 phase-1.5.
+  > 
+  > ## 확정 스코프 / 핵심 결정
+  > | 항목 | 값 |
+  > |---|---|
+  > | 캘리브레이션 표시 위치/문구 | `FinalVerdictCard` 모델 confidence 칩 아래 보정 칩 — `실측 적중률 N% (n=M)` / 부족 시 `실측 표본 부족` / 보정값 없으면 미노출 |
+  > | 적중률 산식 | 전 horizon hit/miss 합산, hitRate=hit/(hit+miss)(flat 분모 제외, phase-1 D3 정합) |
+  > | 플래그 이름/기본값 | env `SCORECARD_FEEDBACK_PROMPT`, **기본 OFF**("1"·"true"·"on" 만 ON, 서버 전용) |
+  > | MIN_SAMPLE_N | **20** (상수 모듈 단일 조정점) |
+  > | 데이터 경로 | 신규 read-only BFF `/api/scorecard/calibration` + 도메인 훅 |
+  > 
+  > **표시 전용 원칙(C3)**: 캘리브레이션은 모델 confidence·verdict 를 후처리로 바꾸지 않는다(별도 칩으로만 표시).
+  > **무회귀**: 플래그 OFF(기본)면 PM 프롬프트 한 글자도 안 바뀌고 DB 조회조차 skip. 표본 0/부족이면 칩 미노출 + 주입 skip.
+  > 
+  > ## AC 체크리스트
+  > - [x] AC-1 캘리브레이션 산출 정확성(전 horizon 합산·flat 분모 제외) — 단위 테스트
+  > - [x] AC-2 min-n 게이트 경계(`sample==N`→true, `N-1`→false, 표본 0→null/false) — 단위 테스트
+  > - [x] AC-3 BFF `/api/scorecard/calibration`(미설정/0건 200+빈 배열) — 빌드 라우트 등록 확인, QA 라이브 검증 예정
+  > - [x] AC-4 판정 카드 보정 칩(3 사용처·3 상태) — 구현 완료, QA 라이브(두 뷰포트) 예정
+  > - [x] AC-5 요약 빌더 n>=min-n 만 포함 — 단위 테스트
+  > - [x] AC-6 빈 데이터 시 빈 문자열=주입 skip — 단위 테스트
+  > - [x] AC-7 플래그 기본 OFF·무회귀 — 단위 테스트(`feedbackFlag`)
+  > - [x] AC-8 lint·tsc·test·build 통과
+  > 
+  > ## 검증 결과 (실측)
+  > - `npm run lint` — 통과(출력 없음, 오류 0)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - QA: 라이브 두 뷰포트로 보정 칩 3 사용처(라이브 최종/이전 결론/저장 결론 모달) × 3 상태(충분/부족/미노출) 검증, BFF 미설정·0건 graceful 확인. 플래그 OFF 분석 무회귀 확인.
+  - 운영: 채점 표본이 MIN_SAMPLE_N(20) 이상 쌓인 뒤 운영자가 `SCORECARD_FEEDBACK_PROMPT` ON 전환 → 전환 후 confidence 캘리브레이션 개선 여부 모니터링.
+  - 후속 slug `proactive-briefing`(phase-2): 이번 캘리브레이션·성적 데이터를 능동 푸시/브리핑 콘텐츠 소스로 연결.

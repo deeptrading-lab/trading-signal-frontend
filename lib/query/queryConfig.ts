@@ -161,6 +161,14 @@ export const queryConfig = {
       staleTime: 5 * MINUTE,
       gcTime: 30 * MINUTE,
     },
+    /**
+     * 신뢰도 캘리브레이션 — 채점 누적 통계라 변동 느림. 판정 카드에 곁들이는 보조 정보라
+     * 실시간성 불요 → summary 와 동일 정책(staleTime 5분). PRD `scorecard-feedback` §(가).
+     */
+    calibration: {
+      staleTime: 5 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
   },
 } as const;
 

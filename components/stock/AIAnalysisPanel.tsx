@@ -14,6 +14,7 @@ import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
+import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
@@ -53,6 +54,8 @@ function PreviousDecisionIntro({
   const available = providerData?.available ?? [];
   const canSlide =
     !isProvidersLoading && !providerData?.vercel && available.length >= 1;
+  // 보정된 신뢰도(scorecard-feedback (가)) — 이전 결론 카드에도 곁들인다(표시 전용·무회귀).
+  const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   return (
     // 라이브 분석 뷰(풀 width)와 동일하게 패널 폭을 꽉 채운다 — 데스크탑에서 좌우 여백 제거.
@@ -106,7 +109,11 @@ function PreviousDecisionIntro({
         </div>
       </div>
 
-      <FinalVerdictCard data={snapshot.decision} />
+      <FinalVerdictCard
+        data={snapshot.decision}
+        calibration={getCalibration(snapshot.decision.confidence)}
+        calibrationMinSampleN={minSampleN}
+      />
     </div>
   );
 }
@@ -141,6 +148,8 @@ export function AIAnalysisPanel({
   const [showProviderChooser, setShowProviderChooser] = useState(false);
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
+  // 보정된 신뢰도(scorecard-feedback (가)) — 라이브 최종 결론 카드에 곁들인다(표시 전용·무회귀).
+  const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   const isAllPending = agents.every((a) => a.status === "pending");
   const shouldLoadPreviousDecision = isOpen && isAllPending && !isRunning && !error;
@@ -574,7 +583,14 @@ export function AIAnalysisPanel({
                     {/* ── Row 6: 최종 결론 (portfolio_manager 결과) ──────── */}
                     {(() => {
                       const pmAgent = agents.find(a => a.key === "portfolio_manager")!;
-                      if (final) return <FinalVerdictCard data={final} />;
+                      if (final)
+                        return (
+                          <FinalVerdictCard
+                            data={final}
+                            calibration={getCalibration(final.confidence)}
+                            calibrationMinSampleN={minSampleN}
+                          />
+                        );
                       if (pmAgent.status === "running") {
                         return (
                           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

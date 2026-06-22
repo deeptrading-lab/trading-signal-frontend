@@ -80,3 +80,35 @@ export function summaryHeadline(scoredCount: number, totalRows: number): string 
 
 /** 적중률 분모 안내(flat 제외). */
 export const HIT_RATE_NOTE = "적중률 = 적중 / (적중 + 미적중) · 보합은 분모 제외";
+
+// ── 신뢰도 캘리브레이션(scorecard-feedback (가)) ─────────────────────────────────
+//
+// 판정 카드(FinalVerdictCard)에서 모델 confidence 옆에 실측 적중률을 곁들인다(표시 전용).
+
+/** confidence 코드 → 한글 짧은 라벨(카드 인라인용). */
+export const CALIBRATION_CONFIDENCE_LABEL: Record<string, string> = {
+  HIGH: "높음",
+  MEDIUM: "보통",
+  LOW: "낮음",
+};
+
+/**
+ * 보정된 신뢰도 본문 — 예) "높음 · 실측 적중률 55% (n=25)".
+ * confidence 라벨은 카드가 자체 라벨을 쓰므로 여기선 적중률·표본만 조립한다.
+ */
+export function calibrationHitRateText(hitRate: number | null, sample: number): string {
+  const pct = hitRate === null ? "—" : `${Math.round(hitRate * 100)}%`;
+  return `실측 적중률 ${pct} (n=${sample})`;
+}
+
+/** 표본 부족(n<MIN_SAMPLE_N) 시 칩 문구 — 모델 confidence 만 노출. */
+export const CALIBRATION_INSUFFICIENT = "실측 표본 부족";
+
+/** 보정 칩 hover 설명(표시 전용·모델 판정 불변임을 안내). */
+export const CALIBRATION_BASIS =
+  "과거 같은 확신도 판정이 실제로 적중한 비율(채점 누적). 모델 판정은 바꾸지 않는 표시용 보정이에요.";
+
+/** 표본 부족 칩 hover 설명. */
+export function calibrationInsufficientBasis(minSampleN: number): string {
+  return `채점 표본이 ${minSampleN}건 미만이라 실측 적중률을 아직 신뢰하기 어려워요.`;
+}
