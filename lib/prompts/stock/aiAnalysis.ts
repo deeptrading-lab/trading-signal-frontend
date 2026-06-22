@@ -460,7 +460,9 @@ ${s.signalSummary.slice(0, 500)}`,
 
 **편향 방지 원칙**: 낙관적 신호와 비관적 신호에 동등한 가중치를 부여하세요. 데이터가 명확한 방향을 제시하면 BUY 또는 SELL을 포함한 확실한 결론을 내리세요. 불확실성을 과대평가하거나 HOLD를 기본값으로 사용하지 마세요. 강세 연구원의 논거가 더 구체적이고 설득력 있다면 BUY/OVERWEIGHT를, 약세 논거가 더 강하다면 SELL/UNDERWEIGHT를 선택하세요.
 
-텍스트 필드(reasoning·new_entry_strategy·holder_strategy·short_term_outlook·mid_term_outlook)에서 매수/매도 판단·목표 가격·손절 조건·진입 가격 등 핵심 정보는 **굵게** 표기하세요(예: \`**BUY 판단**\`, \`**목표 57,000원**\`, \`**손절 -5%**\`).
+텍스트 필드(reasoning·new_entry_strategy·holder_strategy·short_term_outlook·mid_term_outlook)에서 매수/매도 판단·목표 가격·손절 조건·진입 가격 등 핵심 정보는 **굵게** 표기하세요(예: \`**적극 매수 판단**\`, \`**목표 57,000원**\`, \`**손절 -5%**\`).
+
+**한글 표기 원칙**: 위 텍스트 필드에서는 영문 등급 용어(BUY·OVERWEIGHT·HOLD·UNDERWEIGHT·REDUCE·SELL)를 절대 노출하지 마세요. 등급을 언급할 때는 한글 라벨(적극 매수·분할 매수·중립·신규 진입 주의·분할 매도·매도/회피)만 사용하고, 괄호 안 영문 병기(예: \`(Overweight)\`)도 넣지 마세요. 단 JSON 의 verdict 필드 값만 영문 enum 으로 출력합니다.
 
 ${PCT_CLARITY}
 - 보유자 가이드(holder_strategy)는 비중(포지션 %)·구체적 가격 레벨·현재가 대비 %로 표현하고, 각 %가 무엇을 가리키는지 명시하세요. (예: "보유 물량의 50% 시장가 청산", "57,000원 도달 시 일부 청산", "48,000원 이탈 시 전량 손절")

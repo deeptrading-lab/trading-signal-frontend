@@ -4272,3 +4272,31 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - QA: 라이브 검증 1건 — 케이뱅크 등 90~130봉 종목 실분석 → reasoning 불확실성 문구 + verdict confidence ≤ MEDIUM 육안 확인. QA 리포트는 dev-manager-bot `docs/qa/signal-degraded-warmup.md`.
   - 인접 분기(별도 PRD, 본 건과 독립): (a) 신규 상장/데이터 제한 종목 분석 카드 배지 노출 UX(디자이너 합류 필요), (b) LLM 이 confidence 캡 지시를 반복 무시할 경우 서버에서 limitedData 시 verdict confidence ≤ MEDIUM 강제 clamp 후처리.
+
+### 2026-06-22 — fix(analyze): PM 본문 영문 등급 용어 노출 차단 — 한글 라벨 강제 (#145)
+
+- **slug**: `pm-korean-verdict-labels` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/145
+- **요약**: fix(analyze): PM 본문 영문 등급 용어 노출 차단 — 한글 라벨 강제
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 재분석 결과 PM(포트폴리오 매니저) 카드 본문에 영문 등급 용어(`UNDERWEIGHT`/`OVERWEIGHT`/`Overweight` 등)가 한글 문장 안에 그대로 노출되던 문제를 수정한다. (예: "4일 전 UNDERWEIGHT에서 OVERWEIGHT로 상향", "분할 매수(Overweight)가 정석이다")
+  > 
+  > ## 원인
+  > 큰 제목 등급 라벨은 `verdict` enum → `VERDICT_LABEL` 매핑으로 이미 한글화되어 있으나, 영문 용어는 PM이 자유서술 텍스트 필드(`reasoning`·`new_entry_strategy`·`holder_strategy`·`short_term_outlook`·`mid_term_outlook`)에 직접 써넣은 본문이었다. PM 시스템 프롬프트가 영문 등급 용어로 모델을 학습시켜 본문에 그대로 옮겨 쓰던 것.
+  > 
+  > ## 변경
+  > - `lib/prompts/stock/aiAnalysis.ts` PM 시스템 프롬프트에 **한글 표기 원칙** 규칙 추가 — 위 텍스트 필드에서 영문 등급 enum(BUY·OVERWEIGHT·HOLD·UNDERWEIGHT·REDUCE·SELL) 및 괄호 영문 병기 금지, 한글 라벨(적극 매수·분할 매수·중립·신규 진입 주의·분할 매도·매도/회피)만 사용.
+  > - `verdict` JSON 필드 값은 영문 enum 유지 → 프론트 `VERDICT_LABEL` 매핑 그대로 동작.
+  > - 굵게 표기 예시 `**BUY 판단**` → `**적극 매수 판단**` 한글화(영문 강화 차단).
+  > 
+  > ## 영향
+  > - 신규/재분석 결과부터 적용. 빌드·타입 영향 없는 프롬프트 문자열 변경.
+  > - 이미 저장된 분석 카드는 재분석 시 반영(소급 변경 없음).
+  > 
+  > ## 다음 작업
+  > - (선택) 이미 저장된 분석 카드의 영문 잔여 용어를 렌더 시점에 한글로 치환하는 정규화 유틸 검토 — `(Overweight)` 괄호 병기 제거 처리가 까다로워 이번 PR에서는 보류.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 이미 저장된 분석 카드의 영문 잔여 용어를 렌더 시점에 한글로 치환하는 정규화 유틸 검토 — `(Overweight)` 괄호 병기 제거 처리가 까다로워 이번 PR에서는 보류.
