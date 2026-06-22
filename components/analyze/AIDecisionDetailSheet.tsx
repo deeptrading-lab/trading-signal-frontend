@@ -16,6 +16,7 @@ import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { fmtCost, fmtTokens } from "./format";
 import { FinalVerdictCard } from "@/components/stock/ai-analysis/FinalVerdictCard";
 import { SentimentBadge } from "@/components/stock/ai-analysis/SentimentBadge";
+import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
 import { ReanalyzeButton } from "./ReanalyzeButton";
 import { PROVIDER_TAB_CLAUDE, PROVIDER_TAB_CODEX } from "@/lib/copy/analyze/labels";
 import {
@@ -47,6 +48,8 @@ interface AIDecisionDetailSheetProps {
 
 export function AIDecisionDetailSheet({ item, name, onClose }: AIDecisionDetailSheetProps) {
   const providerLabel = item.provider === "claude" ? PROVIDER_TAB_CLAUDE : PROVIDER_TAB_CODEX;
+  // 보정된 신뢰도(scorecard-feedback (가)) — 모달이 열린 동안만 조회. 미설정/표본 없음이면 null(무회귀).
+  const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   // Escape 로 닫기 + 배경 스크롤 잠금.
   useEffect(() => {
@@ -124,7 +127,12 @@ export function AIDecisionDetailSheet({ item, name, onClose }: AIDecisionDetailS
         {/* 본문 — 스크롤 영역. 결론 카드가 패널 폭을 꽉 채운다. */}
         <div className="flex-1 overflow-y-auto">
           <div className="flex w-full flex-col gap-md p-lg">
-            <FinalVerdictCard data={item.decision} signal={item.signal} />
+            <FinalVerdictCard
+              data={item.decision}
+              signal={item.signal}
+              calibration={getCalibration(item.decision.confidence)}
+              calibrationMinSampleN={minSampleN}
+            />
           </div>
         </div>
       </motion.div>

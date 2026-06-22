@@ -133,3 +133,34 @@ export interface ScorecardSummaryResponse {
   totalRows: number;
   generatedAt: string;
 }
+
+// ─── 신뢰도 캘리브레이션(scorecard-feedback (가)) ────────────────────────────
+
+/**
+ * 한 confidence 버킷(HIGH/MEDIUM/LOW)의 실측 보정 — 표시 전용(모델 판정 불변).
+ *
+ * PRD `scorecard-feedback` §(가). confidence 차원 집계 셀을 전 horizon 합산해
+ * 실측 적중률 + 표본수(n=hit+miss)를 산출한다. n<MIN_SAMPLE_N 이면 `sufficient:false`.
+ */
+export interface ConfidenceCalibration {
+  confidence: ScorecardConfidence;
+  /** 실측 적중률 hit/(hit+miss). 표본 0 이면 null. */
+  hitRate: number | null;
+  /** 표본수 = hit + miss(flat 제외, MIN_SAMPLE_N 게이트 기준). */
+  sample: number;
+  hit: number;
+  miss: number;
+  /** sample >= MIN_SAMPLE_N 이면 true(실측 적중률 노출 가능). false 면 "표본 부족". */
+  sufficient: boolean;
+}
+
+/** `/api/scorecard/calibration` 응답 — confidence 버킷별 보정값(표시용, 읽기 전용). */
+export interface ScorecardCalibrationResponse {
+  /** Supabase 연결 여부 — false 면 calibrations 빈 배열. */
+  configured: boolean;
+  /** HIGH/MEDIUM/LOW 중 표본이 1건 이상인 버킷만 포함(없으면 빈 배열). */
+  calibrations: ConfidenceCalibration[];
+  /** 게이트 기준값(MIN_SAMPLE_N) — 클라가 안내 문구에 노출. */
+  minSampleN: number;
+  generatedAt: string;
+}

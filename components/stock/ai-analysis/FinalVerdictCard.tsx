@@ -5,7 +5,14 @@ import { motion } from "motion/react";
 import { TrendingUp, TrendingDown, Info, BadgeCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
+import {
+  CALIBRATION_BASIS,
+  CALIBRATION_INSUFFICIENT,
+  calibrationHitRateText,
+  calibrationInsufficientBasis,
+} from "@/lib/copy/scorecard/labels";
 import type { DecisionSignal, FinalDecision, FinalVerdict } from "@/lib/types/stock/aiAnalysis";
+import type { ConfidenceCalibration } from "@/lib/types/scorecard/scorecard";
 
 // 부호 숫자(+12.3%, -14.7 …) 또는 범위 구분자(~)를 토큰화.
 // "-14.7~-18.6%" 처럼 굵은 본문 안에서 ~ 와 - 가 붙어 구분이 어려운 문제를 풀기 위해,
@@ -88,10 +95,19 @@ const isNoEntryVerdict = (v: FinalVerdict) => v === "UNDERWEIGHT" || v === "REDU
 export function FinalVerdictCard({
   data,
   signal,
+  calibration,
+  calibrationMinSampleN,
 }: {
   data: FinalDecision;
   /** 분석 시점 결정론 시그널 — 있으면 LLM 확신도 대신 "신호 강도" 표시. 라이브 패널은 미전달(폴백). */
   signal?: DecisionSignal | null;
+  /**
+   * 이 판정 confidence 버킷의 실측 보정값(scorecard-feedback (가), 표시 전용·판정 불변).
+   * null/undefined 면 보정 줄을 그리지 않는다(데이터 게이팅 — 미설정·표본 없음 시 완전 무회귀).
+   */
+  calibration?: ConfidenceCalibration | null;
+  /** 표본 부족 안내 문구에 노출할 게이트 기준 표본수. */
+  calibrationMinSampleN?: number;
 }) {
   const bullish = isBullishVerdict(data.verdict);
   const bearish = isBearishVerdict(data.verdict);
@@ -156,6 +172,26 @@ export function FinalVerdictCard({
               <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
                 {signal ? COPY.verdict.signalStrengthBasis : COPY.verdict.confidenceBasis}
               </p>
+              {calibration && (
+                <span
+                  className={cn(
+                    "mt-1.5 inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
+                    calibration.sufficient
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                  )}
+                  title={
+                    calibration.sufficient
+                      ? CALIBRATION_BASIS
+                      : calibrationInsufficientBasis(calibrationMinSampleN ?? calibration.sample)
+                  }
+                >
+                  <BadgeCheck size={12} className="flex-shrink-0" />
+                  {calibration.sufficient
+                    ? calibrationHitRateText(calibration.hitRate, calibration.sample)
+                    : CALIBRATION_INSUFFICIENT}
+                </span>
+              )}
             </div>
           </div>
           {data.limitedData && (

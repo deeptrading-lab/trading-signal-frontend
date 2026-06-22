@@ -75,5 +75,7 @@ export const queryKeys = {
   scorecard: {
     /** AI 판정 적중률 집계 — Supabase signal_scorecard BFF. 인자 없는 단일 키. */
     summary: ["scorecard", "summary"] as const,
+    /** confidence 버킷별 실측 보정값(scorecard-feedback (가)). 인자 없는 단일 키. */
+    calibration: ["scorecard", "calibration"] as const,
   },
 } as const;
