@@ -15,7 +15,8 @@
  * lucide-react 아이콘 매핑은 menuItems mock 의 `iconName` 키에서 도출 — 컴포넌트 단 record.
  */
 
-import { Bell, CreditCard, LogOut, Moon, Shield } from "lucide-react";
+import Link from "next/link";
+import { Bell, CreditCard, LogOut, Moon, Shield, Target } from "lucide-react";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import { ThemeMenuButton } from "@/components/theme/ThemeMenuButton";
 import type {
@@ -27,6 +28,7 @@ import {
   MENU_SECURITY,
   MENU_BILLING,
   MENU_THEME,
+  MENU_SCORECARD,
   MENU_LOGOUT,
 } from "@/lib/copy/profile/labels";
 
@@ -39,6 +41,7 @@ const MENU_LABEL: Record<ProfileMenuKey, string> = {
   SECURITY: MENU_SECURITY,
   BILLING: MENU_BILLING,
   THEME: MENU_THEME,
+  SCORECARD: MENU_SCORECARD,
   LOGOUT: MENU_LOGOUT,
 };
 
@@ -47,8 +50,13 @@ const ICON_MAP = {
   Shield,
   CreditCard,
   Moon,
+  Target,
   LogOut,
 } as const;
+
+// default 메뉴 행 공통 클래스 — 버튼(설정)과 링크(이동) 항목이 같은 시각을 공유.
+const MENU_ROW_CLASS =
+  "w-full flex items-center gap-md p-md rounded-md text-left transition-colors hover:bg-surface-muted";
 
 export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
   const danger = items.find((item) => item.variant === "danger");
@@ -62,6 +70,8 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
             {/* THEME 항목만 client 로 분리(3-state 토글 동작) — 나머지는 server MenuButton 유지. */}
             {item.key === "THEME" ? (
               <ThemeMenuButton />
+            ) : item.href ? (
+              <MenuLink item={item} />
             ) : (
               <MenuButton item={item} />
             )}
@@ -87,14 +97,24 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
 function MenuButton({ item }: { item: ProfileMenuItem }) {
   const Icon = ICON_MAP[item.iconName];
   return (
-    <button
-      type="button"
-      className="w-full flex items-center gap-md p-md rounded-md text-left transition-colors hover:bg-surface-muted"
-    >
+    <button type="button" className={MENU_ROW_CLASS}>
       <Icon className="h-5 w-5 text-text-muted" aria-hidden="true" />
       <span className="text-body-strong text-text-strong">
         {MENU_LABEL[item.key]}
       </span>
     </button>
+  );
+}
+
+// 다른 라우트로 이동하는 항목(href 보유) — 예: 신호 성적표 → /dashboard/scorecard.
+function MenuLink({ item }: { item: ProfileMenuItem }) {
+  const Icon = ICON_MAP[item.iconName];
+  return (
+    <Link href={item.href ?? "#"} className={MENU_ROW_CLASS}>
+      <Icon className="h-5 w-5 text-text-muted" aria-hidden="true" />
+      <span className="text-body-strong text-text-strong">
+        {MENU_LABEL[item.key]}
+      </span>
+    </Link>
   );
 }
