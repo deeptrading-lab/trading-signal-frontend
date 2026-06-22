@@ -20,6 +20,12 @@ export function fmtCost(n: number | null): string {
   return `$${n.toFixed(4)}`;
 }
 
+/** USD 비용(분석 1회 총합) — 소수 2자리 반올림. null = "—". */
+export function fmtCostRounded(n: number | null): string {
+  if (n == null) return "—";
+  return `$${n.toFixed(2)}`;
+}
+
 /** 토큰 근사 표기(카드 chip 용) — "약 76만"(1만 이상) / 1만 미만은 콤마. null = "—". */
 export function fmtTokensApprox(n: number | null): string {
   if (n == null) return "—";
