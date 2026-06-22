@@ -620,6 +620,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
                   short_term_outlook: typeof d.short_term_outlook === "string" ? d.short_term_outlook : "",
                   mid_term_outlook: typeof d.mid_term_outlook === "string" ? d.mid_term_outlook : "",
+                  limitedData: signalResult.limitedData,
+                  bars: signalResult.bars,
                 };
                 send({ type: "final", data: finalDecision });
                 const saveResult = await upsertAIDecision({

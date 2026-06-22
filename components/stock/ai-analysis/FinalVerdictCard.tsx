@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
-import { TrendingUp, TrendingDown, Info, BadgeCheck } from "lucide-react";
+import { TrendingUp, TrendingDown, Info, BadgeCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { DecisionSignal, FinalDecision, FinalVerdict } from "@/lib/types/stock/aiAnalysis";
@@ -158,6 +158,12 @@ export function FinalVerdictCard({
               </p>
             </div>
           </div>
+          {data.limitedData && (
+            <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              <AlertTriangle size={14} className="mt-px flex-shrink-0" />
+              <span>{COPY.verdict.limitedData(data.bars)}</span>
+            </div>
+          )}
           <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
             <InlineBold text={data.reasoning} />
           </p>

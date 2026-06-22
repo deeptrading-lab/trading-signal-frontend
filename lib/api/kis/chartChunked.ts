@@ -4,7 +4,7 @@
  * inquire-daily-itemchartprice 는 1회 호출 시 ~100봉 한도. 200봉 이상 필요한 경우
  * CHUNK_DAYS(130) 단위로 분할 순차 호출 후 중복 제거·오름차순 정렬하여 반환.
  *
- * 사용처: app/api/stock/chart/route.ts, app/api/stock/ai-signal/route.ts
+ * 사용처: app/api/stock/chart/route.ts
  */
 
 import { fetchStockDailyChart } from "@/lib/api/kis";

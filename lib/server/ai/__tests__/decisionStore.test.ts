@@ -22,6 +22,8 @@ const decision: FinalDecision = {
   risk_reward_ratio: 2.4,
   short_term_outlook: "단기",
   mid_term_outlook: "중기",
+  limitedData: false,
+  bars: 250,
 };
 
 const signal: DecisionSignal = {

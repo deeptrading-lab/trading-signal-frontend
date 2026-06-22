@@ -139,6 +139,11 @@ export const COPY = {
     targetHint: "현재가 대비",
     shortTermLabel: "단기 전망 (1~2주)",
     midTermLabel: "중기 전망 (1~3개월)",
+    /** 데이터 제한 경고 칩 — 거래일 봉 수 부족(< 130봉)으로 장기추세 미확보 시 노출 */
+    limitedData: (bars: number) =>
+      `데이터 제한 · ${bars}봉 — 장기추세(120일선) 미확보, 참고용`,
+    /** 데이터 제한 컴팩트 칩(저장 결정 카드용) — 짧은 봉 수 표기 */
+    limitedDataShort: (bars: number) => `데이터 제한 · ${bars}봉`,
   },
   /** SNS 분석가 카드 구조화 감성 배지 — 밴드 1차 · 점수 보조 · 신뢰도 병기(과신 방지). */
   sentiment: {
