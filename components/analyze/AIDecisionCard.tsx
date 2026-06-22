@@ -10,7 +10,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { TrendingDown, TrendingUp, Minus, ArrowRight } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, ArrowRight, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { fmtCostApprox, fmtTokensApprox } from "./format";
@@ -60,6 +60,16 @@ const ACCENT_BAR: Record<Tone, string> = {
 function MetaChip({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-pill bg-surface-muted px-sm py-[2px] text-caption text-text-muted">
+      {children}
+    </span>
+  );
+}
+
+/** 데이터 제한 경고 chip — limitedData=true 일 때만. FinalVerdictCard 와 같은 amber 톤. */
+function WarnChip({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-[2px] rounded-pill bg-amber-50 px-sm py-[2px] text-caption font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+      <AlertTriangle size={11} aria-hidden="true" />
       {children}
     </span>
   );
@@ -154,6 +164,9 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
         )}
         <MetaChip>{item.decision.time_horizon}</MetaChip>
         <MetaChip>{tokenChipLabel(item)}</MetaChip>
+        {item.decision.limitedData && (
+          <WarnChip>{COPY.verdict.limitedDataShort(item.decision.bars)}</WarnChip>
+        )}
         <span className="ml-auto text-caption text-text-muted">
           {formatRelativeTime(item.updatedAt)}
         </span>

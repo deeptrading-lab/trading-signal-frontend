@@ -198,6 +198,10 @@ export interface FinalDecision {
   short_term_outlook: string;
   /** 1~3개월 중기 전망 1~2문장 */
   mid_term_outlook: string;
+  /** 데이터 제한 여부 — 거래일 봉 수 < 130봉이라 장기추세(120일선·레짐) 미확보 시 true. 시그널 엔진 evaluateSignal 결과를 그대로 실어 카드 배지에 사용 */
+  limitedData: boolean;
+  /** 시그널 평가에 사용된 거래일 봉 수 */
+  bars: number;
 }
 
 // ─── 훅 내부 상태 ────────────────────────────────────────────────────────────
