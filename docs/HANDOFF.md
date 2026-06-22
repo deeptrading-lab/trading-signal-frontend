@@ -4342,3 +4342,31 @@
   - QA: 라이브 두 뷰포트로 보정 칩 3 사용처(라이브 최종/이전 결론/저장 결론 모달) × 3 상태(충분/부족/미노출) 검증, BFF 미설정·0건 graceful 확인. 플래그 OFF 분석 무회귀 확인.
   - 운영: 채점 표본이 MIN_SAMPLE_N(20) 이상 쌓인 뒤 운영자가 `SCORECARD_FEEDBACK_PROMPT` ON 전환 → 전환 후 confidence 캘리브레이션 개선 여부 모니터링.
   - 후속 slug `proactive-briefing`(phase-2): 이번 캘리브레이션·성적 데이터를 능동 푸시/브리핑 콘텐츠 소스로 연결.
+
+### 2026-06-22 — fix(analyze): PM 본문 일반 영문 투자 용어도 한글로 — thesis·binary event 등 (#148)
+
+- **slug**: `pm-korean-jargon` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/148
+- **요약**: fix(analyze): PM 본문 일반 영문 투자 용어도 한글로 — thesis·binary event 등
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > PM(포트폴리오 매니저) 분석 카드 본문에 `thesis`·`binary event`·`catalyst` 같은 **일반 영문 투자 용어**가 한글 문장 안에 섞여 노출되던 문제를 수정한다. (예: "장기 thesis가 훼손된 단계", "2분기 실적이라는 이진(binary) 이벤트를 2~3주 앞둔")
+  > 
+  > ## 배경
+  > 직전 PR #145 의 "한글 표기 원칙"은 verdict 등급 enum(OVERWEIGHT·UNDERWEIGHT 등)만 차단했고, 본문 서술에 쓰이는 일반 영문 jargon은 그대로 새어나왔다. 용어 자체는 맞지만 라틴 문자 영어가 한글에 안 풀린 채 노출돼 가독성이 떨어졌다.
+  > 
+  > ## 변경
+  > - `lib/prompts/stock/aiAnalysis.ts` PM 시스템 프롬프트 "한글 표기 원칙"에 규칙 한 줄 확장:
+  >   - 본문 서술은 모두 한국어 문장으로 작성, 라틴 문자 영어 투자 용어를 그대로 섞지 말고 한국어로 풀어 쓰기 (예: thesis → 투자 논거, binary event → 결과가 한쪽으로 크게 갈리는 이벤트, catalyst → 촉매·주가 동인, conviction → 확신, overhang → 매물 부담, re-rating → 밸류에이션 재평가, downside/upside → 하방/상방).
+  >   - **예외**: 표준 기술 지표·재무 약어(RSI·MACD·ATR·PBR·PER·EV/EBITDA·ROE·ETF 등)와 ticker·고유명사는 그대로 사용 허용 — 이들은 한국 투자 문서에서 표준이고 무리하게 풀면 오히려 가독성 저하.
+  > 
+  > ## 영향
+  > - 신규/재분석 결과부터 적용. 빌드·타입 영향 없는 프롬프트 문자열 변경(tsc exit 0).
+  > - 이미 저장된 분석 카드는 재분석 시 반영(소급 변경 없음).
+  > 
+  > ## 다음 작업
+  > - (선택) 리서치 매니저·트레이더 등 PM 외 프롬프트의 본문 영문 병기도 같은 원칙으로 확장 검토 — 현재는 사용자 노출 경로(PM JSON)에 한정해 PM만 처리.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 리서치 매니저·트레이더 등 PM 외 프롬프트의 본문 영문 병기도 같은 원칙으로 확장 검토 — 현재는 사용자 노출 경로(PM JSON)에 한정해 PM만 처리.
