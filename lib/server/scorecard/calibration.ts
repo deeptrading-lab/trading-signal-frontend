@@ -8,7 +8,8 @@
  *   n≥MIN_SAMPLE_N 버킷만 포함, 표본 없으면 **빈 문자열**(주입 skip → 무회귀).
  *
  * 입력은 모두 `summarizeScorecard` 가 만든 집계 셀(`ScorecardSummaryCell[]`)이다.
- * 채점 로직(phase-1)·집계 로직은 재활용만 하고 변경하지 않는다.
+ * 집계 셀의 hit/miss 는 **주 채점 지표(기본 excess — scorecard-relative-scoring) 기준**이라,
+ * 자가교정도 자동으로 시장 베타가 아닌 **알파(종목 선택력)** 를 반영한다(프롬프트 주입 포함).
  */
 
 import type {
@@ -128,7 +129,7 @@ export function buildScorecardFeedbackSummary(
   if (lines.length === 0) return "";
 
   return `\n\n[너의 과거 판정 성적 — 실측 채점 데이터]
-아래는 이 시스템의 과거 AI 판정이 결정시점 대비 실제로 적중했는지 채점한 누적 통계다(표본 n=${minSampleN} 이상 버킷만).
+아래는 이 시스템의 과거 AI 판정이 **같은 기간 시장(KOSPI/KOSDAQ) 대비 초과수익** 으로 실제로 적중했는지 채점한 누적 통계다(시장 베타 제거·알파 기준, 표본 n=${minSampleN} 이상 버킷만).
 ${lines.join("\n")}
 
 위 성적 활용 원칙 (Portfolio Manager 전용):

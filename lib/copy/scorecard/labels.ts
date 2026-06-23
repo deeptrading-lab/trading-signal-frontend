@@ -112,3 +112,32 @@ export const CALIBRATION_BASIS =
 export function calibrationInsufficientBasis(minSampleN: number): string {
   return `채점 표본이 ${minSampleN}건 미만이라 실측 적중률을 아직 신뢰하기 어려워요.`;
 }
+
+// ── 시장/베타 보정 채점(scorecard-relative-scoring) ─────────────────────────────
+//
+// 표 헤더·차원·국면(regime) 한글 카피. 주 적중률 = 초과수익(excess) 기준, abs 는 참고 병기.
+
+/** 차원 필터에 추가되는 국면(regime) 라벨. */
+export const REGIME_LABEL: Record<string, string> = {
+  up: "강세장",
+  down: "약세장",
+  flat: "횡보장",
+};
+
+/** 차원 라벨에 regime 항목 추가(DIMENSION_LABEL 과 같은 키 공간). */
+export const DIMENSION_LABEL_REGIME = "시장 국면별";
+
+/** 주 적중률(초과수익) 컬럼 헤더 + abs 참고 컬럼 헤더. */
+export const COL_HIT_RATE_EXCESS = "적중률(초과)";
+export const COL_HIT_RATE_ABS = "적중률(절대)";
+
+/** 주 지표 안내 — 표 상단. */
+export const METRIC_NOTE_EXCESS =
+  "적중률(초과) = 같은 기간 시장(KOSPI/KOSDAQ) 대비 초과수익으로 채점 · 적중률(절대)은 시장 베타 포함 참고치";
+
+/** 주 지표 모드 → 한글 짧은 라벨. */
+export const METRIC_MODE_LABEL: Record<string, string> = {
+  absolute: "절대 수익률",
+  excess: "초과수익(시장 대비)",
+  beta_adjusted: "베타보정 알파",
+};

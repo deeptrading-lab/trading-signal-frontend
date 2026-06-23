@@ -277,6 +277,50 @@ export type KisInquireIndexPriceOutput = {
 };
 
 /**
+ * 국내 업종 일자별 지수 차트 응답 (`GET .../quotations/inquire-daily-indexchartprice`).
+ *
+ * TR_ID = `FHKUP03500100`. params `FID_COND_MRKT_DIV_CODE=U`(업종),
+ * `FID_INPUT_ISCD=<code>`("0001" KOSPI / "1001" KOSDAQ),
+ * `FID_INPUT_DATE_1`~`FID_INPUT_DATE_2`(YYYYMMDD), `FID_PERIOD_DIV_CODE=D`.
+ *
+ * ## ⚠️ 실전(prod) 전용 — 모의(vts) 미지원
+ * `inquire-index-price` 와 동일 정책. BFF/cron 이 prod 게이트 통과 시에만 호출.
+ *
+ * output2 = 일별 봉 배열. 종가 필드는 `bstp_nmix_clpr`(업종 지수 종가).
+ */
+export type KisInquireDailyIndexChartItem = {
+  /** 영업일자(YYYYMMDD). */
+  stck_bsop_date?: string;
+  /** 업종 지수 종가. "2750.23". */
+  bstp_nmix_clpr?: string;
+  /** 업종 지수 시가 / 고가 / 저가. */
+  bstp_nmix_oprc?: string;
+  bstp_nmix_hgpr?: string;
+  bstp_nmix_lwpr?: string;
+  /** 누적 거래량. */
+  acml_vol?: string;
+};
+
+export type KisInquireDailyIndexChartResponse = {
+  rt_cd: string;
+  msg_cd: string;
+  msg1: string;
+  output1?: Record<string, unknown>;
+  output2?: KisInquireDailyIndexChartItem[];
+};
+
+/**
+ * 지수 일봉 종가 1건(클라이언트 친화) — `{ date: "YYYY-MM-DD", close }`.
+ * 종목 일봉(StockDailyCandle)과 달리 채점엔 종가만 필요해 최소 스키마로 둔다.
+ */
+export type IndexDailyClose = {
+  /** YYYY-MM-DD. */
+  date: string;
+  /** 지수 종가. */
+  close: number;
+};
+
+/**
  * 지수 코드 → 지수명 클라이언트 상수.
  *
  * ⚠️ `inquire-index-price` 응답에는 지수명 필드가 없으므로 본 상수가 단일 진실 원천.

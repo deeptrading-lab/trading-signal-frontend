@@ -75,3 +75,53 @@ comment on column public.signal_scorecard.w1_status is
   'horizon +1w(5영업일) 평가 상태';
 comment on column public.signal_scorecard.m1_status is
   'horizon +1m(21영업일) 평가 상태';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 시장/베타 보정 채점 v2(scorecard-relative-scoring) — 멱등 컬럼 추가(비파괴).
+--
+-- PRD `scorecard-relative-scoring`. 기존 abs(d?_return_pct) 컬럼은 그대로 유지하고, horizon별
+-- 상대 측정값(벤치 수익률·초과수익·베타·알파 잔차·국면) + 종목 벤치마크 키만 신규 추가한다.
+-- d?_status 는 코드(v2 cron)가 주 지표(기본 excess) 기준으로 (재)갱신한다 — 컬럼 변경 없음.
+--
+-- 코드 머지 전 prod Supabase 에 수동 선적용(서버 service role REST 가 read/insert/update).
+
+-- 종목 벤치마크 지수 키(행 공통) — "0001" KOSPI / "1001" KOSDAQ. 미해석이면 폴백(KOSPI) 기록.
+alter table public.signal_scorecard add column if not exists bench_key text;
+
+-- horizon별 상대 측정값 — d1.
+alter table public.signal_scorecard add column if not exists d1_bench_return_pct numeric;
+alter table public.signal_scorecard add column if not exists d1_excess_return_pct numeric;
+alter table public.signal_scorecard add column if not exists d1_beta numeric;
+alter table public.signal_scorecard add column if not exists d1_alpha_residual_pct numeric;
+alter table public.signal_scorecard add column if not exists d1_regime text
+  check (d1_regime is null or d1_regime in ('up','down','flat'));
+
+-- horizon별 상대 측정값 — w1.
+alter table public.signal_scorecard add column if not exists w1_bench_return_pct numeric;
+alter table public.signal_scorecard add column if not exists w1_excess_return_pct numeric;
+alter table public.signal_scorecard add column if not exists w1_beta numeric;
+alter table public.signal_scorecard add column if not exists w1_alpha_residual_pct numeric;
+alter table public.signal_scorecard add column if not exists w1_regime text
+  check (w1_regime is null or w1_regime in ('up','down','flat'));
+
+-- horizon별 상대 측정값 — m1.
+alter table public.signal_scorecard add column if not exists m1_bench_return_pct numeric;
+alter table public.signal_scorecard add column if not exists m1_excess_return_pct numeric;
+alter table public.signal_scorecard add column if not exists m1_beta numeric;
+alter table public.signal_scorecard add column if not exists m1_alpha_residual_pct numeric;
+alter table public.signal_scorecard add column if not exists m1_regime text
+  check (m1_regime is null or m1_regime in ('up','down','flat'));
+
+-- backfill 대상(채점됐으나 상대값 비어있는 horizon) 빠른 탐색용 부분 인덱스.
+create index if not exists signal_scorecard_rel_backfill_idx
+  on public.signal_scorecard (entry_date)
+  where (d1_status in ('hit','miss','flat') and d1_bench_return_pct is null)
+     or (w1_status in ('hit','miss','flat') and w1_bench_return_pct is null)
+     or (m1_status in ('hit','miss','flat') and m1_bench_return_pct is null);
+
+comment on column public.signal_scorecard.bench_key is
+  '벤치마크 지수 키(KIS 업종코드) — "0001" KOSPI / "1001" KOSDAQ. 종목 상장시장 매핑(미해석 시 KOSPI 폴백)';
+comment on column public.signal_scorecard.d1_excess_return_pct is
+  '초과수익(%p) = d1_return_pct − d1_bench_return_pct. 주 채점 지표(기본 excess) 기준값';
+comment on column public.signal_scorecard.d1_regime is
+  '해당 horizon 구간 시장 국면(벤치마크 기준): up(강세)/down(약세)/flat(횡보)';

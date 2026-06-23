@@ -22,12 +22,14 @@ import type {
 } from "@/lib/types/scorecard/scorecard";
 import {
   DIMENSION_LABEL,
+  DIMENSION_LABEL_REGIME,
   EMPTY_BODY,
   EMPTY_TITLE,
   FILTER_DIMENSION_LABEL,
   FILTER_HORIZON_LABEL,
   HIT_RATE_NOTE,
   HORIZON_LABEL,
+  METRIC_NOTE_EXCESS,
   NOT_CONFIGURED_BODY,
   NOT_CONFIGURED_TITLE,
   STATE_ERROR,
@@ -39,7 +41,17 @@ import {
 
 type HorizonFilter = ScorecardHorizon | "all";
 
-const DIMENSIONS: ScorecardDimension[] = ["verdict", "confidence", "horizon", "signalScore"];
+const DIMENSIONS: ScorecardDimension[] = [
+  "verdict",
+  "confidence",
+  "horizon",
+  "signalScore",
+  "regime",
+];
+
+/** 차원 → 라벨(기존 DIMENSION_LABEL + regime 보강). */
+const dimensionLabel = (d: ScorecardDimension): string =>
+  d === "regime" ? DIMENSION_LABEL_REGIME : DIMENSION_LABEL[d];
 const HORIZON_FILTERS: HorizonFilter[] = ["all", "d1", "w1", "m1"];
 
 export function ScorecardContainer() {
@@ -111,7 +123,7 @@ export function ScorecardContainer() {
           >
             {DIMENSIONS.map((d) => (
               <option key={d} value={d}>
-                {DIMENSION_LABEL[d]}
+                {dimensionLabel(d)}
               </option>
             ))}
           </select>
@@ -152,6 +164,7 @@ export function ScorecardContainer() {
       <p className="text-caption text-text-muted">
         {summaryHeadline(data.scoredCount, data.totalRows)} · {HIT_RATE_NOTE}
       </p>
+      <p className="text-caption text-text-muted">{METRIC_NOTE_EXCESS}</p>
 
       {isEmpty || filtered.length === 0 ? (
         <div className="card" role="status">

@@ -8,6 +8,7 @@
 
 import { getKisStore } from "@/lib/api/kis/store";
 import type { ScoreDecisionsResult } from "@/lib/server/scorecard/scoreDecisions";
+import type { RelativeScoreResult } from "@/lib/server/scorecard/relativeScoreDecisions";
 
 const META_KEY = "scorecard:cron:meta";
 const TTL_SEC = 30 * 24 * 60 * 60; // 30일.
@@ -21,8 +22,8 @@ export type ScorecardCronMeta = {
   reason?: string;
   /** 실행 시점 KIS 환경. */
   env?: string;
-  /** 채점 결과 요약(정상 채점 시). */
-  result?: ScoreDecisionsResult;
+  /** 채점 결과 요약(정상 채점 시). v1(ScoreDecisionsResult) 또는 v2(RelativeScoreResult). */
+  result?: ScoreDecisionsResult | RelativeScoreResult;
 };
 
 /** cron 실행 결과 마커 기록 — 다음 실행에서 덮어씀. fail-soft. */

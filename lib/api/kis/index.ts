@@ -37,6 +37,8 @@ export {
 } from "./price";
 export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
+export { fetchIndexDailyChart } from "./index-chart";
+export { fetchIndexDailyChunked } from "./indexChartChunked";
 export { fetchIndexPriceShared, fetchOverseasIndexShared, isSharedIndexCode } from "./index-store";
 export { fetchOverseasIndex } from "./overseas-index";
 export {
@@ -52,6 +54,7 @@ export {
   searchSymbols,
   getCorpCode,
   getSymbolName,
+  getMarketByTicker,
   getSymbolsMeta,
 } from "./search";
 export { getAccessToken } from "./token";
@@ -72,4 +75,7 @@ export type {
   KisOverseasDailyChartResponse,
   KisForeignInstitutionTotalItem,
   KisInquireInvestorItem,
+  IndexDailyClose,
+  KisInquireDailyIndexChartItem,
+  KisInquireDailyIndexChartResponse,
 } from "./types";

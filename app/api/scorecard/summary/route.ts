@@ -14,6 +14,7 @@ import {
   isScorecardStoreConfigured,
 } from "@/lib/server/scorecard/scorecardStore";
 import { countScored, summarizeScorecard } from "@/lib/server/scorecard/summarize";
+import { SCORING_METRIC_MODE } from "@/lib/server/scorecard/constants";
 import {
   jsonWithDataSource,
   withTimeout,
@@ -28,6 +29,7 @@ export async function GET(): Promise<Response> {
   if (!configured) {
     const payload: ScorecardSummaryResponse = {
       configured: false,
+      metric: SCORING_METRIC_MODE,
       cells: [],
       scoredCount: 0,
       totalRows: 0,
@@ -40,6 +42,7 @@ export async function GET(): Promise<Response> {
     const rows = await withTimeout(getAllScorecardRows(), 5_000);
     const payload: ScorecardSummaryResponse = {
       configured: true,
+      metric: SCORING_METRIC_MODE,
       cells: summarizeScorecard(rows),
       scoredCount: countScored(rows),
       totalRows: rows.length,

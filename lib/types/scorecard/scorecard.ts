@@ -25,6 +25,21 @@ export type ScorecardHorizon = "d1" | "w1" | "m1";
  */
 export type HorizonStatus = "pending" | "hit" | "miss" | "flat" | "skipped";
 
+/**
+ * 주 채점 지표 모드(scorecard-relative-scoring). status 산출에 쓸 수익률 지표 1개를 고른다.
+ * - "absolute"      — 결정시점 대비 절대 수익률(phase-1 동치).
+ * - "excess"(기본)  — 초과수익 = abs − bench(같은 horizon 벤치마크 지수 수익률).
+ * - "beta_adjusted" — 베타보정 잔차 = abs − β·bench(β 추정 불가 시 excess 폴백).
+ */
+export type ScoringMetricMode = "absolute" | "excess" | "beta_adjusted";
+
+/**
+ * 시장 국면(regime) — 해당 horizon 구간 벤치마크 지수 수익률로 분류.
+ * - "up"   강세장 / "down" 약세장 / "flat" 횡보.
+ * 측정 불가(벤치마크 부재)면 행에 null 로 남는다.
+ */
+export type ScorecardRegime = "up" | "down" | "flat";
+
 /** confidence(HIGH/MEDIUM/LOW) — FinalDecision.confidence 재사용. */
 export type ScorecardConfidence = "HIGH" | "MEDIUM" | "LOW";
 
@@ -58,17 +73,49 @@ export interface ScorecardRow {
   d1Close: number | null;
   d1ReturnPct: number | null;
   d1ScoredAt: string | null;
+  /** 같은 horizon 벤치마크 지수 수익률(%). 측정 불가면 null. */
+  d1BenchReturnPct: number | null;
+  /** 초과수익 = abs − bench(%p). */
+  d1ExcessReturnPct: number | null;
+  /** entry 직전 윈도우로 추정한 베타. 추정 불가면 null. */
+  d1Beta: number | null;
+  /** 베타보정 잔차 = abs − β·bench(%p). */
+  d1AlphaResidualPct: number | null;
+  /** 해당 horizon 구간 시장 국면(벤치마크 기준). 측정 불가면 null. */
+  d1Regime: ScorecardRegime | null;
 
   w1Status: HorizonStatus;
   w1Close: number | null;
   w1ReturnPct: number | null;
   w1ScoredAt: string | null;
+  /** 같은 horizon 벤치마크 지수 수익률(%). 측정 불가면 null. */
+  w1BenchReturnPct: number | null;
+  /** 초과수익 = abs − bench(%p). */
+  w1ExcessReturnPct: number | null;
+  /** entry 직전 윈도우로 추정한 베타. 추정 불가면 null. */
+  w1Beta: number | null;
+  /** 베타보정 잔차 = abs − β·bench(%p). */
+  w1AlphaResidualPct: number | null;
+  /** 해당 horizon 구간 시장 국면(벤치마크 기준). 측정 불가면 null. */
+  w1Regime: ScorecardRegime | null;
 
   m1Status: HorizonStatus;
   m1Close: number | null;
   m1ReturnPct: number | null;
   m1ScoredAt: string | null;
+  /** 같은 horizon 벤치마크 지수 수익률(%). 측정 불가면 null. */
+  m1BenchReturnPct: number | null;
+  /** 초과수익 = abs − bench(%p). */
+  m1ExcessReturnPct: number | null;
+  /** entry 직전 윈도우로 추정한 베타. 추정 불가면 null. */
+  m1Beta: number | null;
+  /** 베타보정 잔차 = abs − β·bench(%p). */
+  m1AlphaResidualPct: number | null;
+  /** 해당 horizon 구간 시장 국면(벤치마크 기준). 측정 불가면 null. */
+  m1Regime: ScorecardRegime | null;
 
+  /** 벤치마크 지수 키(코드 "0001"/"1001"). 종목 상장시장 매핑 결과. 미해석이면 null. */
+  benchKey: string | null;
   createdAt: string;
 }
 
@@ -87,6 +134,8 @@ export interface ScorecardInsert {
   livePrice: number | null;
   decidedAt: string;
   runId: string | null;
+  /** 종목 벤치마크 지수 키("0001"/"1001"). 결정시점 상장시장 매핑(미해석 시 폴백 또는 null). */
+  benchKey: string | null;
 }
 
 /** 한 horizon 평가 결과 — cron 이 채점 후 store 에 갱신할 패치. */
@@ -95,6 +144,14 @@ export interface HorizonScoreUpdate {
   close: number | null;
   returnPct: number | null;
   scoredAt: string;
+  /** 시장/베타 보정 측정값(scorecard-relative-scoring). 미측정 필드는 undefined(PATCH 생략). */
+  benchReturnPct?: number | null;
+  excessReturnPct?: number | null;
+  beta?: number | null;
+  alphaResidualPct?: number | null;
+  regime?: ScorecardRegime | null;
+  /** 종목 벤치마크 키(행 공통). horizon 갱신 시 동봉되면 행에도 반영. */
+  benchKey?: string | null;
 }
 
 export type ScorecardWriteResult =
@@ -105,15 +162,24 @@ export type ScorecardWriteResult =
 // ─── 집계(summary) API ──────────────────────────────────────────────────────
 
 /** 집계 차원. */
-export type ScorecardDimension = "verdict" | "confidence" | "horizon" | "signalScore";
+export type ScorecardDimension =
+  | "verdict"
+  | "confidence"
+  | "horizon"
+  | "signalScore"
+  | "regime";
 
 /** 집계 셀 1개 — 차원 키 × horizon 별 hit/miss/flat 카운트 + 적중률. */
 export interface ScorecardSummaryCell {
   dimension: ScorecardDimension;
-  /** 차원 키(verdict 값 / HIGH·MEDIUM·LOW / d1·w1·m1 / 점수구간 라벨). */
+  /** 차원 키(verdict 값 / HIGH·MEDIUM·LOW / d1·w1·m1 / 점수구간 라벨 / up·down·flat). */
   key: string;
   /** horizon 차원이면 key 와 동일, 그 외엔 집계 대상 horizon("all" = 전 horizon 합산). */
   horizon: ScorecardHorizon | "all";
+  /**
+   * 주 지표 기준 hit/miss/flat (기본 excess). status 컬럼이 곧 주 지표 판정이므로,
+   * hit/miss/flat 은 "주 지표로 채점된 결과" 의 카운트다(scorecard-relative-scoring).
+   */
   hit: number;
   miss: number;
   flat: number;
@@ -121,11 +187,20 @@ export interface ScorecardSummaryCell {
   total: number;
   /** hit / (hit + miss). 분모(hit+miss) 0 이면 null(D3 — flat 분모 제외). */
   hitRate: number | null;
+  /**
+   * 참고용 **절대 수익률** 기준 적중률(abs vs ±T). 같은 셀의 abs 지표로 재판정한 hit/(hit+miss).
+   * 표에서 excess(주) 옆에 abs 를 같이 노출해 시장 베타 기여분을 비교한다. 분모 0 이면 null.
+   */
+  absHitRate: number | null;
+  /** absHitRate 분모(abs 기준 hit+miss). 표본 비교용. */
+  absSample: number;
 }
 
 export interface ScorecardSummaryResponse {
   /** Supabase 연결 여부 — false 면 빈 집계 + 미설정 안내. */
   configured: boolean;
+  /** 주 채점 지표 모드(기본 "excess") — 표 헤더·안내 문구용. */
+  metric: ScoringMetricMode;
   cells: ScorecardSummaryCell[];
   /** 채점 완료 행 수(전체) — 표본 규모 표시. */
   scoredCount: number;
