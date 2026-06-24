@@ -16,7 +16,7 @@
  */
 
 import Link from "next/link";
-import { Bell, CreditCard, LogOut, Moon, Shield, Target } from "lucide-react";
+import { Bell, Bot, CreditCard, LogOut, Moon, Shield, Target } from "lucide-react";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import { ThemeMenuButton } from "@/components/theme/ThemeMenuButton";
 import type {
@@ -29,6 +29,7 @@ import {
   MENU_BILLING,
   MENU_THEME,
   MENU_SCORECARD,
+  MENU_PAPER_TRADING,
   MENU_LOGOUT,
 } from "@/lib/copy/profile/labels";
 
@@ -42,6 +43,7 @@ const MENU_LABEL: Record<ProfileMenuKey, string> = {
   BILLING: MENU_BILLING,
   THEME: MENU_THEME,
   SCORECARD: MENU_SCORECARD,
+  PAPER_TRADING: MENU_PAPER_TRADING,
   LOGOUT: MENU_LOGOUT,
 };
 
@@ -51,6 +53,7 @@ const ICON_MAP = {
   CreditCard,
   Moon,
   Target,
+  Bot,
   LogOut,
 } as const;
 

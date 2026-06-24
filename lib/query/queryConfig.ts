@@ -170,6 +170,16 @@ export const queryConfig = {
       gcTime: 30 * MINUTE,
     },
   },
+  paperTrading: {
+    sessions: {
+      staleTime: 5 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
+    session: {
+      staleTime: 5 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
+  },
 } as const;
 
 export type QueryConfig = typeof queryConfig;

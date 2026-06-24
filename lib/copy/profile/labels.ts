@@ -59,6 +59,7 @@ export const MENU_BILLING = "구독 / 결제 관리";
 export const MENU_THEME = "화면 테마 설정 (다크모드)";
 /* scorecard-nav-link — `/dashboard/scorecard`(판정 적중률 자가점검) 도달성 보조 메뉴 라벨. */
 export const MENU_SCORECARD = "신호 성적표 (적중률 자가점검)";
+export const MENU_PAPER_TRADING = "AI 모의투자";
 export const MENU_LOGOUT = "로그아웃";
 
 /* 테마 3-state 토글 (light/dark/system) — `components/theme/ThemeMenuButton.tsx`. */
