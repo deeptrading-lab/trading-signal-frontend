@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/paperTrading/constants";
 import { addTickWindow, floorToTickWindow } from "@/lib/server/paperTrading/time";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
+import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
   CreatePaperTradingSessionRequest,
   PaperTradingEquityPoint,
@@ -57,9 +58,10 @@ export function getPaperTradingSessionDetail(
   return toDetail(entry);
 }
 
-export function createPaperTradingSession(
+export async function createPaperTradingSession(
   request: CreatePaperTradingSessionRequest,
-): PaperTradingSessionDetail {
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider } = {},
+): Promise<PaperTradingSessionDetail> {
   const now = new Date().toISOString();
   const initialCash = sanitizePositiveNumber(
     request.initialCash,
@@ -83,7 +85,7 @@ export function createPaperTradingSession(
     cashBufferPct: PAPER_TRADING_DEFAULT_CASH_BUFFER_PCT,
     tickIntervalMinutes: PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES,
     decisionProvider: "mock",
-    mode: "sandbox",
+    mode: "live-paper",
     lastTickWindowStart: null,
     startedAt: now,
     endedAt: null,
@@ -98,12 +100,13 @@ export function createPaperTradingSession(
   };
 
   const firstWindow = floorToTickWindow(new Date(now), session.tickIntervalMinutes);
-  const firstTick = runPaperTradingTick({
+  const firstTick = await runPaperTradingTick({
     session: entry.session,
     positions: entry.positions,
     existingTicks: entry.ticks,
     triggeredBy: "user",
     tickWindowStart: firstWindow,
+    priceSnapshotProvider: options.priceSnapshotProvider,
   });
 
   entry.session = firstTick.session;
@@ -131,13 +134,14 @@ export function patchPaperTradingSessionStatus(
   return toDetail(entry);
 }
 
-export function runPaperTradingSessionTick(
+export async function runPaperTradingSessionTick(
   sessionId: string,
   options: {
     triggeredBy?: PaperTradingTriggeredBy;
     tickWindowStart?: string;
+    priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
   },
-): PaperTradingSessionDetail | null {
+): Promise<PaperTradingSessionDetail | null> {
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
   if (entry.session.status !== "running") return toDetail(entry);
@@ -148,12 +152,13 @@ export function runPaperTradingSessionTick(
       ? addTickWindow(entry.session.lastTickWindowStart, entry.session.tickIntervalMinutes)
       : floorToTickWindow(new Date(), entry.session.tickIntervalMinutes));
 
-  const result = runPaperTradingTick({
+  const result = await runPaperTradingTick({
     session: entry.session,
     positions: entry.positions,
     existingTicks: entry.ticks,
     triggeredBy: options.triggeredBy ?? "user",
     tickWindowStart,
+    priceSnapshotProvider: options.priceSnapshotProvider,
   });
 
   const alreadyExists = entry.ticks.some((tick) => tick.id === result.tick.id);

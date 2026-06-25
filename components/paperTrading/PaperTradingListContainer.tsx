@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
+import { isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils/cn";
 import {
   PAPER_TRADING_CREATE_BUTTON,
@@ -26,6 +27,7 @@ import {
   PAPER_TRADING_PAGE_TITLE,
   PAPER_TRADING_PROVIDER_DISABLED,
   PAPER_TRADING_PROVIDER_MOCK,
+  PAPER_TRADING_LIVE_PRICE_NOTICE,
   PAPER_TRADING_REFRESH,
   PAPER_TRADING_RETRY,
   PAPER_TRADING_RISK_AGGRESSIVE,
@@ -58,9 +60,10 @@ export function PaperTradingListContainer() {
   const [selectedStocks, setSelectedStocks] = useState<PaperTradingSelectedStock[]>([
     { ticker: "005930", name: "삼성전자", market: "KOSPI" },
   ]);
-  const [initialCash, setInitialCash] = useState("100");
+  const [initialCash, setInitialCash] = useState("10000000");
   const [targetReturnPct, setTargetReturnPct] = useState("5");
   const [riskMode, setRiskMode] = useState<PaperTradingRiskMode>("balanced");
+  const [createError, setCreateError] = useState<string | null>(null);
   const { data: stockResults = [], isPending: isSearching } = useQueryStockSearch(
     debouncedKeyword,
     { enabled: debouncedKeyword.length > 0 },
@@ -73,16 +76,25 @@ export function PaperTradingListContainer() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const detail = await create({
-      name,
-      tickers: selectedStocks.map((stock) => stock.ticker),
-      stocks: selectedStocks,
-      initialCash: Number(initialCash),
-      targetReturnPct: Number(targetReturnPct),
-      riskMode,
-      decisionProvider: "mock",
-    });
-    router.push(`/dashboard/paper-trading/${detail.session.id}`);
+    setCreateError(null);
+    try {
+      const detail = await create({
+        name,
+        tickers: selectedStocks.map((stock) => stock.ticker),
+        stocks: selectedStocks,
+        initialCash: Number(initialCash),
+        targetReturnPct: Number(targetReturnPct),
+        riskMode,
+        decisionProvider: "mock",
+      });
+      router.push(`/dashboard/paper-trading/${detail.session.id}`);
+    } catch (error) {
+      setCreateError(
+        isApiError(error)
+          ? error.message
+          : "모의투자 세션을 만들지 못했어요. 잠시 후 다시 시도해 주세요.",
+      );
+    }
   }
 
   function addStock(stock: PaperTradingSelectedStock) {
@@ -110,6 +122,7 @@ export function PaperTradingListContainer() {
           <div>
             <h2 className="text-h2 text-text-strong">{PAPER_TRADING_CREATE_TITLE}</h2>
             <p className="mt-xs text-caption text-text-muted">{PAPER_TRADING_MOCK_NOTICE}</p>
+            <p className="mt-xs text-caption text-text-muted">{PAPER_TRADING_LIVE_PRICE_NOTICE}</p>
           </div>
 
           <label className="flex flex-col gap-xs text-body-sm text-text-muted">
@@ -249,6 +262,11 @@ export function PaperTradingListContainer() {
             <Rocket className="size-4" aria-hidden />
             {isCreating ? PAPER_TRADING_CREATING : PAPER_TRADING_CREATE_BUTTON}
           </button>
+          {createError ? (
+            <div className="card-critical" role="alert">
+              <p className="text-body-sm">{createError}</p>
+            </div>
+          ) : null}
         </form>
 
         <section className="card flex flex-col gap-md" aria-label="모의투자 세션 목록">

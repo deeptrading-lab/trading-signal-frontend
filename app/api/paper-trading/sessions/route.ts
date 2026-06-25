@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  PAPER_TRADING_DEFAULT_INITIAL_CASH,
+} from "@/lib/server/paperTrading/constants";
+import { getPaperTradingAiCliGate } from "@/lib/server/paperTrading/aiCliGate";
+import {
   createPaperTradingSession,
   listPaperTradingSessions,
 } from "@/lib/server/paperTrading/sessionStore";
@@ -25,11 +29,19 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ error: validation }, { status: 422 });
     }
 
-    const payload: CreatePaperTradingSessionResponse = createPaperTradingSession({
+    const cliGate = getPaperTradingAiCliGate();
+    if (!cliGate.ok) {
+      return NextResponse.json(
+        { error: cliGate.message },
+        { status: cliGate.status, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const payload: CreatePaperTradingSessionResponse = await createPaperTradingSession({
       name: body.name ?? "AI 모의투자",
       tickers: body.tickers ?? body.stocks?.map((stock) => stock.ticker) ?? ["005930"],
       stocks: body.stocks,
-      initialCash: body.initialCash ?? 100,
+      initialCash: body.initialCash ?? PAPER_TRADING_DEFAULT_INITIAL_CASH,
       targetReturnPct: body.targetReturnPct ?? 5,
       riskMode: body.riskMode ?? "balanced",
       decisionProvider: body.decisionProvider ?? "mock",
@@ -63,7 +75,7 @@ function validateCreateRequest(body: Partial<CreatePaperTradingSessionRequest>):
     return "목표 수익률은 0보다 커야 해요.";
   }
   if (body.decisionProvider && body.decisionProvider !== "mock") {
-    return "MVP에서는 mock 판단 방식만 사용할 수 있어요.";
+    return "현재 AI 모의투자는 MVP 판단 방식만 사용할 수 있어요. 단, 실행에는 Codex 또는 Claude CLI가 필요합니다.";
   }
   return null;
 }

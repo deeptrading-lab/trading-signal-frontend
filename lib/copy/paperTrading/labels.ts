@@ -21,7 +21,9 @@ export const PAPER_TRADING_PAUSE = "일시정지";
 export const PAPER_TRADING_RESUME = "재개";
 export const PAPER_TRADING_COMPLETE = "완료 처리";
 export const PAPER_TRADING_MOCK_NOTICE =
-  "MVP-A는 mock 판단과 in-memory 저장소로 동작해요. Supabase와 CLI 에이전트 연결은 후속 단계입니다.";
+  "AI 모의투자는 로컬 Codex 또는 Claude CLI가 있을 때만 진행돼요. CLI가 없으면 세션 생성과 재판단을 실행하지 않습니다.";
+export const PAPER_TRADING_LIVE_PRICE_NOTICE =
+  "체결 기준 가격은 KIS 실제 현재가를 사용하며, 국내주식은 1주 단위로만 가상 체결돼요.";
 export const PAPER_TRADING_REAL_ACTION_NOTICE =
   "이 화면은 가상 체결 기록입니다. 실제 매매는 별도 증권 앱에서 직접 판단해 주세요.";
 
@@ -39,7 +41,7 @@ export const PAPER_TRADING_FIELD_PROVIDER = "판단 방식";
 export const PAPER_TRADING_RISK_CONSERVATIVE = "보수";
 export const PAPER_TRADING_RISK_BALANCED = "균형";
 export const PAPER_TRADING_RISK_AGGRESSIVE = "공격";
-export const PAPER_TRADING_PROVIDER_MOCK = "Mock 판단";
+export const PAPER_TRADING_PROVIDER_MOCK = "MVP 판단 · AI CLI 필요";
 export const PAPER_TRADING_PROVIDER_DISABLED = "후속 예정";
 
 export const PAPER_TRADING_METRIC_INITIAL = "시작 투자금";
@@ -77,4 +79,4 @@ export const PAPER_TRADING_TABLE_AVG = "평균가";
 export const PAPER_TRADING_TABLE_PRICE = "현재가";
 export const PAPER_TRADING_TABLE_VALUE = "평가금액";
 export const PAPER_TRADING_TABLE_PNL = "손익";
-export const PAPER_TRADING_TABLE_ALLOC = "비중";
+export const PAPER_TRADING_TABLE_ALLOC = "실제 체결 비중";

@@ -79,21 +79,50 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
   for (const target of targets.items) {
     const snapshot = input.priceSnapshot.find((item) => item.ticker === target.ticker);
     if (!snapshot) continue;
+    if (snapshot.price <= 0) {
+      guardAdjustments.push(`${target.ticker} 현재가가 0원이라 가상 주문을 건너뛰었어요.`);
+      continue;
+    }
     const position = nextPositions.find((item) => item.ticker === target.ticker);
     const currentQuantity = position?.quantity ?? 0;
     const targetValue = portfolioBefore * (target.targetAllocationPct / 100) * scale;
-    const targetQuantity = targetValue / snapshot.price;
-    const deltaQuantity = targetQuantity - currentQuantity;
+    const targetQuantity = Math.floor(targetValue / snapshot.price);
+    const deltaQuantity = targetQuantity - Math.floor(currentQuantity);
 
-    if (Math.abs(deltaQuantity) < 0.0001) continue;
+    if (deltaQuantity === 0) {
+      if (targetValue > 0 && targetQuantity === 0) {
+        guardAdjustments.push(`${snapshot.name} 목표 비중은 있으나 현금이 부족해 1주도 체결하지 않았어요.`);
+      }
+      continue;
+    }
 
     const side: PaperTradingOrder["side"] = deltaQuantity > 0 ? "BUY" : "SELL";
-    const notional = Math.abs(deltaQuantity) * snapshot.price;
+    const availableCash = Math.max(0, nextCash - minimumCash);
+    const executableQuantity =
+      side === "BUY"
+        ? Math.min(deltaQuantity, Math.floor(availableCash / snapshot.price))
+        : Math.min(Math.abs(deltaQuantity), Math.floor(currentQuantity));
+
+    if (executableQuantity <= 0) {
+      guardAdjustments.push(
+        side === "BUY"
+          ? `${snapshot.name} 매수는 현금이 부족해 체결하지 않았어요.`
+          : `${snapshot.name} 매도 가능 수량이 없어 체결하지 않았어요.`,
+      );
+      continue;
+    }
+
+    if (side === "BUY" && executableQuantity < deltaQuantity) {
+      guardAdjustments.push(`${snapshot.name} 매수 수량을 주문 가능 현금에 맞춰 줄였어요.`);
+    }
+
+    const signedQuantity = side === "BUY" ? executableQuantity : -executableQuantity;
+    const notional = executableQuantity * snapshot.price;
     nextCash = side === "BUY" ? nextCash - notional : nextCash + notional;
-    const nextQuantity = Math.max(0, targetQuantity);
+    const nextQuantity = Math.max(0, Math.floor(currentQuantity) + signedQuantity);
     const nextAvgEntryPrice =
       side === "BUY" && position
-        ? weightedAverage(position.avgEntryPrice, currentQuantity, snapshot.price, deltaQuantity)
+        ? weightedAverage(position.avgEntryPrice, Math.floor(currentQuantity), snapshot.price, executableQuantity)
         : side === "BUY"
           ? snapshot.price
           : position?.avgEntryPrice ?? snapshot.price;
@@ -112,13 +141,13 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
     };
 
     nextPositions = replacePosition(nextPositions, nextPosition).filter(
-      (item) => item.quantity > 0.0001,
+      (item) => item.quantity >= 1,
     );
     orders.push({
       ticker: snapshot.ticker,
       name: snapshot.name,
       side,
-      quantity: Math.abs(deltaQuantity),
+      quantity: executableQuantity,
       price: snapshot.price,
       notional,
       reason: target.rationale,

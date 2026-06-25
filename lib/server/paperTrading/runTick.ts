@@ -1,6 +1,9 @@
 import { randomUUID } from "crypto";
 import { decideWithMockProvider } from "@/lib/server/paperTrading/decisionProviders/mock";
-import { getMockPriceSnapshot } from "@/lib/server/paperTrading/marketData";
+import {
+  getLivePriceSnapshot,
+  type PaperTradingPriceSnapshotProvider,
+} from "@/lib/server/paperTrading/marketData";
 import { executeVirtualTrade } from "@/lib/server/paperTrading/virtualExecution";
 import type {
   PaperTradingPosition,
@@ -15,6 +18,7 @@ export type RunPaperTradingTickInput = {
   existingTicks: PaperTradingTick[];
   triggeredBy: PaperTradingTriggeredBy;
   tickWindowStart: string;
+  priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
 };
 
 export type RunPaperTradingTickResult = {
@@ -23,7 +27,9 @@ export type RunPaperTradingTickResult = {
   tick: PaperTradingTick;
 };
 
-export function runPaperTradingTick(input: RunPaperTradingTickInput): RunPaperTradingTickResult {
+export async function runPaperTradingTick(
+  input: RunPaperTradingTickInput,
+): Promise<RunPaperTradingTickResult> {
   const existing = input.existingTicks.find(
     (tick) => tick.tickWindowStart === input.tickWindowStart,
   );
@@ -37,8 +43,11 @@ export function runPaperTradingTick(input: RunPaperTradingTickInput): RunPaperTr
 
   const tickIndex = input.existingTicks.length;
   const pricedAt = input.tickWindowStart;
-  const priceSnapshot = input.session.stocks.map((stock, index) =>
-    getMockPriceSnapshot(stock, tickIndex, pricedAt, index),
+  const priceSnapshotProvider = input.priceSnapshotProvider ?? getLivePriceSnapshot;
+  const priceSnapshot = await priceSnapshotProvider(
+    input.session.stocks,
+    tickIndex,
+    pricedAt,
   );
   const markedPortfolioValue =
     input.session.cash +
