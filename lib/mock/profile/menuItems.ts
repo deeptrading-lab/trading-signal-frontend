@@ -20,5 +20,11 @@ export const PROFILE_MENU_ITEMS_MOCK: ProfileMenuItems = [
     variant: "default",
     href: "/dashboard/scorecard",
   },
+  {
+    key: "PAPER_TRADING",
+    iconName: "Bot",
+    variant: "default",
+    href: "/dashboard/paper-trading",
+  },
   { key: "LOGOUT", iconName: "LogOut", variant: "danger" },
 ];

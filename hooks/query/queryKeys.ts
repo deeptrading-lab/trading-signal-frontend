@@ -78,4 +78,10 @@ export const queryKeys = {
     /** confidence 버킷별 실측 보정값(scorecard-feedback (가)). 인자 없는 단일 키. */
     calibration: ["scorecard", "calibration"] as const,
   },
+  paperTrading: {
+    /** AI 모의투자 세션 목록 — MVP-A in-memory BFF. */
+    sessions: ["paper-trading", "sessions"] as const,
+    /** AI 모의투자 세션 상세 — 세션별 tick/포지션/자산곡선. */
+    session: (sessionId: string) => ["paper-trading", "session", sessionId] as const,
+  },
 } as const;
