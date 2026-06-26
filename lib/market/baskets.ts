@@ -14,7 +14,7 @@
  */
 
 /** 바스켓 가중치·구성 기준일. 분기 갱신 시 함께 업데이트. */
-export const BASKETS_AS_OF = "2026-06-24";
+export const BASKETS_AS_OF = "2026-06-26";
 
 export type ThemeBasket = {
   /** 안정적 식별 키. */
@@ -131,7 +131,6 @@ export const THEME_BASKETS: readonly ThemeBasket[] = [
       ["009540", "HD한국조선해양"],
       ["010140", "삼성중공업"],
       ["329180", "HD현대중공업"],
-      ["010620", "HD현대미포"],
       ["042660", "한화오션"],
     ],
   },

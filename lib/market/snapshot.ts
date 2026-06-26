@@ -128,7 +128,9 @@ export async function buildMarketSnapshot(opts?: { topN?: number }): Promise<Bui
       sectors = computeSectorPerf(byTicker, THEME_BASKETS, names);
       concentration = computeConcentration(byTicker, MEGACAP, topN, BASKETS_AS_OF);
       if (quotes.length < universe.length) {
-        warnings.push(`바스켓 시세 부분 확보(${quotes.length}/${universe.length})`);
+        const got = new Set(quotes.map((q) => q.ticker));
+        const missing = universe.filter((t) => !got.has(t)).map((t) => `${names.get(t) ?? t}(${t})`);
+        warnings.push(`바스켓 시세 부분 확보(${quotes.length}/${universe.length}) — 미확보: ${missing.join(", ")}`);
       }
     }
   }
