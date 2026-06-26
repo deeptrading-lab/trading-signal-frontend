@@ -163,9 +163,18 @@ export async function proxy(request: NextRequest) {
  * `isPublicPath` 가 공개 여부를 **정확 일치**로 단일 판정한다(= 보안 경계의 진짜 단일 진실).
  * (이전엔 matcher 가 `icon` 등 접두로 폭넓게 제외해 `/iconography` 같은 미래 경로가 게이트를
  *  통째로 건너뛸 미세 표면이 있었음 → 정확 매칭으로 전환.)
+ *
+ * ⚠️ SSE 스트림 라우트 `/api/stock/ai-analysis` **정확히 그 경로만** 예외로 제외한다(`$` 앵커).
+ *    이 라우트는 `text/event-stream` 스트림이라 미들웨어를 거치면 Next 가 `ReadableStream` 응답을
+ *    **버퍼링**해(브라우저가 완료 시점에 한꺼번에 수신) 실시간 진행 표시가 깨진다. early-return 만으론
+ *    못 막고(통과 자체가 버퍼링) matcher 제외가 정답.
+ *    `$` 가 없으면 `…/decision`·`…/decisions`(저장 데이터 반환) 하위 라우트까지 게이트를 벗어나므로,
+ *    스트리밍 라우트 한 경로만 좁혀 제외하고 하위 GET 라우트는 그대로 게이트한다.
+ *    보안 안전: 이 라우트는 로컬 전용(Vercel 환경 감지 시 503, route.ts 참조)이라 게이트 우회로 노출되는
+ *    실데이터가 없다 — 미인증 호출은 401 대신 503 을 받을 뿐.
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  matcher: ["/((?!_next/static|_next/image|api/stock/ai-analysis$).*)"],
 };
 
 /* 프로덕션 + 비밀번호 미설정 경고 — 모듈 로드 시 1회(요청마다 스팸 금지, AC-13). */
