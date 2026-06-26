@@ -287,6 +287,45 @@ export async function getRowsNeedingRelativeScoring(limit: number): Promise<Scor
   return Array.isArray(rows) ? rows.map(toRow) : [];
 }
 
+/**
+ * 채점 원장의 (ticker, entry_date) 키 집합 조회 — backfill 멱등 판별용
+ * (PRD `scorecard-backfill-decisions`). 키 형식은 `${ticker}|${entry_date}`.
+ *
+ * ticker·entry_date 만 select 해 경량. 미설정/오류 시 빈 Set(fail-soft) — backfill 게이트가
+ * 별도로 막으므로 빈 Set 이어도 잘못된 중복 insert 로 이어지지 않는다(insert 실패는 카운트만).
+ */
+export async function getScorecardKeys(limit = 5000): Promise<Set<string>> {
+  const config = supabaseConfig();
+  if (!config) return new Set();
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", "ticker,entry_date");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    log.warn("키 조회 예외", error);
+    return null;
+  });
+
+  if (!res) return new Set();
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    log.warn(`키 조회 실패 status=${res.status} ${text}`);
+    return new Set();
+  }
+
+  const rows = (await res.json().catch(() => [])) as Array<{
+    ticker: string;
+    entry_date: string;
+  }>;
+  if (!Array.isArray(rows)) return new Set();
+  return new Set(rows.map((r) => `${r.ticker}|${r.entry_date}`));
+}
+
 /** 집계(summary) 용 전체 행 조회. decided_at 내림차순 + limit. 미설정/오류 시 빈 배열. */
 export async function getAllScorecardRows(limit = 2000): Promise<ScorecardRow[]> {
   const config = supabaseConfig();
