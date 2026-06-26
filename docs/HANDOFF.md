@@ -4454,3 +4454,31 @@
   - 라이브 검증: prod cron 1회 실행 후 `/api/flow/cron-status` 로그(`[flow-snapshot] backfill inserted=...`)로 6/19 5건 inserted 확인 → 후속 패스에서 채점(hit/miss/flat) 합류 확인.
   - FOLLOWUP: 결정 원장 ticker PK upsert 한계 — 같은 종목 과거(6/19) 결정이 최신(6/22)으로 덮인 경우 복원 불가. history 보존은 별도 slug(`decisions-history`) 검토.
   - 관련 slug: `scorecard-relative-scoring`(#149, backfill 행이 합류하는 v2 채점) · `scorecard-feedback`(표본 누적 후 프롬프트 주입 플래그 ON 검토).
+
+### 2026-06-26 — fix(analyze): PM 한글 표기 예외 약어 보강 — KOSPI·EPS·CAGR·YoY 등 (#156)
+
+- **slug**: `pm-korean-jargon-abbrevs` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/156
+- **요약**: fix(analyze): PM 한글 표기 예외 약어 보강 — KOSPI·EPS·CAGR·YoY 등
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > PM "한글 표기 원칙"의 영문 약어 예외 목록을 보강한다. 직전 PR #148 의 reviewer 비차단 후속으로, 본문에 흔히 쓰이는 표준 약어를 모델이 무리하게 한글로 풀어 쓰는 과소-한글화 여지를 줄인다.
+  > 
+  > ## 배경
+  > #148 은 일반 영문 jargon(thesis·binary event 등)을 한글로 풀게 했고, 표준 기술/재무 약어(RSI·PBR·EV/EBITDA 등)·ticker는 예외로 뒀다. reviewer가 본문 빈출 약어(KOSPI·52주·CAGR·EPS 등)를 예외에 더 보강하면 과소-한글화를 줄일 수 있다고 비차단 권고했다.
+  > 
+  > ## 변경
+  > - `lib/prompts/stock/aiAnalysis.ts` "한글 표기 원칙" 예외 목록 확장(한 줄):
+  >   - 재무 약어에 `EPS·CAGR·YoY·QoQ` 추가
+  >   - `지수명(KOSPI·KOSDAQ)`, `52주 신고가/신저가` 같은 표준 표현을 예외에 명시
+  > 
+  > ## 영향
+  > - 신규/재분석 결과부터 적용. 빌드·타입 영향 없는 프롬프트 문자열 변경(tsc exit 0).
+  > - 영문 jargon 한글화 방향은 그대로 유지하고, 표준 약어만 예외 폭을 넓힌 것이라 회귀 위험 낮음.
+  > 
+  > ## 다음 작업
+  > - (선택) 리서치 매니저·트레이더 등 PM 외 프롬프트의 본문 영문 병기도 같은 원칙으로 확장 검토 — 현재는 사용자 노출 경로(PM JSON)에 한정.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 리서치 매니저·트레이더 등 PM 외 프롬프트의 본문 영문 병기도 같은 원칙으로 확장 검토 — 현재는 사용자 노출 경로(PM JSON)에 한정.
