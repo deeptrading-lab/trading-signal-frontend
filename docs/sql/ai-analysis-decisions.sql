@@ -10,6 +10,10 @@ create table if not exists public.ai_analysis_decisions (
   updated_at timestamptz not null default now()
 );
 
+-- PostgREST anon/authenticated 접근은 차단하고 service role 서버 접근만 허용한다.
+-- service role은 RLS를 우회하므로 저장·대시보드 BFF 동작에는 영향이 없다.
+alter table public.ai_analysis_decisions enable row level security;
+
 -- 기존 테이블에 신규 컬럼 추가 (이미 배포된 DB용 — 멱등).
 alter table public.ai_analysis_decisions
   add column if not exists signal jsonb;
