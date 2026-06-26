@@ -15,12 +15,15 @@
 
 set -uo pipefail
 
+# 기본 URL 은 ?refresh=1(생성·저장 경로)을 포함한다 — override 시에도 ?refresh=1 을 유지할 것.
 URL="${MARKET_ANALYSIS_URL:-http://localhost:3000/api/market/analysis?refresh=1}"
 BODY="$(mktemp -t market-analysis-cron.XXXXXX)"
+HEADERS="$(mktemp -t market-analysis-cron-h.XXXXXX)"
+# crontab 이 SIGTERM 으로 중단해도 임시파일을 정리한다.
+trap 'rm -f "$BODY" "$HEADERS"' EXIT
 TS="$(date '+%Y-%m-%d %H:%M:%S')"
 
 # CLI 합성은 ~2분 → 타임아웃 240s. 헤더(-D)에서 X-CLI/X-Pruned 확인.
-HEADERS="$(mktemp -t market-analysis-cron-h.XXXXXX)"
 code="$(curl -s -m 240 -D "$HEADERS" -o "$BODY" -w '%{http_code}' "$URL" 2>/dev/null || echo "000")"
 
 if [ "$code" = "200" ]; then
@@ -31,5 +34,3 @@ if [ "$code" = "200" ]; then
 else
   echo "[$TS] SKIP/FAIL code=${code} — dev 서버 미실행이거나 생성 실패(무해)"
 fi
-
-rm -f "$BODY" "$HEADERS"
