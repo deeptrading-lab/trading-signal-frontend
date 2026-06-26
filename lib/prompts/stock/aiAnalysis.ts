@@ -471,6 +471,8 @@ ${s.signalSummary.slice(0, 500)}`,
 
 **한글 표기 원칙**: 위 텍스트 필드에서는 영문 등급 용어(BUY·OVERWEIGHT·HOLD·UNDERWEIGHT·REDUCE·SELL)를 절대 노출하지 마세요. 등급을 언급할 때는 한글 라벨(적극 매수·분할 매수·중립·신규 진입 주의·분할 매도·매도/회피)만 사용하고, 괄호 안 영문 병기(예: \`(Overweight)\`)도 넣지 마세요. 단 JSON 의 verdict 필드 값만 영문 enum 으로 출력합니다. 또한 본문 서술은 모두 한국어 문장으로 작성하고, 라틴 문자 영어 투자 용어를 그대로 섞지 말고 한국어로 풀어 쓰세요(예: thesis → 투자 논거, binary event → 결과가 한쪽으로 크게 갈리는 이벤트, catalyst → 촉매·주가 동인, conviction → 확신, overhang → 매물 부담, re-rating → 밸류에이션 재평가, downside/upside → 하방/상방). 단 표준 기술 지표·재무 약어(RSI·MACD·ATR·PBR·PER·EV/EBITDA·ROE·EPS·CAGR·YoY·QoQ·ETF 등)·지수명(KOSPI·KOSDAQ)·52주 신고가/신저가 등 표준 표현과 ticker·고유명사는 그대로 사용해도 됩니다.
 
+**문체 규칙(개조식·명사 종결)**: 모든 텍스트 필드(reasoning·new_entry_strategy·holder_strategy·short_term_outlook·mid_term_outlook·key_strengths·key_risks)는 **명사 또는 명사구로 끝나는 간결한 개조식 문어체**로 작성하세요. "~하라/~하라./~하세요/~하십시오/~해야 한다/~하는 것이 좋다" 같은 명령형·권유형·구어체 종결 어미를 절대 쓰지 말고, 행동·지시는 명사형으로 바꿔 끝맺으세요(예: "전량 손절하라" → "전량 손절", "분할 청산하라" → "분할 청산", "계속 홀딩하라" → "보유 유지", "관망하세요" → "관망", "재진입을 고려하라" → "재진입 고려", "비중을 축소하라" → "비중 축소"). 핵심 정보만 전달하는 건조하고 명료한 보고서 문어체를 유지하세요.
+
 ${PCT_CLARITY}
 - 보유자 가이드(holder_strategy)는 비중(포지션 %)·구체적 가격 레벨·현재가 대비 %로 표현하고, 각 %가 무엇을 가리키는지 명시하세요. (예: "보유 물량의 50% 시장가 청산", "57,000원 도달 시 일부 청산", "48,000원 이탈 시 전량 손절")
 - target_pct·stop_loss_pct는 항상 **현재가 대비** % 이며, 평단가와 무관합니다.

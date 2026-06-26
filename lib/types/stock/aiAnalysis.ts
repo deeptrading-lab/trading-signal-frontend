@@ -194,6 +194,8 @@ export interface FinalDecision {
   stop_loss_pct: number;
   /** 손익비 (예: 3.0 = 3:1). target_pct null이면 null */
   risk_reward_ratio: number | null;
+  /** 분석 시점 현재가(원) — target_pct·stop_loss_pct(%) 의 기준가. 절대가격 표기용. 이 필드 추가 이전 legacy 행은 undefined → %만 표기. */
+  base_price?: number | null;
   /** 1~2주 단기 전망 1~2문장 */
   short_term_outlook: string;
   /** 1~3개월 중기 전망 1~2문장 */

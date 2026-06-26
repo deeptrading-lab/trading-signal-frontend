@@ -116,7 +116,7 @@ export function SlideToAnalyze({
           aria-busy={isCommitting}
           {...handlers}
           className={cn(
-            "group relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-full p-1 sm:w-auto",
+            "group relative flex w-full items-center justify-between gap-2 overflow-hidden rounded-full p-1 sm:w-auto",
             "h-11",
             "border transition-colors duration-200",
             isThreshold
@@ -132,14 +132,14 @@ export function SlideToAnalyze({
             aria-hidden
             style={{ x: knobX }}
             className={cn(
-              "z-10 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-slate-50 px-3 dark:bg-slate-200",
+              "z-10 inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-slate-50 px-2.5 dark:bg-slate-200",
               "shadow-sm ring-1 ring-black/5 group-hover:shadow-md transition-shadow duration-200",
             )}
           >
             {isCommitting && (
               <Loader2 size={13} className="animate-spin text-blue-600" />
             )}
-            <span className="whitespace-nowrap text-[12px] font-bold leading-none text-blue-700 dark:text-blue-800">
+            <span className="whitespace-nowrap text-[13px] font-bold leading-none text-blue-700 dark:text-blue-800">
               {COPY.previousDecision.slide.short}
             </span>
             <span
@@ -154,7 +154,7 @@ export function SlideToAnalyze({
           <span
             aria-hidden
             className={cn(
-              "z-0 inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-bold",
+              "z-0 inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-bold pr-2",
               isThreshold ? "text-green-700 dark:text-green-400" : accent.text,
             )}
           >

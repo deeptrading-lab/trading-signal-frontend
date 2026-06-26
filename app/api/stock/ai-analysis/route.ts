@@ -670,6 +670,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                   target_pct: rawTarget,
                   stop_loss_pct: rawStop > 0 ? -rawStop : rawStop,
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
+                  // % 기준가 = LLM 에 넘긴 "현재가"(priceData?.price ?? 마지막 봉 종가). 절대가격 표기·재현용.
+                  base_price: priceData?.price ?? sorted[sorted.length - 1]?.close ?? null,
                   short_term_outlook: typeof d.short_term_outlook === "string" ? d.short_term_outlook : "",
                   mid_term_outlook: typeof d.mid_term_outlook === "string" ? d.mid_term_outlook : "",
                   limitedData: signalResult.limitedData,
