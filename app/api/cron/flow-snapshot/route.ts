@@ -1,11 +1,13 @@
 /**
  * `/api/cron/flow-snapshot` — 매 영업일 장마감 후 **단일 디스패처** cron.
  *
- * PRD `investor-flow-cumulative` §4.A / §6 + `signal-scorecard` §3-2 / §9 D4.
+ * PRD `investor-flow-cumulative` §4.A / §6 + `signal-scorecard` §3-2 / §9 D4 +
+ * `scorecard-backfill-decisions`(결정 원장 → 채점 원장 멱등 backfill).
  *
  * - **Vercel Cron** 이 호출(`vercel.json` crons, KST 16:10 = UTC 07:10, 평일). cron 항목 1개 유지
- *   (Hobby 1일 1회 한도) → 이 슬롯 안에서 ①수급 스냅샷 적립 후 ②AI 판정 채점(runScoring)을
- *   **순차 호출**한다. 각 단계는 **독립 try/catch** — 한 단계 실패가 다른 단계를 막지 않는다.
+ *   (Hobby 1일 1회 한도) → 이 슬롯 안에서 ①수급 스냅샷 적립 → ②결정 원장 backfill → ③AI 판정
+ *   채점(relativeRunScoring)을 **순차 호출**한다. backfill 을 채점 앞에 둬, 새로 append 된 행이
+ *   같은 패스 채점에서 잡히게 한다. 각 단계는 **독립 try/catch** — 한 단계 실패가 다른 단계를 막지 않는다.
  * - **인증**: `Authorization: Bearer ${CRON_SECRET}` 필수(Vercel Cron 자동 부착). 미일치 401.
  * - 외국인·기관 각각 `fetchForeignInstitutionTotal` → **전 행** 저장(top10 slice 안 함, 누적 커버리지).
  * - transient(EGW00201/네트워크) 1회 재시도(`fetchWithTransientRetry`). 2콜 간 delay 로 한도 회피.
@@ -23,8 +25,10 @@ import {
 import { saveFlowSnapshot, saveFlowCronMeta } from "@/lib/server/flowSnapshotStore";
 import { delay, fetchWithTransientRetry } from "@/lib/server/bffUtils";
 import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
+import { runBackfillDecisions } from "@/lib/server/scorecard/runBackfillDecisions";
 import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
 import type { RelativeScoreResult } from "@/lib/server/scorecard/relativeScoreDecisions";
+import type { BackfillDecisionsResult } from "@/lib/server/scorecard/backfillDecisions";
 
 const SUBJECT_DELAY_MS = 200; // 주체 2콜 간 지연 — EGW00201 회피.
 const RETRY_BACKOFF_MS = 250;
@@ -71,7 +75,23 @@ export async function GET(request: NextRequest) {
     await saveFlowCronMeta({ at: new Date().toISOString(), ok: false, reason: "flow-error", env });
   }
 
-  // ── 단계 ② AI 판정 채점 (독립 try/catch — 수급 실패와 무관하게 실행) ──────────
+  // ── 단계 ② 결정 원장 → 채점 원장 backfill (독립 try/catch) ────────────────────
+  // PRD `scorecard-backfill-decisions` — 채점 원장 append(#140) 이전 분석은 결정 원장에만
+  // 있어 채점 불가. asOf 있는 결정의 봉 종가로 entry 복원해 멱등 append. **채점(단계③) 앞**에
+  // 둬 새로 들어온 행이 같은 패스 채점에서 잡히게 한다. 멱등 — 재실행해도 중복 insert 0.
+  let backfill: BackfillDecisionsResult | null = null;
+  try {
+    backfill = await runBackfillDecisions();
+    console.info(
+      `[flow-snapshot] backfill candidates=${backfill.candidates} inserted=${backfill.inserted} ` +
+        `skippedNoAsOf=${backfill.skippedNoAsOf} skippedExists=${backfill.skippedExists} ` +
+        `skippedNoEntry=${backfill.skippedNoEntry} errors=${backfill.errors}`,
+    );
+  } catch (error) {
+    console.warn("[flow-snapshot] backfill 단계 실패 — 채점 단계는 계속", error);
+  }
+
+  // ── 단계 ③ AI 판정 채점 (독립 try/catch — 수급·backfill 실패와 무관하게 실행) ──
   let scoring: RelativeScoreResult | null = null;
   try {
     scoring = await relativeRunScoring();
@@ -86,5 +106,5 @@ export async function GET(request: NextRequest) {
     await saveScorecardCronMeta({ at: new Date().toISOString(), ok: false, reason: "scoring-error", env });
   }
 
-  return NextResponse.json({ ok: true, saved, scoring }, { status: 200 });
+  return NextResponse.json({ ok: true, saved, backfill, scoring }, { status: 200 });
 }

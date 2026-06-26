@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
+import { runBackfillDecisions } from "@/lib/server/scorecard/runBackfillDecisions";
 import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
 import { createLogger } from "@/lib/server/logTag";
 
@@ -39,6 +40,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, reason: "kis-not-prod", env }, { status: 200 });
   }
 
+  // backfill — 채점 원장 append(#140) 이전 결정을 멱등 복원(독립 try/catch, 채점 앞).
+  // PRD `scorecard-backfill-decisions`. 디스패처(flow-snapshot)와 동일 단계를 수동 트리거에도 공유.
+  let backfill: Awaited<ReturnType<typeof runBackfillDecisions>> | null = null;
+  try {
+    backfill = await runBackfillDecisions();
+    log(
+      `backfill candidates=${backfill.candidates} inserted=${backfill.inserted} ` +
+        `skippedNoAsOf=${backfill.skippedNoAsOf} skippedExists=${backfill.skippedExists} ` +
+        `skippedNoEntry=${backfill.skippedNoEntry} errors=${backfill.errors}`,
+    );
+  } catch (error) {
+    log.warn("backfill 실패 — 채점은 계속", error);
+  }
+
   try {
     const result = await relativeRunScoring();
     log(
@@ -47,7 +62,7 @@ export async function GET(request: NextRequest) {
         `skipped=${result.skipped} backfilled=${result.backfilled} errors=${result.errors}`,
     );
     await saveScorecardCronMeta({ at: new Date().toISOString(), ok: true, env, result });
-    return NextResponse.json({ ok: true, result }, { status: 200 });
+    return NextResponse.json({ ok: true, backfill, result }, { status: 200 });
   } catch (error) {
     // fail-soft — 전체 throw 도 200(다른 cron·재시도 보호). 헬스 마커에 사유 기록.
     log.error("채점 예외", error);
