@@ -46,6 +46,10 @@ create table if not exists public.signal_scorecard (
   created_at timestamptz not null default now()
 );
 
+-- PostgREST anon/authenticated 접근은 차단하고 service role 서버 접근만 허용한다.
+-- service role은 RLS를 우회하므로 저장·대시보드 BFF 동작에는 영향이 없다.
+alter table public.signal_scorecard enable row level security;
+
 -- 이미 배포된 DB용 멱등 컬럼 추가(신규 컬럼만 — 기존 컬럼 삭제/타입 변경 금지). ─────────
 alter table public.signal_scorecard add column if not exists live_price numeric;
 alter table public.signal_scorecard add column if not exists run_id text;
