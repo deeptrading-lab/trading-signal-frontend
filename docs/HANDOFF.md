@@ -4412,3 +4412,45 @@
   - prod Supabase 에 `signal-scorecard.sql` 신규 컬럼 선적용 후 cron 1회 돌려 backfill 멱등·excess status 갱신 모니터링(헬스 마커 `scorecard:cron:meta` 의 backfilled 카운트 확인).
   - QA·리뷰는 후속 별도(이 슬러그는 PM+dev 묶음). 라이브 지수 TR(`FHKUP03500100`) 실응답 필드(`bstp_nmix_clpr`) prod 단건 검증 권장.
   - 후속 슬러그 후보: `scorecard-sector-relative`(섹터 상대), beta_adjusted 기본 모드 전환 검토.
+
+### 2026-06-26 — feat(scorecard): 결정 원장 → 채점 원장 멱등 backfill (asOf 봉 종가 entry 복원 + cron 통합) (#152)
+
+- **slug**: `scorecard-backfill-decisions` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/152
+- **요약**: feat(scorecard): 결정 원장 → 채점 원장 멱등 backfill (asOf 봉 종가 entry 복원 + cron 통합)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 채점 원장(`signal_scorecard`) append 코드(`signal-scorecard`, #140)가 **~6/19 배포**되어, 그 이전 분석들은 결정 원장(`ai_analysis_decisions`)에만 있고 채점 원장엔 없어 **채점 불가**였다. 이번 PR은 **결정시점 봉 날짜(`signal.asOf`)가 있는 결정**을 그 봉 종가로 entry 복원해 채점 원장에 **멱등 backfill** 하고, 디스패처 cron 에 통합해 자동 실행한다.
+  > 
+  > PRD: `docs/prd/scorecard-backfill-decisions.md`
+  > 
+  > ## 대상 (현재)
+  > 
+  > - **6/19 분석 5건**(017670·042700·329180·194370·010120) — append(#140) 이전이지만 asOf 보유 → 첫 backfill 대상.
+  > - 6/22 이후 분석은 이미 채점 원장에 있어 **멱등 skip**.
+  > 
+  > ## 핵심 결정
+  > 
+  > - **backfill 트리거 = cron 통합**: `flow-snapshot` 디스패처에 단계 추가. 순서 **flow → backfill → 채점**. backfill 을 채점 앞에 둬 새로 append 된 행이 같은 패스 채점에서 잡히게. 수동 트리거 불요. (`score-decisions` 수동 라우트도 동일 단계 공유.)
+  > - **멱등키 = (ticker, entry_date=asOf)**: 채점 원장에 이미 그 키 행이 있으면 skip. 같은 패스 내 중복 후보도 1회만 insert. 재실행해도 중복 insert 0.
+  > - **entry 복원 방식**: `fetchDailyChunked(ticker, asOf-10일, asOf)` → `date===asOf` 봉 종가. **못 구하면(부재/fetch 실패/0·음수) insert 안 함** → 다음 패스 재시도(추측·null insert 금지, 채점 오염 차단).
+  > - **대상 필터**: `signal.asOf` 있는 결정만(legacy asOf null 은 entry 복원 불가 → 자연 제외, 추측 금지).
+  > - **fail-soft 다층**: 단계(독립 try/catch)·결정(per-decision catch)·fetch(transient 재시도)·insert(미설정/실패=카운트). 어느 층 실패도 cron 200·다른 단계 무영향.
+  > 
+  > ## SQL 변경
+  > 
+  > **불필요** — 기존 채점 원장 컬럼(verdict/decision_confidence/signal_score/signal_action/target_pct/stop_loss_pct/entry_close/entry_date/live_price/decided_at/run_id/bench_key + horizon pending)만 사용. 신규 컬럼/인덱스/마이그레이션 0.
+  > 
+  > ## 신규/수정 파일
+  > 
+  > - 신규 `lib/server/scorecard/backfillDecisions.ts` — 주입형 backfill 핵심 로직 + `existsKey` 멱등키.
+  > - 신규 `lib/server/scorecard/runBackfillDecisions.ts` — 실 deps 주입 배선(throw 안 함).
+  > - 신규 `lib/server/scorecard/__tests__/backfillDecisions.test.ts` — 단위테스트 10건.
+  > - 수정 `lib/server/scorecard/scorecardStore.ts` — `getScorecardKeys` 멱등키 조회 추가.
+  > - 수정 `app/api/cron/flow-snapshot/route.ts` — backfill 단계(채점 앞) 통합.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 라이브 검증: prod cron 1회 실행 후 `/api/flow/cron-status` 로그(`[flow-snapshot] backfill inserted=...`)로 6/19 5건 inserted 확인 → 후속 패스에서 채점(hit/miss/flat) 합류 확인.
+  - FOLLOWUP: 결정 원장 ticker PK upsert 한계 — 같은 종목 과거(6/19) 결정이 최신(6/22)으로 덮인 경우 복원 불가. history 보존은 별도 slug(`decisions-history`) 검토.
+  - 관련 slug: `scorecard-relative-scoring`(#149, backfill 행이 합류하는 v2 채점) · `scorecard-feedback`(표본 누적 후 프롬프트 주입 플래그 ON 검토).
