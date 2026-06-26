@@ -42,6 +42,13 @@ export interface AnalysisState {
    * verdict confidence ≤ MEDIUM 캡을 강제한다. 풀 데이터(빈 문자열)면 PM 프롬프트에서 분기로 제외.
    */
   dataWarning?: string;
+  /**
+   * 시황 컨텍스트(Phase 3) — 저장된 최신 `MarketAnalysis` 를 포매팅한 시장 전체 국면 블록.
+   * env `AI_MARKET_CONTEXT_ENABLED` ON + 저장본 존재 시에만 채워지고(없으면 undefined),
+   * market·news·portfolio_manager user 프롬프트에 끼워 넣는다(없으면 무주입 → 무회귀).
+   * 빌더: `lib/market/analysisContext.ts` `buildMarketContextBlock`.
+   */
+  marketContext?: string;
 }
 
 /** PM 프롬프트에 주입할 정형 감성 한 줄 컨텍스트(없으면 "데이터 없음"). */
@@ -139,7 +146,7 @@ export const AGENT_PROMPTS: Record<AgentKey, AgentPrompts> = {
 리포트 마지막에는 핵심 포인트를 정리한 마크다운 표를 반드시 포함하세요.
 
 핵심 지표 최대 8개만 선별하고, 마크다운 표 1개를 포함해 총 2,500자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `다음 기술적 시그널 데이터와 시장 스냅샷을 분석해 상세한 기술 분석 리포트를 작성하세요:\n\n[기술적 시그널]\n${s.signalSummary}\n\n[시장 스냅샷 — 현재가·성과·수급]\n${s.priceContext}`,
+    user: (s) => `다음 기술적 시그널 데이터와 시장 스냅샷을 분석해 상세한 기술 분석 리포트를 작성하세요:\n\n[기술적 시그널]\n${s.signalSummary}\n\n[시장 스냅샷 — 현재가·성과·수급]\n${s.priceContext}${s.marketContext ?? ""}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -164,7 +171,7 @@ WebSearch 도구로 다음을 검색하고, WebFetch로 주요 기사 본문을 
 리포트 마지막에는 핵심 뉴스를 날짜·헤드라인·영향도로 정리한 마크다운 표를 반드시 포함하세요.
 
 주요 뉴스 최대 5개만 선별하고, 마크다운 표 1개를 포함해 총 3,000자 이내로 작성하세요.${LANG_INSTRUCTION}`,
-    user: (s) => `종목 코드 ${s.ticker}에 대한 최신 뉴스·공시·업종 동향·거시경제 환경을 웹 검색으로 조사하고 포괄적인 리포트를 작성하세요.\n\n[참고 — 현재 시장 스냅샷]\n${s.priceContext}`,
+    user: (s) => `종목 코드 ${s.ticker}에 대한 최신 뉴스·공시·업종 동향·거시경제 환경을 웹 검색으로 조사하고 포괄적인 리포트를 작성하세요.\n\n[참고 — 현재 시장 스냅샷]\n${s.priceContext}${s.marketContext ?? ""}`,
     tools: ["WebSearch", "WebFetch"],
     timeoutMs: T.WEB_TOOL,
   },
@@ -555,7 +562,7 @@ ${s.riskRisky}
 ${s.riskNeutral}
 
 [보수적 리스크 평가]
-${s.riskSafe}${buildDataWarningContext(s.dataWarning)}`,
+${s.riskSafe}${buildDataWarningContext(s.dataWarning)}${s.marketContext ?? ""}`,
     tools: [],
     timeoutMs: T.PM,
     effort: "high" as const,
