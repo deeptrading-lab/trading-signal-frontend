@@ -5,10 +5,11 @@
  * 주입 대상(market/news/PM 포함, 비대상 제외) 회귀 차단.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   buildMarketContextBlock,
-  isMarketContextPromptEnabled,
+  isMarketAnalysisFresh,
+  MARKET_CONTEXT_MAX_AGE_HOURS,
 } from "../analysisContext";
 import type { MarketAnalysis } from "../analysisTypes";
 import { AGENT_PROMPTS } from "@/lib/prompts/stock/aiAnalysis";
@@ -115,30 +116,42 @@ describe("buildMarketContextBlock", () => {
   });
 });
 
-describe("isMarketContextPromptEnabled", () => {
-  const original = process.env.AI_MARKET_CONTEXT_ENABLED;
-  afterEach(() => {
-    if (original === undefined) delete process.env.AI_MARKET_CONTEXT_ENABLED;
-    else process.env.AI_MARKET_CONTEXT_ENABLED = original;
+describe("isMarketAnalysisFresh", () => {
+  const now = new Date("2026-06-27T05:00:00.000Z");
+
+  it("한계 이내(방금·1시간 전) → fresh", () => {
+    expect(isMarketAnalysisFresh("2026-06-27T05:00:00.000Z", now)).toBe(true);
+    expect(isMarketAnalysisFresh("2026-06-27T04:00:00.000Z", now)).toBe(true);
   });
 
-  it("미설정 → OFF", () => {
-    delete process.env.AI_MARKET_CONTEXT_ENABLED;
-    expect(isMarketContextPromptEnabled()).toBe(false);
+  it("한계 직전(24h 미만) → fresh, 한계 초과(25h) → stale", () => {
+    // 23h59m 전
+    expect(isMarketAnalysisFresh("2026-06-26T05:01:00.000Z", now)).toBe(true);
+    // 25h 전
+    expect(isMarketAnalysisFresh("2026-06-26T04:00:00.000Z", now)).toBe(false);
   });
 
-  it("1·true·on(대소문자 무시) → ON", () => {
-    for (const v of ["1", "true", "TRUE", "on", "On"]) {
-      process.env.AI_MARKET_CONTEXT_ENABLED = v;
-      expect(isMarketContextPromptEnabled()).toBe(true);
-    }
+  it("며칠 전 저장본 → stale(주입 skip)", () => {
+    expect(isMarketAnalysisFresh("2026-06-24T05:00:00.000Z", now)).toBe(false);
   });
 
-  it("그 외 값 → OFF", () => {
-    for (const v of ["0", "false", "off", "yes", ""]) {
-      process.env.AI_MARKET_CONTEXT_ENABLED = v;
-      expect(isMarketContextPromptEnabled()).toBe(false);
-    }
+  it("미래 타임스탬프(시계 오차) → fresh 취급", () => {
+    expect(isMarketAnalysisFresh("2026-06-27T06:00:00.000Z", now)).toBe(true);
+  });
+
+  it("asOf 누락/파싱 불가 → stale(보수적)", () => {
+    expect(isMarketAnalysisFresh(undefined, now)).toBe(false);
+    expect(isMarketAnalysisFresh(null, now)).toBe(false);
+    expect(isMarketAnalysisFresh("", now)).toBe(false);
+    expect(isMarketAnalysisFresh("not-a-date", now)).toBe(false);
+  });
+
+  it("maxAgeHours 인자로 조정 가능", () => {
+    // 기본 24h 상수 노출
+    expect(MARKET_CONTEXT_MAX_AGE_HOURS).toBe(24);
+    // 2h 한계로 좁히면 3h 전은 stale
+    expect(isMarketAnalysisFresh("2026-06-27T02:00:00.000Z", now, 2)).toBe(false);
+    expect(isMarketAnalysisFresh("2026-06-27T04:00:00.000Z", now, 2)).toBe(true);
   });
 });
 
