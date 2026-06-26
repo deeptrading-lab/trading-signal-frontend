@@ -44,9 +44,9 @@ export interface AnalysisState {
   dataWarning?: string;
   /**
    * 시황 컨텍스트(Phase 3) — 저장된 최신 `MarketAnalysis` 를 포매팅한 시장 전체 국면 블록.
-   * env `AI_MARKET_CONTEXT_ENABLED` ON + 저장본 존재 시에만 채워지고(없으면 undefined),
-   * market·news·portfolio_manager user 프롬프트에 끼워 넣는다(없으면 무주입 → 무회귀).
-   * 빌더: `lib/market/analysisContext.ts` `buildMarketContextBlock`.
+   * 저장본이 존재하고 신선(asOf ≤ 24h)할 때만 채워지고(없음/노후/조회실패면 undefined),
+   * market·news·portfolio_manager user 프롬프트에 끼워 넣는다(없으면 무주입 → 무영향).
+   * 빌더: `lib/market/analysisContext.ts` `buildMarketContextBlock`, 신선도 게이트: `isMarketAnalysisFresh`.
    */
   marketContext?: string;
 }

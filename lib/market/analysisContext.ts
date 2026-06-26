@@ -6,8 +6,12 @@
  * 포매팅한다. 주입 원천은 `getLatestMarketAnalysis()`(?mode=latest 저장본) — CLI 0콜이라
  * 종목분석 latency 에 합성을 더하지 않는다.
  *
- * - `buildMarketContextBlock` — 순수함수. null/빈 입력 → "" (주입 skip → 무회귀).
- * - `isMarketContextPromptEnabled` — env `AI_MARKET_CONTEXT_ENABLED` 게이트(기본 OFF, 서버 전용).
+ * 주입은 **항상 시도**(별도 env 토글 없음)하되, 저장본이 너무 오래됐으면 주입을 건너뛴다 —
+ * 오래된 국면(예: 며칠 전 "패닉 조정" 진단)을 "현재 시장"으로 오판하게 만드는 걸 막는다.
+ * Phase 4 cron 이 30분마다 갱신하면 저장본은 항상 신선해 사실상 항상 주입된다.
+ *
+ * - `buildMarketContextBlock` — 순수함수. null/빈 입력 → "" (주입 skip → 무영향).
+ * - `isMarketAnalysisFresh` — 순수함수. 저장본 `asOf` 가 신선도 한계 이내인지 판정(주입 게이트).
  */
 
 import type {
@@ -135,16 +139,32 @@ export function buildMarketContextBlock(
 }
 
 /**
- * 종목분석 프롬프트에 시황 컨텍스트를 주입할지 여부 — **기본 OFF**.
+ * 시황 저장본 신선도 한계(시간). 이보다 오래된 분석은 "현재 국면"으로 주입하지 않는다.
  *
- * PRD `market-context-injection` §2. 운영자가 시황 저장본을 충분히 신뢰(신선·정확)한 뒤에만 켠다.
- * - OFF(기본): 종목분석 라우트가 시황 조회·주입을 아예 하지 않음 → 완전 무회귀.
- * - ON: `getLatestMarketAnalysis()` 저장본을 market·news·PM 프롬프트에 덧붙인다(fail-soft).
- *
- * env `AI_MARKET_CONTEXT_ENABLED` = "1"·"true"·"on"(대소문자 무시) 이면 ON, 그 외/미설정은 OFF.
- * 서버 전용(`NEXT_PUBLIC_` 금지) — 프롬프트는 route handler 안에서만 조립된다.
+ * 24h 근거: Phase 4 cron(30분 주기) 도입 후엔 저장본이 항상 30분 이내라 늘 주입되고,
+ * cron 전(운영자 수동 `?refresh=1`)에도 하루 1회 갱신이면 충분히 신선. 주말·연휴로 하루 넘게
+ * 묵으면 자동 skip 되어 며칠 전 국면을 현재로 오판하지 않는다. 코드 1줄로 조정.
  */
-export function isMarketContextPromptEnabled(): boolean {
-  const raw = process.env.AI_MARKET_CONTEXT_ENABLED?.trim().toLowerCase();
-  return raw === "1" || raw === "true" || raw === "on";
+export const MARKET_CONTEXT_MAX_AGE_HOURS = 24;
+
+/**
+ * 저장된 시황 분석이 주입하기에 충분히 신선한지 판정(순수함수).
+ *
+ * - `asOf` 누락/파싱 불가 → `false`(주입 skip, 보수적).
+ * - 미래 타임스탬프(시계 오차) → `true`(신선 취급).
+ * - 그 외 → `now - asOf <= maxAgeHours` 이면 `true`.
+ *
+ * `now` 를 인자로 받아 순수성을 유지한다(route handler 가 `new Date()` 주입).
+ */
+export function isMarketAnalysisFresh(
+  asOf: string | undefined | null,
+  now: Date,
+  maxAgeHours: number = MARKET_CONTEXT_MAX_AGE_HOURS,
+): boolean {
+  if (!asOf) return false;
+  const t = Date.parse(asOf);
+  if (Number.isNaN(t)) return false;
+  const ageMs = now.getTime() - t;
+  if (ageMs < 0) return true;
+  return ageMs <= maxAgeHours * 3_600_000;
 }

@@ -56,7 +56,7 @@ import { isScorecardFeedbackPromptEnabled } from "@/lib/server/scorecard/constan
 import { getLatestMarketAnalysis } from "@/lib/server/marketAnalysisStore";
 import {
   buildMarketContextBlock,
-  isMarketContextPromptEnabled,
+  isMarketAnalysisFresh,
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { isVercelEnv } from "@/lib/server/env";
@@ -435,23 +435,24 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  // 시황 컨텍스트 주입(market-context, Phase 3) — **플래그 OFF(기본)면 완전 skip**.
-  // OFF 면 시황 저장본 조회·문자열 조립을 아예 하지 않아 프롬프트·동작 무변경(무회귀).
+  // 시황 컨텍스트 주입(market-context, Phase 3) — **항상 시도**(별도 토글 없음).
   // 주입 원천은 Phase 2 가 저장한 `?mode=latest` 본(읽기 1회·CLI 0콜) → 종목분석 latency 무증가.
-  // 미설정/조회실패/저장본없음은 빈 문자열 → 주입 skip(fail-soft, 분석 안 막음).
+  // 신선도 가드: 저장본이 MARKET_CONTEXT_MAX_AGE_HOURS 초과로 묵으면 주입 skip — 며칠 전 국면을
+  // "현재 시장"으로 오판하는 걸 막는다(Phase 4 cron 도입 시 항상 신선해 사실상 항상 주입).
+  // fail-soft: 미설정/조회실패/저장본없음/노후 → 빈 문자열 → 주입 skip(분석 안 막음).
   let marketContext = "";
-  if (isMarketContextPromptEnabled()) {
-    try {
-      const latest = await getLatestMarketAnalysis();
-      if (latest) {
-        marketContext = buildMarketContextBlock(latest.analysis, { dataSource: latest.dataSource });
-        if (marketContext) aiLog("시황 컨텍스트 주입(market-context ON)");
-      } else {
-        aiLog("시황 컨텍스트 주입 skip — 저장된 시황 분석 없음");
-      }
-    } catch (error) {
-      aiLog.warn("시황 컨텍스트 조회 실패 — 주입 skip", error);
+  try {
+    const latest = await getLatestMarketAnalysis();
+    if (!latest) {
+      aiLog("시황 컨텍스트 주입 skip — 저장된 시황 분석 없음");
+    } else if (!isMarketAnalysisFresh(latest.analysis.asOf, new Date())) {
+      aiLog(`시황 컨텍스트 주입 skip — 저장본 노후(asOf=${latest.analysis.asOf})`);
+    } else {
+      marketContext = buildMarketContextBlock(latest.analysis, { dataSource: latest.dataSource });
+      if (marketContext) aiLog("시황 컨텍스트 주입(market-context)");
     }
+  } catch (error) {
+    aiLog.warn("시황 컨텍스트 조회 실패 — 주입 skip", error);
   }
 
   // 클라이언트 disconnect + 서버 타임아웃 통합 signal
@@ -483,7 +484,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         ticker,
         signalSummary: "",
         priceContext: "",
-        // 시황 컨텍스트(Phase 3) — 플래그 OFF/미설정/실패 시 빈 문자열(무주입·무회귀).
+        // 시황 컨텍스트(Phase 3) — 저장본 없음/노후(>24h)/조회실패 시 빈 문자열(무주입·무영향).
         marketContext,
         // 이전 실행 결과로 초기화 (startFrom 이전 에이전트들은 재실행 안 함)
         marketReport:        preState.marketReport        ?? "",
