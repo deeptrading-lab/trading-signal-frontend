@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
-import { runScoring } from "@/lib/server/scorecard/runScoring";
+import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
 import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
 import { createLogger } from "@/lib/server/logTag";
 
@@ -40,11 +40,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await runScoring();
+    const result = await relativeRunScoring();
     log(
       `채점 완료 candidates=${result.candidates} scored=${result.scored} ` +
         `hit=${result.hit} miss=${result.miss} flat=${result.flat} ` +
-        `skipped=${result.skipped} errors=${result.errors}`,
+        `skipped=${result.skipped} backfilled=${result.backfilled} errors=${result.errors}`,
     );
     await saveScorecardCronMeta({ at: new Date().toISOString(), ok: true, env, result });
     return NextResponse.json({ ok: true, result }, { status: 200 });

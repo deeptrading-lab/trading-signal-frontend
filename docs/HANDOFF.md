@@ -4370,3 +4370,45 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) 리서치 매니저·트레이더 등 PM 외 프롬프트의 본문 영문 병기도 같은 원칙으로 확장 검토 — 현재는 사용자 노출 경로(PM JSON)에 한정해 PM만 처리.
+
+### 2026-06-23 — feat(scorecard): 시장/베타 보정 채점 v2 — 초과수익(excess) 기준 알파 측정 (PRD+구현+테스트) (#149)
+
+- **slug**: `scorecard-relative-scoring` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/149
+- **요약**: feat(scorecard): 시장/베타 보정 채점 v2 — 초과수익(excess) 기준 알파 측정 (PRD+구현+테스트)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > phase-1 절대 수익률 채점은 시장 전체가 빠지는 날 약세 판정(UNDERWEIGHT/SELL)이 **시장 베타에 올라타 자동 hit** 되는 함정이 있었다(알파 vs 베타 미분리). 이 PR 은 **같은 horizon 의 벤치마크 지수(KOSPI/KOSDAQ) 수익률을 빼서 초과수익(excess)·베타보정 잔차(alpha)로 채점**하는 v2 로, 시장 베타를 제거하고 종목 선택력(알파)만 측정한다.
+  > 
+  > PRD: `docs/prd/scorecard-relative-scoring.md`
+  > 
+  > ## 핵심 설계 결정
+  > 
+  > - **신규 지수 TR**: `FHKUP03500100`(`inquire-daily-indexchartprice`), `FID_COND_MRKT_DIV_CODE=U`, code `0001`(KOSPI)/`1001`(KOSDAQ), 종가 `bstp_nmix_clpr`. **prod 전용**(기존 `fetchIndexPrice` 정책 계승). 100봉 한도라 130일 청크 분할.
+  > - **벤치마크 매핑**: 오프라인 `symbols.json` `market` 필드 역참조(`getMarketByTicker`) → KOSPI `0001`/KOSDAQ `1001`, 미수록 폴백 `0001`. **추가 API 호출 0**(rate-limit·비용 절감). 결정시점에도 원장 `bench_key` 보존.
+  > - **기본 채점 모드**: `excess`(초과수익 = abs − bench). 상수 `SCORING_METRIC_MODE`(`absolute|excess|beta_adjusted`). status 는 선택 지표 vs ±T 로 산출하되 **phase-1 `scoreOutcome` 방향 규칙을 그대로 재사용**(입력만 상대 지표로 교체).
+  > - **regime 임계**: 벤치 수익률 ±1.5% → up/down, 사이 flat.
+  > - **β 추정 윈도우**: entry **직전** 60영업일 종목·지수 일간수익률 회귀(look-ahead 없음·결정론), 최소 30페어. 추정 불가(표본 부족·지수 무변동) 시 **beta_adjusted 는 excess 로 견고 폴백**(반쯤 만든 상태 금지).
+  > - **backfill 방식**: `getRowsNeedingRelativeScoring` 가 pending **또는** "채점됐으나 bench null(미보정)" horizon 을 조회 → cron 패스에서 상대값 멱등 재계산 + status 주 지표 기준 갱신. skipped 는 제외. 과거 entry 종가가 원장에 보존돼 있어 복원 가능(phase-1 의 "가격 미보존 백필 불가" 와 다름).
+  > 
+  > ## AC (요약)
+  > 
+  > - AC-1 지수 일봉 fetch / AC-2 벤치마크 매핑 / AC-3 excess 시장베타 차단 / AC-4 β·모드선택·폴백 / AC-5 regime·±T 경계 / AC-6 backfill 멱등 / AC-7 fail-soft(지수 측정불가→pending 보류) / AC-8 집계·자가교정 excess / AC-9 무회귀. 상세는 PRD §5.
+  > 
+  > ## fail-soft
+  > 
+  > 지수/종목 fetch 실패는 `fetchWithTransientRetryOrThrow` 로 transient 1회 재시도 후 throw 전파 → ticker 단위 catch 가 pending 유지(영구 skip 오확정 금지). 지수 성공 빈 배열(entry 지수 부재)도 excess 측정 불가 → pending 보류.
+  > 
+  > ## ⚠️ 마이그레이션 주의
+  > 
+  > `docs/sql/signal-scorecard.sql` 의 신규 멱등 컬럼(`bench_key` + horizon별 `*_bench_return_pct`/`*_excess_return_pct`/`*_beta`/`*_alpha_residual_pct`/`*_regime`) + backfill 부분 인덱스를 **코드 머지/배포 전 prod Supabase 에 수동 선적용**해야 한다. 기존 컬럼 비파괴.
+  > 
+  > ## 검증 (실측)
+  > 
+  > - `npm run lint` — 0 errors/0 warnings
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - prod Supabase 에 `signal-scorecard.sql` 신규 컬럼 선적용 후 cron 1회 돌려 backfill 멱등·excess status 갱신 모니터링(헬스 마커 `scorecard:cron:meta` 의 backfilled 카운트 확인).
+  - QA·리뷰는 후속 별도(이 슬러그는 PM+dev 묶음). 라이브 지수 TR(`FHKUP03500100`) 실응답 필드(`bstp_nmix_clpr`) prod 단건 검증 권장.
+  - 후속 슬러그 후보: `scorecard-sector-relative`(섹터 상대), beta_adjusted 기본 모드 전환 검토.

@@ -51,6 +51,7 @@ import {
 } from "@/lib/server/scorecard/scorecardStore";
 import { summarizeScorecard } from "@/lib/server/scorecard/summarize";
 import { buildScorecardFeedbackSummary } from "@/lib/server/scorecard/calibration";
+import { resolveBenchCode } from "@/lib/server/scorecard/relativeRunScoring";
 import { isScorecardFeedbackPromptEnabled } from "@/lib/server/scorecard/constants";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { isVercelEnv } from "@/lib/server/env";
@@ -681,6 +682,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                     livePrice: priceData?.price ?? null,
                     decidedAt: new Date().toISOString(),
                     runId,
+                    benchKey: resolveBenchCode(ticker),
                   });
                   if (scoreResult.skipped) {
                     aiLog("채점 원장 append skip — Supabase 미설정");

@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { getSymbolName, searchSymbols } from "@/lib/api/kis/search";
+import { getSymbolName, getMarketByTicker, searchSymbols } from "@/lib/api/kis/search";
+import { resolveBenchCode } from "@/lib/server/scorecard/relativeRunScoring";
 
 describe("getSymbolName", () => {
   it("시드 수록 ticker 는 종목명 반환", () => {
@@ -18,5 +19,23 @@ describe("getSymbolName", () => {
 
   it("시드 미수록 ticker 는 null", () => {
     expect(getSymbolName("999999")).toBeNull();
+  });
+});
+
+describe("getMarketByTicker — 오프라인 상장시장 역참조(scorecard-relative-scoring)", () => {
+  it("KOSPI 대형주(삼성전자 005930) → KOSPI", () => {
+    expect(getMarketByTicker("005930")).toBe("KOSPI");
+  });
+  it("시드 미수록 ticker → null", () => {
+    expect(getMarketByTicker("999999")).toBeNull();
+  });
+});
+
+describe("resolveBenchCode — 종목 → 벤치마크 지수 코드", () => {
+  it("KOSPI 종목 → 0001", () => {
+    expect(resolveBenchCode("005930")).toBe("0001");
+  });
+  it("시드 미수록 → 폴백 0001(KOSPI)", () => {
+    expect(resolveBenchCode("999999")).toBe("0001");
   });
 });

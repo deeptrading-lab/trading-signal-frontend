@@ -6,7 +6,10 @@
  * 채점 cron(`/api/cron/score-decisions`)이 이 값을 단일 진실 원천으로 참조한다.
  */
 
-import type { ScorecardHorizon } from "@/lib/types/scorecard/scorecard";
+import type {
+  ScorecardHorizon,
+  ScoringMetricMode,
+} from "@/lib/types/scorecard/scorecard";
 
 /**
  * horizon 별 평가 경과 영업일 임계.
@@ -80,3 +83,57 @@ export function isScorecardFeedbackPromptEnabled(): boolean {
  * 평가일이 휴장이면 그 직후 가장 가까운 영업봉 종가를 쓴다(연속 휴장 흡수). 이를 넘으면 skipped.
  */
 export const HORIZON_CLOSE_LOOKAHEAD_BARS = 7;
+
+// ─── 시장/베타 보정 채점(scorecard-relative-scoring) 상수 ────────────────────
+//
+// PRD `scorecard-relative-scoring`. 절대 수익률 채점은 시장 베타에 올라타 약세 판정이 자동
+// hit 되는 문제가 있어, 같은 horizon 의 벤치마크 지수 수익률을 빼 알파(종목 선택력)를 측정한다.
+// 본 상수는 한 곳에서 조정(env 노출 불요 — 운영자 1인 MVP).
+
+/**
+ * 주 채점 지표 모드.
+ * - "absolute"      — phase-1 동치(결정시점 대비 절대 수익률 r%).
+ * - "excess"(기본)  — 초과수익 = abs − bench(같은 horizon 벤치마크 지수 수익률).
+ * - "beta_adjusted" — 베타보정 잔차 = abs − β·bench(β 추정 불가 시 excess 로 폴백).
+ *
+ * 기본 = "excess". OVERWEIGHT/UNDERWEIGHT 가 본질적으로 "시장 대비" 상대 개념이라, 시장 베타를
+ * 1로 가정해 통째로 빼는 초과수익이 알파의 1차 근사로 견고하다(β 추정 표본 의존도가 낮음).
+ */
+export type { ScoringMetricMode } from "@/lib/types/scorecard/scorecard";
+export const SCORING_METRIC_MODE: ScoringMetricMode = "excess";
+
+/**
+ * 시장 국면(regime) 분류 임계(%). 해당 horizon 구간 벤치마크 수익률 기준.
+ * - bench ≥ +T_regime → 강세장(up) / bench ≤ −T_regime → 약세장(down) / 그 사이 → 횡보(flat).
+ *
+ * 적중 임계 T(HIT_THRESHOLD_PCT=2) 보다 약간 작게 잡아(1.5%) 명확한 추세장과 횡보를 가른다.
+ */
+export const REGIME_THRESHOLD_PCT = 1.5;
+
+/**
+ * 베타(β) 추정 윈도우 — entry **직전** 영업일 수(종목·지수 일간수익률 회귀 표본 구간).
+ * 60영업일 ≒ 약 3달. 직전 구간이라 entry 시점 정보만 사용(look-ahead 없음 — 결정론).
+ */
+export const BETA_WINDOW_BUSINESS_DAYS = 60;
+
+/**
+ * β 추정 최소 유효 페어 수. 이 미만이면 β=null(beta_adjusted 가 excess 로 폴백).
+ * 신규 상장·장기 거래정지로 윈도우 봉이 부족한 종목을 방어한다.
+ */
+export const BETA_MIN_PAIRS = 30;
+
+/**
+ * 벤치마크 지수 코드(KIS 업종 코드). 종목 상장시장 → 벤치마크 매핑.
+ * - KOSPI 종목 → "0001"(KOSPI 종합지수)
+ * - KOSDAQ 종목 → "1001"(KOSDAQ 종합지수)
+ */
+export const BENCH_INDEX_CODE = {
+  KOSPI: "0001",
+  KOSDAQ: "1001",
+} as const;
+
+/**
+ * 종목 상장시장을 `symbols.json` 에서 못 찾을 때의 폴백 벤치마크.
+ * KOSPI 가 시총 비중이 커 시장 베타 근사로 더 보수적(과대 hit 위험 낮음). 한계는 PRD §6 명시.
+ */
+export const BENCH_FALLBACK_CODE = BENCH_INDEX_CODE.KOSPI;

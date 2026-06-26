@@ -40,6 +40,8 @@ function confCell(
     flat,
     total: hit + miss + flat,
     hitRate: denom > 0 ? hit / denom : null,
+    absHitRate: denom > 0 ? hit / denom : null,
+    absSample: denom,
   };
 }
 
@@ -59,6 +61,8 @@ function verdictCell(
     flat: 0,
     total: hit + miss,
     hitRate: denom > 0 ? hit / denom : null,
+    absHitRate: denom > 0 ? hit / denom : null,
+    absSample: denom,
   };
 }
 

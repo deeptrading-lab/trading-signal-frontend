@@ -77,6 +77,17 @@ export function getSymbolName(ticker: string): string | null {
 }
 
 /**
+ * ticker → 상장시장("KOSPI" | "KOSDAQ") 역참조 — **오프라인 시드 기반**(추가 API 호출 없음).
+ *
+ * PRD `scorecard-relative-scoring` §벤치마크 해석. 채점 cron 이 종목→벤치마크 지수를 정할 때 쓴다.
+ * `symbols.json` 미수록(신규 상장·시드 누락)이면 null → 호출부가 폴백 벤치마크(KOSPI)로 대체하고
+ * 한계를 인지한다(PRD §6). search-stock-info(prod 전용 추가 호출) 의존을 피해 비용·rate-limit 절감.
+ */
+export function getMarketByTicker(ticker: string): "KOSPI" | "KOSDAQ" | null {
+  return SYMBOLS.find((s) => s.ticker === ticker)?.market ?? null;
+}
+
+/**
  * 시드 메타 — BFF route handler 가 응답 헤더 (`X-Symbols-Source: seed-v0.1.0`) 에 표기.
  */
 export function getSymbolsMeta(): {

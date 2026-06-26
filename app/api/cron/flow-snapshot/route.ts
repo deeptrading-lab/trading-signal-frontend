@@ -22,9 +22,9 @@ import {
 } from "@/lib/api/kis";
 import { saveFlowSnapshot, saveFlowCronMeta } from "@/lib/server/flowSnapshotStore";
 import { delay, fetchWithTransientRetry } from "@/lib/server/bffUtils";
-import { runScoring } from "@/lib/server/scorecard/runScoring";
+import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
 import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
-import type { ScoreDecisionsResult } from "@/lib/server/scorecard/scoreDecisions";
+import type { RelativeScoreResult } from "@/lib/server/scorecard/relativeScoreDecisions";
 
 const SUBJECT_DELAY_MS = 200; // 주체 2콜 간 지연 — EGW00201 회피.
 const RETRY_BACKOFF_MS = 250;
@@ -72,12 +72,13 @@ export async function GET(request: NextRequest) {
   }
 
   // ── 단계 ② AI 판정 채점 (독립 try/catch — 수급 실패와 무관하게 실행) ──────────
-  let scoring: ScoreDecisionsResult | null = null;
+  let scoring: RelativeScoreResult | null = null;
   try {
-    scoring = await runScoring();
+    scoring = await relativeRunScoring();
     console.info(
       `[flow-snapshot] scoring candidates=${scoring.candidates} scored=${scoring.scored} ` +
-        `hit=${scoring.hit} miss=${scoring.miss} flat=${scoring.flat} skipped=${scoring.skipped}`,
+        `hit=${scoring.hit} miss=${scoring.miss} flat=${scoring.flat} ` +
+        `skipped=${scoring.skipped} backfilled=${scoring.backfilled}`,
     );
     await saveScorecardCronMeta({ at: new Date().toISOString(), ok: true, env, result: scoring });
   } catch (error) {
