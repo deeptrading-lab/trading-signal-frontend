@@ -17,6 +17,12 @@ import type { MarketDataSource } from "@/lib/market/types";
 const log = createLogger("market-analysis-store");
 const TABLE = "market_analyses";
 
+/**
+ * 시황 분석 보존 윈도우(일) — 이보다 오래된 행은 저장 시점에 정리한다(롤링 보존, Phase 4a).
+ * 거래일 ~16행 × ~65거래일 ≈ 1,000행 상한. 무한 누적 방지 + 분기치 이력 보존. 코드 1줄 조정.
+ */
+export const MARKET_ANALYSIS_RETENTION_DAYS = 90;
+
 type SupabaseRow = {
   analysis: MarketAnalysis;
   data_source: MarketDataSource | null;
@@ -119,4 +125,57 @@ export async function insertMarketAnalysis(
   }
 
   return { ok: true, skipped: false };
+}
+
+/** 보존 컷오프 ISO — `now` 기준 `retentionDays` 이전 시각(순수, 테스트 대상). */
+export function retentionCutoffIso(
+  now: Date,
+  retentionDays: number = MARKET_ANALYSIS_RETENTION_DAYS,
+): string {
+  return new Date(now.getTime() - retentionDays * 86_400_000).toISOString();
+}
+
+export type AnalysisPruneResult =
+  | { ok: true; skipped: true; reason: "not_configured" }
+  | { ok: true; skipped: false; deleted: number }
+  | { ok: false; skipped: false; error: string };
+
+/**
+ * 보존 윈도우(retentionDays) 초과 행 삭제 — `created_at < cutoff` 한정 DELETE(롤링 보존, Phase 4a).
+ *
+ * - 필터(`created_at=lt.`)가 있는 한정 삭제라 전체 삭제 위험 없음. 방금 insert 한 최신본(asOf≈now)은
+ *   컷오프 밖이라 절대 지워지지 않는다.
+ * - 삭제 건수는 `Prefer: count=exact` 의 `Content-Range`(예: `*​/3`) 꼬리에서 집계(로그용).
+ * - 미설정 → skipped, 오류 → error(fail-soft). 분석 응답을 막지 않는다.
+ */
+export async function pruneOldMarketAnalyses(
+  retentionDays: number = MARKET_ANALYSIS_RETENTION_DAYS,
+  now: Date = new Date(),
+): Promise<AnalysisPruneResult> {
+  const config = supabaseConfig();
+  if (!config) return { ok: true, skipped: true, reason: "not_configured" };
+
+  const cutoff = retentionCutoffIso(now, retentionDays);
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("created_at", `lt.${cutoff}`);
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { ...headers(config.key), Prefer: "count=exact" },
+  }).catch((error: unknown) => ({
+    ok: false,
+    status: 0,
+    headers: new Headers(),
+    text: async () => (error instanceof Error ? error.message : String(error)),
+  }));
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, skipped: false, error: `Supabase prune 실패 status=${res.status} ${text}` };
+  }
+
+  const range = res.headers?.get("content-range") ?? "";
+  const tail = range.includes("/") ? Number(range.split("/").pop()) : 0;
+  const deleted = Number.isFinite(tail) ? tail : 0;
+  return { ok: true, skipped: false, deleted };
 }
