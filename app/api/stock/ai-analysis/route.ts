@@ -484,7 +484,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         ticker,
         signalSummary: "",
         priceContext: "",
-        // 시황 컨텍스트(Phase 3) — 플래그 OFF/미설정/실패 시 빈 문자열(무주입·무회귀).
+        // 시황 컨텍스트(Phase 3) — 저장본 없음/노후(>24h)/조회실패 시 빈 문자열(무주입·무영향).
         marketContext,
         // 이전 실행 결과로 초기화 (startFrom 이전 에이전트들은 재실행 안 함)
         marketReport:        preState.marketReport        ?? "",
