@@ -192,11 +192,17 @@ export type BuildAnalysisResult = {
   analysis: MarketAnalysis;
   /** CLI 호출 여부(저비용 경로 추적용). */
   cliInvoked: boolean;
+  /**
+   * 합성 실패로 기본값 degrade 가 됐는지(CLI throw 또는 JSON 파싱 실패).
+   * true 면 라우트가 **저장하지 않는다** — 가짜 기본값 분석이 `?mode=latest` 최신본으로 고착되는 것 방지
+   * (직전 정상 저장본 유지가 더 정직). Phase 4 cron 도착 전엔 자동 덮어쓰기가 없어 특히 중요.
+   */
+  degraded: boolean;
 };
 
 /**
  * 스냅샷을 CLI 로 합성해 `MarketAnalysis` 생성. CLI 실패/빈 출력 시 정규화 기본값으로 degrade
- * (전체 throw 아님 — 라우트가 200 fail-soft 유지).
+ * (전체 throw 아님 — 라우트가 200 fail-soft 유지). degrade 는 `degraded:true` 로 표시해 저장 제외.
  */
 export async function buildMarketAnalysis(
   snapshot: MarketSnapshot,
@@ -224,15 +230,17 @@ export async function buildMarketAnalysis(
       return {
         analysis: normalizeAnalysisFields(null, snapshot, ["CLI 합성 결과 파싱 실패 — 기본값 degrade"]),
         cliInvoked: true,
+        degraded: true,
       };
     }
-    return { analysis: normalizeAnalysisFields(parsed, snapshot), cliInvoked: true };
+    return { analysis: normalizeAnalysisFields(parsed, snapshot), cliInvoked: true, degraded: false };
   } catch (error) {
     log.warn("CLI 합성 실패 — degrade", error);
     const msg = error instanceof Error ? error.message : String(error);
     return {
       analysis: normalizeAnalysisFields(null, snapshot, [`CLI 합성 실패(${msg}) — 기본값 degrade`]),
       cliInvoked: false,
+      degraded: true,
     };
   }
 }

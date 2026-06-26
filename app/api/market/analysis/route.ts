@@ -27,7 +27,7 @@ import { jsonWithDataSource, withTimeout, BFF_TIMEOUT_SENTINEL } from "@/lib/ser
 import { createLogger } from "@/lib/server/logTag";
 
 export const preferredRegion = "icn1";
-/** CLI 합성(effort high) 여유 — 라우트 함수 최대 실행시간. */
+/** CLI 합성(effort medium, CLI 타임아웃 180s) 여유 — 라우트 함수 최대 실행시간. */
 export const maxDuration = 300;
 
 const log = createLogger("market/analysis");
@@ -81,18 +81,19 @@ export async function GET(request: NextRequest) {
       setCachedSnapshot(snapshot);
     }
 
-    const { analysis, cliInvoked } = await buildMarketAnalysis(snapshot, {
+    const { analysis, cliInvoked, degraded } = await buildMarketAnalysis(snapshot, {
       signal: request.signal,
     });
 
-    // mock 스냅샷은 적립 안 함(prod 게이트 통과라 보통 live/partial).
-    if (snapshot.dataSource !== "mock") {
+    // 적립 제외: mock 스냅샷 / degrade(합성 실패 기본값) — 가짜 분석이 최신본으로 고착되는 것 방지.
+    // degrade 면 직전 정상 저장본이 ?mode=latest 로 유지된다.
+    if (snapshot.dataSource !== "mock" && !degraded) {
       const write = await insertMarketAnalysis(analysis, snapshot.dataSource);
       if (!write.ok) log.warn("저장 실패", write.error);
     }
 
     log(
-      `phase=${analysis.regimeDiagnosis.phase} risk=${analysis.systemRisk.level} cli=${cliInvoked} source=${snapshot.dataSource}`,
+      `phase=${analysis.regimeDiagnosis.phase} risk=${analysis.systemRisk.level} cli=${cliInvoked} degraded=${degraded} source=${snapshot.dataSource}`,
     );
     return jsonWithDataSource(analysis, snapshot.dataSource, {
       "X-KIS-Env": env,
