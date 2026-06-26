@@ -4,7 +4,14 @@
  * PRD `market-snapshot` §3.2. KIS 실데이터를 모아 순수함수(sectors/concentration/regime)로 가공해
  * 단일 스냅샷을 조립한다. 각 섹션은 독립 try/catch — 일부 실패해도 전체 200(부분 성공, `partial`).
  *
- * 호출 예산(§3.4): 지수 5 + multprice ⌈유니버스/30⌉(~4) + ETF 일봉 청크(~3) + flow 2 ≈ 6~10콜.
+ * 호출 예산(§3.4): 지수 5 + multprice ⌈유니버스/30⌉(~3) + ETF 일봉 청크(~4) + flow 2 ≈ 14콜.
+ *
+ * ## 레이트리밋(EGW00201) 페이싱
+ *
+ * KIS 는 전역 레이트리미터·재시도가 없어 라우트마다 직접 페이싱한다(집안 표준 2개씩 120ms,
+ * 지수 라우트 `KIS_CHUNK_SIZE=2`/`120ms` 정합). 본 오케스트레이터도 지수·바스켓 일괄시세를
+ * **무지연 동시 버스트가 아니라 2개씩 페이싱**해, 다른 라우트와 같은 app-key 초당 예산을 나눠 써도
+ * EGW00201 로 조용히 데이터가 빠지는 것을 막는다. 일봉(`fetchDailyChunked`)은 이미 150ms 페이싱.
  */
 
 import {
@@ -13,8 +20,11 @@ import {
   fetchForeignInstitutionTotal,
   fetchIntstockMultprice,
   type MarketIndexQuote,
+  type WatchlistQuote,
 } from "@/lib/api/kis";
+import { MULTPRICE_CHUNK_SIZE } from "@/lib/api/kis/intstock-multprice";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
+import { delay } from "@/lib/server/bffUtils";
 import { computeDomesticFearGreed } from "@/lib/utils/fearGreed";
 import {
   THEME_BASKETS,
@@ -43,6 +53,10 @@ const DEFAULT_TOP_N = 5;
 const FLOW_TOP_N = 7;
 /** regime 일봉 룩백(캘린더일) — 120+20 거래봉 확보용 여유. */
 const REGIME_LOOKBACK_DAYS = 400;
+/** EGW00201 회피 페이싱 — 동시 KIS 콜 수 상한(지수 라우트 정합). */
+const KIS_CHUNK_SIZE = 2;
+/** EGW00201 회피 페이싱 — 청크 간 지연(ms, 지수 라우트 정합). */
+const KIS_CHUNK_DELAY_MS = 120;
 
 export type BuildResult = { snapshot: MarketSnapshot; callCount: number };
 
@@ -56,23 +70,29 @@ export async function buildMarketSnapshot(opts?: { topN?: number }): Promise<Bui
   let calls = 0;
   let anyFail = false;
 
-  // ── 지수 (국내 3 + 해외 2, 병렬) ──────────────────────────────────────────
+  // ── 지수 (국내 3 + 해외 2) — 2개씩 페이싱(EGW00201 회피) ──────────────────
   const domesticQuotes = new Map<string, MarketIndexQuote>();
   const overseasQuotes = new Map<string, MarketIndexQuote>();
   {
-    const settled = await Promise.allSettled([
-      ...DOMESTIC_CODES.map((c) => fetchIndexPriceShared(c)),
-      ...OVERSEAS_CODES.map((c) => fetchOverseasIndexShared(c)),
-    ]);
-    calls += DOMESTIC_CODES.length + OVERSEAS_CODES.length;
-    settled.forEach((r, i) => {
-      if (r.status === "fulfilled") {
-        const code = i < DOMESTIC_CODES.length ? DOMESTIC_CODES[i] : OVERSEAS_CODES[i - DOMESTIC_CODES.length];
-        (i < DOMESTIC_CODES.length ? domesticQuotes : overseasQuotes).set(code, r.value);
-      } else {
-        anyFail = true;
-      }
-    });
+    const targets = [
+      ...DOMESTIC_CODES.map((code) => ({ code, overseas: false })),
+      ...OVERSEAS_CODES.map((code) => ({ code, overseas: true })),
+    ];
+    for (let i = 0; i < targets.length; i += KIS_CHUNK_SIZE) {
+      const group = targets.slice(i, i + KIS_CHUNK_SIZE);
+      const settled = await Promise.allSettled(
+        group.map((t) => (t.overseas ? fetchOverseasIndexShared(t.code) : fetchIndexPriceShared(t.code))),
+      );
+      calls += group.length;
+      settled.forEach((r, j) => {
+        if (r.status === "fulfilled") {
+          (group[j].overseas ? overseasQuotes : domesticQuotes).set(group[j].code, r.value);
+        } else {
+          anyFail = true;
+        }
+      });
+      if (i + KIS_CHUNK_SIZE < targets.length) await delay(KIS_CHUNK_DELAY_MS);
+    }
     if (domesticQuotes.size === 0) warnings.push("국내 지수 조회 실패 — 일부 지표 누락");
   }
 
@@ -82,14 +102,27 @@ export async function buildMarketSnapshot(opts?: { topN?: number }): Promise<Bui
   // ── 시장 폭 (KOSPI+KOSDAQ 합산) ──────────────────────────────────────────
   const breadth = computeBreadth(domesticQuotes.get("0001"), domesticQuotes.get("1001"));
 
-  // ── 섹터 + 집중도 (multprice 일괄) ───────────────────────────────────────
+  // ── 섹터 + 집중도 (바스켓 일괄시세 — 30종목/콜, 청크 간 페이싱) ──────────
   let sectors: MarketSnapshot["sectors"] = [];
   let concentration: MarketSnapshot["concentration"] = null;
   {
     const universe = allBasketTickers();
-    try {
-      const quotes = await fetchIntstockMultprice(universe);
-      calls += Math.ceil(universe.length / 30);
+    const quotes: WatchlistQuote[] = [];
+    // 30종목/콜로 쪼개 순차 호출 + 청크 간 지연(무지연 동시 버스트 회피). 청크 실패는 부분 누락.
+    for (let i = 0; i < universe.length; i += MULTPRICE_CHUNK_SIZE) {
+      const group = universe.slice(i, i + MULTPRICE_CHUNK_SIZE);
+      try {
+        quotes.push(...(await fetchIntstockMultprice(group)));
+      } catch {
+        anyFail = true;
+      }
+      calls += 1;
+      if (i + MULTPRICE_CHUNK_SIZE < universe.length) await delay(KIS_CHUNK_DELAY_MS);
+    }
+    if (quotes.length === 0) {
+      anyFail = true;
+      warnings.push("바스켓 일괄 시세 조회 실패 — 섹터·집중도 누락");
+    } else {
       const byTicker = new Map(quotes.map((q) => [q.ticker, { changePercent: q.changePercent }]));
       const names = basketNameByTicker();
       sectors = computeSectorPerf(byTicker, THEME_BASKETS, names);
@@ -97,9 +130,6 @@ export async function buildMarketSnapshot(opts?: { topN?: number }): Promise<Bui
       if (quotes.length < universe.length) {
         warnings.push(`바스켓 시세 부분 확보(${quotes.length}/${universe.length})`);
       }
-    } catch {
-      anyFail = true;
-      warnings.push("바스켓 일괄 시세 조회 실패 — 섹터·집중도 누락");
     }
   }
   if (concentration) {
