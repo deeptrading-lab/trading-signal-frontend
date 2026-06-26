@@ -21,6 +21,8 @@ import { buildMarketAnalysis } from "@/lib/market/analysis";
 import {
   getLatestMarketAnalysis,
   insertMarketAnalysis,
+  pruneOldMarketAnalyses,
+  MARKET_ANALYSIS_RETENTION_DAYS,
 } from "@/lib/server/marketAnalysisStore";
 import { getMockMarketAnalysis } from "@/lib/mock/market/analysis";
 import { jsonWithDataSource, withTimeout, BFF_TIMEOUT_SENTINEL } from "@/lib/server/bffUtils";
@@ -87,18 +89,31 @@ export async function GET(request: NextRequest) {
 
     // 적립 제외: mock 스냅샷 / degrade(합성 실패 기본값) — 가짜 분석이 최신본으로 고착되는 것 방지.
     // degrade 면 직전 정상 저장본이 ?mode=latest 로 유지된다.
+    let pruned = 0;
     if (snapshot.dataSource !== "mock" && !degraded) {
       const write = await insertMarketAnalysis(analysis, snapshot.dataSource);
-      if (!write.ok) log.warn("저장 실패", write.error);
+      if (!write.ok) {
+        log.warn("저장 실패", write.error);
+      } else if (!write.skipped) {
+        // 저장 성공 시에만 보존 윈도우(90일) 초과분 정리(롤링 보존, fail-soft — 응답 안 막음).
+        const prune = await pruneOldMarketAnalyses();
+        if (prune.ok && !prune.skipped && prune.deleted > 0) {
+          pruned = prune.deleted;
+          log(`보존 정리 — ${pruned}행 삭제(>${MARKET_ANALYSIS_RETENTION_DAYS}일)`);
+        } else if (!prune.ok) {
+          log.warn("보존 정리 실패", prune.error);
+        }
+      }
     }
 
     log(
-      `phase=${analysis.regimeDiagnosis.phase} risk=${analysis.systemRisk.level} cli=${cliInvoked} degraded=${degraded} source=${snapshot.dataSource}`,
+      `phase=${analysis.regimeDiagnosis.phase} risk=${analysis.systemRisk.level} cli=${cliInvoked} degraded=${degraded} source=${snapshot.dataSource} pruned=${pruned}`,
     );
     return jsonWithDataSource(analysis, snapshot.dataSource, {
       "X-KIS-Env": env,
       "X-Cache": "miss",
       "X-CLI": cliInvoked ? "1" : "0",
+      "X-Pruned": String(pruned),
     });
   } catch (error) {
     // 스냅샷 빌드 실패/타임아웃 — 저장본 폴백, 없으면 mock.
