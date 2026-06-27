@@ -4636,3 +4636,44 @@
   - (후속) 탭 라벨: 종목코드 → 종목명 캐시 강화(현재 analyze 진입만 name 전달, 상세 진입은 ticker 폴백).
   - (후속) 4번째 요청 대기 큐 옵션(현재는 차단). 필요 시 슬롯 free 시 자동 승격.
   - (후속) 재분석 시 직전 aborted 스트림의 late-event race — 관측되면 슬롯 runId 태깅으로 보강.
+
+### 2026-06-27 — feat(ai-analysis): 토큰 최적화 A/B 하니스 (config 파라미터화 + 비교/낭비진단 + 러너) (#165)
+
+- **slug**: `ab-harness-config` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/165
+- **요약**: feat(ai-analysis): 토큰 최적화 A/B 하니스 (config 파라미터화 + 비교/낭비진단 + 러너)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > **토큰 최적화 A/B 하니스** — PR #164(관측성)로 측정 공백을 메운 뒤, 이제 **데이터로 객관적 토큰 낭비를 찾고 무회귀로 절감**하는 단계의 도구. 같은 종목을 config A/B 로 N회 돌려 **토큰/비용/지연 Δ + 결정 품질 회귀를 자동 판정**하고, **어디가 품질 기여 없이 토큰을 먹는지** 진단한다.
+  > 
+  > > 목표(사용자): "품질을 깎아 토큰을 버는" 게 아니라 **객관적 낭비·구조적 절감**을 찾는 것. 1순위 가설 = 프롬프트 프리픽스 불안정으로 인한 캐시 생성 폭증(휘발값 후방 이동 = 품질 0 손실 절감).
+  > 
+  > ## 구성 (PR-A 기반 + PR-B 하니스)
+  > 
+  > **PR-A — config 파라미터화 (무회귀 생명선)**
+  > - `lib/server/ai/analysisConfig.ts`: `resolveAnalysisConfig()` + `DEFAULT_ANALYSIS_CONFIG`(현 하드코딩값과 **바이트 동일**). override 없으면 일반 분석 무변경.
+  > - `aiAnalysis.ts`: 하드코딩 `.slice(0,N)`·`DEBATE_ROUNDS` → `config` 에서 읽기(`AnalysisState.config?` 옵셔널).
+  > - `route.ts`: body `runId`/`config` 수용(하니스 전용, 재개 시 runId 무시) + 에이전트별 effort/model 오버라이드.
+  > 
+  > **PR-B — 하니스**
+  > - **태깅**: `ab_run_config` 테이블/store(fail-soft) + route-side 기록(session 동봉 시 run_id↔config 1행). 기존 스키마 무변경.
+  > - **재사용 리팩터**: usage 집계를 `usageAggregate.ts` 로 추출 → 대시보드(usage/route)와 compare/waste 공유.
+  > - **비교**: `compare.ts` — config 별 토큰/비용/지연 Δ + 품질 프록시(verdict 일치율·confidence 분포·target/stop/signal drift) + **자동 PASS/REVIEW/INSUFFICIENT**(`abHarness/constants.ts` 임계).
+  > - **낭비 진단**: `waste.ts` — 입력:출력 수율·캐시생성 비중·단계별 분포(yield 오름차순 = 최악 먼저).
+  > - **API**: `GET /api/ab-harness/report?session=<id>` (읽기 BFF).
+  > - **러너**: `scripts/ab-harness/run-golden-set.mjs` (순수 Node, ticker 내 순차·간 동시 3, SSE 소비, claude 고정).
+  > 
+  > ## 검증
+  > 
+  > - `tsc` 0 · `eslint` 0 · `vitest` **518 passed**(무회귀 11 + 낭비진단 5 + 기존)
+  > - **무회귀**: `config undefined == DEFAULT` 프롬프트 바이트 동일(테스트), usage 리팩터 전후 동일(라이브 스모크: runCount 30·모델·wall-clock 그대로)
+  > - **API 스모크**(dev webpack): report 빈-세션 200 + 정상 shape, usage 200 무회귀
+  > - ⬜ 전체 A/B 런(30 runs ≈ 1.5h + 실비용)은 미실행 — 실험 시점에 러너로 구동(로컬 전용)
+  > 
+  > ## 실행 방법 (머지 후)
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **첫 실험**: baseline vs 캐시-프리픽스 안정화(휘발값 후방 이동) — `waste.ts` 의 캐시생성 비중 상위 에이전트부터. PASS 면 품질 0 손실 절감 확정.
+  - 출력 캡·웹fetch 가이드 파라미터화(config 확장), 사후 horizon hit-rate 자동 A/B(채점 cron 후), 대시보드 A/B 뷰(components/analyze 확장).

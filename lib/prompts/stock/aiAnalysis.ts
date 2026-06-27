@@ -15,7 +15,10 @@ import type {
   SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import { DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
+import {
+  DEFAULT_ANALYSIS_CONFIG,
+  type AnalysisConfig,
+} from "@/lib/server/ai/analysisConfig";
 
 // ─── 서버 전용 파이프라인 상태 ────────────────────────────────────────────────
 
@@ -49,6 +52,16 @@ export interface AnalysisState {
    * 빌더: `lib/market/analysisContext.ts` `buildMarketContextBlock`, 신선도 게이트: `isMarketAnalysisFresh`.
    */
   marketContext?: string;
+  /**
+   * 런타임 토큰 최적화 config(A/B 하니스 주입). 미주입(undefined)이면 DEFAULT_ANALYSIS_CONFIG
+   * = 현 하드코딩값과 동일 → 무회귀. slice/토론라운드 등 레버를 이 객체에서 읽는다.
+   */
+  config?: AnalysisConfig;
+}
+
+/** state.config 가 없으면 기본 config 로 폴백(무회귀). 프롬프트 빌더 공용 접근자. */
+function cfg(s: AnalysisState): AnalysisConfig {
+  return s.config ?? DEFAULT_ANALYSIS_CONFIG;
 }
 
 /** PM 프롬프트에 주입할 정형 감성 한 줄 컨텍스트(없으면 "데이터 없음"). */
@@ -377,13 +390,13 @@ ${s.priceContext}
 ${s.researchPlan}
 
 [강세 연구원 최종 논거]
-${s.bullArgument.slice(0, 1500)}
+${s.bullArgument.slice(0, cfg(s).slices.traderBull)}
 
 [약세 연구원 최종 논거]
-${s.bearArgument.slice(0, 1500)}
+${s.bearArgument.slice(0, cfg(s).slices.traderBear)}
 
 [기술 분석 요약]
-${s.marketReport.slice(0, 800)}`,
+${s.marketReport.slice(0, cfg(s).slices.traderMarket)}`,
     tools: [],
     timeoutMs: T.TRADER,
     effort: "max" as const,
@@ -406,10 +419,10 @@ ${s.priceContext}
 ${s.traderProposal}
 
 [투자 계획 (리서치 매니저)]
-${s.researchPlan.slice(0, 800)}
+${s.researchPlan.slice(0, cfg(s).slices.riskResearch)}
 
 [기술적 시그널]
-${s.signalSummary.slice(0, 500)}`,
+${s.signalSummary.slice(0, cfg(s).slices.riskSignal)}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -429,10 +442,10 @@ ${s.priceContext}
 ${s.traderProposal}
 
 [투자 계획 (리서치 매니저)]
-${s.researchPlan.slice(0, 800)}
+${s.researchPlan.slice(0, cfg(s).slices.riskResearch)}
 
 [기술적 시그널]
-${s.signalSummary.slice(0, 500)}`,
+${s.signalSummary.slice(0, cfg(s).slices.riskSignal)}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -452,10 +465,10 @@ ${s.priceContext}
 ${s.traderProposal}
 
 [투자 계획 (리서치 매니저)]
-${s.researchPlan.slice(0, 800)}
+${s.researchPlan.slice(0, cfg(s).slices.riskResearch)}
 
 [기술적 시그널]
-${s.signalSummary.slice(0, 500)}`,
+${s.signalSummary.slice(0, cfg(s).slices.riskSignal)}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -546,10 +559,10 @@ ${s.socialReport}
 ${buildSentimentContext(s.sentiment)}
 
 [강세 연구원 최종 논거]
-${s.bullArgument.slice(0, 2000)}
+${s.bullArgument.slice(0, cfg(s).slices.pmBull)}
 
 [약세 연구원 최종 논거]
-${s.bearArgument.slice(0, 2000)}
+${s.bearArgument.slice(0, cfg(s).slices.pmBear)}
 
 [투자 계획 (리서치 매니저)]
 ${s.researchPlan}
@@ -575,8 +588,8 @@ ${s.riskSafe}${buildDataWarningContext(s.dataWarning)}${s.marketContext ?? ""}`,
 // ─── 2라운드 토론 프롬프트 빌더 ──────────────────────────────────────────────
 
 function buildBullR2Prompt(state: AnalysisState): string {
-  const prevBull = state.bullArgument.slice(0, 1500);
-  const prevBear = state.bearArgument.slice(0, 1500);
+  const prevBull = state.bullArgument.slice(0, cfg(state).slices.debateR2Prev);
+  const prevBear = state.bearArgument.slice(0, cfg(state).slices.debateR2Prev);
   return `약세 연구원의 반론이 나왔습니다. 이에 맞서 강세 입장을 강화하세요.
 이전 발화는 핵심 논점 파악에만 사용하고, 전문을 그대로 재인용하지 마세요.
 
@@ -590,8 +603,8 @@ ${prevBear}
 }
 
 function buildBearR2Prompt(state: AnalysisState, latestBullText: string): string {
-  const prevBear = state.bearArgument.slice(0, 1500);
-  const bullR2 = latestBullText.slice(0, 1500);
+  const prevBear = state.bearArgument.slice(0, cfg(state).slices.debateR2Prev);
+  const bullR2 = latestBullText.slice(0, cfg(state).slices.debateR2Prev);
   return `강세 연구원의 재반론이 나왔습니다. 최종 입장으로 마무리하세요.
 이전 발화는 핵심 논점 파악에만 사용하고, 전문을 그대로 재인용하지 마세요.
 
@@ -614,7 +627,8 @@ export async function runDebateLoop(
   runId: string,
   ticker: string,
 ): Promise<"done" | "aborted" | "error"> {
-  for (let round = 1; round <= DEBATE_ROUNDS; round++) {
+  const rounds = cfg(state).debateRounds;
+  for (let round = 1; round <= rounds; round++) {
     if (combinedSignal.aborted) return "aborted";
     console.log(`[ai-analysis] ── 토론 ${round}라운드 시작 ──`);
 
@@ -633,6 +647,9 @@ export async function runDebateLoop(
         userPrompt: bullPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
+        // 하니스 config 오버라이드(미지정이면 undefined = 기존 동작 무변경).
+        effort: cfg(state).effortByAgent?.bull,
+        model: cfg(state).modelByAgent?.bull,
       }, combinedSignal, (token) => {
         send({ type: "debate_stream", speaker: "bull", chunk: token, round });
       });
@@ -653,7 +670,7 @@ export async function runDebateLoop(
       : bullText;
     send({ type: "debate", speaker: "bull", content: bullText, round });
     console.log(`[ai-analysis] ✓ bull R${round} len=${bullText.length} elapsed=${((Date.now() - bullT0) / 1000).toFixed(1)}s`);
-    if (round === DEBATE_ROUNDS) send({ type: "progress", agent: "bull", status: "done" });
+    if (round === rounds) send({ type: "progress", agent: "bull", status: "done" });
 
     if (combinedSignal.aborted) return "aborted";
 
@@ -672,6 +689,9 @@ export async function runDebateLoop(
         userPrompt: bearPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
+        // 하니스 config 오버라이드(미지정이면 undefined = 기존 동작 무변경).
+        effort: cfg(state).effortByAgent?.bear,
+        model: cfg(state).modelByAgent?.bear,
       }, combinedSignal, (token) => {
         send({ type: "debate_stream", speaker: "bear", chunk: token, round });
       });
@@ -692,7 +712,7 @@ export async function runDebateLoop(
       : bearText;
     send({ type: "debate", speaker: "bear", content: bearText, round });
     console.log(`[ai-analysis] ✓ bear R${round} len=${bearText.length} elapsed=${((Date.now() - bearT0) / 1000).toFixed(1)}s`);
-    if (round === DEBATE_ROUNDS) send({ type: "progress", agent: "bear", status: "done" });
+    if (round === rounds) send({ type: "progress", agent: "bear", status: "done" });
   }
 
   return "done";

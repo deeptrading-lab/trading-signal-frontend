@@ -39,7 +39,7 @@ import type {
   SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import { AGENT_ORDER, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
+import { AGENT_ORDER } from "@/lib/types/stock/aiAnalysis";
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import {
   getLatestAIDecision,
@@ -63,6 +63,8 @@ import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
+import { resolveAnalysisConfig, type AnalysisConfigOverride } from "@/lib/server/ai/analysisConfig";
+import { recordAbRunConfig } from "@/lib/server/ai/abRunConfigStore";
 import { businessDaysBetween } from "@/lib/utils/businessDays";
 
 /** 토큰 사용량 집계용 단계 분류: A=분석가, B=토론, C=매니저 체인. */
@@ -402,12 +404,18 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  // Body: { ticker, provider?, startFrom?, state? }
+  // Body: { ticker, provider?, startFrom?, state?, runId?, config? }
+  // runId·config 는 A/B 하니스 전용(일반 클라이언트는 안 보냄). 미주입 시 기존 동작.
   const body = await req.json().catch(() => null) as {
     ticker?: unknown;
     provider?: unknown;
     startFrom?: unknown;
     state?: unknown;
+    runId?: unknown;
+    config?: unknown;
+    session?: unknown;
+    configId?: unknown;
+    configLabel?: unknown;
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
@@ -428,15 +436,33 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const provider: AIAnalysisProvider = rawProvider;
 
-  // 토큰 사용량 이력에서 이 분석 1회(12 agent)를 묶는 키. 재개 시에도 새 run 으로 집계.
-  const runId = crypto.randomUUID();
-
   // startFrom 검증 + 정규화 (bear → bull: 토론은 항상 bull부터 재실행)
   const rawStartFrom: AgentKey | undefined =
     typeof body.startFrom === "string" && (AGENT_ORDER as string[]).includes(body.startFrom)
       ? (body.startFrom as AgentKey)
       : undefined;
   const startFrom: AgentKey | undefined = rawStartFrom === "bear" ? "bull" : rawStartFrom;
+
+  // 토큰 사용량 이력에서 이 분석 1회(12 agent)를 묶는 키.
+  // 하니스가 미리 생성한 runId 를 신규 실행에 한해 사용(재개 시엔 무시하고 새 UUID — 기존 정책 유지).
+  const runId =
+    !startFrom && typeof body.runId === "string" && body.runId.trim()
+      ? body.runId.trim()
+      : crypto.randomUUID();
+
+  // 런타임 토큰 최적화 config(A/B 하니스 전용). override 없으면 DEFAULT = 현 동작 무변경.
+  const configOverride: AnalysisConfigOverride | null =
+    body.config && typeof body.config === "object"
+      ? (body.config as AnalysisConfigOverride)
+      : null;
+  const analysisConfig = resolveAnalysisConfig(configOverride);
+
+  // A/B 하니스 태깅(session 있을 때만). run_id ↔ config 매핑을 ab_run_config 에 1행 기록(fail-soft).
+  const abSession =
+    typeof body.session === "string" && body.session.trim() ? body.session.trim() : null;
+  const abConfigId =
+    typeof body.configId === "string" && body.configId.trim() ? body.configId.trim() : "default";
+  const abConfigLabel = typeof body.configLabel === "string" ? body.configLabel : null;
 
   // 이전 실행 결과 (재개 시)
   const preState: ResumeState = (body.state && typeof body.state === "object")
@@ -495,6 +521,18 @@ export async function POST(req: NextRequest): Promise<Response> {
     ? AbortSignal.any([req.signal, timeoutController.signal])
     : timeoutController.signal;
 
+  // A/B 하니스: session 지정 시 이 run 을 config 로 태깅(fail-soft, 분석 비차단).
+  if (abSession) {
+    recordAbRunConfig({
+      runId,
+      session: abSession,
+      configId: abConfigId,
+      configLabel: abConfigLabel,
+      ticker,
+      params: configOverride,
+    });
+  }
+
   // 스트림이 cancel(클라이언트 disconnect)·정상 종료로 닫혔는지 추적.
   // 클라이언트가 분석 도중 페이지를 떠나면 cancel()이 먼저 컨트롤러를 닫는데,
   // start() 비동기 본문은 Promise.allSettled 단계를 빠져나오며 계속 흐르다 controller.close()를
@@ -519,6 +557,8 @@ export async function POST(req: NextRequest): Promise<Response> {
         priceContext: "",
         // 시황 컨텍스트(Phase 3) — 저장본 없음/노후(>24h)/조회실패 시 빈 문자열(무주입·무영향).
         marketContext,
+        // 런타임 토큰 최적화 config(A/B 하니스). 미주입이면 DEFAULT = 현 동작 무변경.
+        config: analysisConfig,
         // 이전 실행 결과로 초기화 (startFrom 이전 에이전트들은 재실행 안 함)
         marketReport:        preState.marketReport        ?? "",
         newsReport:          preState.newsReport          ?? "",
@@ -639,8 +679,9 @@ export async function POST(req: NextRequest): Promise<Response> {
               userPrompt: prompts.user(state),
               tools: prompts.tools,
               timeoutMs: prompts.timeoutMs,
-              effort: prompts.effort,
-              model: prompts.model,
+              // config 오버라이드(하니스) 우선, 없으면 AGENT_PROMPTS 기본.
+              effort: analysisConfig.effortByAgent?.[agentKey] ?? prompts.effort,
+              model: analysisConfig.modelByAgent?.[agentKey] ?? prompts.model,
             }, combinedSignal, (token) => {
               send({ type: "stream", agent: agentKey, chunk: token });
             });
@@ -817,7 +858,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         // ── Phase B: 토론 (bull → bear × DEBATE_ROUNDS) ─────────────────────
         if (!combinedSignal.aborted && AGENT_ORDER.indexOf("bull") >= startIndex) {
-          aiLog(`▶ 토론 시작 (${DEBATE_ROUNDS}라운드)`);
+          aiLog(`▶ 토론 시작 (${analysisConfig.debateRounds}라운드)`);
           const result = await runDebateLoop(state, send, combinedSignal, provider, runId, ticker);
           if (result === "aborted") {
             aiLog("토론 중단 (abort)");
