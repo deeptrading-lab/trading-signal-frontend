@@ -78,6 +78,15 @@ export const COPY = {
     // restartAll 도 공급자 선택 화면으로 돌아간다(다른 AI로 다시 선택).
     restartAll: "다시 선택",
     close: "닫기",
+    /** 우측 재열기 탭 — 종목별 패널 열기 aria. */
+    reopen: (name: string) => `${name} AI 분석 패널 열기`,
+    /** 재열기 탭 닫기(완료 슬롯 제거) aria. */
+    dismissTab: (name: string) => `${name} 분석 닫기`,
+  },
+  /** 동시 분석 상한(최대 3개) 안내. */
+  limit: {
+    atCapacity: (max: number) =>
+      `동시 분석은 최대 ${max}개까지예요. 진행 중인 분석이 끝나면 다시 시도해 주세요.`,
   },
   progress: {
     market:           ["기술적 지표 산출 중...", "차트 패턴 분석 중...", "추세 강도 계산 중...", "매매 시그널 확인 중..."],

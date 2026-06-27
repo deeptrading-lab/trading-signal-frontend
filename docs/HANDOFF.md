@@ -4593,3 +4593,46 @@
   - **PR-5 (지연, 게이트)**: 토론 R1 병렬화(R2 직렬 유지). ⚠️ `aiAnalysisProvider.tsx` debate 핸들러를 speaker+round 매칭으로 reconcile 재작성 필수.
   - **PR-6/7/8 (게이트)**: 웹툴 안정화 / 빠른 모드(rounds=1 옵션) / trader effort A/B — 모두 sentiment·verdict 회귀 게이트 통과 후.
   - **드롭**: PM 강등, 토론 R2 병렬화, 웹 fetch 하드캡, codex 추정비용 단가표(위험>이득).
+
+### 2026-06-27 — feat(ai-analysis): AI 종목분석 동시 3건 지원 — 종목별 슬롯 + 탭 전환 (#163)
+
+- **slug**: `ai-analysis-concurrency` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/163
+- **요약**: feat(ai-analysis): AI 종목분석 동시 3건 지원 — 종목별 슬롯 + 탭 전환
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > Slack 봇처럼 웹사이트(로컬 dev)에서도 **AI 종목분석을 최대 3건 동시** 실행할 수 있게 했습니다. 기존엔 새 분석을 시작하면 진행 중이던 스트림을 abort 하는 "동시 1건" 구조였습니다.
+  > 
+  > ## 무엇을
+  > - **전역 상태(provider)**: 단일 슬롯 → **종목별 슬롯 맵 + `useReducer`**. 종목마다 자체 `AbortController`. dispatch 안정성 덕에 stale-closure ref 7개 제거.
+  > - **동시성 게이트**: "대상 종목 제외 running ≥ 3"이면 차단 + 인라인 안내. running 슬롯 재분석(자기 제외)은 통과, 완료/에러 슬롯 재실행·새 종목은 정확히 3에서 차단.
+  > - **탭 UI**: 패널 헤더 탭 스트립(2건+), 우측 재열기 탭을 종목별 스택으로(진행수·스피너·닫기 ×).
+  > - **analyze 카드**: `isTickerRunning(ticker)`로 per-종목 "분석 중" 배지.
+  > - 서버 route handler·SSE·CLI **무수정**(요청별 독립).
+  > 
+  > ## 변경 파일
+  > - `hooks/stock/aiAnalysisProvider.tsx` (핵심 리팩터)
+  > - `components/stock/GlobalAIAnalysis.tsx`, `components/stock/AIAnalysisPanel.tsx`
+  > - `components/analyze/AIDecisionCardMenu.tsx`, `components/analyze/ReanalyzeButton.tsx`
+  > - `lib/copy/stock/aiAnalysis.ts`
+  > 
+  > ## 검증
+  > - `npm run typecheck` 클린, `npm run lint`(변경 파일) 클린, dev HMR 재컴파일 에러 0건.
+  > - ⚠️ 실제 3건 동시 구동은 로컬 claude/codex CLI + KIS 설정 필요 — 아래 시나리오로 수동 검증 권장.
+  > 
+  > ### 수동 검증 시나리오
+  > 1. 종목 A·B·C 순서로 분석 시작 → 우측 재열기 탭 3개 스택, 헤더 탭 전환으로 각자 독립 진행 확인
+  > 2. 종목 D 시도 → "최대 3개" 차단 배너
+  > 3. 한 종목 stop → 그 종목만 멈추고 나머지 계속
+  > 4. 완료 시 해당 탭만 스피너 해제 + `/analyze` 카드 자동 갱신
+  > 
+  > ## 주의/한계
+  > - **로컬 dev 전용**(Vercel route 503). 동시 3건 = CLI 프로세스 동시 다수 + claude/codex 구독 rate limit·KIS 호출 ×3 부하 — 봇과 동일 상한(3)으로 제한.
+  > - 슬롯 누적 상한 6(running 3 + 완료 잔여), 초과 시 가장 오래된 완료 슬롯 evict.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 실제 로컬에서 3건 동시 구동 QA(스트림 독립성·탭 전환·차단·stop·완료 캐시 무효화).
+  - (후속) 탭 라벨: 종목코드 → 종목명 캐시 강화(현재 analyze 진입만 name 전달, 상세 진입은 ticker 폴백).
+  - (후속) 4번째 요청 대기 큐 옵션(현재는 차단). 필요 시 슬롯 free 시 자동 승격.
+  - (후속) 재분석 시 직전 aborted 스트림의 late-event race — 관측되면 슬롯 runId 태깅으로 보강.
