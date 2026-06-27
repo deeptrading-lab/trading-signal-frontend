@@ -64,6 +64,7 @@ import { createLogger } from "@/lib/server/logTag";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 import { resolveAnalysisConfig, type AnalysisConfigOverride } from "@/lib/server/ai/analysisConfig";
+import { recordAbRunConfig } from "@/lib/server/ai/abRunConfigStore";
 import { businessDaysBetween } from "@/lib/utils/businessDays";
 
 /** 토큰 사용량 집계용 단계 분류: A=분석가, B=토론, C=매니저 체인. */
@@ -412,6 +413,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     state?: unknown;
     runId?: unknown;
     config?: unknown;
+    session?: unknown;
+    configId?: unknown;
+    configLabel?: unknown;
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
@@ -447,11 +451,18 @@ export async function POST(req: NextRequest): Promise<Response> {
       : crypto.randomUUID();
 
   // 런타임 토큰 최적화 config(A/B 하니스 전용). override 없으면 DEFAULT = 현 동작 무변경.
-  const analysisConfig = resolveAnalysisConfig(
+  const configOverride: AnalysisConfigOverride | null =
     body.config && typeof body.config === "object"
       ? (body.config as AnalysisConfigOverride)
-      : undefined,
-  );
+      : null;
+  const analysisConfig = resolveAnalysisConfig(configOverride);
+
+  // A/B 하니스 태깅(session 있을 때만). run_id ↔ config 매핑을 ab_run_config 에 1행 기록(fail-soft).
+  const abSession =
+    typeof body.session === "string" && body.session.trim() ? body.session.trim() : null;
+  const abConfigId =
+    typeof body.configId === "string" && body.configId.trim() ? body.configId.trim() : "default";
+  const abConfigLabel = typeof body.configLabel === "string" ? body.configLabel : null;
 
   // 이전 실행 결과 (재개 시)
   const preState: ResumeState = (body.state && typeof body.state === "object")
@@ -509,6 +520,18 @@ export async function POST(req: NextRequest): Promise<Response> {
   const combinedSignal = AbortSignal.any
     ? AbortSignal.any([req.signal, timeoutController.signal])
     : timeoutController.signal;
+
+  // A/B 하니스: session 지정 시 이 run 을 config 로 태깅(fail-soft, 분석 비차단).
+  if (abSession) {
+    recordAbRunConfig({
+      runId,
+      session: abSession,
+      configId: abConfigId,
+      configLabel: abConfigLabel,
+      ticker,
+      params: configOverride,
+    });
+  }
 
   // 스트림이 cancel(클라이언트 disconnect)·정상 종료로 닫혔는지 추적.
   // 클라이언트가 분석 도중 페이지를 떠나면 cancel()이 먼저 컨트롤러를 닫는데,
