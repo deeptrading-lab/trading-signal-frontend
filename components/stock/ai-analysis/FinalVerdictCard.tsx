@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { TrendingUp, TrendingDown, Info, BadgeCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { roundToKrxTick } from "@/lib/utils/krxTick";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import {
   CALIBRATION_BASIS,
@@ -131,7 +132,7 @@ export function FinalVerdictCard({
     if (basePrice == null) {
       return <span className={cn("text-lg font-extrabold tabular-nums", colorClass)}>{pctStr}</span>;
     }
-    const price = Math.round(basePrice * (1 + pct / 100));
+    const price = roundToKrxTick(basePrice * (1 + pct / 100));
     return (
       <span className="flex items-baseline gap-1 whitespace-nowrap">
         <span className={cn("text-lg font-extrabold tabular-nums", colorClass)}>
