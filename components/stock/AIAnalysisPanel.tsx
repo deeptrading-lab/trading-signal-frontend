@@ -267,7 +267,7 @@ export function AIAnalysisPanel({
                     ? <Loader2 size={15} className="animate-spin" />
                     : <Sparkles size={15} />
                   }
-                  <span className="text-[11px] font-bold leading-none tabular-nums">{t.ticker}</span>
+                  <span className="max-w-[4.5rem] truncate text-[11px] font-bold leading-tight text-center">{t.name ?? t.ticker}</span>
                   {t.isRunning && (
                     <span className="text-[10px] font-bold tabular-nums leading-none px-1 py-0.5 rounded bg-white/20">
                       {t.doneCount}/{t.agentCount}
