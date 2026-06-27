@@ -157,6 +157,44 @@ export type StockDailyCandle = {
   volume: number;
 };
 
+/**
+ * 분봉 캔들 — `StockDailyCandle` 과 **동일한 OHLCV 스키마**(시그널 엔진/레벨/백테스트가 그대로 소비).
+ *
+ * ## ⚠️ date = 정렬·dedup 키 (구조적 함정)
+ * 일봉은 `date`="YYYY-MM-DD" 이지만 분봉은 반드시 **"YYYY-MM-DDTHH:mm"** 타임스탬프를 쓴다.
+ * 시그널 엔진·백테스트·청크 dedup 이 `date` 를 **문자열 비교**(`localeCompare`)로만 정렬하므로,
+ * 분봉에 bare "YYYY-MM-DD" 를 넣으면 같은 날 모든 분봉이 1봉으로 붕괴한다.
+ * `YYYY-MM-DDTHH:mm` 는 사전식 정렬이 곧 시간순 정렬이라 안전하다(Z 등 타임존 접미사 미부착).
+ */
+export type StockMinuteCandle = StockDailyCandle;
+
+/**
+ * 종목 당일/과거 분봉 차트 응답 1건 (`output2` 배열 원소).
+ * - 당일: `inquire-time-itemchartprice` (TR_ID `FHKST03010200`)
+ * - 과거 다일: `inquire-time-dailychartprice` (TR_ID `FHKST03010230`)
+ *
+ * ## ⚠️ 응답 필드 미검증 (레퍼런스 `domestic-stock-quotations.md` §4 — 파라미터만 수집)
+ * KIS 분봉 관례 필드명으로 best-guess 매핑한다. 매퍼는 누락 시 `toNumber`→0 으로 방어하며,
+ * 실호출 1회로 필드명을 확정한 뒤 보강한다(`chk_inquire_time_itemchartprice.py` 참조).
+ * 모든 값은 KIS 관례대로 문자열(숫자도 string).
+ */
+export type KisInquireTimeItemChartItem = {
+  /** 영업일자 (YYYYMMDD). 당일분봉은 누락될 수 있어 매퍼가 기준일로 폴백. */
+  stck_bsop_date?: string;
+  /** 체결시간 (HHMMSS) — 해당 분봉의 시각. */
+  stck_cntg_hour?: string;
+  /** 현재가 = 해당 분봉 종가. */
+  stck_prpr?: string;
+  /** 시가 / 고가 / 저가. */
+  stck_oprc?: string;
+  stck_hgpr?: string;
+  stck_lwpr?: string;
+  /** 체결 거래량 — 해당 분봉(누적 아님). */
+  cntg_vol?: string;
+  /** 누적 거래대금. */
+  acml_tr_pbmn?: string;
+};
+
 export type StockSearchResult = {
   ticker: string;
   name: string;

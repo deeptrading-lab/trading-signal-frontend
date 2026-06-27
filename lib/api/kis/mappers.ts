@@ -20,12 +20,14 @@ import type {
   KisInquireDailyPriceItem,
   KisInquireIndexPriceOutput,
   KisInquirePriceOutput,
+  KisInquireTimeItemChartItem,
   KisIntstockMultpriceItem,
   KisSearchStockInfoOutput,
   MarketIndexQuote,
   StockDailyCandle,
   StockInfo,
   StockMarket,
+  StockMinuteCandle,
   StockPrice,
   WatchlistQuote,
 } from "./types";
@@ -239,6 +241,52 @@ export function mapIntstockMultprice(
     open: item.inter2_oprc ? toNumber(item.inter2_oprc) : undefined,
     high: item.inter2_hgpr ? toNumber(item.inter2_hgpr) : undefined,
     low: item.inter2_lwpr ? toNumber(item.inter2_lwpr) : undefined,
+  };
+}
+
+/**
+ * 분봉 캔들의 정렬·dedup 키 타임스탬프 "YYYY-MM-DDTHH:mm" 생성.
+ *
+ * - `date` YYYYMMDD(누락 시 폴백 기준일) + `hour` HHMMSS → "YYYY-MM-DDTHH:mm".
+ * - 8자리 날짜·6자리(이상) 시각이 아니면 디펜시브하게 분 단위만 추출하거나 기준일로 폴백.
+ * - 사전식 정렬이 곧 시간순이 되도록 타임존 접미사를 붙이지 않는다(`StockMinuteCandle` 주석 참조).
+ *
+ * @param date     영업일자 YYYYMMDD (분봉 응답 누락 가능)
+ * @param hour     체결시각 HHMMSS
+ * @param fallbackDate 응답 `date` 누락 시 사용할 YYYY-MM-DD(보통 호출 기준일)
+ */
+export function formatMinuteStamp(
+  date: string | undefined,
+  hour: string | undefined,
+  fallbackDate: string,
+): string {
+  const ymd = date && /^\d{8}$/.test(date) ? formatDate(date) : fallbackDate;
+  const hhmmss = (hour ?? "").padStart(6, "0").slice(0, 6);
+  const hh = /^\d{2}/.test(hhmmss) ? hhmmss.slice(0, 2) : "00";
+  const mm = /^\d{4}/.test(hhmmss) ? hhmmss.slice(2, 4) : "00";
+  return `${ymd}T${hh}:${mm}`;
+}
+
+/**
+ * KIS inquire-time-itemchartprice / inquire-time-dailychartprice 단건 → `StockMinuteCandle`.
+ *
+ * ⚠️ `date` 는 "YYYY-MM-DDTHH:mm" 타임스탬프(정렬/ dedup 키). close=`stck_prpr`,
+ * volume=`cntg_vol`(해당 분봉 체결량, 누적 아님). 응답 필드명 미검증 → `toNumber` 방어.
+ *
+ * @param item KIS 분봉 output2 단건.
+ * @param fallbackDate 응답 `stck_bsop_date` 누락 시 사용할 YYYY-MM-DD(호출 기준일).
+ */
+export function mapMinuteCandle(
+  item: KisInquireTimeItemChartItem,
+  fallbackDate: string,
+): StockMinuteCandle {
+  return {
+    date: formatMinuteStamp(item.stck_bsop_date, item.stck_cntg_hour, fallbackDate),
+    open: toNumber(item.stck_oprc),
+    high: toNumber(item.stck_hgpr),
+    low: toNumber(item.stck_lwpr),
+    close: toNumber(item.stck_prpr),
+    volume: toNumber(item.cntg_vol),
   };
 }
 

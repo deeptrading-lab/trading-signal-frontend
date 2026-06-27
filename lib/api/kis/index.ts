@@ -33,8 +33,16 @@ export {
   fetchStockPriceWithShares,
   fetchStockDaily,
   fetchStockDailyChart,
+  fetchStockMinuteChart,
+  fetchStockMinuteDaily,
   type StockPriceWithShares,
 } from "./price";
+export {
+  resampleMinuteCandles,
+  fetchTodayMinuteCandles,
+  fetchMinuteCandlesForDate,
+  fetchMinuteHistory,
+} from "./minuteChartChunked";
 export { fetchStockInfo } from "./stock-info";
 export { fetchIndexPrice } from "./index-price";
 export { fetchIndexDailyChart } from "./index-chart";
@@ -63,6 +71,7 @@ export { INDEX_NAME_BY_CODE, OVERSEAS_INDEX_NAME_BY_CODE } from "./types";
 export type {
   StockPrice,
   StockDailyCandle,
+  StockMinuteCandle,
   StockSearchResult,
   StockInfo,
   StockMarket,
