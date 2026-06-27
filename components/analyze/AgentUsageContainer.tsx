@@ -39,7 +39,8 @@ const TABS: { key: AIAnalysisProvider; label: string }[] = [
 
 export function AgentUsageContainer() {
   const { data, isLoading, isError, isFetching, refetch } = useQueryAgentUsage();
-  const [provider, setProvider] = useState<AIAnalysisProvider>("claude");
+  // null = 사용자 미선택 → 가장 최근 분석 provider(latestProvider)를 기본 탭으로.
+  const [picked, setPicked] = useState<AIAnalysisProvider | null>(null);
 
   if (isLoading) {
     return (
@@ -72,7 +73,9 @@ export function AgentUsageContainer() {
     );
   }
 
+  const provider = picked ?? data.latestProvider ?? "claude";
   const rows = data.byProvider[provider] ?? [];
+  const wallClockMs = data.runStatsByProvider[provider]?.avgWallClockMs ?? null;
 
   return (
     <div className="flex flex-col gap-md">
@@ -85,7 +88,7 @@ export function AgentUsageContainer() {
               type="button"
               role="tab"
               aria-selected={provider === t.key}
-              onClick={() => setProvider(t.key)}
+              onClick={() => setPicked(t.key)}
               className={cn(
                 "cursor-pointer rounded-pill border px-md py-xs text-body-sm-strong transition-colors",
                 provider === t.key
@@ -122,7 +125,7 @@ export function AgentUsageContainer() {
         </div>
       ) : (
         <>
-          <CacheCostCards rows={rows} />
+          <CacheCostCards rows={rows} wallClockMs={wallClockMs} />
           <AgentTokenBarChart rows={rows} />
           <StageInputTrendChart rows={rows} />
           <AgentUsageTable rows={rows} />

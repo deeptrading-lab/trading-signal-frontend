@@ -16,6 +16,8 @@ export interface AgentUsageRow {
   sampleCount: number;
   /** 그중 토큰이 실제 측정된 행 수 (measured=true) */
   measuredCount: number;
+  /** 가장 최근 호출에 사용된 모델 id (opus/sonnet 등). 측정 불가 시 null */
+  model: string | null;
   avgInputTokens: number | null;
   avgOutputTokens: number | null;
   avgCacheReadTokens: number | null;
@@ -23,6 +25,20 @@ export interface AgentUsageRow {
   /** 0~1. sum(cacheRead) / (sum(input) + sum(cacheRead)) */
   cacheHitRate: number | null;
   avgCostUsd: number | null;
+  /** 에이전트 1회 호출 평균 소요(ms). measured 무관(codex 포함). */
+  avgDurationMs: number | null;
+}
+
+/** provider별 run(분석 1회) 단위 소요시간 통계. */
+export interface ProviderRunStats {
+  /**
+   * 분석 1회 평균 wall-clock(ms). 에이전트 소요의 단순 합이 아니라
+   * run별 `max(종료) - min(시작)` (시작 = created_at - duration_ms)로 산출 →
+   * Phase A·리스크3 병렬 구간을 중복 합산하지 않는다.
+   */
+  avgWallClockMs: number | null;
+  /** 이 provider 의 distinct run_id 수 */
+  runCount: number;
 }
 
 /** /api/stock/ai-analysis/usage 응답. */
@@ -32,5 +48,9 @@ export interface AgentUsageSummary {
   /** 집계에 포함된 distinct run_id 수 */
   runCount: number;
   byProvider: Record<AIAnalysisProvider, AgentUsageRow[]>;
+  /** provider별 run 단위 소요시간 통계 (소요시간 카드용) */
+  runStatsByProvider: Record<AIAnalysisProvider, ProviderRunStats>;
+  /** 가장 최근 분석을 실행한 provider (대시보드 기본 탭 정합용). 데이터 없으면 null */
+  latestProvider: AIAnalysisProvider | null;
   generatedAt: string;
 }
