@@ -49,6 +49,8 @@ import {
 export const MAX_CONCURRENT_ANALYSES = 3;
 /** 슬롯 누적 상한 — running 3 + 완료 잔여 몇 개. 초과 시 가장 오래된 완료 슬롯 evict. */
 const MAX_TOTAL_SLOTS = 6;
+/** 재분석 프롬프트 노출 임계 — 마지막 분석 완료가 이 시간 이상 지났을 때만 "새로 분석?" 안내(신선하면 미노출). */
+const REANALYSIS_PROMPT_MIN_AGE_MS = 30 * 60 * 1000;
 
 // ── 종목별 분석 슬롯 ─────────────────────────────────────────────────────────
 
@@ -68,6 +70,8 @@ interface AnalysisSlot {
   resumeFrom: AgentKey | null;
   /** 시작 시각(ms) — analyzingTicker 파생·evict 순서용. */
   startedAt: number;
+  /** 완료(done) 시각(ms) — 재분석 프롬프트 신선도 판정용. 미완료면 null. */
+  finishedAt: number | null;
 }
 
 function emptySlot(
@@ -89,6 +93,7 @@ function emptySlot(
     error: null,
     resumeFrom: null,
     startedAt: 0,
+    finishedAt: null,
   };
 }
 
@@ -273,7 +278,7 @@ const INITIAL_STATE: AIAnalysisState = {
 };
 
 type Action =
-  | { kind: "event"; ticker: string; event: AIAnalysisEvent }
+  | { kind: "event"; ticker: string; event: AIAnalysisEvent; now: number }
   | { kind: "startSlot"; ticker: string; provider: AIAnalysisProvider; name?: string; now: number }
   | { kind: "clearSlot"; ticker: string }
   | { kind: "resumePrep"; ticker: string; fromIndex: number; clearSentiment: boolean; debateMode: "all" | "bearOnly" | "keep"; clearFinal: boolean }
@@ -291,8 +296,10 @@ function reducer(state: AIAnalysisState, action: Action): AIAnalysisState {
     case "event": {
       const slot = state.slots[action.ticker];
       if (!slot) return state;
-      const next = reduceSlotEvent(slot, action.event);
+      let next = reduceSlotEvent(slot, action.event);
       if (next === slot) return state;
+      // 완료 시각 기록 — 재분석 프롬프트 신선도(30분) 판정용.
+      if (action.event.type === "done") next = { ...next, finishedAt: action.now };
       return { ...state, slots: { ...state.slots, [action.ticker]: next } };
     }
 
@@ -563,7 +570,7 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
           event.type === "debate"   ? `${event.speaker} R${event.round} len=${event.content.length}` : "",
         );
       }
-      dispatch({ kind: "event", ticker, event });
+      dispatch({ kind: "event", ticker, event, now: Date.now() });
 
       if (event.type === "done") {
         // 분석 완료 → 저장된 결론/목록 캐시 무효화로 /analyze 카드를 자동 갱신.
@@ -673,11 +680,15 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
     if (name) namesRef.current[ticker] = name;
     const slot = stateRef.current.slots[ticker];
     const allPending = !slot || slot.agents.every((a) => a.status === "pending");
+    // 재분석 프롬프트 — 결과가 있고 비실행이며, 마지막 분석이 30분 이상 지났을 때만(신선하면 미노출).
+    const lastAnalyzedAt = slot ? slot.finishedAt ?? slot.startedAt : 0;
+    const stale =
+      lastAnalyzedAt > 0 && Date.now() - lastAnalyzedAt >= REANALYSIS_PROMPT_MIN_AGE_MS;
     dispatch({
       kind: "setView",
       ticker,
       open: true,
-      reanalysisPrompt: !!slot && !allPending && !slot.isRunning,
+      reanalysisPrompt: !!slot && !allPending && !slot.isRunning && stale,
     });
   }, []);
 
