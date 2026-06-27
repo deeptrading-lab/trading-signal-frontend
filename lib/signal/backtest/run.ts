@@ -35,6 +35,11 @@ export type BacktestOptions = {
    * 한국장 통념 ~0.2~0.3%(온라인 수수료 ~0.03% 양방 + 매도 거래세 ~0.15~0.18% + 슬리피지). 기본 0.
    */
   costPct?: number;
+  /**
+   * 워밍업 시작 봉수 — 이 봉수가 확보된 시점부터 신호 평가. 기본 `MIN_BARS`(130, 일봉).
+   * 분봉 백테스트는 프로파일 minBars(예: 5분 100)를 주입해 일봉 상수에 묶이지 않게 한다.
+   */
+  warmupBars?: number;
 };
 
 const BULL = new Set<string>(STRONG_BULL_TRIGGERS);
@@ -49,12 +54,13 @@ export function backtest(
   const mode = opts.entry?.mode ?? "everyBar";
   const cooldown = opts.entry?.cooldownDays ?? DEFAULT_COOLDOWN_DAYS;
   const cost = opts.costPct ?? 0;
+  const warmup = opts.warmupBars ?? MIN_BARS;
   // 방향별 마지막 진입 인덱스 — 쿨다운 판정.
   let lastBuyIdx = -Infinity;
   let lastSellIdx = -Infinity;
 
   // i = 워밍업 확보 시점부터, 미래 봉이 최소 1개 남는 n-2 까지.
-  for (let i = MIN_BARS - 1; i < n - 1; i++) {
+  for (let i = warmup - 1; i < n - 1; i++) {
     const result = evaluateSignal(candles.slice(0, i + 1), opts.signal);
     if (!result.warmupOk || result.action === "HOLD") continue;
 

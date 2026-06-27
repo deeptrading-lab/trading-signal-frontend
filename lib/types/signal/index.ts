@@ -68,6 +68,28 @@ export type SignalResult = {
   regime: RuleDirection;
 };
 
+/**
+ * 타임프레임 인식 지표 주기 프로파일 — 미지정 필드는 일봉 기본 상수(`weights.ts`/지표 함수 기본값).
+ *
+ * 분봉은 일봉 보정 주기(MA 5/20/60/120, MACD 12/26/9 등)가 의미를 잃으므로 캘러가 주기를 주입한다.
+ * 지표 **임계값**(RSI 30/70·거래량 1.5배·ADX 25 등 무차원 상수)은 그대로 두고 **주기만** 바꾼다
+ * (1차 컷 — 차원 있는 MA/지표 길이가 타임프레임 변경에 가장 민감하다).
+ */
+export type IndicatorProfile = {
+  /** 이동평균 기간 (short/mid/long/base). */
+  maPeriods?: { short: number; mid: number; long: number; base: number };
+  /** MACD fast/slow/signal. */
+  macd?: { fast: number; slow: number; signal: number };
+  /** RSI 기간. */
+  rsiPeriod?: number;
+  /** 볼린저 기간/표준편차 배수. */
+  bollinger?: { period: number; mult: number };
+  /** ADX 기간. */
+  adxPeriod?: number;
+  /** 거래량 이동평균 기간. */
+  volumeMaPeriod?: number;
+};
+
 /** 엔진 튜닝 옵션 (미지정 시 `weights.ts` 기본값). */
 export type EvaluateOptions = {
   /** 축 가중치 (합 1 권장). */
@@ -78,6 +100,19 @@ export type EvaluateOptions = {
   sellThreshold?: number;
   /** 장기추세 레짐 필터 적용 여부 (기본 true). 역추세 진입 veto. */
   regimeFilter?: boolean;
+  /**
+   * 타임프레임 인식 지표 주기 — 분봉 프로파일. 미지정 시 일봉 기본(무회귀).
+   */
+  indicators?: IndicatorProfile;
+  /**
+   * 레짐 외부 주입 — 분봉은 자체 SMA120 레짐이 오버나잇 갭에 오염되므로
+   * 일봉 SMA 기울기로 산출한 레짐(-1/0/1)을 주입해 veto 판단에 쓴다. 미지정 시 내부 `computeRegime`.
+   */
+  regimeOverride?: RuleDirection;
+  /** warmup 차단 최소 봉수 오버라이드 (분봉 프로파일). 미지정 시 `SOFT_MIN_BARS`(90). */
+  softMinBars?: number;
+  /** 풀 품질 최소 봉수 오버라이드 (분봉 프로파일). 미지정 시 `MIN_BARS`(130). */
+  minBars?: number;
 };
 
 // ───────────────────────── 백테스트 ─────────────────────────
