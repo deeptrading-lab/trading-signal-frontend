@@ -259,7 +259,8 @@ export function AIAnalysisPanel({
                 ? <Loader2 size={16} className="animate-spin" />
                 : <Sparkles size={16} />
               }
-              <span className="text-[11px] font-bold tabular-nums leading-none">{tabs.length}</span>
+              <span className="text-[10px] font-bold leading-tight text-center">AI<br />종합<br />분석</span>
+              <span className="text-[10px] font-bold tabular-nums leading-none px-1.5 py-0.5 rounded-full bg-white/20">{tabs.length}</span>
             </button>
 
             {/* 상세 카드(hover) — 헤더 + 종목별 행. */}
