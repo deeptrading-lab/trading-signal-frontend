@@ -134,6 +134,7 @@ export function AIAnalysisPanel({
   resumeFrom,
   tabs,
   limitNotice,
+  open,
   start,
   switchTab,
   dismissSlot,
@@ -235,8 +236,8 @@ export function AIAnalysisPanel({
 
   return (
     <>
-      {/* 패널 숨김 상태 — 진행 중·결과 보유 슬롯을 우측 트레이 카드 하나로 묶어 노출(동시 최대 3건).
-          행마다 좌=종목명 / 우=진행수로 정렬해 너비를 통일한다. 행 클릭 → 해당 분석 열기. */}
+      {/* 패널 숨김 상태 — 우측 재열기 트레이. 기본은 컴팩트 핀(아이콘+개수), hover 시 종목별 상세 카드.
+          동시 최대 3건. 상세 행: 좌=종목명 / 우=진행수(또는 hover 닫기 ×). 행 클릭 → 해당 분석 열기. */}
       <AnimatePresence>
         {!isOpen && tabs.length > 0 && (
           <motion.div
@@ -245,61 +246,80 @@ export function AIAnalysisPanel({
             animate={{ x: 0 }}
             exit={{ x: 64 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            role="group"
-            aria-label={COPY.panel.title}
-            className="fixed right-0 top-1/2 -translate-y-1/2 z-[70] w-52 max-h-[70vh] overflow-y-auto rounded-l-2xl border border-r-0 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl"
+            className="group fixed right-0 top-1/2 -translate-y-1/2 z-[70]"
           >
-            {/* 트레이 헤더 — 라벨 + 진행 중 개수 배지 */}
-            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-              <Sparkles size={13} className="text-blue-500 dark:text-blue-400" />
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{COPY.panel.title}</span>
-              {runningTabCount > 0 && (
-                <span className="ml-auto text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                  {runningTabCount}
-                </span>
-              )}
-            </div>
+            {/* 컴팩트 핀(기본) — hover 시 숨김. 클릭/터치 시 분석 패널 열기(키보드 접근 폴백). */}
+            <button
+              type="button"
+              onClick={() => open()}
+              aria-label={`AI 분석 ${tabs.length}건 열기`}
+              className="flex flex-col items-center gap-1 rounded-l-2xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 px-2.5 py-3 text-white shadow-xl transition-colors cursor-pointer group-hover:hidden"
+            >
+              {runningTabCount > 0
+                ? <Loader2 size={16} className="animate-spin" />
+                : <Sparkles size={16} />
+              }
+              <span className="text-[11px] font-bold tabular-nums leading-none">{tabs.length}</span>
+            </button>
 
-            {/* 행 목록 */}
-            <div className="py-1">
-              {tabs.map((t) => (
-                <div key={t.ticker} className="group/row relative">
-                  <button
-                    type="button"
-                    onClick={() => switchTab(t.ticker)}
-                    aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-                  >
-                    {t.isRunning
-                      ? <Loader2 size={14} className="shrink-0 animate-spin text-blue-500 dark:text-blue-400" />
-                      : <Sparkles size={14} className="shrink-0 text-blue-400 dark:text-blue-500" />
-                    }
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800 dark:text-slate-100">
-                      {t.name ?? t.ticker}
-                    </span>
-                    {/* 진행수 — 비실행(닫기 ×) 행은 hover 시 페이드아웃해 ×에 자리를 내준다. */}
-                    <span
-                      className={cn(
-                        "shrink-0 text-[11px] font-bold tabular-nums text-slate-400 dark:text-slate-500",
-                        !t.isRunning && "transition-opacity group-hover/row:opacity-0",
-                      )}
-                    >
-                      {t.doneCount}/{t.agentCount}
-                    </span>
-                  </button>
-                  {/* 닫기 × — 비실행(완료/에러) 슬롯만. 진행수 자리에 hover 시 노출. */}
-                  {!t.isRunning && (
+            {/* 상세 카드(hover) — 헤더 + 종목별 행. */}
+            <div
+              role="group"
+              aria-label={COPY.panel.title}
+              className="hidden w-52 max-h-[70vh] overflow-y-auto rounded-l-2xl border border-r-0 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl group-hover:block"
+            >
+              {/* 트레이 헤더 — 라벨 + 진행 중 개수 배지 */}
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                <Sparkles size={13} className="text-blue-500 dark:text-blue-400" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{COPY.panel.title}</span>
+                {runningTabCount > 0 && (
+                  <span className="ml-auto text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                    {runningTabCount}
+                  </span>
+                )}
+              </div>
+
+              {/* 행 목록 */}
+              <div className="py-1">
+                {tabs.map((t) => (
+                  <div key={t.ticker} className="group/row relative">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
-                      aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                      onClick={() => switchTab(t.ticker)}
+                      aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                     >
-                      <X size={12} />
+                      {t.isRunning
+                        ? <Loader2 size={14} className="shrink-0 animate-spin text-blue-500 dark:text-blue-400" />
+                        : <Sparkles size={14} className="shrink-0 text-blue-400 dark:text-blue-500" />
+                      }
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                        {t.name ?? t.ticker}
+                      </span>
+                      {/* 진행수 — 비실행(닫기 ×) 행은 hover 시 페이드아웃해 ×에 자리를 내준다. */}
+                      <span
+                        className={cn(
+                          "shrink-0 text-[11px] font-bold tabular-nums text-slate-400 dark:text-slate-500",
+                          !t.isRunning && "transition-opacity group-hover/row:opacity-0",
+                        )}
+                      >
+                        {t.doneCount}/{t.agentCount}
+                      </span>
                     </button>
-                  )}
-                </div>
-              ))}
+                    {/* 닫기 × — 비실행(완료/에러) 슬롯만. 진행수 자리에 hover 시 노출. */}
+                    {!t.isRunning && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
+                        aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </motion.div>
         )}
