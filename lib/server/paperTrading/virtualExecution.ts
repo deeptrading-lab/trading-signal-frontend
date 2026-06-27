@@ -17,6 +17,18 @@ export type VirtualExecutionInput = {
   priceSnapshot: PaperTradingPriceSnapshot[];
   maxPositionPct?: number;
   cashBufferPct?: number;
+  /**
+   * 단타 청산 트리거 — 보유 포지션이 도달 시 결정을 무시하고 강제 EXIT(리스크 룰 우선).
+   * `executeVirtualTrade` 가 마크투마켓 후 사전 판정한다. mock/일봉 경로는 미지정(무영향).
+   */
+  forcedExit?: {
+    /** 익절 목표가(절대 원) — lastPrice ≥ 시 청산. */
+    targetPrice?: number | null;
+    /** 손절가(절대 원) — lastPrice ≤ 시 청산. */
+    stopPrice?: number | null;
+    /** 장 막판 전량 청산(15:20). */
+    flattenAll?: boolean;
+  };
 };
 
 export type VirtualExecutionResult = {
@@ -40,6 +52,12 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
   }
 
   const markedPositions = markPositions(input.positions, input.priceSnapshot);
+
+  // 단타 청산 트리거(리스크 룰 우선) — 익절/손절/장막판 도달 시 결정을 EXIT 로 덮어쓴다.
+  const forced = resolveForcedExit(input.forcedExit, markedPositions, price);
+  const decision = forced ?? input.decision;
+  if (forced) guardAdjustments.push(forced.rationale);
+
   const portfolioBefore = input.cash + sumMarketValue(markedPositions);
   if (portfolioBefore <= 0) {
     return {
@@ -56,7 +74,7 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
   const minimumCash = portfolioBefore * (cashBufferPct / 100);
   const maxInvestableValue = Math.max(0, portfolioBefore - minimumCash);
 
-  const targets = normalizeTargets(input.decision, input.priceSnapshot, maxPositionPct);
+  const targets = normalizeTargets(decision, input.priceSnapshot, maxPositionPct);
   if (targets.adjustedForMax) {
     guardAdjustments.push("종목별 최대 비중에 맞춰 주문 크기를 줄였어요.");
   }
@@ -158,6 +176,43 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
   const allocatedPositions = withAllocations(nextPositions, portfolioAfter);
 
   return buildResult(nextCash, allocatedPositions, orders, portfolioAfter, guardAdjustments, null);
+}
+
+/**
+ * 단타 청산 트리거 판정 — 보유 포지션이 익절/손절/장막판에 도달하면 전량 EXIT 결정을 만든다.
+ * 트리거 없으면 null(원 결정 유지). 단타(cli-agent) 외 경로는 forcedExit 미지정 → 항상 null.
+ */
+function resolveForcedExit(
+  forcedExit: VirtualExecutionInput["forcedExit"],
+  positions: PaperTradingPosition[],
+  price: PaperTradingPriceSnapshot | undefined,
+): PaperTradingDecision | null {
+  if (!forcedExit || !price) return null;
+  const held = positions.find((p) => p.quantity >= 1);
+  if (!held) return null;
+
+  const last = price.price;
+  let reason: string | null = null;
+  if (forcedExit.flattenAll) {
+    reason = "장 막판 강제 청산(오버나잇 보유 없음).";
+  } else if (forcedExit.targetPrice != null && last >= forcedExit.targetPrice) {
+    reason = `익절 목표가(${Math.round(forcedExit.targetPrice).toLocaleString("ko-KR")}원) 도달로 가상 청산합니다.`;
+  } else if (forcedExit.stopPrice != null && last <= forcedExit.stopPrice) {
+    reason = `손절선(${Math.round(forcedExit.stopPrice).toLocaleString("ko-KR")}원) 이탈로 가상 청산합니다.`;
+  }
+  if (!reason) return null;
+
+  return {
+    action: "EXIT",
+    targetAllocationPct: 0,
+    targetAllocations: [
+      { ticker: held.ticker, name: held.name, targetAllocationPct: 0, rationale: reason },
+    ],
+    confidence: "HIGH",
+    rationale: reason,
+    riskNotes: [],
+    source: "cli-agent",
+  };
 }
 
 function normalizeTargets(

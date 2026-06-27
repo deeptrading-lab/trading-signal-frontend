@@ -43,6 +43,11 @@ export type PaperTradingDecision = {
   riskNotes: string[];
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
+  /**
+   * 익절 목표가(절대 원) — 단타 cli-agent provider 가 설정. `executeVirtualTrade` 의 forced-exit
+   * 가 `lastPrice ≥ targetPrice` 시 청산한다. mock/existing-ai 는 미설정(undefined).
+   */
+  targetPrice?: number | null;
   source: PaperTradingDecisionProvider;
 };
 

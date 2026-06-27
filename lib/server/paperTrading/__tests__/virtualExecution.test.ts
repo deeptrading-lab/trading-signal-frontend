@@ -148,3 +148,93 @@ describe("executeVirtualTrade", () => {
     expect(result.guardAdjustments.join(" ")).toContain("현금이 부족");
   });
 });
+
+describe("executeVirtualTrade forced-exit (단타 청산)", () => {
+  const held: PaperTradingPosition = {
+    ticker: "005930",
+    name: "삼성전자",
+    quantity: 3,
+    avgEntryPrice: 100_000,
+    lastPrice: 100_000,
+    marketValue: 300_000,
+    unrealizedPnl: 0,
+    unrealizedPnlPct: 0,
+    allocationPct: 30,
+    updatedAt: price.asOf,
+  };
+  const holdDecision: PaperTradingDecision = {
+    action: "HOLD",
+    targetAllocationPct: 30,
+    targetAllocations: [{ ticker: "005930", name: "삼성전자", targetAllocationPct: 30, rationale: "유지" }],
+    confidence: "LOW",
+    rationale: "유지",
+    riskNotes: [],
+    source: "cli-agent",
+  };
+
+  it("손절가 이탈 시 HOLD 를 무시하고 강제 청산", () => {
+    const result = executeVirtualTrade({
+      cash: 700_000,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 96_000 }],
+      forcedExit: { stopPrice: 97_000, targetPrice: 110_000, flattenAll: false },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).toContain("손절선");
+  });
+
+  it("익절 목표가 도달 시 강제 청산", () => {
+    const result = executeVirtualTrade({
+      cash: 700_000,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 105_000 }],
+      forcedExit: { stopPrice: 95_000, targetPrice: 104_000, flattenAll: false },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).toContain("익절");
+  });
+
+  it("장 막판 flattenAll 이면 가격 무관 전량 청산", () => {
+    const result = executeVirtualTrade({
+      cash: 700_000,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 100_000 }],
+      forcedExit: { stopPrice: 90_000, targetPrice: 120_000, flattenAll: true },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).toContain("장 막판");
+  });
+
+  it("트리거 미도달이면 원 결정(HOLD) 유지 — 청산 안 함", () => {
+    const result = executeVirtualTrade({
+      cash: 700_000,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 100_000 }],
+      forcedExit: { stopPrice: 95_000, targetPrice: 110_000, flattenAll: false },
+    });
+    expect(result.positions).toHaveLength(1);
+    expect(result.positions[0].quantity).toBe(3);
+  });
+
+  it("보유 포지션이 없으면 forcedExit 무시(청산 가드 노트 없음)", () => {
+    const flatHold: PaperTradingDecision = {
+      ...holdDecision,
+      targetAllocationPct: 0,
+      targetAllocations: [{ ticker: "005930", name: "삼성전자", targetAllocationPct: 0, rationale: "관망" }],
+    };
+    const result = executeVirtualTrade({
+      cash: 1_000_000,
+      positions: [],
+      decision: flatHold,
+      priceSnapshot: [{ ...price, price: 96_000 }],
+      forcedExit: { stopPrice: 97_000, flattenAll: false },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.orders).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).not.toContain("손절선");
+  });
+});
