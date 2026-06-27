@@ -254,13 +254,21 @@ export async function invokeAgentCliStream(
   onToken: (token: string) => void,
 ): Promise<AgentStreamResult> {
   if (provider === "claude") {
-    return invokeClaudeAgentStream(
+    // --model 로 지정한 요청 모델(에이전트별 override ?? CLAUDE_CLI_MODEL).
+    const requestedModel = (request.model ?? process.env.CLAUDE_CLI_MODEL)?.trim() || null;
+    const result = await invokeClaudeAgentStream(
       process.env.CLAUDE_CLI_PATH ?? "claude",
-      request.model ?? process.env.CLAUDE_CLI_MODEL,
+      requestedModel ?? undefined,
       request,
       signal,
       onToken,
     );
+    // 표시용 모델 = 요청 모델 우선. modelUsage 추출값(usage.model)은 웹검색 보조 모델(haiku)이
+    // 섞여 주 모델을 가릴 수 있어, 요청 모델을 모를 때(env 미설정)만 last-resort 로 쓴다.
+    return {
+      ...result,
+      usage: { ...result.usage, model: requestedModel ?? result.usage.model },
+    };
   }
 
   const raw = await executeAgentCli({
