@@ -132,9 +132,11 @@ export function AIAnalysisPanel({
   sentiment,
   error,
   resumeFrom,
-  doneCount,
-  open,
+  tabs,
+  limitNotice,
   start,
+  switchTab,
+  dismissSlot,
   chooseAgain,
   run,
   resume,
@@ -231,31 +233,50 @@ export function AIAnalysisPanel({
 
   return (
     <>
-      {/* 패널 숨김 상태 — 분석 중이거나 결과 있을 때 우측 탭으로 재열기 */}
+      {/* 패널 숨김 상태 — 진행 중·결과 보유 슬롯마다 우측 재열기 탭(스택). 동시 분석 최대 3건. */}
       <AnimatePresence>
-        {!isOpen && !isAllPending && (
-          <motion.button
-            key="reopen-tab"
+        {!isOpen && tabs.length > 0 && (
+          <motion.div
+            key="reopen-stack"
             initial={{ x: 56 }}
             animate={{ x: 0 }}
             exit={{ x: 56 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            onClick={() => open()}
-            className="fixed right-0 top-1/2 -translate-y-1/2 z-[70] flex flex-col items-center gap-2 px-2.5 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-l-2xl shadow-xl transition-colors cursor-pointer"
-            aria-label="AI 분석 패널 열기"
+            className="fixed right-0 top-1/2 -translate-y-1/2 z-[70] flex flex-col items-end gap-2"
           >
-            {isRunning
-              ? <Loader2 size={16} className="animate-spin" />
-              : <Sparkles size={16} />
-            }
-            <span className="text-xs font-bold leading-snug text-center">AI<br />분<br />석</span>
-            {/* 진행 중 — 완료 에이전트 수를 모든 페이지에서 노출(백그라운드 진행 표시) */}
-            {isRunning && (
-              <span className="text-[10px] font-bold tabular-nums leading-none px-1 py-0.5 rounded bg-white/20">
-                {doneCount}/{agents.length}
-              </span>
-            )}
-          </motion.button>
+            {tabs.map((t) => (
+              <div key={t.ticker} className="group relative flex items-center">
+                {/* 닫기 × — 비실행(완료/에러) 슬롯만. 클릭 전파 차단(탭 전환과 분리). */}
+                {!t.isRunning && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
+                    aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
+                    className="absolute -left-1.5 -top-1.5 z-10 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-white opacity-0 shadow transition-opacity group-hover:opacity-100 hover:bg-slate-900 cursor-pointer"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => switchTab(t.ticker)}
+                  aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
+                  className="flex flex-col items-center gap-1 px-2.5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-l-2xl shadow-xl transition-colors cursor-pointer"
+                >
+                  {t.isRunning
+                    ? <Loader2 size={15} className="animate-spin" />
+                    : <Sparkles size={15} />
+                  }
+                  <span className="text-[11px] font-bold leading-none tabular-nums">{t.ticker}</span>
+                  {t.isRunning && (
+                    <span className="text-[10px] font-bold tabular-nums leading-none px-1 py-0.5 rounded bg-white/20">
+                      {t.doneCount}/{t.agentCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            ))}
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -356,6 +377,38 @@ export function AIAnalysisPanel({
               </div>
             </div>
 
+                {/* ── 동시 분석 탭 스트립(2건 이상일 때만) ─────────────── */}
+                {tabs.length > 1 && (
+                  <div className="flex-none flex items-center gap-1.5 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-hide-mobile">
+                    {tabs.map((t) => {
+                      const activeTab = t.ticker === ticker;
+                      return (
+                        <button
+                          key={t.ticker}
+                          type="button"
+                          onClick={() => switchTab(t.ticker)}
+                          aria-current={activeTab ? "true" : undefined}
+                          className={cn(
+                            "flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer border",
+                            activeTab
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700",
+                          )}
+                        >
+                          {t.isRunning
+                            ? <Loader2 size={11} className="animate-spin" />
+                            : <Sparkles size={11} />
+                          }
+                          <span className="max-w-[7rem] truncate">{t.name ?? t.ticker}</span>
+                          {t.isRunning && (
+                            <span className="tabular-nums opacity-80">{t.doneCount}/{t.agentCount}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* ── 에이전트 진행 바 ────────────────────────────────── */}
                 <div className="flex-none px-5 py-2.5 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
                   <div
@@ -404,6 +457,13 @@ export function AIAnalysisPanel({
                 {/* ── 스크롤 영역 ───────────────────────────────────── */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto">
                   <div className="p-4 space-y-4">
+                    {/* 동시 분석 상한 안내(최대 3개) */}
+                    {limitNotice && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+                        {limitNotice}
+                      </div>
+                    )}
+
                     {/* 재분석 프롬프트 */}
                     <AnimatePresence>
                       {showReanalysisPrompt && (

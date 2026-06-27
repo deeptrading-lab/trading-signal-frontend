@@ -28,13 +28,13 @@ interface AIDecisionCardMenuProps {
 }
 
 export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
-  const { openFor, isRunning, analyzingTicker } = useAIAnalysisContext();
+  const { openFor, isTickerRunning } = useAIAnalysisContext();
   const btnRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
 
-  const runningThis = isRunning && analyzingTicker === item.ticker;
+  const runningThis = isTickerRunning(item.ticker);
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,7 +68,8 @@ export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
   const handleConfirm = () => {
     setConfirming(false);
     // 종목 상세 "AI 종합 분석" 버튼과 동일 — 패널만 열고 공급자 선택→분석은 패널에 위임.
-    openFor(item.ticker);
+    //   name 을 함께 넘겨 동시분석 탭 라벨로 캐시한다.
+    openFor(item.ticker, name);
   };
 
   return (

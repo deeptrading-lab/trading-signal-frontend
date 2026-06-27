@@ -28,15 +28,16 @@ interface ReanalyzeButtonProps {
 }
 
 export function ReanalyzeButton({ item, name, onTriggered }: ReanalyzeButtonProps) {
-  const { openFor, isRunning, analyzingTicker } = useAIAnalysisContext();
+  const { openFor, isTickerRunning } = useAIAnalysisContext();
   const [confirming, setConfirming] = useState(false);
 
-  const runningThis = isRunning && analyzingTicker === item.ticker;
+  const runningThis = isTickerRunning(item.ticker);
 
   const handleConfirm = () => {
     setConfirming(false);
     // 종목 상세 "AI 종합 분석" 버튼과 동일 — 패널만 열고 이후 흐름(공급자 선택→분석)은 패널에 위임.
-    openFor(item.ticker);
+    //   name 을 함께 넘겨 동시분석 탭 라벨로 캐시한다.
+    openFor(item.ticker, name);
     onTriggered?.();
   };
 
