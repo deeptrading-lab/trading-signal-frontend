@@ -101,16 +101,49 @@ function sseEvent(data: AIAnalysisEvent): Uint8Array {
 
 // ─── JSON 파싱 헬퍼 (Portfolio Manager 응답) ─────────────────────────────────
 
+/** 문자열 리터럴 내부 brace 를 무시하고 첫 완결 `{...}` 객체를 추출(prose 가 앞뒤로 섞여도). */
+function extractBalancedObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let k = start; k < text.length; k++) {
+    const ch = text[k];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return text.slice(start, k + 1);
+  }
+  return null;
+}
+
+/** LLM JSON 흔한 흠 — `}`·`]` 앞 trailing comma 제거. */
+function stripTrailingCommas(s: string): string {
+  return s.replace(/,(\s*[}\]])/g, "$1");
+}
+
 function parseLooseJson(raw: string): unknown | null {
   const text = raw.trim();
   if (!text) return null;
-  const candidates = [text];
+  const candidates: string[] = [text];
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fence?.[1]) candidates.push(fence[1].trim());
+  // 균형 중괄호 추출(문자열 내부 brace 무시) — prose 혼입·뒤따르는 stray brace 에 강하다.
+  const balanced = extractBalancedObject(text);
+  if (balanced) candidates.push(balanced);
+  // 폴백: 첫 { ~ 마지막 }
   const i = text.indexOf("{"), j = text.lastIndexOf("}");
   if (i !== -1 && j > i) candidates.push(text.slice(i, j + 1));
   for (const c of candidates) {
-    try { return JSON.parse(c); } catch { /* next */ }
+    const stripped = stripTrailingCommas(c);
+    const variants = stripped === c ? [c] : [c, stripped];
+    for (const variant of variants) {
+      try { return JSON.parse(variant); } catch { /* next */ }
+    }
   }
   return null;
 }
@@ -722,10 +755,18 @@ export async function POST(req: NextRequest): Promise<Response> {
                   aiLog.warn("채점 원장 append skip — entry 종가 캡처 실패");
                 }
               } else {
+                // verdict 값이 6단계 화이트리스트에 없음 — 무표시 대신 에러로 표면화(재시도 카드 노출).
+                aiLog.warn(`PM verdict 무효 — verdict=${String(d.verdict)} len=${text.length}`);
                 send({ type: "report", agent: agentKey, content: text });
+                send({ type: "progress", agent: agentKey, status: "error" });
+                return "error";
               }
             } else {
+              // 결론 JSON 파싱 실패 — 무표시(블랙홀) 대신 에러로 표면화(재시도 카드 노출).
+              aiLog.warn(`PM 결론 JSON 파싱 실패 — len=${text.length}`);
               send({ type: "report", agent: agentKey, content: text });
+              send({ type: "progress", agent: agentKey, status: "error" });
+              return "error";
             }
           } else if (agentKey === "social") {
             // SNS 분석가: 감성 블록 파싱 + 마커 제거한 깨끗한 텍스트로 report 발행.
