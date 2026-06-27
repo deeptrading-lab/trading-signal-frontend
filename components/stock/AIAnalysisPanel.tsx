@@ -132,9 +132,12 @@ export function AIAnalysisPanel({
   sentiment,
   error,
   resumeFrom,
-  doneCount,
+  tabs,
+  limitNotice,
   open,
   start,
+  switchTab,
+  dismissSlot,
   chooseAgain,
   run,
   resume,
@@ -152,6 +155,8 @@ export function AIAnalysisPanel({
   const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   const isAllPending = agents.every((a) => a.status === "pending");
+  // 재열기 트레이 헤더 배지 — 진행 중(running) 슬롯 수.
+  const runningTabCount = tabs.filter((t) => t.isRunning).length;
   const shouldLoadPreviousDecision = isOpen && isAllPending && !isRunning && !error;
   const {
     data: previousDecisionData,
@@ -231,31 +236,93 @@ export function AIAnalysisPanel({
 
   return (
     <>
-      {/* 패널 숨김 상태 — 분석 중이거나 결과 있을 때 우측 탭으로 재열기 */}
+      {/* 패널 숨김 상태 — 우측 재열기 트레이. 기본은 컴팩트 핀(아이콘+개수), hover 시 종목별 상세 카드.
+          동시 최대 3건. 상세 행: 좌=종목명 / 우=진행수(또는 hover 닫기 ×). 행 클릭 → 해당 분석 열기. */}
       <AnimatePresence>
-        {!isOpen && !isAllPending && (
-          <motion.button
-            key="reopen-tab"
-            initial={{ x: 56 }}
+        {!isOpen && tabs.length > 0 && (
+          <motion.div
+            key="reopen-tray"
+            initial={{ x: 64 }}
             animate={{ x: 0 }}
-            exit={{ x: 56 }}
+            exit={{ x: 64 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            onClick={() => open()}
-            className="fixed right-0 top-1/2 -translate-y-1/2 z-[70] flex flex-col items-center gap-2 px-2.5 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-l-2xl shadow-xl transition-colors cursor-pointer"
-            aria-label="AI 분석 패널 열기"
+            className="group fixed right-0 top-1/2 -translate-y-1/2 z-[70]"
           >
-            {isRunning
-              ? <Loader2 size={16} className="animate-spin" />
-              : <Sparkles size={16} />
-            }
-            <span className="text-xs font-bold leading-snug text-center">AI<br />분<br />석</span>
-            {/* 진행 중 — 완료 에이전트 수를 모든 페이지에서 노출(백그라운드 진행 표시) */}
-            {isRunning && (
-              <span className="text-[10px] font-bold tabular-nums leading-none px-1 py-0.5 rounded bg-white/20">
-                {doneCount}/{agents.length}
-              </span>
-            )}
-          </motion.button>
+            {/* 컴팩트 핀(기본) — hover 시 숨김. 클릭/터치 시 분석 패널 열기(키보드 접근 폴백). */}
+            <button
+              type="button"
+              onClick={() => open()}
+              aria-label={`AI 분석 ${tabs.length}건 열기`}
+              className="flex flex-col items-center gap-1 rounded-l-2xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 px-2.5 py-3 text-white shadow-xl transition-colors cursor-pointer group-hover:hidden"
+            >
+              {runningTabCount > 0
+                ? <Loader2 size={16} className="animate-spin" />
+                : <Sparkles size={16} />
+              }
+              <span className="text-[10px] font-bold leading-tight text-center">AI<br />종합<br />분석</span>
+              <span className="text-[10px] font-bold tabular-nums leading-none px-1.5 py-0.5 rounded-full bg-white/20">{tabs.length}</span>
+            </button>
+
+            {/* 상세 카드(hover) — 헤더 + 종목별 행. */}
+            <div
+              role="group"
+              aria-label={COPY.panel.title}
+              className="hidden w-52 max-h-[70vh] overflow-y-auto rounded-l-2xl border border-r-0 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl group-hover:block"
+            >
+              {/* 트레이 헤더 — 라벨 + 진행 중 개수 배지 */}
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                <Sparkles size={13} className="text-blue-500 dark:text-blue-400" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{COPY.panel.title}</span>
+                {runningTabCount > 0 && (
+                  <span className="ml-auto text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                    {runningTabCount}
+                  </span>
+                )}
+              </div>
+
+              {/* 행 목록 */}
+              <div className="py-1">
+                {tabs.map((t) => (
+                  <div key={t.ticker} className="group/row relative">
+                    <button
+                      type="button"
+                      onClick={() => switchTab(t.ticker)}
+                      aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      {t.isRunning
+                        ? <Loader2 size={14} className="shrink-0 animate-spin text-blue-500 dark:text-blue-400" />
+                        : <Sparkles size={14} className="shrink-0 text-blue-400 dark:text-blue-500" />
+                      }
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                        {t.name ?? t.ticker}
+                      </span>
+                      {/* 진행수 — 비실행(닫기 ×) 행은 hover 시 페이드아웃해 ×에 자리를 내준다. */}
+                      <span
+                        className={cn(
+                          "shrink-0 text-[11px] font-bold tabular-nums text-slate-400 dark:text-slate-500",
+                          !t.isRunning && "transition-opacity group-hover/row:opacity-0",
+                        )}
+                      >
+                        {t.doneCount}/{t.agentCount}
+                      </span>
+                    </button>
+                    {/* 닫기 × — 비실행(완료/에러) 슬롯만. 진행수 자리에 hover 시 노출. */}
+                    {!t.isRunning && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
+                        aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -356,6 +423,38 @@ export function AIAnalysisPanel({
               </div>
             </div>
 
+                {/* ── 동시 분석 탭 스트립(2건 이상일 때만) ─────────────── */}
+                {tabs.length > 1 && (
+                  <div className="flex-none flex items-center gap-1.5 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-hide-mobile">
+                    {tabs.map((t) => {
+                      const activeTab = t.ticker === ticker;
+                      return (
+                        <button
+                          key={t.ticker}
+                          type="button"
+                          onClick={() => switchTab(t.ticker)}
+                          aria-current={activeTab ? "true" : undefined}
+                          className={cn(
+                            "flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer border",
+                            activeTab
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700",
+                          )}
+                        >
+                          {t.isRunning
+                            ? <Loader2 size={11} className="animate-spin" />
+                            : <Sparkles size={11} />
+                          }
+                          <span className="max-w-[7rem] truncate">{t.name ?? t.ticker}</span>
+                          {t.isRunning && (
+                            <span className="tabular-nums opacity-80">{t.doneCount}/{t.agentCount}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* ── 에이전트 진행 바 ────────────────────────────────── */}
                 <div className="flex-none px-5 py-2.5 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
                   <div
@@ -404,6 +503,13 @@ export function AIAnalysisPanel({
                 {/* ── 스크롤 영역 ───────────────────────────────────── */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto">
                   <div className="p-4 space-y-4">
+                    {/* 동시 분석 상한 안내(최대 3개) */}
+                    {limitNotice && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+                        {limitNotice}
+                      </div>
+                    )}
+
                     {/* 재분석 프롬프트 */}
                     <AnimatePresence>
                       {showReanalysisPrompt && (
