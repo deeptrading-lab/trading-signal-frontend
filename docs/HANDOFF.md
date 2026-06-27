@@ -4550,6 +4550,50 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (없음) legacy % 폴백 UX 는 현행 유지 결정(PR #160 후속 2번 — a안).
 
+### 2026-06-27 — feat(analyze): 토큰 대시보드 지연·모델·소요시간 계측 노출 + opus effort max (#164)
+
+- **slug**: `ai-usage-observability` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/164
+- **요약**: feat(analyze): 토큰 대시보드 지연·모델·소요시간 계측 노출 + opus effort max
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > `/analyze` 토큰 대시보드의 **측정 공백**을 메우는 관측성 PR. 표면 지표(캐시 적중률 99.1%)는 좋아 보이지만 실제 비용/지연 동인이 가려져 있어, 이후 속도/비용 최적화의 ROI를 실측할 기반을 먼저 만든다. 더불어 사용자 지시로 opus 결정 에이전트(트레이더·PM) `effort`를 `high→max`로 올려, 그 비용·지연 증가가 같은 대시보드에서 바로 보이게 묶었다.
+  > 
+  > > 26개 개선안을 적대적 검증(통과 22/드롭 4)한 로드맵의 1단계(PR-1+PR-2). "측정 먼저 → 데이터로 결정" 기조.
+  > 
+  > ## 변경 내용
+  > 
+  > ### 계측 노출 (PR-1)
+  > - `duration_ms`를 조회 SELECT/타입(`AgentUsageRecord`·`AgentUsageRow`)/집계에 편입 — 그동안 **DB에 기록만 되고 한 번도 읽히지 않던** 값.
+  > - **run wall-clock = `max(종료) − min(시작)` per run** (시작 = `created_at − duration_ms`). 에이전트 소요의 단순 합이 아니라 구간 span이라 Phase A·리스크3 **병렬 구간을 중복 합산하지 않는다**.
+  > - 에이전트별 **모델**·**평균 소요** 테이블 컬럼 + **분석 1회 평균 소요** 카드 추가.
+  > - 소요시간은 `measured` 무관 전체 행으로 집계(codex도 시간은 측정됨).
+  > 
+  > ### 비용 착시 교정 (PR-2)
+  > - 단계별 추세 차트: 신규/캐시 입력 **2계열 분리** + 힌트 교정 — 기존 "뒤 단계일수록 누적" 서술은 실데이터(웹분석가 피크 후 급락)와 **정반대**였음. 봉우리=웹분석가 tool-loop 캐시읽기임을 명시.
+  > - 캐시 적중률 힌트: 캐시 읽기(≈0.1x)가 아니라 **캐시 생성(≈1.25x)이 진짜 비용**임을 설명.
+  > - codex 안내문 정정: "토큰 미제공" → **"비용만 미제공"**(토큰·소요시간은 측정됨).
+  > - 대시보드 기본 탭을 **가장 최근 실행 provider**로 정합(실행 기본=codex와 불일치 해소).
+  > 
+  > ### 결정 품질 투자
+  > - 트레이더·PM `effort: "high" → "max"` ([aiAnalysis.ts](lib/prompts/stock/aiAnalysis.ts)). 타입에 `"max"` 이미 존재 → `--effort max` 전달.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` (전체 프로젝트) ✅
+  > - `eslint` (변경 파일) ✅
+  > - `next build --webpack` → **Compiled successfully** ✅ (내 코드 번들 정상)
+  > - ⚠️ 기본 `next build`(Turbopack)는 **워크트리의 node_modules 심볼릭**을 거부해 실패 — 코드가 아닌 환경 이슈. webpack 빌드의 후속 타입에러(`resetIndicesCacheForTest`)는 `app/api/market/indices/route.ts`의 **기존 main 이슈**(이 diff 무관).
+  > - ⬜ 대시보드 육안 확인(소요/모델/캐시생성 값 렌더)은 dev 서버 필요 → 워크트리 Turbopack 제약으로 머지 후 본 체크아웃에서 권장.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR-3 (관측성)**: 캐시 생성·모델별 비용 분해 가시화. 단, 모델별 단가표(`PRICE_PER_MTOK[model]`) + model 노출 전제로만(단일 단가 추정 금지=새 착시). raw 토큰/`cost_usd` 실측부터.
+  - **PR-4 (관측성)**: run 단위 분포/시계열(p50). 표본 N<20까지 분위수 숨김. 지연 시계열은 병렬구간 max 처리.
+  - **PR-5 (지연, 게이트)**: 토론 R1 병렬화(R2 직렬 유지). ⚠️ `aiAnalysisProvider.tsx` debate 핸들러를 speaker+round 매칭으로 reconcile 재작성 필수.
+  - **PR-6/7/8 (게이트)**: 웹툴 안정화 / 빠른 모드(rounds=1 옵션) / trader effort A/B — 모두 sentiment·verdict 회귀 게이트 통과 후.
+  - **드롭**: PM 강등, 토론 R2 병렬화, 웹 fetch 하드캡, codex 추정비용 단가표(위험>이득).
+
 ### 2026-06-27 — feat(ai-analysis): AI 종목분석 동시 3건 지원 — 종목별 슬롯 + 탭 전환 (#163)
 
 - **slug**: `ai-analysis-concurrency` · **author**: @HY0118

@@ -386,7 +386,7 @@ ${s.bearArgument.slice(0, 1500)}
 ${s.marketReport.slice(0, 800)}`,
     tools: [],
     timeoutMs: T.TRADER,
-    effort: "high" as const,
+    effort: "max" as const,
     model: process.env.TRADER_MODEL,
   },
 
@@ -567,7 +567,7 @@ ${s.riskNeutral}
 ${s.riskSafe}${buildDataWarningContext(s.dataWarning)}${s.marketContext ?? ""}`,
     tools: [],
     timeoutMs: T.PM,
-    effort: "high" as const,
+    effort: "max" as const,
     model: process.env.PM_MODEL,
   },
 };
