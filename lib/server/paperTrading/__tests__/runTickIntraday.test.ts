@@ -5,6 +5,10 @@
 
 import { describe, it, expect } from "vitest";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
+import {
+  createPaperTradingSession,
+  resetPaperTradingStoreForTest,
+} from "@/lib/server/paperTrading/sessionStore";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
   PaperTradingPosition,
@@ -117,5 +121,25 @@ describe("runPaperTradingTick — cli-agent 분기", () => {
 
     expect(result.positions).toHaveLength(0);
     expect(result.tick.guardAdjustments.join(" ")).toContain("손절선");
+  });
+});
+
+describe("createPaperTradingSession — cli-agent 세션", () => {
+  it("provider 를 존중하고 단타 주기(5분)로 설정", async () => {
+    resetPaperTradingStoreForTest();
+    const detail = await createPaperTradingSession(
+      {
+        name: "단타",
+        tickers: ["005930"],
+        stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+        initialCash: 1_000_000,
+        targetReturnPct: 3,
+        riskMode: "balanced",
+        decisionProvider: "cli-agent",
+      },
+      { priceSnapshotProvider: priceAt(10_000) },
+    );
+    expect(detail.session.decisionProvider).toBe("cli-agent");
+    expect(detail.session.tickIntervalMinutes).toBe(5);
   });
 });
