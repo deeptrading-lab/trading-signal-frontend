@@ -14,7 +14,9 @@
 # 환경변수:
 #   INTRADAY_SESSION_ID (필수) — tick 을 밀어넣을 paper-trading 세션 ID.
 #   INTRADAY_TICK_URL   (선택) — 기본 http://localhost:3000. 경로는 스크립트가 조립.
+#   CRON_SECRET         (선택) — 서버에 설정돼 있으면 동일 값을 secret 쿼리로 전달.
 #
+# ⚠️ 앱 비밀번호 게이트가 /api/* 를 막으므로 게이트 예외인 /api/cron/intraday-tick 으로 호출한다.
 # ⚠️ 실제 증권사 주문은 발생하지 않는다(가상매매). 일일 손실 한도 도달 시 서버 측 게이트가
 #    신규 진입을 차단하므로 스케줄러는 단순 발화만 한다.
 
@@ -28,15 +30,15 @@ if [ -z "${INTRADAY_SESSION_ID:-}" ]; then
 fi
 
 BASE="${INTRADAY_TICK_URL:-http://localhost:3000}"
-URL="${BASE}/api/paper-trading/sessions/${INTRADAY_SESSION_ID}/tick"
+URL="${BASE}/api/cron/intraday-tick?session=${INTRADAY_SESSION_ID}"
+if [ -n "${CRON_SECRET:-}" ]; then
+  URL="${URL}&secret=${CRON_SECRET}"
+fi
 BODY="$(mktemp -t intraday-tick.XXXXXX)"
 trap 'rm -f "$BODY"' EXIT
 
-# 에이전트 그룹 2콜 직렬 ≈ 6~15초 + 분봉 페치 → 타임아웃 120s.
-code="$(curl -s -m 120 -o "$BODY" -w '%{http_code}' \
-  -X POST "$URL" \
-  -H 'Content-Type: application/json' \
-  -d '{"triggeredBy":"auto"}' 2>/dev/null || echo "000")"
+# 에이전트 그룹 2콜 직렬 ≈ 6~15초 + 분봉 페치 → 타임아웃 120s. (게이트 예외 cron 라우트, GET)
+code="$(curl -s -m 120 -o "$BODY" -w '%{http_code}' "$URL" 2>/dev/null || echo "000")"
 
 if [ "$code" = "200" ]; then
   action="$(grep -o '"action":"[^"]*"' "$BODY" | head -1 | sed 's/.*:"//;s/"//')"
