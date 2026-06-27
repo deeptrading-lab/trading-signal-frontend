@@ -52,8 +52,10 @@ export function fmtDuration(ms: number | null): string {
   if (ms == null) return "—";
   const totalSec = ms / 1000;
   if (totalSec < 60) return `${totalSec.toFixed(1)}초`;
-  const min = Math.floor(totalSec / 60);
-  const sec = Math.round(totalSec % 60);
+  // 초를 먼저 반올림 후 분/초로 분해 — %60 반올림 시 "1분 60초" carry 버그 방지.
+  const whole = Math.round(totalSec);
+  const min = Math.floor(whole / 60);
+  const sec = whole % 60;
   return sec === 0 ? `${min}분` : `${min}분 ${sec}초`;
 }
 
