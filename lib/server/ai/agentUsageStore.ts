@@ -47,6 +47,8 @@ export interface AgentUsageRecord {
   cacheCreationInputTokens: number | null;
   cacheReadInputTokens: number | null;
   costUsd: number | null;
+  /** 에이전트 1회 호출 소요(ms). measured 무관(codex도 기록). */
+  durationMs: number | null;
   createdAt: string;
 }
 
@@ -58,7 +60,7 @@ export type UsageStoreWriteResult =
 const TABLE = "ai_agent_usage";
 const SELECT_COLS =
   "run_id,ticker,agent_key,stage,round,provider,model,measured," +
-  "input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,cost_usd,created_at";
+  "input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,cost_usd,duration_ms,created_at";
 
 type SupabaseUsageRow = {
   run_id: string;
@@ -74,6 +76,7 @@ type SupabaseUsageRow = {
   cache_creation_input_tokens: number | null;
   cache_read_input_tokens: number | null;
   cost_usd: number | null;
+  duration_ms: number | null;
   created_at: string;
 };
 
@@ -107,6 +110,7 @@ function toRecord(row: SupabaseUsageRow): AgentUsageRecord {
     cacheCreationInputTokens: row.cache_creation_input_tokens,
     cacheReadInputTokens: row.cache_read_input_tokens,
     costUsd: row.cost_usd,
+    durationMs: row.duration_ms,
     createdAt: row.created_at,
   };
 }

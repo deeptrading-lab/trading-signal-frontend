@@ -46,3 +46,21 @@ export function fmtRate(n: number | null): string {
   if (n == null) return "—";
   return `${(n * 100).toFixed(1)}%`;
 }
+
+/** 소요시간(ms) — 60초 이상은 "M분 S초", 미만은 "S.S초". null = "—". */
+export function fmtDuration(ms: number | null): string {
+  if (ms == null) return "—";
+  const totalSec = ms / 1000;
+  if (totalSec < 60) return `${totalSec.toFixed(1)}초`;
+  // 초를 먼저 반올림 후 분/초로 분해 — %60 반올림 시 "1분 60초" carry 버그 방지.
+  const whole = Math.round(totalSec);
+  const min = Math.floor(whole / 60);
+  const sec = whole % 60;
+  return sec === 0 ? `${min}분` : `${min}분 ${sec}초`;
+}
+
+/** 모델 id 축약 — 선행 "claude-" 제거(예: claude-opus-4-8 → opus-4-8). null = "—". */
+export function fmtModel(model: string | null): string {
+  if (!model) return "—";
+  return model.replace(/^claude-/, "");
+}

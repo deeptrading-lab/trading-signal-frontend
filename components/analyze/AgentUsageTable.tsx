@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
-import { agentLabel, fmtCost, fmtRate, fmtTokens } from "./format";
+import { agentLabel, fmtCost, fmtDuration, fmtModel, fmtRate, fmtTokens } from "./format";
 import {
   COL_AGENT,
   COL_AVG_COST,
@@ -17,7 +17,9 @@ import {
   COL_AVG_OUTPUT,
   COL_CACHE_HIT,
   COL_CACHE_READ,
+  COL_DURATION,
   COL_FRESH,
+  COL_MODEL,
   COL_SAMPLES,
   COL_STAGE,
   MEASURE_BADGE_UNMEASURED,
@@ -26,8 +28,8 @@ import {
 } from "@/lib/copy/analyze/labels";
 
 type SortKey =
-  | "agent" | "stage" | "input" | "fresh" | "cache"
-  | "hit" | "output" | "cost" | "samples";
+  | "agent" | "stage" | "model" | "input" | "fresh" | "cache"
+  | "hit" | "output" | "cost" | "duration" | "samples";
 type SortDir = "asc" | "desc";
 
 interface DisplayRow extends AgentUsageRow {
@@ -55,12 +57,14 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
     const accessor: Record<SortKey, (r: DisplayRow) => number | string> = {
       agent: (r) => agentLabel(r.agentKey),
       stage: (r) => r.orderIndex,
+      model: (r) => r.model ?? "",
       input: (r) => r.totalInput ?? NUM_FALLBACK,
       fresh: (r) => r.avgInputTokens ?? NUM_FALLBACK,
       cache: (r) => r.avgCacheReadTokens ?? NUM_FALLBACK,
       hit: (r) => r.cacheHitRate ?? NUM_FALLBACK,
       output: (r) => r.avgOutputTokens ?? NUM_FALLBACK,
       cost: (r) => r.avgCostUsd ?? NUM_FALLBACK,
+      duration: (r) => r.avgDurationMs ?? NUM_FALLBACK,
       samples: (r) => r.sampleCount,
     };
     const get = accessor[sortKey];
@@ -82,7 +86,7 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "agent" || key === "stage" ? "asc" : "desc");
+      setSortDir(key === "agent" || key === "stage" || key === "model" ? "asc" : "desc");
     }
   }
 
@@ -94,12 +98,14 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
   const COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] = [
     { key: "agent", label: COL_AGENT, align: "left" },
     { key: "stage", label: COL_STAGE, align: "left" },
+    { key: "model", label: COL_MODEL, align: "left" },
     { key: "input", label: COL_AVG_INPUT, align: "right" },
     { key: "fresh", label: COL_FRESH, align: "right" },
     { key: "cache", label: COL_CACHE_READ, align: "right" },
     { key: "hit", label: COL_CACHE_HIT, align: "right" },
     { key: "output", label: COL_AVG_OUTPUT, align: "right" },
     { key: "cost", label: COL_AVG_COST, align: "right" },
+    { key: "duration", label: COL_DURATION, align: "right" },
     { key: "samples", label: COL_SAMPLES, align: "right" },
   ];
 
@@ -135,6 +141,9 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
                 <td className="py-md pr-md text-caption text-text-muted whitespace-nowrap">
                   {STAGE_LABEL[r.stage]}
                 </td>
+                <td className="py-md pr-md text-caption text-text-muted whitespace-nowrap tabular-nums">
+                  {fmtModel(r.model)}
+                </td>
                 {r.measuredOk ? (
                   <>
                     <Num value={fmtTokens(r.totalInput)} strong />
@@ -149,6 +158,7 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
                     <span className="badge-coming-soon">{MEASURE_BADGE_UNMEASURED}</span>
                   </td>
                 )}
+                <Num value={fmtDuration(r.avgDurationMs)} />
                 <td className="py-md pl-md text-right text-caption text-text-muted tabular-nums">
                   {r.measuredCount}/{r.sampleCount}
                 </td>

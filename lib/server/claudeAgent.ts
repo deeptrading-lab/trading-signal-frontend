@@ -32,13 +32,27 @@ export interface AgentStreamResult {
   usage: AgentUsage;
 }
 
-/** modelUsage 객체의 첫 키(=실제 사용 모델명)를 추출. 없으면 null. */
+/**
+ * modelUsage 에서 주 모델명을 추출. 없으면 null.
+ * Claude CLI 는 보조 작업(요약 등)에 haiku 를 함께 써서 modelUsage 에 여러 모델이 섞일 수 있다.
+ * 첫 키(keys[0])는 보조 모델일 수 있어, **실사용량(토큰 합)이 가장 큰 모델**을 주 모델로 고른다.
+ */
 function extractModel(modelUsage: unknown): string | null {
-  if (modelUsage && typeof modelUsage === "object") {
-    const keys = Object.keys(modelUsage as Record<string, unknown>);
-    if (keys.length > 0) return keys[0];
-  }
-  return null;
+  if (!modelUsage || typeof modelUsage !== "object") return null;
+  const entries = Object.entries(modelUsage as Record<string, unknown>);
+  if (entries.length === 0) return null;
+  if (entries.length === 1) return entries[0][0];
+  // 항목별 숫자 필드 총합(토큰·캐시 등) — 키 케이싱에 무관하게 사용 규모를 비교.
+  const usageScore = (v: unknown): number =>
+    v && typeof v === "object"
+      ? Object.values(v as Record<string, unknown>).reduce<number>(
+          (s, x) => s + (typeof x === "number" ? x : 0),
+          0,
+        )
+      : 0;
+  let best = entries[0];
+  for (const e of entries) if (usageScore(e[1]) > usageScore(best[1])) best = e;
+  return best[0];
 }
 
 /** claude CLI result 이벤트에서 AgentUsage 를 구성. usage 누락 시 measured:false. */

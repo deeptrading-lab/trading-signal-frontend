@@ -1,13 +1,15 @@
 /**
  * 단계별 입력 토큰 추세 — ★최적화 핵심 뷰.
- * AGENT_ORDER 순서로 평균 총 입력(신규+캐시)을 이어 그려, 뒤 단계(트레이더·PM)로 갈수록
- * 앞 리포트가 누적돼 입력이 커지는지 가시화한다. 가장 큰 지점이 1순위 절감 대상.
+ * AGENT_ORDER 순서로 신규 입력(과금)과 캐시 입력(재사용)을 분리해 이어 그린다.
+ * 봉우리는 뒤 단계 누적이 아니라 웹검색 분석가(뉴스·기본·SNS)의 tool-loop 에서
+ * fetch 한 웹 컨텍스트가 캐시로 재사용된 것 — 신규(과금) 입력은 작고 평탄하다.
  */
 
 "use client";
 
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -18,15 +20,21 @@ import {
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
 import { agentLabel, fmtTokens } from "./format";
-import { CHART_TREND_HINT, CHART_TREND_TITLE } from "@/lib/copy/analyze/labels";
+import {
+  CHART_TREND_HINT,
+  CHART_TREND_TITLE,
+  LEGEND_CACHE_READ,
+  LEGEND_FRESH_INPUT,
+} from "@/lib/copy/analyze/labels";
 
 export function StageInputTrendChart({ rows }: { rows: AgentUsageRow[] }) {
   const theme = useChartTheme();
 
-  // 총 입력 = 신규 입력 + 캐시 입력 (모델에 실제로 들어간 컨텍스트 크기).
+  // 신규 입력(과금)과 캐시 입력(재사용)을 분리 — 봉우리의 정체(캐시)를 그림으로 드러낸다.
   const data = rows.map((r) => ({
     name: agentLabel(r.agentKey),
-    totalInput: (r.avgInputTokens ?? 0) + (r.avgCacheReadTokens ?? 0),
+    fresh: r.avgInputTokens ?? 0,
+    cache: r.avgCacheReadTokens ?? 0,
   }));
 
   return (
@@ -51,14 +59,25 @@ export function StageInputTrendChart({ rows }: { rows: AgentUsageRow[] }) {
             <Tooltip
               contentStyle={theme.tooltipStyle}
               labelStyle={theme.labelStyle}
-              formatter={(v) => [fmtTokens(Number(v)), "총 입력"]}
+              formatter={(v, name) => [fmtTokens(Number(v)), name]}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Line
+              type="monotone"
+              dataKey="cache"
+              name={LEGEND_CACHE_READ}
+              stroke={theme.C.rsiLine}
+              strokeWidth={2}
+              dot={{ r: 3, fill: theme.C.rsiLine }}
+              activeDot={{ r: 5 }}
             />
             <Line
               type="monotone"
-              dataKey="totalInput"
-              stroke={theme.C.stroke}
+              dataKey="fresh"
+              name={LEGEND_FRESH_INPUT}
+              stroke={theme.C.macdLine}
               strokeWidth={2}
-              dot={{ r: 3, fill: theme.C.stroke }}
+              dot={{ r: 3, fill: theme.C.macdLine }}
               activeDot={{ r: 5 }}
             />
           </LineChart>

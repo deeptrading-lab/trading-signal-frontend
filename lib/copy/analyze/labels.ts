@@ -88,9 +88,9 @@ export const usageRunCount = (n: number): string => `분석 ${n}회 기준`;
 // ─── provider 탭 ───────────────────────────────────────────────────────────────
 export const PROVIDER_TAB_CLAUDE = "Claude";
 export const PROVIDER_TAB_CODEX = "Codex";
-/** codex는 현재 토큰 미측정. */
+/** codex는 비용(USD)만 미측정 — 토큰·소요시간은 측정된다. */
 export const CODEX_UNMEASURED_NOTICE =
-  "Codex CLI는 현재 토큰 사용량을 제공하지 않아 측정되지 않습니다. 토큰 분석은 Claude 실행분을 사용하세요.";
+  "Codex CLI는 비용(USD)을 제공하지 않아 비용 지표만 비어 있습니다. 토큰·소요시간은 측정됩니다.";
 export const MEASURE_BADGE_UNMEASURED = "측정 안 됨";
 
 // ─── 지표 카드 ─────────────────────────────────────────────────────────────────
@@ -98,14 +98,18 @@ export const CARD_AVG_COST = "분석 1회 평균 비용";
 export const CARD_TOTAL_AVG_INPUT = "평균 입력 토큰(합)";
 export const CARD_TOTAL_AVG_OUTPUT = "평균 출력 토큰(합)";
 export const CARD_CACHE_HIT = "캐시 적중률";
-export const CARD_CACHE_HINT = "캐시 적중률이 높을수록 입력 비용이 절감됩니다.";
+export const CARD_CACHE_HINT =
+  "캐시 읽기는 싸지만(≈0.1x), 그 컨텍스트를 처음 쓰는 캐시 생성(≈1.25x)이 진짜 비용입니다. 적중률이 높아도 비용이 클 수 있어요.";
+export const CARD_WALL_CLOCK = "분석 1회 평균 소요";
+export const CARD_WALL_CLOCK_HINT =
+  "에이전트 소요의 단순 합이 아니라 병렬 단계를 반영한 실제 wall-clock(첫 시작~마지막 종료)입니다.";
 
 // ─── 차트 ──────────────────────────────────────────────────────────────────────
 export const CHART_BAR_TITLE = "분석가별 평균 토큰";
 export const CHART_BAR_HINT = "입력(신규+캐시)과 출력 분해 — 막대가 길수록 절감 여지가 큽니다.";
 export const CHART_TREND_TITLE = "단계별 입력 토큰 추세";
 export const CHART_TREND_HINT =
-  "뒤 단계 분석가일수록 앞 리포트가 누적돼 입력이 커집니다. 가장 큰 지점이 1순위 절감 대상입니다.";
+  "봉우리는 웹검색 분석가(뉴스·기본·SNS)의 tool-loop에서 fetch한 웹 컨텍스트가 캐시로 재사용된 것입니다. 신규(과금) 입력은 작고 평탄해요 — 절감 1순위는 웹분석가 fetch 컨텍스트입니다.";
 
 export const LEGEND_FRESH_INPUT = "신규 입력";
 export const LEGEND_CACHE_READ = "캐시 입력";
@@ -115,12 +119,14 @@ export const LEGEND_OUTPUT = "출력";
 export const TABLE_TITLE = "분석가별 상세";
 export const COL_AGENT = "분석가";
 export const COL_STAGE = "단계";
+export const COL_MODEL = "모델";
 export const COL_AVG_INPUT = "평균 입력";
 export const COL_FRESH = "신규 입력";
 export const COL_CACHE_READ = "캐시 입력";
 export const COL_CACHE_HIT = "적중률";
 export const COL_AVG_OUTPUT = "평균 출력";
 export const COL_AVG_COST = "평균 비용";
+export const COL_DURATION = "평균 소요";
 export const COL_SAMPLES = "표본";
 
 export const STAGE_LABEL: Record<"A" | "B" | "C", string> = {
