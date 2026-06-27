@@ -4518,3 +4518,34 @@
   - 가격 호가단위(틱) 반올림 적용 여부 검토 (현재 `Math.round` 원 단위).
   - `base_price` legacy 백필 또는 안내 문구 검토 (기존 카드 % 폴백 UX).
   - 재분석 후 PM 출력이 실제로 명사 종결 문체로 나오는지 샘플 검증.
+
+### 2026-06-27 — feat(ai-analysis): 결정 카드 절대가격 KRX 호가단위 반올림 (#162)
+
+- **slug**: `krx-tick-rounding` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/162
+- **요약**: feat(ai-analysis): 결정 카드 절대가격 KRX 호가단위 반올림
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > PM 결정 카드의 목표·손절·재진입 절대가격을 1원 단위 반올림(`Math.round`)에서 **KRX 호가단위(tick)** 반올림으로 바꿔, 실제로 주문 가능한 가격으로 표시한다. (PR #160 후속 — `## 다음 작업` 1번)
+  > 
+  > ## 배경
+  > `renderPctStat` 가 `현재가 × (1 ± %)` 를 1원 단위로 반올림해 "76,161원"처럼 해당 가격대(100원 틱)에서 낼 수 없는 가격이 나왔다.
+  > 
+  > ## 변경 내용
+  > - **`lib/utils/krxTick.ts`** (신규): `krxTickSize(price)` 가격대별 호가단위 + `roundToKrxTick(price)` nearest 스냅. 기준 = KRX 유가증권시장 2023-01 호가가격단위 개편.
+  > - **`FinalVerdictCard`**: `Math.round(...)` → `roundToKrxTick(...)`. 예) 76,161 → **76,200**.
+  > - **테스트**: `krxTick.test.ts` 7케이스(가격대 경계 + 반올림 + 비유한 입력).
+  > 
+  > ## 영향 / 주의
+  > - 표시 가격이 ½ 틱 이내로 스냅되므로 옆의 `%` 와 미세하게 어긋날 수 있음(참고용 가이드 가격이라 허용). 헤드라인은 `%`.
+  > - 코스닥 고가 구간 호가단위 차이는 무시(컴포넌트가 시장 구분 모름, 근사 허용) — 코드 주석 명시.
+  > - base_price 없는 legacy 카드는 영향 없음(여전히 `%` 폴백).
+  > 
+  > ## 테스트
+  > - `tsc --noEmit` 통과, `vitest krxTick` 7 passed.
+  > 
+  > ## 다음 작업
+  > - (없음) legacy % 폴백 UX 는 현행 유지 결정(PR #160 후속 2번 — a안).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (없음) legacy % 폴백 UX 는 현행 유지 결정(PR #160 후속 2번 — a안).
