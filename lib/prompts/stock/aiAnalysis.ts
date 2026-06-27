@@ -647,6 +647,9 @@ export async function runDebateLoop(
         userPrompt: bullPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
+        // 하니스 config 오버라이드(미지정이면 undefined = 기존 동작 무변경).
+        effort: cfg(state).effortByAgent?.bull,
+        model: cfg(state).modelByAgent?.bull,
       }, combinedSignal, (token) => {
         send({ type: "debate_stream", speaker: "bull", chunk: token, round });
       });
@@ -686,6 +689,9 @@ export async function runDebateLoop(
         userPrompt: bearPrompt,
         tools: [],
         timeoutMs: round === 1 ? T.NO_TOOL : T.DEBATE_R2,
+        // 하니스 config 오버라이드(미지정이면 undefined = 기존 동작 무변경).
+        effort: cfg(state).effortByAgent?.bear,
+        model: cfg(state).modelByAgent?.bear,
       }, combinedSignal, (token) => {
         send({ type: "debate_stream", speaker: "bear", chunk: token, round });
       });

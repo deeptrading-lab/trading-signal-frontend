@@ -194,7 +194,6 @@ function buildConfigStats(
 }
 
 function buildDelta(
-  baseUsage: AgentUsageRecord[],
   baseSc: ScorecardRow[],
   baseStats: ConfigStats,
   cfgSc: ScorecardRow[],
@@ -320,13 +319,12 @@ export async function compareSession(session: string): Promise<AbComparison> {
 
   const baselineId = configOrder[0];
   const baseStats = configs[0];
-  const baseUsage = usageByConfig.get(baselineId) ?? [];
   const baseSc = scByConfig.get(baselineId) ?? [];
 
   const deltas: ConfigDelta[] = configs
     .slice(1)
     .map((cfgStats) =>
-      buildDelta(baseUsage, baseSc, baseStats, scByConfig.get(cfgStats.configId) ?? [], cfgStats),
+      buildDelta(baseSc, baseStats, scByConfig.get(cfgStats.configId) ?? [], cfgStats),
     );
 
   // 낭비 진단은 baseline(현행) 기준.

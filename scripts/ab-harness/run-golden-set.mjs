@@ -77,7 +77,7 @@ async function runOne(ticker, config) {
       } catch {
         continue;
       }
-      if (evt.type === "final") verdict = evt.decision?.verdict ?? evt.verdict ?? "?";
+      if (evt.type === "final") verdict = evt.data?.verdict ?? evt.decision?.verdict ?? evt.verdict ?? "?";
       else if (evt.type === "error") errored = evt.message ?? "error";
     }
   }
