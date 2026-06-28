@@ -14,11 +14,14 @@
 
 import { fetchStockMinuteChart, fetchStockMinuteDaily } from "./price";
 import type { StockMinuteCandle } from "./types";
+import { fetchWithTransientRetryOrThrow } from "@/lib/server/bffUtils";
 
 /** 1분봉 1콜 ~30봉, 하루 390분 → ~13페이지. 여유 포함 상한. */
 const MAX_PAGES_PER_DAY = 16;
 /** 페이지 간 지연 — EGW00201(과도호출) 회피. */
 const PAGE_DELAY_MS = 150;
+/** transient(EGW00201/네트워크) 재시도 backoff — 백테스트가 수백 콜 쏘므로 페이지마다 1회 재시도. */
+const RETRY_BACKOFF_MS = 400;
 /** priorDays 채우려고 거슬러 볼 최대 캘린더일(주말·휴장 흡수). */
 const MAX_CALENDAR_LOOKBACK = 20;
 
@@ -125,7 +128,7 @@ async function pageDayBackward(
   let prevEarliest = "";
 
   for (let page = 0; page < MAX_PAGES_PER_DAY; page++) {
-    const batch = await fetchAt(anchor);
+    const batch = await fetchWithTransientRetryOrThrow(() => fetchAt(anchor), RETRY_BACKOFF_MS);
     if (batch.length === 0) break;
     acc.push(...batch);
 
@@ -156,7 +159,10 @@ export async function fetchTodayMinuteCandles(
   let prevEarliest = "";
 
   for (let page = 0; page < MAX_PAGES_PER_DAY && acc.length < maxBars; page++) {
-    const batch = await fetchStockMinuteChart(ticker, anchor, true);
+    const batch = await fetchWithTransientRetryOrThrow(
+      () => fetchStockMinuteChart(ticker, anchor, true),
+      RETRY_BACKOFF_MS,
+    );
     if (batch.length === 0) break;
     acc.push(...batch);
     const earliest = batch.reduce((min, c) => (c.date < min ? c.date : min), batch[0].date);
