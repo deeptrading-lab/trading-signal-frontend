@@ -4830,3 +4830,38 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) 도식을 README/위키에서 링크, 파이프라인 변경 시 동기 업데이트.
   - 첫 A/B 실험 실행(#165 러너), PR-6/7/8 게이트.
+
+### 2026-06-28 — refactor(ai-analysis): 에이전트 실패 로그 케이스별 표준화 (reason= 분류) (#171)
+
+- **slug**: `agent-fail-logging` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/171
+- **요약**: refactor(ai-analysis): 에이전트 실패 로그 케이스별 표준화 (reason= 분류)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > AI 종목분석 파이프라인의 **에이전트 실패 로그를 케이스별 `reason=` 분류로 통일**한다. 모니터링 시 `grep "✗ 실패"`로 전체 실패를, `grep "reason=timeout"` 등으로 케이스별로 잡을 수 있다. **동작 무변경(로깅 리팩터)**.
+  > 
+  > ## 왜
+  > A/B 하니스 실행 중 `000660` PM이 verdict=null로 실패했는데, 콘솔만으로는 원인이 **타임아웃인지 JSON 파싱 실패인지 verdict 무효인지** 즉시 구분이 안 됐다(실제로는 PM 300초 타임아웃). 케이스마다 prefix·레벨이 제각각이라 grep 모니터링이 어려웠다.
+  > 
+  > ## 변경
+  > - `route.ts`: `failAgent(agentKey, reason, detail?, err?)` 헬퍼 신설. 4케이스 통일 — `timeout` · `cli-error` · `json-parse` · `verdict-invalid`. 예상 밖 `cli-error`만 `error` 레벨(스택 포함), 나머지는 `warn`.
+  > - `aiAnalysis.ts`: 토론 bull/bear catch도 `logDebateFail`로 `timeout`/`cli-error` 구분.
+  > - 포맷: `✗ 실패 agent=<k> reason=<사유> <detail>`.
+  > - 사용자 중지(AbortError)는 실패가 아니라 info "중지"로 유지.
+  > 
+  > ## 동작 무변경 보장
+  > 각 실패 site는 기존과 동일하게 `send({progress, status:error})` + (PM은 report) + `return "error"`. 바뀐 건 **로그 문자열·레벨 일관화**뿐.
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 32/32 (lib/server/ai·lib/prompts)
+  > 
+  > ## 다음 작업
+  > - (제안) SSE `progress` 이벤트에 `reason` 필드 추가 → 재시도 카드에 "타임아웃/결론 파싱 실패" 표시(클라까지 관측성).
+  > - (제안) 실패 사유를 DB 기록 → 토큰 대시보드에 "PM 타임아웃률" 등 패널(현재는 로그에만 존재).
+  > - (별건) **T.PM=300초가 opus+effort:max PM엔 빠듯**(성공분 139~224초, 000660은 초과로 abort) → 타임아웃 상향 검토.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (제안) SSE `progress` 이벤트에 `reason` 필드 추가 → 재시도 카드에 "타임아웃/결론 파싱 실패" 표시(클라까지 관측성).
+  - (제안) 실패 사유를 DB 기록 → 토큰 대시보드에 "PM 타임아웃률" 등 패널(현재는 로그에만 존재).
+  - (별건) **T.PM=300초가 opus+effort:max PM엔 빠듯**(성공분 139~224초, 000660은 초과로 abort) → 타임아웃 상향 검토.
