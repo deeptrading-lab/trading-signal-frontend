@@ -115,6 +115,20 @@ export const LEGEND_FRESH_INPUT = "신규 입력";
 export const LEGEND_CACHE_READ = "캐시 입력";
 export const LEGEND_OUTPUT = "출력";
 
+// ─── 모델별 비용 분해 ────────────────────────────────────────────────────────────
+export const MODEL_COST_TITLE = "모델별 비용 (분석 1회 기준)";
+/** 단가 값은 components/analyze/modelBreakdown.ts MODEL_RATES 와 정합 유지. */
+export const MODEL_COST_HINT =
+  "비용은 실제 청구(CLI) 기준이라 위 ‘분석 1회 평균 비용’과 합이 같습니다. " +
+  "공개 단가(1M토큰당, 입력/출력): opus $5/$25 · sonnet $3/$15 · haiku $1/$5 — " +
+  "opus는 토큰이 적어도 비용 비중이 큰 이유예요.";
+export const MODEL_COL_MODEL = "모델";
+export const MODEL_COL_AGENTS = "분석가 수";
+export const MODEL_COL_INPUT = "입력(+캐시)";
+export const MODEL_COL_OUTPUT = "출력";
+export const MODEL_COL_COST = "비용";
+export const MODEL_COL_SHARE = "비용 비중";
+
 // ─── 테이블 ────────────────────────────────────────────────────────────────────
 export const TABLE_TITLE = "분석가별 상세";
 export const COL_AGENT = "분석가";
