@@ -625,7 +625,8 @@ ${bullR2}
  */
 function logDebateFail(speaker: "bull" | "bear", round: number, err: unknown): void {
   const reason = (err as { name?: string }).name === "TimeoutError" ? "timeout" : "cli-error";
-  const line = `[ai-analysis] ✗ 실패 agent=${speaker} round=${round} reason=${reason}`;
+  // 필드 순서를 route.ts failAgent 와 맞춤(agent=…  reason=… 인접) → grep 정합.
+  const line = `[ai-analysis] ✗ 실패 agent=${speaker} reason=${reason} round=${round}`;
   if (reason === "cli-error") console.error(line, err);
   else console.warn(line);
 }
