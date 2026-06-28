@@ -4636,3 +4636,47 @@
   - (후속) 탭 라벨: 종목코드 → 종목명 캐시 강화(현재 analyze 진입만 name 전달, 상세 진입은 ticker 폴백).
   - (후속) 4번째 요청 대기 큐 옵션(현재는 차단). 필요 시 슬롯 free 시 자동 승격.
   - (후속) 재분석 시 직전 aborted 스트림의 late-event race — 관측되면 슬롯 runId 태깅으로 보강.
+
+### 2026-06-28 — feat(intraday): 장중 단타 판단(참고) decision-support + 봇 연동 + 시황 스케줄러 (#170)
+
+- **slug**: `intraday-scalping-agent` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/170
+- **요약**: feat(intraday): 장중 단타 판단(참고) decision-support + 봇 연동 + 시황 스케줄러
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 장중 단타 분봉 AI를 **검증 게이트로 먼저 증명**하려 했으나 **AUTO-EDGE NO-GO**(균형 12종목×15일, 비용 차감 net 전 타임프레임 음수) → 자동 수익 스캘퍼를 폐기하고 **decision-support(사람 집행)로 피벗**. 결정론 레벨 + 2-에이전트 CLI 서사를 **"참고 판단"**으로 제공하는 표면 3종 + Slack 봇 연동 + 시황 자동 갱신 스케줄러.
+  > 
+  > - PRD: `docs/prd/intraday-scalping-agent.md` (§0 NO-GO 박제)
+  > - QA: `docs/qa/intraday-scalping-agent.md`
+  > 
+  > ## 핵심 결정 — §0 framing
+  > 
+  > - 검증 NO-GO → 사용자 표면에 **"자동 수익/추천" 표현 전면 금지**, "참고·판단 보조" 톤
+  > - 실주문 **영구 제외**(read-only), 전부 가상 + 로컬 CLI(구독, 토큰 0)
+  > - Vercel 503(로컬 전용)
+  > 
+  > ## 변경 (영역별)
+  > 
+  > **데이터·엔진·검증 (게이트 우선)**
+  > - 분봉 데이터 레이어 (KIS FHKST03010200 당일 / 03010230 과거, 리샘플, dropFillerBars 0거래량 제거, 5xx·EGW00201 재시도)
+  > - 분봉 시그널 프로파일 (엔진 포크 없이 seam, 일봉 기본값 무회귀)
+  > - 검증 게이트 + 오프라인 진단 하네스 (RUN_LIVE_INTRADAY / RUN_INTRADAY_DIAG)
+  > 
+  > **decision-support 표면 3종**
+  > - A 종목 상세 "장중 단타 판단(참고)" 카드
+  > - B `/intraday` 단타 워치 워크스페이스 (수급 top10 후보 → on-demand read)
+  > - C Slack webhook 푸시 (`/api/cron/intraday-slack`)
+  > 
+  > **봇 연동**
+  > - `GET /api/cron/intraday-read` (게이트 예외 JSON) — Slack 봇(dev-manager-bot)이 호출해 스레드 게시
+  > 
+  > **UI·운영**
+  > - 후보 칩 커서 픽스 + "단타 워치" 메뉴 마이페이지 위 + prod 숨김(`localOnly`/`getVisibleNavItems`)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 평일 장중 라이브 검증: 단타 read E2E(판단가 재시도 효과) + 시황 스케줄러 발화 로그 확인
+  - 봇 단타 워치 라이브 테스트 (dev-manager-bot `feature/intraday-watch` PR과 연동)
+  - "AI 매매" 메뉴 네이밍 — 자동매매 신뢰 검증 후 재논의 (현재 "단타 워치" 유지)
+  - 시황 스케줄러 단일 오너 강제 — 로그인 도입 시 (현재 수동 env 플래그 `MARKET_REFRESH_SELF_SCHEDULE`)
+  - 봇 단타 워치 영속화(인메모리 → KV/파일) — 필요 시
