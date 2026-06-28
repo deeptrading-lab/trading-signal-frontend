@@ -72,7 +72,7 @@ export function RunTrendChart({ series }: { series: RunSeriesPoint[] }) {
     isAnomaly: p.isAnomaly,
   }));
 
-  const tickInterval = Math.max(0, Math.floor(data.length / 6) - 0);
+  const tickInterval = Math.max(0, Math.floor(data.length / 6));
   const deltaPct =
     t.latestDeltaRatio != null ? Math.round(t.latestDeltaRatio * 100) : null;
   const deltaUp = deltaPct != null && deltaPct > 0;
