@@ -4759,3 +4759,40 @@
   - **AI 분석 탭 URL 반영**: `/analyze?tab=usage` 쿼리 파라미터로 상위 탭을 딥링크·새로고침·공유·뒤로가기 가능하게(별도 PR, 사용자 요청).
   - (선택) 추세 X축: 같은 날 run 다수면 날짜 라벨 중복 → 시:분 표기 폴리시.
   - (선택) 분포(히스토그램) 뷰, 사후 horizon hit-rate 추세(채점 cron 후).
+
+### 2026-06-28 — feat(analyze): 상위 탭 URL 쿼리 동기화 (?tab=usage) (#168)
+
+- **slug**: `analyze-tab-url` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/168
+- **요약**: feat(analyze): 상위 탭 URL 쿼리 동기화 (?tab=usage)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `/analyze` 상위 탭(분석 결과 / 토큰 사용량) 상태를 **URL 쿼리(`?tab=usage`)** 로 단일화한다. 딥링크·새로고침·공유·뒤로가기가 일관 동작. 기본(분석 결과)은 깨끗한 `/analyze`, 토큰 사용량만 `?tab=usage`.
+  > 
+  > ## 왜
+  > 기존 탭은 `useState` 라 새로고침·공유·뒤로가기 시 항상 "분석 결과"로 리셋됐다. 토큰 대시보드(특정 탭)를 공유·북마크·딥링크할 수 없었다.
+  > 
+  > ## 변경
+  > - 신규 `components/analyze/analyzeTab.ts` — 순수 매핑(`analyzeTabFromParam`/`analyzeTabHref`, 기본 results=쿼리 없는 경로, usage만 `?tab=usage`)
+  > - `AnalyzeTabsContainer.tsx` — `useState` → `useSearchParams` 단일 출처, `router.replace(href,{scroll:false})`
+  > - `app/(main)/analyze/page.tsx` — `useSearchParams` 경계용 `<Suspense fallback={null}>` 래핑 (login 패턴)
+  > - 단위테스트 4 (`__tests__/analyzeTab.test.ts`), QA `docs/qa/analyze-tab-url.md`
+  > 
+  > ## 설계 결정
+  > - **쿼리 파라미터** 채택(경로 분리 아님) — 라우트 1개 유지, 결과 탭 툴바 portal 슬롯·레이아웃 그대로, 최소 변경
+  > - **범위 = 상위 탭만** — provider(Claude/Codex) 서브탭은 제외(합의)
+  > - 기본 탭은 깨끗한 경로(토스톤), 잘못된 파라미터는 결과로 폴백
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 4/4
+  > - 빌드 로그: `/analyze`·`/analyze?tab=usage` 200, useSearchParams Suspense bailout 경고 0
+  > - 육안 확인(딥링크·새로고침·뒤로가기) + 다관점 적대 리뷰 워크플로(12 에이전트, 4관점×검증) → 실재 결함 0·블로커 0
+  > 
+  > ## 다음 작업
+  > - (선택) provider(Claude/Codex) 서브탭·추세 지표도 URL 동기화로 확장.
+  > - (선택) Suspense fallback 을 null → 탭바 스켈레톤으로(첫 페인트 CLS 완화). 현재는 login 패턴(null) 준수.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) provider(Claude/Codex) 서브탭·추세 지표도 URL 동기화로 확장.
+  - (선택) Suspense fallback 을 null → 탭바 스켈레톤으로(첫 페인트 CLS 완화). 현재는 login 패턴(null) 준수.
