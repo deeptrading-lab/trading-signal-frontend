@@ -33,15 +33,19 @@ export function evaluateSignal(
   const n = candles.length;
   const asOf = n > 0 ? candles[n - 1].date : "";
 
-  // 워밍업 부족(< SOFT_MIN_BARS) — 60일선·골든크로스도 흔들려 분석 부적정 → HOLD 안전 폴백.
-  if (n < SOFT_MIN_BARS) {
+  // 분봉 프로파일은 warmup 경계를 오버라이드(미지정 시 일봉 기본 90/130 — 무회귀).
+  const softMin = opts?.softMinBars ?? SOFT_MIN_BARS;
+  const fullMin = opts?.minBars ?? MIN_BARS;
+
+  // 워밍업 부족(< softMin) — 60일선·골든크로스도 흔들려 분석 부적정 → HOLD 안전 폴백.
+  if (n < softMin) {
     return { action: "HOLD", score: 50, confidence: 0, axes: [], asOf, warmupOk: false, limitedData: false, bars: n, regime: 0 };
   }
 
-  // 90 <= n < 130 — 장기추세(120일선·정배열·레짐) 미확보. 분석은 정상 수행하되 limitedData 마킹.
-  const limitedData = n < MIN_BARS;
+  // softMin <= n < fullMin — 장기추세(베이스 이평·정배열·레짐) 미확보. 분석은 수행하되 limitedData 마킹.
+  const limitedData = n < fullMin;
 
-  const ctx = buildContext(candles);
+  const ctx = buildContext(candles, opts?.indicators);
 
   const trendHits = evaluateTrend(ctx);
   const trendAxis = aggregateAxis("trend", trendHits);
@@ -67,7 +71,8 @@ export function evaluateSignal(
 
   // 장기추세 레짐 — 항상 산출(투명성). 필터 on(기본)일 때만 역추세 진입 veto.
   // (90~130봉은 SMA120 룩백 미확보로 computeRegime=0 중립 → veto 미적용. 정상 degrade.)
-  const regime = computeRegime(ctx);
+  // 분봉은 자체 SMA120 레짐이 오버나잇 갭에 오염되므로 일봉 레짐을 regimeOverride 로 주입한다.
+  const regime = opts?.regimeOverride ?? computeRegime(ctx);
   let action = rawAction;
   if (opts?.regimeFilter !== false) {
     if (regime === -1 && rawAction === "BUY") action = "HOLD";

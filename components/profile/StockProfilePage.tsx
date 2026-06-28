@@ -20,6 +20,7 @@
 import { BarChart2 } from "lucide-react";
 import { StockSearchContainer } from "@/components/home/StockSearchContainer";
 import { StockPageLayout } from "./StockPageLayout";
+import { IntradayReadSection } from "@/components/stock/IntradayReadSection";
 import { NAV_MENU_STOCK } from "@/lib/copy/layout/navCopy";
 
 export interface StockProfilePageProps {
@@ -37,6 +38,7 @@ export function StockProfilePage({ ticker, initialKeyword }: StockProfilePagePro
       </header>
       <StockSearchContainer initialKeyword={initialKeyword} />
       <StockPageLayout ticker={ticker} />
+      <IntradayReadSection ticker={ticker} />
     </div>
   );
 }

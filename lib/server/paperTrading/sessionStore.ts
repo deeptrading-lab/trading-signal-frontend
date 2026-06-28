@@ -4,6 +4,7 @@ import {
   PAPER_TRADING_DEFAULT_INITIAL_CASH,
   PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
   PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES,
+  PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES,
 } from "@/lib/server/paperTrading/constants";
 import { addTickWindow, floorToTickWindow } from "@/lib/server/paperTrading/time";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
@@ -69,6 +70,16 @@ export async function createPaperTradingSession(
   );
   const targetReturnPct = sanitizePositiveNumber(request.targetReturnPct, 5);
   const stocks = normalizeStocks(request);
+  // 요청 provider 를 존중(화이트리스트). cli-agent 는 단타 주기(5분)로 — 30분이면 5분 cron 이 같은
+  // 틱 윈도로 묶여 중복 제거되므로 단타 루프가 동작하지 않는다.
+  const decisionProvider =
+    request.decisionProvider === "cli-agent" || request.decisionProvider === "existing-ai"
+      ? request.decisionProvider
+      : "mock";
+  const tickIntervalMinutes =
+    decisionProvider === "cli-agent"
+      ? PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES
+      : PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES;
   const session: PaperTradingSession = {
     id: randomUUID(),
     name: request.name.trim() || "AI 모의투자",
@@ -83,8 +94,8 @@ export async function createPaperTradingSession(
     riskMode: request.riskMode,
     maxPositionPct: PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
     cashBufferPct: PAPER_TRADING_DEFAULT_CASH_BUFFER_PCT,
-    tickIntervalMinutes: PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES,
-    decisionProvider: "mock",
+    tickIntervalMinutes,
+    decisionProvider,
     mode: "live-paper",
     lastTickWindowStart: null,
     startedAt: now,

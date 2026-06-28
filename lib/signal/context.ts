@@ -7,6 +7,7 @@
  */
 
 import type { StockDailyCandle } from "@/lib/api/kis/types";
+import type { IndicatorProfile } from "@/lib/types/signal";
 import {
   calcSMA,
   calcMACD,
@@ -39,25 +40,41 @@ export type FactorContext = {
   adx: AdxPoint[];
 };
 
-/** 캔들(오름차순) → 지표 일괄 계산. 표준 파라미터(MACD 12/26/9, RSI 14, BB 20/2). */
-export function buildContext(candles: StockDailyCandle[]): FactorContext {
+/**
+ * 캔들(오름차순) → 지표 일괄 계산.
+ *
+ * `profile` 미지정 시 일봉 표준 파라미터(MA 5/20/60/120, MACD 12/26/9, RSI 14, BB 20/2,
+ * ADX 14, volMA 20) — 기존 동작과 **비트 동일**(무회귀). 분봉은 타임프레임 주기를 주입한다.
+ */
+export function buildContext(
+  candles: StockDailyCandle[],
+  profile?: IndicatorProfile,
+): FactorContext {
   const closes = candles.map((c) => c.close);
   const volumes = candles.map((c) => c.volume);
+
+  const ma = profile?.maPeriods ?? MA_PERIODS;
+  const macd = profile?.macd ?? { fast: 12, slow: 26, signal: 9 };
+  const rsiPeriod = profile?.rsiPeriod ?? 14;
+  const boll = profile?.bollinger ?? { period: 20, mult: 2 };
+  const adxPeriod = profile?.adxPeriod ?? 14;
+  const volMaPeriod = profile?.volumeMaPeriod ?? 20;
+
   return {
     i: candles.length - 1,
     candles,
     closes,
     volumes,
     sma: {
-      short: calcSMA(closes, MA_PERIODS.short),
-      mid: calcSMA(closes, MA_PERIODS.mid),
-      long: calcSMA(closes, MA_PERIODS.long),
-      base: calcSMA(closes, MA_PERIODS.base),
+      short: calcSMA(closes, ma.short),
+      mid: calcSMA(closes, ma.mid),
+      long: calcSMA(closes, ma.long),
+      base: calcSMA(closes, ma.base),
     },
-    macd: calcMACD(closes),
-    rsi: calcRSI(closes),
-    boll: calcBollinger(closes),
-    volMA: calcVolumeMA(volumes),
-    adx: calcADX(candles),
+    macd: calcMACD(closes, macd.fast, macd.slow, macd.signal),
+    rsi: calcRSI(closes, rsiPeriod),
+    boll: calcBollinger(closes, boll.period, boll.mult),
+    volMA: calcVolumeMA(volumes, volMaPeriod),
+    adx: calcADX(candles, adxPeriod),
   };
 }

@@ -5,7 +5,13 @@ import {
   type PaperTradingPriceSnapshotProvider,
 } from "@/lib/server/paperTrading/marketData";
 import { executeVirtualTrade } from "@/lib/server/paperTrading/virtualExecution";
+import {
+  resolveIntradayTickDecision,
+  type IntradayTickArgs,
+  type IntradayTickResult,
+} from "@/lib/server/paperTrading/intradayTickDecision";
 import type {
+  PaperTradingDecision,
   PaperTradingPosition,
   PaperTradingSession,
   PaperTradingTick,
@@ -19,6 +25,11 @@ export type RunPaperTradingTickInput = {
   triggeredBy: PaperTradingTriggeredBy;
   tickWindowStart: string;
   priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
+  /**
+   * 단타(cli-agent) 결정 resolver 주입 — 테스트 스텁용. 기본 `resolveIntradayTickDecision`
+   * (분봉/일봉 페치 + 에이전트 그룹). mock/existing-ai 세션에는 사용 안 함.
+   */
+  intradayResolver?: (args: IntradayTickArgs) => Promise<IntradayTickResult>;
 };
 
 export type RunPaperTradingTickResult = {
@@ -56,14 +67,31 @@ export async function runPaperTradingTick(
       return sum + item.quantity * (price?.price ?? item.lastPrice);
     }, 0);
 
-  const decision = decideWithMockProvider({
-    positions: input.positions,
-    priceSnapshot,
-    portfolioValue: markedPortfolioValue,
-    returnPct: input.session.returnPct,
-    riskMode: input.session.riskMode,
-    maxPositionPct: input.session.maxPositionPct,
-  });
+  let decision: PaperTradingDecision;
+  let forcedExit: Parameters<typeof executeVirtualTrade>[0]["forcedExit"];
+
+  if (input.session.decisionProvider === "cli-agent") {
+    // 단타 경량 에이전트 그룹(로컬 CLI) — 분봉/일봉 기반 절대가 판단 + 청산 트리거.
+    const resolver = input.intradayResolver ?? resolveIntradayTickDecision;
+    const resolved = await resolver({
+      session: input.session,
+      positions: input.positions,
+      priceSnapshot,
+      existingTicks: input.existingTicks,
+      tickWindowStart: input.tickWindowStart,
+    });
+    decision = resolved.decision;
+    forcedExit = resolved.forcedExit;
+  } else {
+    decision = decideWithMockProvider({
+      positions: input.positions,
+      priceSnapshot,
+      portfolioValue: markedPortfolioValue,
+      returnPct: input.session.returnPct,
+      riskMode: input.session.riskMode,
+      maxPositionPct: input.session.maxPositionPct,
+    });
+  }
 
   const executed = executeVirtualTrade({
     cash: input.session.cash,
@@ -72,6 +100,7 @@ export async function runPaperTradingTick(
     priceSnapshot,
     maxPositionPct: input.session.maxPositionPct,
     cashBufferPct: input.session.cashBufferPct,
+    forcedExit,
   });
 
   const portfolioValueAfter = executed.portfolioValue;

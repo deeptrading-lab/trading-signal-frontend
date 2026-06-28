@@ -4899,3 +4899,16 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (보류) 실패 사유 DB 기록 → 대시보드 "PM 타임아웃률" 패널: 무인/스케줄 분석 운영 시 가치. 현재 로컬 수동 단계엔 보류.
   - (검증된 별건) **DEBATE_ROUNDS 2→1**: A/B 하니스로 품질 PASS(verdict 일치 100%·drift 허용내) + 비용 −18%·캐시생성 −36% 입증(공통 4종목, 단 전부 UNDERWEIGHT 동질 표본). 더 다양한 골든셋 재검증 후 기본화 검토.
+
+### 2026-06-28 — feat(intraday): 장중 단타 판단(참고) decision-support + 봇 연동 + 시황 스케줄러 (#170)
+
+- **slug**: `intraday-scalping-agent` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/170
+- **요약**: 검증 게이트 AUTO-EDGE NO-GO(균형 12종목×15일 net 음수) → 자동 스캘퍼 폐기, 사람 집행 decision-support로 피벗. 분봉 데이터레이어·시그널 프로파일·검증 게이트 + 표면 3종(A 종목상세 카드 / B `/intraday` 워치 / C Slack) + 봇용 read 엔드포인트(`/api/cron/intraday-read`, 게이트 예외 JSON) + 시황 자동 갱신 in-process 스케줄러(`instrumentation.ts`, crontab 대체).
+- **현재 상태**: QA 통과(547 테스트·build green) · review-approved(자가 PR `--comment` fallback) · 머지
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 평일 장중 라이브 검증: 단타 read E2E(판단가 재시도) + 시황 스케줄러 발화 로그 + Supabase 적립
+  - 봇 단타 워치 라이브 테스트 (dev-manager-bot #60 연동, 동반 머지)
+  - "AI 매매" 메뉴 네이밍 — 자동매매 신뢰 검증 후 재논의 (현재 "단타 워치" 유지)
+  - 시황 스케줄러 단일 오너 강제 — 로그인 도입 시 (현재 수동 env 플래그 `MARKET_REFRESH_SELF_SCHEDULE`)
+  - 봇 단타 워치 영속화(인메모리 → KV/파일) — 필요 시

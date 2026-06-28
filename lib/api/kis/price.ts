@@ -24,9 +24,10 @@ import type {
   KisEnvelope,
   KisInquireDailyPriceItem,
   KisInquirePriceOutput,
+  KisInquireTimeItemChartItem,
 } from "./types";
-import { mapDailyCandle, mapStockPrice, toNumber } from "./mappers";
-import type { StockDailyCandle, StockPrice } from "./types";
+import { mapDailyCandle, mapMinuteCandle, mapStockPrice, toNumber } from "./mappers";
+import type { StockDailyCandle, StockMinuteCandle, StockPrice } from "./types";
 
 type AuthHeaders = {
   authorization: string;
@@ -260,4 +261,145 @@ export async function fetchStockDailyChart(
   }
 
   return (data.output2 ?? []).map(mapDailyCandle);
+}
+
+/** YYYY-MM-DD (오늘) — 분봉 응답 `stck_bsop_date` 누락 시 폴백 기준일. */
+function todayYmd(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function asMinuteResponse(raw: unknown): {
+  rt_cd: string;
+  msg_cd: string;
+  msg1: string;
+  output2?: KisInquireTimeItemChartItem[];
+} {
+  return raw as {
+    rt_cd: string;
+    msg_cd: string;
+    msg1: string;
+    output2?: KisInquireTimeItemChartItem[];
+  };
+}
+
+/**
+ * 종목 **당일 분봉** 차트 — `inquire-time-itemchartprice` (TR_ID `FHKST03010200`).
+ *
+ * KIS 네이티브 해상도는 **1분봉**이며 1회 호출당 기준시각(`anchorHhmmss`) 이하로 ~30봉을 돌려준다.
+ * 더 과거로 가려면 가장 이른 봉 직전 시각을 다음 `anchorHhmmss` 로 넘겨 역방향 페이징한다
+ * (`minuteChartChunked.ts` 가 담당). N분봉(3/5/15)은 1분봉을 리샘플링해 만든다.
+ *
+ * @param ticker 종목코드 6자리.
+ * @param anchorHhmmss 기준시각 HHMMSS(이하 봉 반환). "" 면 당일 최신부터.
+ * @param includePast 과거 데이터 포함 여부(`FID_PW_DATA_INCU_YN`). 기본 true.
+ * @returns 오름차순 1분봉 `StockMinuteCandle[]` (date="YYYY-MM-DDTHH:mm").
+ */
+export async function fetchStockMinuteChart(
+  ticker: string,
+  anchorHhmmss: string = "",
+  includePast: boolean = true,
+): Promise<StockMinuteCandle[]> {
+  const client = getKisClient();
+  const headers = await buildAuthHeaders("FHKST03010200");
+
+  let response;
+  try {
+    response = await client.get(
+      "/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice",
+      {
+        headers,
+        params: {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_HOUR_1: anchorHhmmss,
+          FID_PW_DATA_INCU_YN: includePast ? "Y" : "N",
+          FID_ETC_CLS_CODE: "",
+        },
+      },
+    );
+  } catch (error) {
+    const status =
+      typeof (error as { response?: { status?: number } }).response?.status === "number"
+        ? (error as { response: { status: number } }).response.status
+        : undefined;
+    throw makeKisTransportError({
+      status,
+      message:
+        error instanceof Error ? error.message : "KIS 분봉 시세 조회 중 네트워크 오류가 발생했어요.",
+    });
+  }
+
+  const data = asMinuteResponse(response.data);
+  if (data.rt_cd !== "0") {
+    throw makeKisBusinessError(data.msg1, data.msg_cd);
+  }
+
+  const fallback = todayYmd();
+  return (data.output2 ?? [])
+    .map((it) => mapMinuteCandle(it, fallback))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * 종목 **과거 다일 분봉** 차트 — `inquire-time-dailychartprice` (TR_ID `FHKST03010230`).
+ *
+ * 당일분봉(`fetchStockMinuteChart`)과 달리 과거 일자(`dateYyyymmdd`)의 1분봉을 조회한다.
+ * 분봉 백테스트(검증 게이트)와 라이브 루프의 **전일 warmup prefetch** 에 사용한다.
+ *
+ * @param ticker 종목코드 6자리.
+ * @param dateYyyymmdd 조회 일자 YYYYMMDD.
+ * @param anchorHhmmss 기준시각 HHMMSS(이하 봉 반환). "" 면 해당일 최신(장 마감)부터.
+ * @returns 오름차순 1분봉 `StockMinuteCandle[]`.
+ */
+export async function fetchStockMinuteDaily(
+  ticker: string,
+  dateYyyymmdd: string,
+  anchorHhmmss: string = "",
+): Promise<StockMinuteCandle[]> {
+  const client = getKisClient();
+  const headers = await buildAuthHeaders("FHKST03010230");
+
+  let response;
+  try {
+    response = await client.get(
+      "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice",
+      {
+        headers,
+        params: {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_HOUR_1: anchorHhmmss,
+          FID_INPUT_DATE_1: dateYyyymmdd,
+          FID_PW_DATA_INCU_YN: "Y",
+          FID_FAKE_TICK_INCU_YN: "N",
+        },
+      },
+    );
+  } catch (error) {
+    const status =
+      typeof (error as { response?: { status?: number } }).response?.status === "number"
+        ? (error as { response: { status: number } }).response.status
+        : undefined;
+    throw makeKisTransportError({
+      status,
+      message:
+        error instanceof Error ? error.message : "KIS 과거 분봉 시세 조회 중 네트워크 오류가 발생했어요.",
+    });
+  }
+
+  const data = asMinuteResponse(response.data);
+  if (data.rt_cd !== "0") {
+    throw makeKisBusinessError(data.msg1, data.msg_cd);
+  }
+
+  const fallback =
+    /^\d{8}$/.test(dateYyyymmdd)
+      ? `${dateYyyymmdd.slice(0, 4)}-${dateYyyymmdd.slice(4, 6)}-${dateYyyymmdd.slice(6, 8)}`
+      : todayYmd();
+  return (data.output2 ?? [])
+    .map((it) => mapMinuteCandle(it, fallback))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
