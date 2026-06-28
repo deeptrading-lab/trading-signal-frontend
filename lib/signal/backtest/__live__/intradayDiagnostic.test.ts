@@ -60,7 +60,7 @@ function atrBarrier(tf: number): BacktestOptions["barrier"] {
 }
 
 describe.skipIf(!ENABLED)("분봉 게이트 진단(오프라인 스윕)", () => {
-  it("비용·레짐·진입·배리어 스윕 + attribution", () => {
+  it("비용·레짐·진입·배리어 스윕 + attribution", { timeout: 120_000 }, () => {
     const byTicker: Record<string, StockMinuteCandle[]> = {};
     let loaded = 0;
     for (const t of TICKERS) {
