@@ -81,10 +81,15 @@ async function loadOneMinFixture(ticker: string): Promise<StockMinuteCandle[]> {
   let filled = 0;
   for (let back = 1; back <= MAX_CALENDAR_LOOKBACK && filled < DAYS; back++) {
     const date = nDaysAgoYyyymmdd(back);
-    const day = await fetchMinuteCandlesForDate(ticker, date, 1); // 1=리샘플 없이 1분봉
-    if (day.length > 0) {
-      acc.push(...day);
-      filled += 1;
+    try {
+      const day = await fetchMinuteCandlesForDate(ticker, date, 1); // 1=리샘플 없이 1분봉
+      if (day.length > 0) {
+        acc.push(...day);
+        filled += 1;
+      }
+    } catch (e) {
+      // 한 날 페치 실패(KIS 간헐 5xx 등)는 그 날만 skip — 게이트 전체를 중단하지 않는다.
+      console.warn(`  [${ticker}] ${date} 분봉 페치 실패 — skip: ${(e as Error).message}`);
     }
   }
   const seen = new Set<string>();
