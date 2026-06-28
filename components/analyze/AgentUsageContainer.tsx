@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils/cn";
 import { useQueryAgentUsage } from "@/hooks/stock/useQueryAgentUsage";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 import { CacheCostCards } from "./CacheCostCards";
+import { ModelCostBreakdown } from "./ModelCostBreakdown";
 import { AgentTokenBarChart } from "./AgentTokenBarChart";
 import { StageInputTrendChart } from "./StageInputTrendChart";
 import { AgentUsageTable } from "./AgentUsageTable";
@@ -126,6 +127,7 @@ export function AgentUsageContainer() {
       ) : (
         <>
           <CacheCostCards rows={rows} wallClockMs={wallClockMs} />
+          <ModelCostBreakdown rows={rows} />
           <AgentTokenBarChart rows={rows} />
           <StageInputTrendChart rows={rows} />
           <AgentUsageTable rows={rows} />
