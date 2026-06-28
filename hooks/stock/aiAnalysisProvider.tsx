@@ -185,6 +185,8 @@ function reduceSlotEvent(slot: AnalysisSlot, event: AIAnalysisEvent): AnalysisSl
               ...a,
               status: event.status,
               streamingChunk: event.status === "done" ? "" : a.streamingChunk,
+              // 실패 사유는 error 일 때만 보존(running/done 으로 가면 해제).
+              failReason: event.status === "error" ? event.reason : undefined,
             }
           : a,
       );

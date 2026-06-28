@@ -592,6 +592,7 @@ export function AIAnalysisPanel({
                               isRunning={isRunning}
                               onExpand={handleExpand}
                               onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                              failReason={agentState.failReason}
                               sentiment={key === "social" ? sentiment : undefined}
                             />
                           );
@@ -635,6 +636,7 @@ export function AIAnalysisPanel({
                                   isRunning={isRunning}
                                   onExpand={handleExpand}
                                   onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                                  failReason={agentState.failReason}
                                 />
                               </div>
                             );
@@ -649,6 +651,7 @@ export function AIAnalysisPanel({
                               isRunning={isRunning}
                               onExpand={handleExpand}
                               onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                              failReason={agentState.failReason}
                             />
                           );
                         })}
@@ -678,6 +681,7 @@ export function AIAnalysisPanel({
                                   isRunning={isRunning}
                                   onExpand={handleExpand}
                                   onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                                  failReason={agentState.failReason}
                                 />
                               )}
                             </div>

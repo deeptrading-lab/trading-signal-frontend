@@ -108,6 +108,13 @@ export const COPY = {
     retry: "재시도",
     viewFull: "전체 보기",
     resumeTitle: (label: string) => `${label}부터 재개`,
+    /** SSE progress.reason → 재시도 카드에 표시할 실패 사유 라벨. */
+    failReason: {
+      timeout: "응답 시간 초과",
+      "cli-error": "실행 오류",
+      "json-parse": "결론 형식 오류",
+      "verdict-invalid": "결론 판정 오류",
+    } as Record<string, string>,
   },
   debate: {
     title: "강세 vs 약세 토론",

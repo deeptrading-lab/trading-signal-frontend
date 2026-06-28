@@ -9,6 +9,7 @@
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import type {
+  AgentFailReason,
   AgentKey,
   AIAnalysisEvent,
   AIAnalysisProvider,
@@ -129,7 +130,9 @@ const PCT_CLARITY =
 const T = {
   NO_TOOL:   300_000,
   WEB_TOOL:  360_000,
-  PM:        300_000,
+  // PM = opus·effort:max + 최대 입력(11에이전트 종합)·최대 출력이라 300초로는 빠듯
+  // (실측 성공 139~224초, 일부 종목 300초 초과 abort). 최종 단계라 여유를 둬 480초로 상향.
+  PM:        480_000,
   TRADER:    360_000,
   DEBATE_R2: 300_000,
 };
@@ -623,12 +626,14 @@ ${bullR2}
  * 토론 발화(bull/bear) 실패 로그 표준화 — route.ts failAgent 와 동일 포맷.
  * "✗ 실패" + "reason=<timeout|cli-error>" 로 모니터링 grep 을 통일한다(여긴 console 사용).
  */
-function logDebateFail(speaker: "bull" | "bear", round: number, err: unknown): void {
-  const reason = (err as { name?: string }).name === "TimeoutError" ? "timeout" : "cli-error";
+function logDebateFail(speaker: "bull" | "bear", round: number, err: unknown): AgentFailReason {
+  const reason: AgentFailReason =
+    (err as { name?: string }).name === "TimeoutError" ? "timeout" : "cli-error";
   // 필드 순서를 route.ts failAgent 와 맞춤(agent=…  reason=… 인접) → grep 정합.
   const line = `[ai-analysis] ✗ 실패 agent=${speaker} reason=${reason} round=${round}`;
   if (reason === "cli-error") console.error(line, err);
   else console.warn(line);
+  return reason;
 }
 
 export async function runDebateLoop(
@@ -672,8 +677,7 @@ export async function runDebateLoop(
       });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
-      logDebateFail("bull", round, err);
-      send({ type: "progress", agent: "bull", status: "error" });
+      send({ type: "progress", agent: "bull", status: "error", reason: logDebateFail("bull", round, err) });
       return "error";
     }
 
@@ -714,8 +718,7 @@ export async function runDebateLoop(
       });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
-      logDebateFail("bear", round, err);
-      send({ type: "progress", agent: "bear", status: "error" });
+      send({ type: "progress", agent: "bear", status: "error", reason: logDebateFail("bear", round, err) });
       return "error";
     }
 
