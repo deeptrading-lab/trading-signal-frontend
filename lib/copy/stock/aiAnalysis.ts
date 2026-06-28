@@ -1,4 +1,4 @@
-import type { SentimentBand, SentimentConfidence } from "@/lib/types/stock/aiAnalysis";
+import type { AgentFailReason, SentimentBand, SentimentConfidence } from "@/lib/types/stock/aiAnalysis";
 
 export const COPY = {
   /** 종목 헤더의 AI 분석 진입 버튼 라벨. */
@@ -108,13 +108,13 @@ export const COPY = {
     retry: "재시도",
     viewFull: "전체 보기",
     resumeTitle: (label: string) => `${label}부터 재개`,
-    /** SSE progress.reason → 재시도 카드에 표시할 실패 사유 라벨. */
+    /** SSE progress.reason → 재시도 카드에 표시할 실패 사유 라벨. satisfies 로 키 완전성 컴파일 강제. */
     failReason: {
       timeout: "응답 시간 초과",
       "cli-error": "실행 오류",
       "json-parse": "결론 형식 오류",
       "verdict-invalid": "결론 판정 오류",
-    } as Record<string, string>,
+    } satisfies Record<AgentFailReason, string>,
   },
   debate: {
     title: "강세 vs 약세 토론",
