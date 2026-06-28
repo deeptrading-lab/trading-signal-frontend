@@ -39,6 +39,7 @@ export {
 } from "./price";
 export {
   resampleMinuteCandles,
+  dropFillerBars,
   fetchTodayMinuteCandles,
   fetchMinuteCandlesForDate,
   fetchMinuteHistory,

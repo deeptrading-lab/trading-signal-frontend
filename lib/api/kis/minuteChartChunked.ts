@@ -92,6 +92,15 @@ export function resampleMinuteCandles(
   return order.map((k) => buckets.get(k)!);
 }
 
+/**
+ * 무거래 채움봉 제거 — KIS 분봉은 **체결 없는 분을 직전가·거래량 0 으로 채워** 보낸다(점심 무렵·장 막판
+ * 등). 이 flat 0거래량 봉은 거래량/변동성 축을 왜곡하므로 시그널 입력에서 제외한다.
+ * 15:30 종가 동시호가처럼 실제 거래량이 있는 봉(volume>0)은 그대로 유지된다.
+ */
+export function dropFillerBars(candles: StockMinuteCandle[]): StockMinuteCandle[] {
+  return candles.filter((c) => c.volume > 0);
+}
+
 /** dedup(date) + 오름차순 정렬. */
 function dedupeSort(candles: StockMinuteCandle[]): StockMinuteCandle[] {
   const seen = new Set<string>();
@@ -159,7 +168,7 @@ export async function fetchTodayMinuteCandles(
     await delay(PAGE_DELAY_MS);
   }
 
-  return resampleMinuteCandles(dedupeSort(acc), timeframe);
+  return resampleMinuteCandles(dropFillerBars(dedupeSort(acc)), timeframe);
 }
 
 /**
@@ -173,7 +182,7 @@ export async function fetchMinuteCandlesForDate(
   const oneMin = await pageDayBackward((anchor) =>
     fetchStockMinuteDaily(ticker, dateYyyymmdd, anchor),
   );
-  return resampleMinuteCandles(oneMin, timeframe);
+  return resampleMinuteCandles(dropFillerBars(oneMin), timeframe);
 }
 
 /**
@@ -208,5 +217,5 @@ export async function fetchMinuteHistory(
     }
   }
 
-  return resampleMinuteCandles(dedupeSort(oneMin), timeframe);
+  return resampleMinuteCandles(dropFillerBars(dedupeSort(oneMin)), timeframe);
 }

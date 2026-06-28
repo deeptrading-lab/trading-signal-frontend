@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { formatMinuteStamp, mapMinuteCandle } from "../mappers";
-import { resampleMinuteCandles } from "../minuteChartChunked";
+import { resampleMinuteCandles, dropFillerBars } from "../minuteChartChunked";
 import type { KisInquireTimeItemChartItem, StockMinuteCandle } from "../types";
 
 describe("formatMinuteStamp", () => {
@@ -119,5 +119,40 @@ describe("resampleMinuteCandles", () => {
     expect(out).toHaveLength(2);
     expect(out[0].date.slice(0, 10)).toBe("2026-06-26");
     expect(out[1].date.slice(0, 10)).toBe("2026-06-29");
+  });
+});
+
+describe("dropFillerBars", () => {
+  const bar = (hhmm: string, price: number, volume: number): StockMinuteCandle => ({
+    date: `2026-06-26T${hhmm}`,
+    open: price,
+    high: price,
+    low: price,
+    close: price,
+    volume,
+  });
+
+  it("거래량 0 채움봉 제거, 거래량>0 봉(종가 동시호가 포함) 유지", () => {
+    const bars = [
+      bar("09:00", 100, 1_000),
+      bar("12:15", 95, 0), // 무거래 채움
+      bar("12:20", 95, 0), // 무거래 채움
+      bar("15:30", 99, 5_000_000), // 종가 동시호가 — 유지
+    ];
+    expect(dropFillerBars(bars).map((c) => c.date)).toEqual([
+      "2026-06-26T09:00",
+      "2026-06-26T15:30",
+    ]);
+  });
+
+  it("리샘플 전 필터: 5분 버킷이 전부 0거래량이면 버킷 자체가 사라짐", () => {
+    const oneMin = [
+      bar("09:00", 100, 500),
+      bar("09:01", 101, 300),
+      bar("09:05", 99, 0), // 09:05 버킷 전부 무거래
+      bar("09:06", 99, 0),
+    ];
+    const out = resampleMinuteCandles(dropFillerBars(oneMin), 5);
+    expect(out.map((c) => c.date)).toEqual(["2026-06-26T09:00"]);
   });
 });
