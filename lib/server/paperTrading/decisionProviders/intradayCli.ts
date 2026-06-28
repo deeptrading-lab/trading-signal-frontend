@@ -70,6 +70,12 @@ export interface IntradayCliInput {
   maxPositionPct: number;
   provider?: AIAnalysisProvider;
   abortSignal: AbortSignal;
+  /**
+   * 사전 게이트의 "변화 없음 → LLM 스킵" 최적화를 무시하고 항상 에이전트를 호출한다.
+   * on-demand 판단 카드(사람이 직접 요청)는 HOLD 라도 분석가 서사가 필요하므로 true.
+   * 주기 틱 루프는 false(비용 절감 유지).
+   */
+  forceAgents?: boolean;
 }
 
 export interface IntradayProviderResult {
@@ -388,9 +394,9 @@ export async function decideIntradayWithCli(
     return { decision: toPaperTradingDecision(intraday, input), intraday };
   };
 
-  // 사전 게이트.
+  // 사전 게이트. (forceAgents=on-demand 판단 카드는 변화없음 스킵을 무시하고 항상 에이전트 호출)
   const pre = evaluatePreGate(ctx, input.dailyLossKill);
-  if (!pre.callLlm) {
+  if (!pre.callLlm && !input.forceAgents) {
     return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", undefined, [
       pre.reason ?? "사전 게이트 스킵",
     ]);

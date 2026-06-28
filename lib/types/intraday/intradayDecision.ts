@@ -87,6 +87,24 @@ export interface IntradayDecisionLlm {
   riskNotes: string[];
 }
 
+/**
+ * 종목 상세 "장중 단타 판단(참고)" 카드 응답 — on-demand standalone read.
+ * ⚠️ 의사결정 보조용. 자동 수익/집행을 주장하지 않으며 최종 판단·집행은 사람이 한다.
+ */
+export interface IntradayReadResponse {
+  ticker: string;
+  name: string;
+  /** 분봉 기준 시각(YYYY-MM-DDTHH:mm). */
+  asOf: string;
+  price: number;
+  timeframe: number;
+  signal: DecisionSignal;
+  levels: IntradayLevels;
+  decision: IntradayDecision;
+  /** 워밍업 부족 등 신뢰도 경고(있으면). */
+  warning?: string;
+}
+
 /** 최종 단타 결정 — LLM 부분 + 서버 메타. */
 export interface IntradayDecision extends IntradayDecisionLlm {
   /** 판단 시 기준가(마지막 분봉 종가). */
