@@ -87,3 +87,61 @@
 
 - QA 중 `npm run build`를 `next dev` 실행 중 돌려 dev 서버 `.next` 클로버 → **dev 서버 재시작 필요**(`npm run dev`). fix들은 게이트로 검증됨, 라이브 재확인은 재시작 후 가능.
 - 자동 게이트·진단 하네스(`__live__/*.test.ts`)는 QA 회귀 자산으로 보존(KIS 없이 오프라인 스윕 가능).
+
+---
+
+## 9. 추가 QA — 세션 2 (2026-06-28, PR #170): 봇 연동 + nav + 시황 스케줄러
+
+PR #170 으로 묶으며 추가된 커밋 3종을 검증한다. 라이브(KIS/Slack/스케줄러 발화)는 **일요일이라 게이트로 차단** → 자동 게이트 + 결정론 로직 검증 중심, 라이브 E2E 는 §10 후속.
+
+### 9.1 자동 게이트 (전체 재실행)
+
+| 항목 | 결과 |
+|---|---|
+| `npm run typecheck` | ✅ clean |
+| `npm run test` | ✅ **547 passed, 3 skipped**(라이브 게이트) |
+| `eslint`(세션2 변경 9파일) | ✅ 0 |
+| `npm run build` | ✅ Compiled — `/intraday` + 신규 API 라우트 등록 |
+
+### 9.2 봇용 read 엔드포인트 (`GET /api/cron/intraday-read`)
+
+| 검증 | 기대 | 실측 |
+|---|---|---|
+| 게이트 예외 경로 | proxy `isPublicPath('/api/cron/*')` 통과 | ✅ (proxy.ts 정합) |
+| Vercel/KIS 미설정 | 503 `local-cli-only` | ✅ (코드 경로) |
+| no-ticker | 400 | ✅ |
+| 정상 | `IntradayReadResponse` JSON 반환(Slack 안 쏨) | ✅ `readIntraday` 재사용 |
+
+→ `intraday-slack`(webhook 푸시)과 분리 — 봇이 `thread_ts` 직접 관리하도록 read 원본만 반환.
+
+### 9.3 nav (커서·위치·prod 숨김)
+
+| 검증 | 기대 | 실측 |
+|---|---|---|
+| 후보 칩 hover 커서 | pointer | ✅ `cursor-pointer` 추가 |
+| "단타 워치" 메뉴 위치 | 마이페이지 바로 위 | ✅ NAV_ITEMS 순서 |
+| Vercel 배포 시 메뉴 | 숨김 | ✅ `getVisibleNavItems()` localOnly 필터(`NEXT_PUBLIC_VERCEL_ENV`) |
+| 로컬 dev | 노출 | ✅ |
+
+### 9.4 시황 자동 갱신 스케줄러 (`instrumentation.ts` → `refreshScheduler`)
+
+| 검증 | 기대 | 실측 |
+|---|---|---|
+| 라우트 리팩터(생성 코어 추출) | 동작·헤더 동일 | ✅ typecheck + build, `refreshMarketAnalysis` 로 위임 |
+| 게이트(플래그 미설정) | no-op | ✅ `MARKET_REFRESH_SELF_SCHEDULE!=="1"` early-return |
+| Vercel | no-op | ✅ `isVercelEnv()` early-return |
+| 시장시간 판정 | 평일 09:00~15:30 KST | ✅ **경계 6/6 통과**(월10시·09시·15:30 O / 16시·08:30·주말 X) |
+| 타이머 | 프로세스 종료 비차단 | ✅ `timer.unref()` |
+
+### 9.5 회귀 — ✅ SAFE
+
+- `market/analysis` 라우트는 생성 코어를 `refreshMarketAnalysis` 로 추출만 — 응답 헤더(`X-CLI`/`X-Pruned`/`X-Cache`)·degrade 저장제외·fallback 분기 동일(typecheck 통과).
+- nav 변경은 순수 가산(`localOnly?` 옵셔널 + 필터 헬퍼) — 기존 메뉴 동작 불변.
+
+## 10. 후속 (라이브, 다음 평일 장중)
+
+- 단타 read E2E(판단가 재시도 효과) + 봇 "단타 봐줘"→스레드 주기 게시 + "단타 그만" 종료
+- 시황 스케줄러 발화 로그(`[market/scheduler] 자동 갱신 …`) + Supabase 적립 확인
+- (운영) 호스트 `.env.local`에 `MARKET_REFRESH_SELF_SCHEDULE=1` 적용 후 dev 재시작
+
+**판정: ✅ PASS** (자동 게이트 + 결정론 로직 전부 통과. 라이브 E2E 는 일요일 차단 → 다음 평일 §10.)
