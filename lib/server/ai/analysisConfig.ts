@@ -33,6 +33,11 @@ export interface AnalysisSliceConfig {
 export interface AnalysisConfig {
   /** 토론 라운드 수(bull↔bear 교대 1쌍 = 1라운드). 기본 = DEBATE_ROUNDS(2). */
   debateRounds: number;
+  /**
+   * 종합 단계(RM·트레이더·PM) 프롬프트에서 강세/약세 논거 블록 제시 순서.
+   * 기본 "bull-first"(현행). "bear-first"=순서만 뒤집어 위치/recency 편향 격리 진단용(A/B).
+   */
+  debateOrder: "bull-first" | "bear-first";
   /** 입력 누적 slice 상한들. */
   slices: AnalysisSliceConfig;
   /** 에이전트별 reasoning effort 오버라이드(미지정 = AGENT_PROMPTS 기본). */
@@ -47,6 +52,7 @@ export interface AnalysisConfig {
  */
 export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
   debateRounds: DEBATE_ROUNDS,
+  debateOrder: "bull-first",
   slices: {
     traderBull: 1500,
     traderBear: 1500,
@@ -62,6 +68,7 @@ export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
 /** 하니스가 보내는 부분 override(slice 도 일부만 토글 가능). */
 export type AnalysisConfigOverride = {
   debateRounds?: number;
+  debateOrder?: "bull-first" | "bear-first";
   slices?: Partial<AnalysisSliceConfig>;
   effortByAgent?: Partial<Record<AgentKey, AgentEffort>>;
   modelByAgent?: Partial<Record<AgentKey, string>>;
@@ -77,6 +84,7 @@ export function resolveAnalysisConfig(
   if (!override) return DEFAULT_ANALYSIS_CONFIG;
   return {
     debateRounds: override.debateRounds ?? DEFAULT_ANALYSIS_CONFIG.debateRounds,
+    debateOrder: override.debateOrder ?? DEFAULT_ANALYSIS_CONFIG.debateOrder,
     slices: { ...DEFAULT_ANALYSIS_CONFIG.slices, ...(override.slices ?? {}) },
     effortByAgent: override.effortByAgent,
     modelByAgent: override.modelByAgent,
