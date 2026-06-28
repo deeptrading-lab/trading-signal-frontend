@@ -109,3 +109,19 @@ describe("analysisConfig — 무회귀", () => {
     expect(tight).not.toContain("B".repeat(501));
   });
 });
+
+describe("debateOrder — 순서 스왑(편향 진단)", () => {
+  for (const key of ["research_manager", "trader", "portfolio_manager"] as const) {
+    it(`${key}: bull-first(기본)는 강세→약세, bear-first는 약세→강세`, () => {
+      const bullFirst = AGENT_PROMPTS[key].user(makeState());
+      const bearFirst = AGENT_PROMPTS[key].user(
+        makeState({ config: resolveAnalysisConfig({ debateOrder: "bear-first" }) }),
+      );
+      // 라벨 대괄호로 매칭(RM 헤더 "강세/약세 연구원의 토론" 오매칭 회피).
+      // 기본은 강세 라벨이 약세 라벨보다 먼저
+      expect(bullFirst.indexOf("[강세 연구원")).toBeLessThan(bullFirst.indexOf("[약세 연구원"));
+      // bear-first는 약세가 먼저
+      expect(bearFirst.indexOf("[약세 연구원")).toBeLessThan(bearFirst.indexOf("[강세 연구원"));
+    });
+  }
+});

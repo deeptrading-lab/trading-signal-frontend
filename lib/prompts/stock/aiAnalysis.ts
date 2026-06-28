@@ -65,6 +65,17 @@ function cfg(s: AnalysisState): AnalysisConfig {
   return s.config ?? DEFAULT_ANALYSIS_CONFIG;
 }
 
+/**
+ * 종합 단계(RM·트레이더·PM)의 강세/약세 논거 블록을 config.debateOrder 순서로 이어붙인다.
+ * 기본 "bull-first" = 강세→약세(현행 바이트 동일). "bear-first" = 약세→강세(위치/recency 편향 진단용).
+ * bullBlock/bearBlock 은 라벨까지 포함한 완성 블록 문자열.
+ */
+function orderedDebate(s: AnalysisState, bullBlock: string, bearBlock: string): string {
+  return cfg(s).debateOrder === "bear-first"
+    ? `${bearBlock}\n\n${bullBlock}`
+    : `${bullBlock}\n\n${bearBlock}`;
+}
+
 /** PM 프롬프트에 주입할 정형 감성 한 줄 컨텍스트(없으면 "데이터 없음"). */
 export function buildSentimentContext(sentiment?: SentimentReport): string {
   if (!sentiment) {
@@ -361,11 +372,7 @@ ${s.bullArgument}`,
 [시장 스냅샷 — 현재가·성과·수급]
 ${s.priceContext}
 
-[강세 연구원 논거]
-${s.bullArgument}
-
-[약세 연구원 논거]
-${s.bearArgument}
+${orderedDebate(s, `[강세 연구원 논거]\n${s.bullArgument}`, `[약세 연구원 논거]\n${s.bearArgument}`)}
 
 [객관 검증 근거 — 어느 편에도 속하지 않은 원자료. 위 양측 주장을 이 데이터와 대조해 타당성을 검증하세요.]
 
@@ -412,11 +419,7 @@ ${s.priceContext}
 [투자 계획 (리서치 매니저 결론)]
 ${s.researchPlan}
 
-[강세 연구원 최종 논거]
-${s.bullArgument.slice(0, cfg(s).slices.traderBull)}
-
-[약세 연구원 최종 논거]
-${s.bearArgument.slice(0, cfg(s).slices.traderBear)}
+${orderedDebate(s, `[강세 연구원 최종 논거]\n${s.bullArgument.slice(0, cfg(s).slices.traderBull)}`, `[약세 연구원 최종 논거]\n${s.bearArgument.slice(0, cfg(s).slices.traderBear)}`)}
 
 [기술 분석 요약]
 ${s.marketReport.slice(0, cfg(s).slices.traderMarket)}`,
@@ -581,11 +584,7 @@ ${s.fundamentalsReport}
 ${s.socialReport}
 ${buildSentimentContext(s.sentiment)}
 
-[강세 연구원 최종 논거]
-${s.bullArgument.slice(0, cfg(s).slices.pmBull)}
-
-[약세 연구원 최종 논거]
-${s.bearArgument.slice(0, cfg(s).slices.pmBear)}
+${orderedDebate(s, `[강세 연구원 최종 논거]\n${s.bullArgument.slice(0, cfg(s).slices.pmBull)}`, `[약세 연구원 최종 논거]\n${s.bearArgument.slice(0, cfg(s).slices.pmBear)}`)}
 
 [투자 계획 (리서치 매니저)]
 ${s.researchPlan}
