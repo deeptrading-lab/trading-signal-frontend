@@ -37,16 +37,35 @@ export interface NavItem {
   label: string;
   /** lucide-react 아이콘 컴포넌트. */
   icon: LucideIcon;
+  /**
+   * 로컬 CLI(구독) 전용 기능 — Vercel 배포에서는 라우트가 503 이므로 메뉴를 숨긴다.
+   * `getVisibleNavItems()` 가 Vercel 환경에서 이 항목을 걸러낸다.
+   */
+  localOnly?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
   { path: "/", label: NAV_MENU_HOME, icon: House },
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, icon: Star },
   { path: "/stock", label: NAV_MENU_STOCK, icon: BarChart2 },
-  { path: "/intraday", label: NAV_MENU_INTRADAY, icon: Zap },
   { path: "/analyze", label: NAV_MENU_ANALYZE, icon: Compass },
+  // 단타 워치 — 로컬 CLI 전용. 마이페이지 바로 위 고정.
+  { path: "/intraday", label: NAV_MENU_INTRADAY, icon: Zap, localOnly: true },
   { path: "/profile", label: NAV_MENU_PROFILE, icon: User },
 ];
+
+/**
+ * 현재 실행 환경에서 노출할 메뉴 목록.
+ * - 로컬 dev(`next dev`): 전부 노출.
+ * - Vercel 배포(production·preview): `localOnly` 항목 제외 — 단타 워치는 로컬 CLI 없이는 동작 불가.
+ *
+ * `NEXT_PUBLIC_VERCEL_ENV` 는 Vercel 이 클라이언트 번들에 빌드타임 인라인하므로 서버/클라 값이
+ * 동일 → 하이드레이션 불일치 없음. (서버 판별은 `lib/server/env.ts isVercelEnv()`.)
+ */
+export function getVisibleNavItems(): NavItem[] {
+  const onVercel = typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string";
+  return onVercel ? NAV_ITEMS.filter((item) => !item.localOnly) : NAV_ITEMS;
+}
 
 /**
  * 활성 라우트 판별.

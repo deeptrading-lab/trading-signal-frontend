@@ -72,7 +72,7 @@ export function IntradayWatchWorkspace() {
                 onClick={() => add(c)}
                 disabled={watching.has(c.ticker)}
                 className={cn(
-                  "text-caption px-sm py-xs rounded-pill border border-border-line transition-colors",
+                  "text-caption px-sm py-xs rounded-pill border border-border-line transition-colors cursor-pointer",
                   "hover:bg-surface-muted disabled:opacity-40 disabled:cursor-default",
                 )}
               >

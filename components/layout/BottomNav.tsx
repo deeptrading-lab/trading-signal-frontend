@@ -19,7 +19,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
-import { NAV_ITEMS, isNavItemActive } from "@/components/layout/navItems";
+import { getVisibleNavItems, isNavItemActive } from "@/components/layout/navItems";
 import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
 import { cn } from "@/lib/utils/cn";
 
@@ -35,7 +35,7 @@ export function BottomNav() {
       className="bottom-nav fixed inset-x-0 bottom-0 z-[50]"
       aria-label="하단 메뉴"
     >
-      {NAV_ITEMS.map((item) => {
+      {getVisibleNavItems().map((item) => {
         const Icon = item.icon;
         const active = isNavItemActive(item.path, pathname);
         return (

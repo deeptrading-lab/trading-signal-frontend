@@ -17,7 +17,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
-import { NAV_ITEMS, isNavItemActive } from "@/components/layout/navItems";
+import { getVisibleNavItems, isNavItemActive } from "@/components/layout/navItems";
 import { NAV_BRAND_LABEL } from "@/lib/copy/layout/navCopy";
 import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
 import { cn } from "@/lib/utils/cn";
@@ -42,7 +42,7 @@ export function Sidebar() {
       </Link>
 
       <nav className="sidebar-nav flex-1" aria-label="메뉴">
-        {NAV_ITEMS.map((item) => {
+        {getVisibleNavItems().map((item) => {
           const Icon = item.icon;
           const active = isNavItemActive(item.path, pathname);
           return (
