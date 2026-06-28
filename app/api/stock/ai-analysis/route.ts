@@ -660,6 +660,25 @@ export async function POST(req: NextRequest): Promise<Response> {
           aiLog(`↩ 재개: ${startFrom}(index=${startIndex})부터`);
         }
 
+        // ── 공통 헬퍼: 에이전트 실패 로그/이벤트 표준화 ────────────────────
+        // 모든 실패를 단일 포맷으로 통일 → 모니터링 grep 용이.
+        //   "✗ 실패" = 전체 실패 / "reason=<사유>" = 케이스별 필터(timeout·cli-error·json-parse·verdict-invalid).
+        // 사용자 중지(AbortError)는 실패가 아니라 별도(info)로 둔다.
+        type AgentFailReason = "timeout" | "cli-error" | "json-parse" | "verdict-invalid";
+        function failAgent(
+          agentKey: AgentKey,
+          reason: AgentFailReason,
+          detail = "",
+          err?: unknown,
+        ): "error" {
+          const line = `✗ 실패 agent=${agentKey} reason=${reason}${detail ? ` ${detail}` : ""}`;
+          // cli-error(예상 밖)만 스택까지 error 레벨. 예상된 실패(타임아웃·파싱·verdict)는 warn.
+          if (err !== undefined) aiLog.error(line, err);
+          else aiLog.warn(line);
+          send({ type: "progress", agent: agentKey, status: "error" });
+          return "error";
+        }
+
         // ── 공통 헬퍼: 일반 에이전트 1개 실행 ─────────────────────────────
         async function runOneAgent(agentKey: AgentKey): Promise<"ok" | "aborted" | "error"> {
           if (combinedSignal.aborted) return "aborted";
@@ -693,13 +712,10 @@ export async function POST(req: NextRequest): Promise<Response> {
               aiLog(`중지 — ${agentKey}`);
               return "aborted";
             }
-            if (errName === "TimeoutError") {
-              aiLog.warn(`⏱ ${agentKey} 타임아웃 elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
-            } else {
-              aiLog.error(`✗ ${agentKey}`, err);
-            }
-            send({ type: "progress", agent: agentKey, status: "error" });
-            return "error";
+            const elapsed = `elapsed=${((Date.now() - agentT0) / 1000).toFixed(1)}s`;
+            return errName === "TimeoutError"
+              ? failAgent(agentKey, "timeout", elapsed)
+              : failAgent(agentKey, "cli-error", elapsed, err);
           }
 
           aiLog(`✓ ${agentKey} 완료 len=${text.length} elapsed=${((Date.now()-agentT0)/1000).toFixed(1)}s`);
@@ -797,17 +813,17 @@ export async function POST(req: NextRequest): Promise<Response> {
                 }
               } else {
                 // verdict 값이 6단계 화이트리스트에 없음 — 무표시 대신 에러로 표면화(재시도 카드 노출).
-                aiLog.warn(`PM verdict 무효 — verdict=${String(d.verdict)} len=${text.length}`);
                 send({ type: "report", agent: agentKey, content: text });
-                send({ type: "progress", agent: agentKey, status: "error" });
-                return "error";
+                return failAgent(
+                  agentKey,
+                  "verdict-invalid",
+                  `verdict=${String(d.verdict)} len=${text.length}`,
+                );
               }
             } else {
               // 결론 JSON 파싱 실패 — 무표시(블랙홀) 대신 에러로 표면화(재시도 카드 노출).
-              aiLog.warn(`PM 결론 JSON 파싱 실패 — len=${text.length}`);
               send({ type: "report", agent: agentKey, content: text });
-              send({ type: "progress", agent: agentKey, status: "error" });
-              return "error";
+              return failAgent(agentKey, "json-parse", `len=${text.length}`);
             }
           } else if (agentKey === "social") {
             // SNS 분석가: 감성 블록 파싱 + 마커 제거한 깨끗한 텍스트로 report 발행.

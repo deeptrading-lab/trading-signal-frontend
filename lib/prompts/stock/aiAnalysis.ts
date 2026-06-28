@@ -619,6 +619,17 @@ ${bullR2}
 
 // ─── 멀티라운드 토론 실행 ────────────────────────────────────────────────────
 
+/**
+ * 토론 발화(bull/bear) 실패 로그 표준화 — route.ts failAgent 와 동일 포맷.
+ * "✗ 실패" + "reason=<timeout|cli-error>" 로 모니터링 grep 을 통일한다(여긴 console 사용).
+ */
+function logDebateFail(speaker: "bull" | "bear", round: number, err: unknown): void {
+  const reason = (err as { name?: string }).name === "TimeoutError" ? "timeout" : "cli-error";
+  const line = `[ai-analysis] ✗ 실패 agent=${speaker} round=${round} reason=${reason}`;
+  if (reason === "cli-error") console.error(line, err);
+  else console.warn(line);
+}
+
 export async function runDebateLoop(
   state: AnalysisState,
   send: (e: AIAnalysisEvent) => void,
@@ -660,7 +671,7 @@ export async function runDebateLoop(
       });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
-      console.error(`[ai-analysis] ✗ bull R${round}`, err);
+      logDebateFail("bull", round, err);
       send({ type: "progress", agent: "bull", status: "error" });
       return "error";
     }
@@ -702,7 +713,7 @@ export async function runDebateLoop(
       });
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return "aborted";
-      console.error(`[ai-analysis] ✗ bear R${round}`, err);
+      logDebateFail("bear", round, err);
       send({ type: "progress", agent: "bear", status: "error" });
       return "error";
     }
