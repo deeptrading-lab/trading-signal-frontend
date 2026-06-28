@@ -4796,3 +4796,37 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) provider(Claude/Codex) 서브탭·추세 지표도 URL 동기화로 확장.
   - (선택) Suspense fallback 을 null → 탭바 스켈레톤으로(첫 페인트 CLS 완화). 현재는 login 패턴(null) 준수.
+
+### 2026-06-28 — docs(diagrams): AI 종목분석 12에이전트 의존성 도식 (#169)
+
+- **slug**: `ai-analysis-deps-diagram` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/169
+- **요약**: docs(diagrams): AI 종목분석 12에이전트 의존성 도식
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `docs/diagrams/ai-analysis-deps.html` — AI 종목분석 12개 에이전트의 **정확한 의존 그래프**(인터랙티브, 자체완결 HTML). 각 에이전트의 user 프롬프트가 `state`의 어떤 필드를 읽는지 코드에서 추출.
+  > 
+  > ## 왜
+  > "직전 단계만 참조"라는 직관이 틀림을 시각화해 파이프라인 이해·향후 최적화 판단 근거로 보존:
+  > - 트레이더 ← 기술분석가(Phase A) 직접 재참조
+  > - 리스크 3팀 ← 원시 signalSummary 직접
+  > - 리서치매니저 ← 토론(bull/bear)만 (4분석가 직접 안 봄)
+  > - PM ← 11개 에이전트 + 4입력 전부 (최대 fan-in)
+  > 
+  > ## 사용
+  > 브라우저로 파일 열기(외부 의존 0). 노드 클릭 → 읽는 것(파랑)/이 결과를 읽는 에이전트(주황) 강조 + 우측 패널 필드 단위 상세. 상단 토글로 공통 입력 점선 on/off.
+  > 
+  > ## 변경
+  > - 신규 `docs/diagrams/ai-analysis-deps.html` (정적 문서, 앱 import 아님 → 빌드/타입/린트 무영향)
+  > 
+  > ## 검증
+  > - 정적 HTML, 코드 경로 무관(Next 처리 대상 아님). 의존 내용은 `lib/prompts/stock/aiAnalysis.ts`·`app/api/stock/ai-analysis/route.ts` 코드와 1:1 대조.
+  > 
+  > ## 다음 작업
+  > - (선택) 도식을 README/위키에서 링크, 파이프라인 변경 시 동기 업데이트.
+  > - 첫 A/B 실험 실행(#165 러너), PR-6/7/8 게이트.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 도식을 README/위키에서 링크, 파이프라인 변경 시 동기 업데이트.
+  - 첫 A/B 실험 실행(#165 러너), PR-6/7/8 게이트.
