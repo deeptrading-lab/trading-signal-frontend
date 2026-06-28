@@ -37,6 +37,19 @@ const MIN_RRR = 1.5;
 const NO_NEW_ENTRY_AFTER = "15:00"; // 이후 신규 진입 금지
 const MAX_TARGET_PCT = 5; // 단타 과욕 캡
 
+/**
+ * 분봉 에이전트 effort — **Haiku 4.5·Sonnet 4.5 는 effort 파라미터 미지원**(API 거부)이라 생략한다.
+ * 그 외(Opus 4.5+ / Sonnet 4.6 / Fable)는 빠른 판정을 위해 "low". 모델 미상이면 안전하게 생략한다.
+ * model 미지정 시 invokeAgentCliStream 이 CLAUDE_CLI_MODEL 로 폴백하므로 그 값으로 판정.
+ */
+export function intradayEffort(model: string | undefined): "low" | undefined {
+  const effective = (model ?? process.env.CLAUDE_CLI_MODEL ?? "").toLowerCase();
+  if (!effective) return undefined;
+  if (effective.includes("haiku")) return undefined;
+  if (effective.includes("sonnet-4-5")) return undefined;
+  return "low";
+}
+
 export interface IntradayCliInput {
   ticker: string;
   name: string;
@@ -384,7 +397,10 @@ export async function decideIntradayWithCli(
   }
 
   const provider: AIAnalysisProvider = input.provider ?? "claude";
-  const model = process.env.INTRADAY_MODEL;
+  // 에이전트별 모델 분리 — 분석가(요약, 싸고 빠르게)와 판단가(필요 시 더 무겁게)를 따로 둔다.
+  // 미설정 시 INTRADAY_MODEL, 그래도 없으면 invokeAgentCliStream 이 CLAUDE_CLI_MODEL 로 폴백.
+  const analystModel = process.env.INTRADAY_ANALYST_MODEL ?? process.env.INTRADAY_MODEL;
+  const judgeModel = process.env.INTRADAY_JUDGE_MODEL ?? process.env.INTRADAY_MODEL;
 
   // ① 흐름·세력 분석가 — 실패해도 진단 없이 ②로 진행(분석가는 보조).
   let analystNote = "";
@@ -396,8 +412,8 @@ export async function decideIntradayWithCli(
         userPrompt: buildFlowAnalystUser(ctx),
         tools: [],
         timeoutMs: AGENT_TIMEOUT_MS,
-        effort: "low",
-        model,
+        effort: intradayEffort(analystModel),
+        model: analystModel,
       },
       input.abortSignal,
       () => {},
@@ -417,8 +433,8 @@ export async function decideIntradayWithCli(
         userPrompt: buildJudgeUser(ctx, analystNote),
         tools: [],
         timeoutMs: AGENT_TIMEOUT_MS,
-        effort: "low",
-        model,
+        effort: intradayEffort(judgeModel),
+        model: judgeModel,
       },
       input.abortSignal,
       () => {},

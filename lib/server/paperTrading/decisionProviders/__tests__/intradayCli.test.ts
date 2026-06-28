@@ -9,6 +9,7 @@ import {
   evaluatePreGate,
   applyPostGate,
   deriveFromSignal,
+  intradayEffort,
 } from "../intradayCli";
 import type {
   IntradayContext,
@@ -134,6 +135,20 @@ describe("applyPostGate", () => {
   it("SELL 은 noNewEntry 와 무관하게 유지", () => {
     const r = applyPostGate(buyLlm({ action: "SELL" }), ctx(), true);
     expect(r.decision.action).toBe("SELL");
+  });
+});
+
+describe("intradayEffort (effort 미지원 모델 가드)", () => {
+  it("Haiku 4.5 는 effort 생략(미지원)", () => {
+    expect(intradayEffort("claude-haiku-4-5")).toBeUndefined();
+    expect(intradayEffort("claude-haiku-4-5-20251001")).toBeUndefined();
+  });
+  it("Sonnet 4.5 도 effort 생략(미지원)", () => {
+    expect(intradayEffort("claude-sonnet-4-5")).toBeUndefined();
+  });
+  it("Sonnet 4.6 / Opus 는 'low'", () => {
+    expect(intradayEffort("claude-sonnet-4-6")).toBe("low");
+    expect(intradayEffort("claude-opus-4-8")).toBe("low");
   });
 });
 
