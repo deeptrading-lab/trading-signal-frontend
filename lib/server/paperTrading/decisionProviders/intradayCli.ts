@@ -132,8 +132,8 @@ export function buildIntradayLevels(
     tpSource: barrier?.tpSource ?? null,
     slSource: barrier?.slSource ?? null,
     rrr,
-    tpPct: tpPrice != null ? ((tpPrice - lastClose) / lastClose) * 100 : null,
-    slPct: slPrice != null ? ((slPrice - lastClose) / lastClose) * 100 : null,
+    tpPct: tpPrice != null && lastClose > 0 ? ((tpPrice - lastClose) / lastClose) * 100 : null,
+    slPct: slPrice != null && lastClose > 0 ? ((slPrice - lastClose) / lastClose) * 100 : null,
   };
 }
 
@@ -429,25 +429,27 @@ export async function decideIntradayWithCli(
     analystNote = "";
   }
 
-  // ② 진입·청산 판단가 — 실패/파싱불가 시 결정론 폴백.
+  // ② 진입·청산 판단가 — JSON 파싱이 가끔 실패(~1/3 관측)하므로 1회 재시도 후 결정론 폴백.
   let llm: IntradayDecisionLlm | null = null;
-  try {
-    const r2 = await invokeAgentCliStream(
-      provider,
-      {
-        systemPrompt: JUDGE_SYSTEM,
-        userPrompt: buildJudgeUser(ctx, analystNote),
-        tools: [],
-        timeoutMs: AGENT_TIMEOUT_MS,
-        effort: intradayEffort(judgeModel),
-        model: judgeModel,
-      },
-      input.abortSignal,
-      () => {},
-    );
-    llm = normalizeLlm(parseLooseJson(r2.text));
-  } catch {
-    llm = null;
+  for (let attempt = 0; attempt < 2 && !llm; attempt++) {
+    try {
+      const r2 = await invokeAgentCliStream(
+        provider,
+        {
+          systemPrompt: JUDGE_SYSTEM,
+          userPrompt: buildJudgeUser(ctx, analystNote),
+          tools: [],
+          timeoutMs: AGENT_TIMEOUT_MS,
+          effort: intradayEffort(judgeModel),
+          model: judgeModel,
+        },
+        input.abortSignal,
+        () => {},
+      );
+      llm = normalizeLlm(parseLooseJson(r2.text));
+    } catch {
+      llm = null;
+    }
   }
 
   if (!llm) {

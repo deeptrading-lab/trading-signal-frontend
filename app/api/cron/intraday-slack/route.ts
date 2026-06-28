@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, reason: error instanceof Error ? error.message : "read 실패" },
-      { status: 200 },
-    );
+    const aborted = (error as { name?: string })?.name === "AbortError";
+    const reason = aborted ? "timeout/abort" : error instanceof Error ? error.message : "read 실패";
+    console.warn(`[intraday-slack] ${ticker} 실패 — ${reason}`);
+    return NextResponse.json({ ok: false, reason }, { status: 200 });
   }
 }

@@ -49,6 +49,9 @@ export function IntradayReadCard({ data }: { data: IntradayReadResponse }) {
         </span>
       </div>
 
+      {/* §0 면책 — 상단 상시 노출(참고·사람 집행). */}
+      <p className="text-caption text-text-muted">{C.disclaimer}</p>
+
       {data.warning && <div className="card-warn text-caption">{data.warning}</div>}
 
       {/* ② 진입·청산 판단 */}
@@ -81,7 +84,7 @@ export function IntradayReadCard({ data }: { data: IntradayReadResponse }) {
       {d.analystNote && (
         <section className="flex flex-col gap-xs">
           <h4 className="text-caption font-medium text-text-muted">{C.sectionSetup}</h4>
-          <p className="text-body text-text-default whitespace-pre-wrap">{d.analystNote}</p>
+          <p className="text-body text-text-strong whitespace-pre-wrap">{d.analystNote}</p>
         </section>
       )}
 

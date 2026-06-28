@@ -34,6 +34,10 @@ export function formatIntradayReadForSlack(read: IntradayReadResponse): {
     levelLines.push(`목표 ${won(d.targetPrice)}${pct(lv.tpPct)}`);
     levelLines.push(`손절 ${won(d.stopPrice)}${pct(lv.slPct)}`);
     if (lv.rrr != null) levelLines.push(`RRR ${lv.rrr.toFixed(2)}`);
+  } else if (d.action === "HOLD" && (d.targetPrice != null || d.stopPrice != null)) {
+    // 보유분 추적 — HOLD 가 직전 결정의 목표/손절을 물고 있으면 정보 손실 없이 함께 표시.
+    if (d.targetPrice != null) levelLines.push(`목표 ${won(d.targetPrice)}`);
+    if (d.stopPrice != null) levelLines.push(`손절 ${won(d.stopPrice)}`);
   }
   levelLines.push(`박스 ${won(lv.boxLow)}~${won(lv.boxHigh)}`);
   levelLines.push(`시그널 ${s.action} ${s.score.toFixed(0)}/100`);
