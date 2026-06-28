@@ -28,6 +28,7 @@ import type { StockPrice, StockDailyCandle } from "@/lib/api/kis/types";
 import type { StockInvestorTrend } from "@/lib/types/stock/investors";
 import type {
   AgentKey,
+  AgentFailReason,
   AgentUsage,
   AIAnalysisEvent,
   AIAnalysisProvider,
@@ -664,7 +665,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // 모든 실패를 단일 포맷으로 통일 → 모니터링 grep 용이.
         //   "✗ 실패" = 전체 실패 / "reason=<사유>" = 케이스별 필터(timeout·cli-error·json-parse·verdict-invalid).
         // 사용자 중지(AbortError)는 실패가 아니라 별도(info)로 둔다.
-        type AgentFailReason = "timeout" | "cli-error" | "json-parse" | "verdict-invalid";
+        // reason 은 로그뿐 아니라 SSE progress 이벤트에도 실어 재시도 카드가 사유를 표시한다.
         function failAgent(
           agentKey: AgentKey,
           reason: AgentFailReason,
@@ -675,7 +676,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           // cli-error(예상 밖)만 스택까지 error 레벨. 예상된 실패(타임아웃·파싱·verdict)는 warn.
           if (err !== undefined) aiLog.error(line, err);
           else aiLog.warn(line);
-          send({ type: "progress", agent: agentKey, status: "error" });
+          send({ type: "progress", agent: agentKey, status: "error", reason });
           return "error";
         }
 

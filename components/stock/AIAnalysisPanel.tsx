@@ -592,6 +592,7 @@ export function AIAnalysisPanel({
                               isRunning={isRunning}
                               onExpand={handleExpand}
                               onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                              failReason={agentState.failReason}
                               sentiment={key === "social" ? sentiment : undefined}
                             />
                           );
@@ -635,6 +636,7 @@ export function AIAnalysisPanel({
                                   isRunning={isRunning}
                                   onExpand={handleExpand}
                                   onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                                  failReason={agentState.failReason}
                                 />
                               </div>
                             );
@@ -649,6 +651,7 @@ export function AIAnalysisPanel({
                               isRunning={isRunning}
                               onExpand={handleExpand}
                               onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                              failReason={agentState.failReason}
                             />
                           );
                         })}
@@ -678,6 +681,7 @@ export function AIAnalysisPanel({
                                   isRunning={isRunning}
                                   onExpand={handleExpand}
                                   onRetry={agentState.status === "error" ? () => resume(key) : undefined}
+                                  failReason={agentState.failReason}
                                 />
                               )}
                             </div>
@@ -709,7 +713,10 @@ export function AIAnalysisPanel({
                           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-5 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                               <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
-                              <p className="text-sm font-medium text-red-600 dark:text-red-400">최종 결론 도출 실패</p>
+                              <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                                최종 결론 도출 실패
+                                {pmAgent.failReason ? ` · ${COPY.card.failReason[pmAgent.failReason]}` : ""}
+                              </p>
                             </div>
                             {!isRunning && (
                               <button

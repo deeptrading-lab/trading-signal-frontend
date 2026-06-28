@@ -4865,3 +4865,37 @@
   - (제안) SSE `progress` 이벤트에 `reason` 필드 추가 → 재시도 카드에 "타임아웃/결론 파싱 실패" 표시(클라까지 관측성).
   - (제안) 실패 사유를 DB 기록 → 토큰 대시보드에 "PM 타임아웃률" 등 패널(현재는 로그에만 존재).
   - (별건) **T.PM=300초가 opus+effort:max PM엔 빠듯**(성공분 139~224초, 000660은 초과로 abort) → 타임아웃 상향 검토.
+
+### 2026-06-28 — feat(ai-analysis): 실패 사유 UI 노출 + PM 타임아웃 상향 (#172)
+
+- **slug**: `agent-failure-ux` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/172
+- **요약**: feat(ai-analysis): 실패 사유 UI 노출 + PM 타임아웃 상향
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > A/B 하니스 실행 중 드러난 두 가지를 고친다 — **#1 실패 사유를 화면(재시도 카드)까지 노출**, **#3 PM 타임아웃 300→480초 상향**.
+  > 
+  > ## 왜
+  > 000660 PM이 **300초 타임아웃**으로 실패했는데 ① 화면엔 "분석 중 오류가 발생했어요"만 떠 원인 불명 ② 타임아웃 자체가 opus·effort:max PM에서 ~1/6 빈도(실측 성공 139~224초)라 신뢰성 이슈. 로그 표준화(#171)는 서버 로그만, 화면/사용자는 여전히 깜깜.
+  > 
+  > ## 변경
+  > ### #1 실패 사유 노출 (event → state → card)
+  > - `AgentFailReason` 타입을 `lib/types`로 승격(공용). `progress` 이벤트 `reason?` + `AgentState` `failReason?`.
+  > - `route.ts failAgent` / `aiAnalysis.ts logDebateFail` 이 reason 을 **로그+SSE 동일 값**으로 동봉.
+  > - `aiAnalysisProvider` 가 error 시 failReason 보존(성공 재시도 시 해제) → `AnalystCard` 한글 라벨 표시(응답 시간 초과 / 실행 오류 / 결론 형식 오류 / 결론 판정 오류). 4개 렌더 사이트 배선.
+  > 
+  > ### #3 PM 타임아웃
+  > - `T.PM` 300_000 → 480_000ms.
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 32/32
+  > - ⚠️ 실제 타임아웃 카드 육안은 실패 강제 트리거 필요해 미수행 — 타입 end-to-end + reason 분류 일치로 갈음.
+  > 
+  > ## 다음 작업
+  > - (보류) 실패 사유 DB 기록 → 대시보드 "PM 타임아웃률" 패널: 무인/스케줄 분석 운영 시 가치. 현재 로컬 수동 단계엔 보류.
+  > - (검증된 별건) **DEBATE_ROUNDS 2→1**: A/B 하니스로 품질 PASS(verdict 일치 100%·drift 허용내) + 비용 −18%·캐시생성 −36% 입증(공통 4종목, 단 전부 UNDERWEIGHT 동질 표본). 더 다양한 골든셋 재검증 후 기본화 검토.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (보류) 실패 사유 DB 기록 → 대시보드 "PM 타임아웃률" 패널: 무인/스케줄 분석 운영 시 가치. 현재 로컬 수동 단계엔 보류.
+  - (검증된 별건) **DEBATE_ROUNDS 2→1**: A/B 하니스로 품질 PASS(verdict 일치 100%·drift 허용내) + 비용 −18%·캐시생성 −36% 입증(공통 4종목, 단 전부 UNDERWEIGHT 동질 표본). 더 다양한 골든셋 재검증 후 기본화 검토.

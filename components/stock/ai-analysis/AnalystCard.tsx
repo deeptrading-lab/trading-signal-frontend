@@ -6,7 +6,7 @@ import { RefreshCw, Check, AlertCircle, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { stripMarkdown } from "@/lib/utils/stripMarkdown";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import type { AgentMeta, AgentStatus, SentimentReport } from "@/lib/types/stock/aiAnalysis";
+import type { AgentMeta, AgentStatus, AgentFailReason, SentimentReport } from "@/lib/types/stock/aiAnalysis";
 import { SentimentBadge } from "./SentimentBadge";
 
 interface AnalystCardProps {
@@ -17,6 +17,8 @@ interface AnalystCardProps {
   isRunning: boolean;
   onExpand: (title: string, content: string, highlight?: string) => void;
   onRetry?: () => void;
+  /** status==="error" 일 때 실패 사유 — 카드에 "응답 시간 초과" 등으로 표시. */
+  failReason?: AgentFailReason;
   /** SNS 분석가(social) 카드 전용 — 정형 감성. 그 외 카드에는 전달하지 않음. */
   sentiment?: SentimentReport | null;
 }
@@ -30,6 +32,7 @@ export const AnalystCard = memo(function AnalystCard({
   onExpand,
   onRetry,
   sentiment,
+  failReason,
 }: AnalystCardProps) {
   const isActive = status === "running";
   const isDone = status === "done";
@@ -114,7 +117,9 @@ export const AnalystCard = memo(function AnalystCard({
           </p>
         )}
         {isError && (
-          <p className="text-[11px] text-red-500 mt-1">{COPY.card.error}</p>
+          <p className="text-[11px] text-red-500 mt-1">
+            {failReason ? COPY.card.failReason[failReason] : COPY.card.error}
+          </p>
         )}
       </div>
 
