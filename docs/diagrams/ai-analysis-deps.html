@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 종목분석 에이전트 의존성 도식</title>
+<style>
+  :root {
+    --bg: #f6f8fb; --card: #ffffff; --line: #d7dee8; --ink: #1b2733; --muted: #6b7888;
+    --in: #94a3b8; --A: #2f6df6; --bull: #15a05a; --bear: #d93838; --rm: #7c4dff;
+    --trader: #e08a00; --risk: #0d9aa8; --pm: #111827;
+    --edge: #c2ccd9; --edgeIn: #2f6df6; --edgeOut: #e08a00;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 20px 28px 8px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 980px; }
+  .wrap { display: flex; gap: 16px; padding: 8px 20px 28px; align-items: flex-start; }
+  .stage { flex: 1 1 auto; min-width: 0; }
+  .controls { display: flex; gap: 14px; align-items: center; padding: 4px 28px 12px; flex-wrap: wrap; font-size: 13px; }
+  .controls label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; color: var(--muted); }
+  .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+  .dot { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .panel { width: 340px; flex: 0 0 340px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; position: sticky; top: 12px; font-size: 13px; }
+  .panel h2 { font-size: 15px; margin: 0 0 2px; }
+  .panel .role { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; }
+  .panel ul { margin: 0; padding-left: 0; list-style: none; }
+  .panel li { padding: 4px 0; border-bottom: 1px dashed #eef1f5; line-height: 1.45; }
+  .panel li b { font-weight: 600; }
+  .panel li .nt { color: var(--muted); font-size: 12px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  svg { width: 100%; height: auto; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .node rect { rx: 9; transition: opacity .15s; }
+  .node text { font-size: 13px; font-weight: 600; fill: #fff; pointer-events: none; }
+  .node .sub { font-size: 10.5px; font-weight: 500; opacity: .9; }
+  .node.input rect { fill: #eef2f7; stroke: #cdd6e2; }
+  .node.input text { fill: #4a5666; font-weight: 600; }
+  .node.input .sub { fill: #8a96a6; }
+  .node { cursor: pointer; }
+  .colhead { font-size: 11.5px; font-weight: 700; fill: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .colsub { font-size: 10.5px; fill: #9aa6b4; }
+  path.edge { fill: none; stroke: var(--edge); stroke-width: 1.4; opacity: .55; transition: opacity .15s, stroke .15s, stroke-width .15s; }
+  path.edge.input { stroke-dasharray: 3 3; opacity: .35; }
+  /* focus mode */
+  svg.focused path.edge { opacity: .06; }
+  svg.focused path.edge.in { opacity: .95; stroke: var(--edgeIn); stroke-width: 2.2; }
+  svg.focused path.edge.out { opacity: .95; stroke: var(--edgeOut); stroke-width: 2.2; }
+  svg.focused .node:not(.lit) rect { opacity: .25; }
+  svg.focused .node:not(.lit) text { opacity: .3; }
+  .hideInputs path.edge.input { display: none; }
+  .hideInputs .node.input { opacity: .35; }
+  .note { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:0 20px 24px; font-size:13px; line-height:1.6; }
+  .note h3 { margin:0 0 8px; font-size:13px; }
+  .note li { margin:4px 0; }
+  code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI 종목분석 — 12 에이전트 의존성 도식</h1>
+  <div class="sub">
+    각 에이전트의 user 프롬프트가 <b>state의 어떤 필드를 실제로 읽는지</b>를 코드에서 추출한 정확한 의존 그래프입니다
+    (<code>lib/prompts/stock/aiAnalysis.ts</code> + <code>app/api/stock/ai-analysis/route.ts</code> 기준).
+    실선 = 에이전트→에이전트, 점선 = 공통 입력(사전 계산값). <b>노드를 클릭</b>하면 그 에이전트가 읽는 것(파랑)과 그 결과를 읽는 에이전트(주황)가 강조됩니다.
+  </div>
+</header>
+
+<div class="controls">
+  <label><input type="checkbox" id="toggleInputs" checked /> 공통 입력(점선) 표시</label>
+  <span class="chip"><i class="dot" style="background:var(--in)"></i>입력(사전계산)</span>
+  <span class="chip"><i class="dot" style="background:var(--A)"></i>Phase A 분석가</span>
+  <span class="chip"><i class="dot" style="background:var(--bull)"></i>강세</span>
+  <span class="chip"><i class="dot" style="background:var(--bear)"></i>약세</span>
+  <span class="chip"><i class="dot" style="background:var(--rm)"></i>리서치매니저</span>
+  <span class="chip"><i class="dot" style="background:var(--trader)"></i>트레이더</span>
+  <span class="chip"><i class="dot" style="background:var(--risk)"></i>리스크3</span>
+  <span class="chip"><i class="dot" style="background:var(--pm)"></i>PM(최종)</span>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <svg id="svg" viewBox="0 0 1560 640" preserveAspectRatio="xMidYMid meet" aria-label="의존성 그래프">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa6b4" />
+        </marker>
+        <marker id="arrowIn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--edgeIn)" />
+        </marker>
+        <marker id="arrowOut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--edgeOut)" />
+        </marker>
+      </defs>
+      <g id="heads"></g>
+      <g id="edges"></g>
+      <g id="nodes"></g>
+    </svg>
+    <div class="note">
+      <h3>🔎 "직전 단계만" 이 아니다 — 눈여겨볼 교차(전전 단계) 의존성</h3>
+      <ul>
+        <li><b>트레이더 ← 기술분석가</b>: 리서치매니저 요약만 받는 게 아니라 <b>marketReport(기술분석) 800자를 직접 재참조</b>. 뉴스·펀더멘털·SNS는 직접 안 봄.</li>
+        <li><b>리스크 3팀 ← 원시 시그널</b>: 분석가·토론을 건너뛰고 <code>signalSummary</code>(결정론 엔진 원시값) + 리서치플랜 + 트레이더 제안만 읽음.</li>
+        <li><b>리서치매니저 ← 토론만</b>: 4개 분석가 리포트를 <b>직접 읽지 않음</b> — 강세/약세 토론으로 걸러진 것만 받음(+시장 스냅샷).</li>
+        <li><b>PM ← 거의 전부(최대 fan-in)</b>: 4개 분석가 + 토론(강·약세) + 리서치매니저 + 트레이더 + 리스크 3팀 = <b>11개 에이전트 + 4개 입력</b>을 모두 직접 종합. SNS는 텍스트 + 정형 감성 2채널.</li>
+        <li><b>약세 ← 강세(R1)</b>: 토론은 순차 — 약세 R1이 강세 R1을 "직접 반박 대상"으로 받음(그래서 R1 병렬화 불가).</li>
+      </ul>
+      <h3 style="margin-top:14px">❓ 자주 묻는 의문</h3>
+      <ul>
+        <li><b>리서치매니저는 뭘 분석하나?</b> 원자료 재분석이 아니라 <b>토론 심판 + 계획 수립</b>. 강세·약세 논거 전체(+시장 스냅샷)만 읽고 → 6단계 투자 등급 + 진입/청산·목표가·손절·모니터링 포인트가 담긴 실행 계획으로 압축. 4개 분석가 리포트는 직접 안 봄(토론으로 걸러진 것만).</li>
+        <li><b>트레이더는 왜 기술분석만 직접 보나?</b> 뉴스·펀더멘털·SNS가 버려지는 게 아니라 <b>간접 전달</b> — 강세/약세 연구원이 4분석가를 전부 읽고 논거에 녹임 → 트레이더가 그 논거(1500자×2)+RM 계획으로 받음. 기술분석만 raw로 추가하는 건 트레이더 일이 "방향"이 아니라 <b>진입가·손절선·지지/저항 같은 구체 가격 레벨</b>이라 토론 요약에서 뭉개지는 raw 기술이 필요해서. 빠진 펀더멘털 뉘앙스는 <b>PM이 4분석가 raw를 전부 재독</b>해 복구.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="panel" id="panel">
+    <h2 id="pName">노드를 클릭하세요</h2>
+    <div class="role" id="pRole">각 에이전트의 정확한 입력/출력 의존을 봅니다.</div>
+    <div id="pBody"></div>
+    <div class="hint" id="pHint">빈 곳을 클릭하면 전체 보기로 돌아갑니다.</div>
+  </aside>
+</div>
+
+<script>
+const NW = 158, NH = 50;
+// 색 매핑
+const FILL = { input:'#eef2f7', A:'#2f6df6', bull:'#15a05a', bear:'#d93838', rm:'#7c4dff', trader:'#e08a00', risk:'#0d9aa8', pm:'#111827' };
+
+// 노드: id, 라벨, 부제, type, 컬럼중심 cx, cy
+const N = [
+  // 입력 (사전 계산)
+  { id:'sig',    label:'기술 시그널',   sub:'signalSummary', type:'input', cx:92, cy:95 },
+  { id:'price',  label:'시장 스냅샷',   sub:'priceContext',  type:'input', cx:92, cy:235 },
+  { id:'mktctx', label:'시황 컨텍스트', sub:'marketContext (≤24h, 선택)', type:'input', cx:92, cy:375 },
+  { id:'warn',   label:'데이터 제한',   sub:'dataWarning (선택)', type:'input', cx:92, cy:500 },
+
+  // Phase A — 분석가 4 (병렬)
+  { id:'market',       label:'기술 분석가', sub:'marketReport', type:'A', cx:330, cy:80 },
+  { id:'news',         label:'뉴스 분석가', sub:'newsReport · WebSearch', type:'A', cx:330, cy:200 },
+  { id:'fundamentals', label:'기본 분석가', sub:'fundamentalsReport · Web', type:'A', cx:330, cy:320 },
+  { id:'social',       label:'SNS 분석가',  sub:'socialReport + 정형감성', type:'A', cx:330, cy:440 },
+
+  // Phase B — 토론 (순차)
+  { id:'bull', label:'강세 연구원', sub:'bullArgument (R1·R2)', type:'bull', cx:585, cy:175 },
+  { id:'bear', label:'약세 연구원', sub:'bearArgument (R1·R2)', type:'bear', cx:585, cy:330 },
+
+  // Phase C
+  { id:'research_manager', label:'리서치 매니저', sub:'researchPlan', type:'rm', cx:820, cy:255 },
+  { id:'trader',           label:'트레이더',     sub:'traderProposal · opus/max', type:'trader', cx:1040, cy:255 },
+
+  { id:'risk_risky',   label:'공격적 리스크', sub:'riskRisky',   type:'risk', cx:1255, cy:150 },
+  { id:'risk_neutral', label:'중립적 리스크', sub:'riskNeutral', type:'risk', cx:1255, cy:265 },
+  { id:'risk_safe',    label:'보수적 리스크', sub:'riskSafe',    type:'risk', cx:1255, cy:380 },
+
+  { id:'portfolio_manager', label:'포트폴리오 매니저', sub:'최종 verdict · opus/max', type:'pm', cx:1475, cy:255 },
+];
+const byId = Object.fromEntries(N.map(n => [n.id, n]));
+
+// 의존: 각 에이전트가 읽는 것(from) + 메모. 엣지는 여기서 파생.
+const READS = {
+  market:       [['sig','전체'], ['price',''], ['mktctx','']],
+  news:         [['price',''], ['mktctx','']],
+  fundamentals: [['price','']],
+  social:       [['price','']],
+  bull:         [['price',''], ['market','marketReport'], ['news','newsReport'], ['fundamentals','fundamentalsReport'], ['social','socialReport']],
+  bear:         [['price',''], ['market','marketReport'], ['news','newsReport'], ['fundamentals','fundamentalsReport'], ['social','socialReport'], ['bull','R1 직접 반박 대상']],
+  research_manager: [['price',''], ['bull','전체 토론'], ['bear','전체 토론']],
+  trader:       [['price',''], ['research_manager','투자계획'], ['bull','1500자'], ['bear','1500자'], ['market','기술요약 800자']],
+  risk_risky:   [['price',''], ['trader','제안서'], ['research_manager','800자'], ['sig','500자']],
+  risk_neutral: [['price',''], ['trader','제안서'], ['research_manager','800자'], ['sig','500자']],
+  risk_safe:    [['price',''], ['trader','제안서'], ['research_manager','800자'], ['sig','500자']],
+  portfolio_manager: [['price',''], ['market','marketReport'], ['news','newsReport'], ['fundamentals','fundamentalsReport'], ['social','리포트 + 정형감성'], ['bull','2000자'], ['bear','2000자'], ['research_manager','투자계획'], ['trader','제안서'], ['risk_risky','평가'], ['risk_neutral','평가'], ['risk_safe','평가'], ['warn',''], ['mktctx','']],
+};
+
+const ROLE = {
+  sig:'입력 · lib/signal 결정론 엔진(추세·모멘텀·거래량·변동성) 자동 계산',
+  price:'입력 · KIS 현재가·성과·52주·수급 (환각 방지 그라운딩)',
+  mktctx:'입력 · 저장된 시장 국면 MarketAnalysis (신선 ≤24h 일 때만)',
+  warn:'입력 · 거래일<130봉 시 confidence 캡 경고 (PM 전용)',
+  market:'Phase A · 병렬 · 기술 지표 분석 (도구 없음)',
+  news:'Phase A · 병렬 · WebSearch/WebFetch 뉴스·공시·매크로',
+  fundamentals:'Phase A · 병렬 · WebSearch/WebFetch 재무·밸류에이션',
+  social:'Phase A · 병렬 · WebSearch SNS 심리 + 정형 감성 파싱',
+  bull:'Phase B · 토론(순차) · 강세 매수 논거 (R1→R2)',
+  bear:'Phase B · 토론(순차) · 약세 매도 논거 (강세 직접 반박)',
+  research_manager:'Phase C-1 · 토론 평가 → 투자 등급·계획',
+  trader:'Phase C-2 · 구체 매매 제안서 · effort:max · TRADER_MODEL(opus)',
+  risk_risky:'Phase C-3 · 병렬 · 공격적 리스크 평가',
+  risk_neutral:'Phase C-3 · 병렬 · 중립적 리스크 평가',
+  risk_safe:'Phase C-3 · 병렬 · 보수적 리스크 평가',
+  portfolio_manager:'Phase C-4 · 최종 JSON verdict · effort:max · PM_MODEL(opus)',
+};
+
+// 엣지 파생
+const EDGES = [];
+for (const [to, list] of Object.entries(READS)) {
+  for (const [from, note] of list) {
+    EDGES.push({ from, to, note, input: byId[from].type === 'input' });
+  }
+}
+
+// 컬럼 헤더
+const HEADS = [
+  { x:92,   t:'입력', s:'사전 계산' },
+  { x:330,  t:'Phase A', s:'분석가 4 · 병렬' },
+  { x:585,  t:'Phase B', s:'토론 · 순차' },
+  { x:820,  t:'Phase C-1', s:'리서치매니저' },
+  { x:1040, t:'C-2', s:'트레이더' },
+  { x:1255, t:'C-3', s:'리스크 3 · 병렬' },
+  { x:1475, t:'C-4', s:'PM · 최종' },
+];
+
+const svg = document.getElementById('svg');
+const gEdges = document.getElementById('edges');
+const gNodes = document.getElementById('nodes');
+const gHeads = document.getElementById('heads');
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+function el(tag, attrs, text) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+// 헤더
+for (const h of HEADS) {
+  gHeads.appendChild(el('text', { x:h.x, y:24, 'text-anchor':'middle', class:'colhead' }, h.t));
+  gHeads.appendChild(el('text', { x:h.x, y:38, 'text-anchor':'middle', class:'colsub' }, h.s));
+}
+
+// 엣지 경로
+function pathFor(s, t) {
+  const sx = s.cx + NW/2, tx = t.cx - NW/2;
+  if (s.cx === t.cx) { // 같은 컬럼 (강세→약세): 오른쪽으로 우회
+    const x = s.cx + NW/2, bx = x + 46;
+    return `M ${x} ${s.cy} C ${bx} ${s.cy}, ${bx} ${t.cy}, ${x} ${t.cy}`;
+  }
+  const dx = Math.max(40, (tx - sx) * 0.45);
+  return `M ${sx} ${s.cy} C ${sx+dx} ${s.cy}, ${tx-dx} ${t.cy}, ${tx} ${t.cy}`;
+}
+const edgeEls = [];
+for (const e of EDGES) {
+  const s = byId[e.from], t = byId[e.to];
+  const p = el('path', { d: pathFor(s, t), class: 'edge' + (e.input ? ' input' : ''), 'marker-end':'url(#arrow)' });
+  p.dataset.from = e.from; p.dataset.to = e.to;
+  gEdges.appendChild(p); edgeEls.push(p);
+}
+
+// 노드
+for (const n of N) {
+  const g = el('g', { class: 'node ' + (n.type === 'input' ? 'input' : ''), 'data-id': n.id });
+  const r = el('rect', { x: n.cx - NW/2, y: n.cy - NH/2, width: NW, height: NH, rx: 9 });
+  if (n.type !== 'input') r.setAttribute('fill', FILL[n.type]);
+  g.appendChild(r);
+  g.appendChild(el('text', { x: n.cx, y: n.cy - 3, 'text-anchor':'middle' }, n.label));
+  g.appendChild(el('text', { x: n.cx, y: n.cy + 12, 'text-anchor':'middle', class:'sub' }, n.sub));
+  g.addEventListener('click', (ev) => { ev.stopPropagation(); focus(n.id); });
+  gNodes.appendChild(g);
+}
+
+const panel = { name:document.getElementById('pName'), role:document.getElementById('pRole'), body:document.getElementById('pBody'), hint:document.getElementById('pHint') };
+
+function focus(id) {
+  svg.classList.add('focused');
+  const lit = new Set([id]);
+  edgeEls.forEach(p => {
+    p.classList.remove('in','out'); p.setAttribute('marker-end','url(#arrow)');
+    if (p.dataset.to === id) { p.classList.add('in'); p.setAttribute('marker-end','url(#arrowIn)'); lit.add(p.dataset.from); }
+    else if (p.dataset.from === id) { p.classList.add('out'); p.setAttribute('marker-end','url(#arrowOut)'); lit.add(p.dataset.to); }
+  });
+  document.querySelectorAll('.node').forEach(g => g.classList.toggle('lit', lit.has(g.dataset.id)));
+
+  const n = byId[id];
+  panel.name.textContent = n.label + '  (' + id + ')';
+  panel.role.textContent = ROLE[id] || '';
+  const reads = (READS[id] || []).map(([f, note]) => {
+    const fn = byId[f];
+    return `<li><b style="color:${fn.type==='input'?'#64748b':FILL[fn.type]}">${fn.label}</b> ${note?`<span class="nt">— ${note}</span>`:''}</li>`;
+  }).join('') || '<li class="nt">없음 (사전 계산 입력만)</li>';
+  const readBy = EDGES.filter(e => e.from === id).map(e => {
+    const tn = byId[e.to];
+    return `<li><b style="color:${FILL[tn.type]||'#334'}">${tn.label}</b> ${e.note?`<span class="nt">— ${e.note}</span>`:''}</li>`;
+  }).join('') || '<li class="nt">없음 (최종 산출물)</li>';
+  panel.body.innerHTML =
+    `<h3>읽는 것 (입력 의존)</h3><ul>${reads}</ul>` +
+    `<h3>이 결과를 읽는 에이전트</h3><ul>${readBy}</ul>`;
+  panel.hint.textContent = '빈 곳을 클릭하면 전체 보기로 돌아갑니다.';
+}
+
+function reset() {
+  svg.classList.remove('focused');
+  edgeEls.forEach(p => { p.classList.remove('in','out'); p.setAttribute('marker-end','url(#arrow)'); });
+  document.querySelectorAll('.node').forEach(g => g.classList.remove('lit'));
+  panel.name.textContent = '노드를 클릭하세요';
+  panel.role.textContent = '각 에이전트의 정확한 입력/출력 의존을 봅니다.';
+  panel.body.innerHTML = '';
+  panel.hint.textContent = '실선=에이전트→에이전트, 점선=공통 입력.';
+}
+svg.addEventListener('click', reset);
+document.getElementById('toggleInputs').addEventListener('change', (e) => {
+  svg.classList.toggle('hideInputs', !e.target.checked);
+});
+// 초기: 입력 표시 on
+reset();
+</script>
+</body>
+</html>
