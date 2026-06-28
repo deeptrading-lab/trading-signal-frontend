@@ -52,3 +52,16 @@ export const INTRADAY_READ_COPY = {
   none: "—",
   gateNote: "리스크 룰 조정",
 } as const;
+
+/** 단타 워치 워크스페이스(B) 카피. */
+export const INTRADAY_WATCH_COPY = {
+  title: "단타 워치",
+  subtitle: "수급 몰리는 종목을 골라 장중 단타 판단(참고)을 받아보세요.",
+  disclaimer:
+    "결정론 레벨 + AI 에이전트의 보조 분석이에요. 자동 수익을 보장하지 않으며, 매매 판단·집행은 직접 하세요.",
+  candidatesTitle: "수급 상위 후보",
+  candidatesHint: "외국인·기관 순매수 상위 (당일). 눌러서 워치에 추가.",
+  candidatesLoading: "후보를 불러오는 중…",
+  candidatesEmpty: "수급 후보를 불러올 수 없어요(장중·prod KIS 필요).",
+  empty: "위 후보에서 종목을 추가하면 장중 단타 판단을 받아볼 수 있어요.",
+} as const;

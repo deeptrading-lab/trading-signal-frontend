@@ -12,7 +12,15 @@ import { useMutationIntradayRead } from "@/hooks/stock/useMutationIntradayRead";
 import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
 import { INTRADAY_READ_COPY as C } from "@/lib/copy/stock/intradayRead";
 
-export function IntradayReadSection({ ticker }: { ticker: string }) {
+export interface IntradayReadSectionProps {
+  ticker: string;
+  /** 카드 제목 — 워크스페이스는 종목명을 넘긴다. 미지정 시 "장중 단타 판단". */
+  heading?: string;
+  /** 워치 목록에서 제거(워크스페이스 전용). 미지정 시 제거 버튼 없음. */
+  onRemove?: () => void;
+}
+
+export function IntradayReadSection({ ticker, heading, onRemove }: IntradayReadSectionProps) {
   const { data: providers, isLoading: gateLoading } = useQueryAIProviders();
   const read = useMutationIntradayRead();
 
@@ -22,15 +30,22 @@ export function IntradayReadSection({ ticker }: { ticker: string }) {
   };
 
   return (
-    <section className="card flex flex-col gap-md" aria-label={C.title}>
+    <section className="card flex flex-col gap-md" aria-label={`${C.title} ${heading ?? ""}`}>
       <div className="flex items-center gap-sm">
-        <h2 className="text-h2 text-text-strong">{C.title}</h2>
+        <h2 className="text-h2 text-text-strong">{heading ?? C.title}</h2>
         <span className="badge-info">{C.badge}</span>
-        {read.data && !read.isPending && (
-          <button type="button" onClick={onRun} className="button-secondary ml-auto">
-            {C.rerun}
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-xs">
+          {read.data && !read.isPending && (
+            <button type="button" onClick={onRun} className="button-secondary">
+              {C.rerun}
+            </button>
+          )}
+          {onRemove && (
+            <button type="button" onClick={onRemove} className="button-secondary" aria-label="워치에서 제거">
+              제거
+            </button>
+          )}
+        </div>
       </div>
 
       {gateLoading ? (

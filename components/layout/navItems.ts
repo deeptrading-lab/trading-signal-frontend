@@ -17,6 +17,7 @@ import {
   Compass,
   Star,
   User,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ import {
   NAV_MENU_HOME,
   NAV_MENU_ANALYZE,
   NAV_MENU_STOCK,
+  NAV_MENU_INTRADAY,
   NAV_MENU_WATCHLIST,
   NAV_MENU_PROFILE,
 } from "@/lib/copy/layout/navCopy";
@@ -41,6 +43,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/", label: NAV_MENU_HOME, icon: House },
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, icon: Star },
   { path: "/stock", label: NAV_MENU_STOCK, icon: BarChart2 },
+  { path: "/intraday", label: NAV_MENU_INTRADAY, icon: Zap },
   { path: "/analyze", label: NAV_MENU_ANALYZE, icon: Compass },
   { path: "/profile", label: NAV_MENU_PROFILE, icon: User },
 ];
