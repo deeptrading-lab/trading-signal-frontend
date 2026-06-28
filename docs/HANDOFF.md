@@ -4637,46 +4637,244 @@
   - (후속) 4번째 요청 대기 큐 옵션(현재는 차단). 필요 시 슬롯 free 시 자동 승격.
   - (후속) 재분석 시 직전 aborted 스트림의 late-event race — 관측되면 슬롯 runId 태깅으로 보강.
 
-### 2026-06-28 — feat(intraday): 장중 단타 판단(참고) decision-support + 봇 연동 + 시황 스케줄러 (#170)
+### 2026-06-27 — feat(ai-analysis): 토큰 최적화 A/B 하니스 (config 파라미터화 + 비교/낭비진단 + 러너) (#165)
 
-- **slug**: `intraday-scalping-agent` · **author**: @HY0118
-- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/170
-- **요약**: feat(intraday): 장중 단타 판단(참고) decision-support + 봇 연동 + 시황 스케줄러
+- **slug**: `ab-harness-config` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/165
+- **요약**: feat(ai-analysis): 토큰 최적화 A/B 하니스 (config 파라미터화 + 비교/낭비진단 + 러너)
 - **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
 - **PR 본문 발췌**:
   > ## 요약
   > 
-  > 장중 단타 분봉 AI를 **검증 게이트로 먼저 증명**하려 했으나 **AUTO-EDGE NO-GO**(균형 12종목×15일, 비용 차감 net 전 타임프레임 음수) → 자동 수익 스캘퍼를 폐기하고 **decision-support(사람 집행)로 피벗**. 결정론 레벨 + 2-에이전트 CLI 서사를 **"참고 판단"**으로 제공하는 표면 3종 + Slack 봇 연동 + 시황 자동 갱신 스케줄러.
+  > **토큰 최적화 A/B 하니스** — PR #164(관측성)로 측정 공백을 메운 뒤, 이제 **데이터로 객관적 토큰 낭비를 찾고 무회귀로 절감**하는 단계의 도구. 같은 종목을 config A/B 로 N회 돌려 **토큰/비용/지연 Δ + 결정 품질 회귀를 자동 판정**하고, **어디가 품질 기여 없이 토큰을 먹는지** 진단한다.
   > 
-  > - PRD: `docs/prd/intraday-scalping-agent.md` (§0 NO-GO 박제)
-  > - QA: `docs/qa/intraday-scalping-agent.md`
+  > > 목표(사용자): "품질을 깎아 토큰을 버는" 게 아니라 **객관적 낭비·구조적 절감**을 찾는 것. 1순위 가설 = 프롬프트 프리픽스 불안정으로 인한 캐시 생성 폭증(휘발값 후방 이동 = 품질 0 손실 절감).
   > 
-  > ## 핵심 결정 — §0 framing
+  > ## 구성 (PR-A 기반 + PR-B 하니스)
   > 
-  > - 검증 NO-GO → 사용자 표면에 **"자동 수익/추천" 표현 전면 금지**, "참고·판단 보조" 톤
-  > - 실주문 **영구 제외**(read-only), 전부 가상 + 로컬 CLI(구독, 토큰 0)
-  > - Vercel 503(로컬 전용)
+  > **PR-A — config 파라미터화 (무회귀 생명선)**
+  > - `lib/server/ai/analysisConfig.ts`: `resolveAnalysisConfig()` + `DEFAULT_ANALYSIS_CONFIG`(현 하드코딩값과 **바이트 동일**). override 없으면 일반 분석 무변경.
+  > - `aiAnalysis.ts`: 하드코딩 `.slice(0,N)`·`DEBATE_ROUNDS` → `config` 에서 읽기(`AnalysisState.config?` 옵셔널).
+  > - `route.ts`: body `runId`/`config` 수용(하니스 전용, 재개 시 runId 무시) + 에이전트별 effort/model 오버라이드.
   > 
-  > ## 변경 (영역별)
+  > **PR-B — 하니스**
+  > - **태깅**: `ab_run_config` 테이블/store(fail-soft) + route-side 기록(session 동봉 시 run_id↔config 1행). 기존 스키마 무변경.
+  > - **재사용 리팩터**: usage 집계를 `usageAggregate.ts` 로 추출 → 대시보드(usage/route)와 compare/waste 공유.
+  > - **비교**: `compare.ts` — config 별 토큰/비용/지연 Δ + 품질 프록시(verdict 일치율·confidence 분포·target/stop/signal drift) + **자동 PASS/REVIEW/INSUFFICIENT**(`abHarness/constants.ts` 임계).
+  > - **낭비 진단**: `waste.ts` — 입력:출력 수율·캐시생성 비중·단계별 분포(yield 오름차순 = 최악 먼저).
+  > - **API**: `GET /api/ab-harness/report?session=<id>` (읽기 BFF).
+  > - **러너**: `scripts/ab-harness/run-golden-set.mjs` (순수 Node, ticker 내 순차·간 동시 3, SSE 소비, claude 고정).
   > 
-  > **데이터·엔진·검증 (게이트 우선)**
-  > - 분봉 데이터 레이어 (KIS FHKST03010200 당일 / 03010230 과거, 리샘플, dropFillerBars 0거래량 제거, 5xx·EGW00201 재시도)
-  > - 분봉 시그널 프로파일 (엔진 포크 없이 seam, 일봉 기본값 무회귀)
-  > - 검증 게이트 + 오프라인 진단 하네스 (RUN_LIVE_INTRADAY / RUN_INTRADAY_DIAG)
+  > ## 검증
   > 
-  > **decision-support 표면 3종**
-  > - A 종목 상세 "장중 단타 판단(참고)" 카드
-  > - B `/intraday` 단타 워치 워크스페이스 (수급 top10 후보 → on-demand read)
-  > - C Slack webhook 푸시 (`/api/cron/intraday-slack`)
+  > - `tsc` 0 · `eslint` 0 · `vitest` **518 passed**(무회귀 11 + 낭비진단 5 + 기존)
+  > - **무회귀**: `config undefined == DEFAULT` 프롬프트 바이트 동일(테스트), usage 리팩터 전후 동일(라이브 스모크: runCount 30·모델·wall-clock 그대로)
+  > - **API 스모크**(dev webpack): report 빈-세션 200 + 정상 shape, usage 200 무회귀
+  > - ⬜ 전체 A/B 런(30 runs ≈ 1.5h + 실비용)은 미실행 — 실험 시점에 러너로 구동(로컬 전용)
   > 
-  > **봇 연동**
-  > - `GET /api/cron/intraday-read` (게이트 예외 JSON) — Slack 봇(dev-manager-bot)이 호출해 스레드 게시
+  > ## 실행 방법 (머지 후)
   > 
-  > **UI·운영**
-  > - 후보 칩 커서 픽스 + "단타 워치" 메뉴 마이페이지 위 + prod 숨김(`localOnly`/`getVisibleNavItems`)
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
-  - 평일 장중 라이브 검증: 단타 read E2E(판단가 재시도 효과) + 시황 스케줄러 발화 로그 확인
-  - 봇 단타 워치 라이브 테스트 (dev-manager-bot `feature/intraday-watch` PR과 연동)
+  - **첫 실험**: baseline vs 캐시-프리픽스 안정화(휘발값 후방 이동) — `waste.ts` 의 캐시생성 비중 상위 에이전트부터. PASS 면 품질 0 손실 절감 확정.
+  - 출력 캡·웹fetch 가이드 파라미터화(config 확장), 사후 horizon hit-rate 자동 A/B(채점 cron 후), 대시보드 A/B 뷰(components/analyze 확장).
+
+### 2026-06-28 — feat(analyze): 토큰 대시보드 모델별 비용 분해 카드 (#166)
+
+- **slug**: `usage-model-cost` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/166
+- **요약**: feat(analyze): 토큰 대시보드 모델별 비용 분해 카드
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `/analyze` → 토큰 사용량 탭에 **"모델별 비용 (분석 1회 기준)"** 카드를 추가한다. 분석 1회 비용을 모델 패밀리(opus/sonnet/haiku)별로 묶어 비용·토큰·비중을 보여줘, 관리자가 "분석 1회 $N 중 어느 모델이 돈을 먹나"를 한눈에 본다.
+  > 
+  > PR-3(관측성 로드맵). 토큰 절감의 "공짜 점심"은 없다는 결론에 따라, 대시보드를 **의사결정·감시 도구**로 강화하는 방향.
+  > 
+  > ## 왜
+  > 기존 대시보드는 비용을 총합(분석 1회 평균 비용)으로만 보여줘 "어디에 돈이 가나"를 알 수 없었다. 모델별 분해로:
+  > - opus(트레이더·PM)를 sonnet으로 강등 시 절감 상한이 얼마인지 즉시 파악
+  > - 실제 비용 드라이버(웹분석가 sonnet 입력)를 정량 확인
+  > 
+  > 실데이터(30회): **sonnet 10명 $2.40(78.6%)** vs **opus 2명 $0.65(21.4%)** → 합 $3.05 = 평균 비용 카드와 일치.
+  > 
+  > ## 변경
+  > - 신규 `components/analyze/modelBreakdown.ts` — 순수 파생(groupByModel/modelFamily/MODEL_RATES)
+  > - 신규 `components/analyze/ModelCostBreakdown.tsx` — 막대(비중) + 표 카드
+  > - 신규 단위테스트 6 (`__tests__/modelBreakdown.test.ts`)
+  > - `AgentUsageContainer.tsx` 카드 1개 배선 + `lib/copy/analyze/labels.ts` 카피
+  > - 신규 `docs/qa/usage-model-cost.md`
+  > 
+  > ## 설계 결정
+  > - **비용 = CLI 청구값(avgCostUsd) 합산** → "분석 1회 평균 비용" 카드와 합 일치(드리프트 없음)
+  > - **토큰×단가 재계산 안 함** — 한 호출이 내부적으로 멀티모델을 써 청구값과 어긋남(왜곡 회피). 공개 단가표는 툴팁 컨텍스트로만.
+  > - **route/스키마/스토어 무변경** — 기존 `AgentUsageRow[]`에서 클라이언트 파생만
+  > 
+  > ## 검증
+  > - tsc 0 error · eslint 0 warning · vitest 6/6
+  > - 로컬 실데이터 합 일치 확인 + 육안 확인(스크린샷)
+  > 
+  > ## 다음 작업
+  > - **PR-4 — run 단위 시계열/분포**: 시간 축 비용·지연 추세 + 이상치로 **회귀 자동 감지**("어제 대비 토큰 30%↑"). 현재는 평균 한 장면만 보여 추세를 못 본다.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR-4 — run 단위 시계열/분포**: 시간 축 비용·지연 추세 + 이상치로 **회귀 자동 감지**("어제 대비 토큰 30%↑"). 현재는 평균 한 장면만 보여 추세를 못 본다.
+  - (선택) 모델별 비용 분해에 캐시생성 비중 컬럼 추가 — 캐시 무효(프리픽스 깸) vs 실입력 증가 구분.
+
+### 2026-06-28 — feat(analyze): 토큰 대시보드 분석별 추세 + 회귀 감지 차트 (#167)
+
+- **slug**: `usage-run-trend` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/167
+- **요약**: feat(analyze): 토큰 대시보드 분석별 추세 + 회귀 감지 차트
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `/analyze` → 토큰 사용량 탭에 **"분석별 추세 (회귀 감지)"** 선차트를 추가한다. run(분석 1회) 단위 시계열을 시간순으로 그리고, 중앙값(점선) 대비 임계(×1.3) 초과 run 을 빨간 점으로 표시해 **"프롬프트·모델 변경 후 비용/소요/토큰이 갑자기 늘었나"**(회귀)를 잡는다.
+  > 
+  > PR-4(관측성 로드맵). 평균 한 장면만 보여주던 대시보드에 시간축 추세·회귀 감지를 더해, 대시보드를 **모니터링 도구**로 완성.
+  > 
+  > ## 왜
+  > 기존 카드는 30회 평균만 보여줘 "최근 분석이 비정상인가"를 알 수 없었다. 실데이터 검증: 30회 중 **3회가 중앙값($3.12) 대비 ×1.3 초과**(최대 $4.99, wall-clock 880~980초) → 자동으로 빨간 점 + "기준 초과" 카운트로 표면화.
+  > 
+  > ## 변경
+  > - 서버: `usageAggregate.ts` `runSeries()`(run별 비용·토큰·wall-clock 합, 종료시각 asc) → `AgentUsageSummary.runSeriesByProvider` + `RunSeriesPoint` 타입 + route 배선/빈 폴백
+  > - 클라: `components/analyze/runTrend.ts`(순수: 중앙값 baseline + 임계 초과 이상치 + 최신 delta + defaultMetric) + `RunTrendChart.tsx`(지표 토글 비용/소요/토큰, 중앙값 ReferenceLine, 이상치 dot)
+  > - 배선 `AgentUsageContainer.tsx`(모델별 비용 아래) + 카피 `labels.ts`
+  > - 단위테스트 12 (runSeries 4 + runTrend 8), QA `docs/qa/usage-run-trend.md`
+  > 
+  > ## 설계 결정
+  > - **중앙값 baseline**(평균 아님) — 이상치에 강건. 임계 = 중앙값×1.3("30%↑", 사용자 표현 정합)
+  > - **한쪽(증가)만 회귀** — 비용·소요·토큰은 늘어나는 게 나쁜 방향
+  > - **codex(비용 미측정)는 소요 지표로 자동 폴백**(defaultMetric)
+  > - route/스키마 **비파괴 확장**(필드 추가만), 스토어 무변경 — 기존 ai_agent_usage 재집계
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 12/12
+  > - 로컬 실데이터(30 run) 추세·이상치 확인 + 육안 확인(스크린샷)
+  > 
+  > ## 다음 작업
+  > - **AI 분석 탭 URL 반영**: `/analyze?tab=usage` 쿼리 파라미터로 상위 탭을 딥링크·새로고침·공유·뒤로가기 가능하게(별도 PR, 사용자 요청).
+  > - (선택) 추세 X축: 같은 날 run 다수면 날짜 라벨 중복 → 시:분 표기 폴리시.
+  > - (선택) 분포(히스토그램) 뷰, 사후 horizon hit-rate 추세(채점 cron 후).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **AI 분석 탭 URL 반영**: `/analyze?tab=usage` 쿼리 파라미터로 상위 탭을 딥링크·새로고침·공유·뒤로가기 가능하게(별도 PR, 사용자 요청).
+  - (선택) 추세 X축: 같은 날 run 다수면 날짜 라벨 중복 → 시:분 표기 폴리시.
+  - (선택) 분포(히스토그램) 뷰, 사후 horizon hit-rate 추세(채점 cron 후).
+
+### 2026-06-28 — feat(analyze): 상위 탭 URL 쿼리 동기화 (?tab=usage) (#168)
+
+- **slug**: `analyze-tab-url` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/168
+- **요약**: feat(analyze): 상위 탭 URL 쿼리 동기화 (?tab=usage)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `/analyze` 상위 탭(분석 결과 / 토큰 사용량) 상태를 **URL 쿼리(`?tab=usage`)** 로 단일화한다. 딥링크·새로고침·공유·뒤로가기가 일관 동작. 기본(분석 결과)은 깨끗한 `/analyze`, 토큰 사용량만 `?tab=usage`.
+  > 
+  > ## 왜
+  > 기존 탭은 `useState` 라 새로고침·공유·뒤로가기 시 항상 "분석 결과"로 리셋됐다. 토큰 대시보드(특정 탭)를 공유·북마크·딥링크할 수 없었다.
+  > 
+  > ## 변경
+  > - 신규 `components/analyze/analyzeTab.ts` — 순수 매핑(`analyzeTabFromParam`/`analyzeTabHref`, 기본 results=쿼리 없는 경로, usage만 `?tab=usage`)
+  > - `AnalyzeTabsContainer.tsx` — `useState` → `useSearchParams` 단일 출처, `router.replace(href,{scroll:false})`
+  > - `app/(main)/analyze/page.tsx` — `useSearchParams` 경계용 `<Suspense fallback={null}>` 래핑 (login 패턴)
+  > - 단위테스트 4 (`__tests__/analyzeTab.test.ts`), QA `docs/qa/analyze-tab-url.md`
+  > 
+  > ## 설계 결정
+  > - **쿼리 파라미터** 채택(경로 분리 아님) — 라우트 1개 유지, 결과 탭 툴바 portal 슬롯·레이아웃 그대로, 최소 변경
+  > - **범위 = 상위 탭만** — provider(Claude/Codex) 서브탭은 제외(합의)
+  > - 기본 탭은 깨끗한 경로(토스톤), 잘못된 파라미터는 결과로 폴백
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 4/4
+  > - 빌드 로그: `/analyze`·`/analyze?tab=usage` 200, useSearchParams Suspense bailout 경고 0
+  > - 육안 확인(딥링크·새로고침·뒤로가기) + 다관점 적대 리뷰 워크플로(12 에이전트, 4관점×검증) → 실재 결함 0·블로커 0
+  > 
+  > ## 다음 작업
+  > - (선택) provider(Claude/Codex) 서브탭·추세 지표도 URL 동기화로 확장.
+  > - (선택) Suspense fallback 을 null → 탭바 스켈레톤으로(첫 페인트 CLS 완화). 현재는 login 패턴(null) 준수.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) provider(Claude/Codex) 서브탭·추세 지표도 URL 동기화로 확장.
+  - (선택) Suspense fallback 을 null → 탭바 스켈레톤으로(첫 페인트 CLS 완화). 현재는 login 패턴(null) 준수.
+
+### 2026-06-28 — docs(diagrams): AI 종목분석 12에이전트 의존성 도식 (#169)
+
+- **slug**: `ai-analysis-deps-diagram` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/169
+- **요약**: docs(diagrams): AI 종목분석 12에이전트 의존성 도식
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `docs/diagrams/ai-analysis-deps.html` — AI 종목분석 12개 에이전트의 **정확한 의존 그래프**(인터랙티브, 자체완결 HTML). 각 에이전트의 user 프롬프트가 `state`의 어떤 필드를 읽는지 코드에서 추출.
+  > 
+  > ## 왜
+  > "직전 단계만 참조"라는 직관이 틀림을 시각화해 파이프라인 이해·향후 최적화 판단 근거로 보존:
+  > - 트레이더 ← 기술분석가(Phase A) 직접 재참조
+  > - 리스크 3팀 ← 원시 signalSummary 직접
+  > - 리서치매니저 ← 토론(bull/bear)만 (4분석가 직접 안 봄)
+  > - PM ← 11개 에이전트 + 4입력 전부 (최대 fan-in)
+  > 
+  > ## 사용
+  > 브라우저로 파일 열기(외부 의존 0). 노드 클릭 → 읽는 것(파랑)/이 결과를 읽는 에이전트(주황) 강조 + 우측 패널 필드 단위 상세. 상단 토글로 공통 입력 점선 on/off.
+  > 
+  > ## 변경
+  > - 신규 `docs/diagrams/ai-analysis-deps.html` (정적 문서, 앱 import 아님 → 빌드/타입/린트 무영향)
+  > 
+  > ## 검증
+  > - 정적 HTML, 코드 경로 무관(Next 처리 대상 아님). 의존 내용은 `lib/prompts/stock/aiAnalysis.ts`·`app/api/stock/ai-analysis/route.ts` 코드와 1:1 대조.
+  > 
+  > ## 다음 작업
+  > - (선택) 도식을 README/위키에서 링크, 파이프라인 변경 시 동기 업데이트.
+  > - 첫 A/B 실험 실행(#165 러너), PR-6/7/8 게이트.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 도식을 README/위키에서 링크, 파이프라인 변경 시 동기 업데이트.
+  - 첫 A/B 실험 실행(#165 러너), PR-6/7/8 게이트.
+
+### 2026-06-28 — refactor(ai-analysis): 에이전트 실패 로그 케이스별 표준화 (reason= 분류) (#171)
+
+- **slug**: `agent-fail-logging` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/171
+- **요약**: refactor(ai-analysis): 에이전트 실패 로그 케이스별 표준화 (reason= 분류)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > AI 종목분석 파이프라인의 **에이전트 실패 로그를 케이스별 `reason=` 분류로 통일**한다. 모니터링 시 `grep "✗ 실패"`로 전체 실패를, `grep "reason=timeout"` 등으로 케이스별로 잡을 수 있다. **동작 무변경(로깅 리팩터)**.
+  > 
+  > ## 왜
+  > A/B 하니스 실행 중 `000660` PM이 verdict=null로 실패했는데, 콘솔만으로는 원인이 **타임아웃인지 JSON 파싱 실패인지 verdict 무효인지** 즉시 구분이 안 됐다(실제로는 PM 300초 타임아웃). 케이스마다 prefix·레벨이 제각각이라 grep 모니터링이 어려웠다.
+  > 
+  > ## 변경
+  > - `route.ts`: `failAgent(agentKey, reason, detail?, err?)` 헬퍼 신설. 4케이스 통일 — `timeout` · `cli-error` · `json-parse` · `verdict-invalid`. 예상 밖 `cli-error`만 `error` 레벨(스택 포함), 나머지는 `warn`.
+  > - `aiAnalysis.ts`: 토론 bull/bear catch도 `logDebateFail`로 `timeout`/`cli-error` 구분.
+  > - 포맷: `✗ 실패 agent=<k> reason=<사유> <detail>`.
+  > - 사용자 중지(AbortError)는 실패가 아니라 info "중지"로 유지.
+  > 
+  > ## 동작 무변경 보장
+  > 각 실패 site는 기존과 동일하게 `send({progress, status:error})` + (PM은 report) + `return "error"`. 바뀐 건 **로그 문자열·레벨 일관화**뿐.
+  > 
+  > ## 검증
+  > - tsc 0 · eslint 0 · vitest 32/32 (lib/server/ai·lib/prompts)
+  > 
+  > ## 다음 작업
+  > - (제안) SSE `progress` 이벤트에 `reason` 필드 추가 → 재시도 카드에 "타임아웃/결론 파싱 실패" 표시(클라까지 관측성).
+  > - (제안) 실패 사유를 DB 기록 → 토큰 대시보드에 "PM 타임아웃률" 등 패널(현재는 로그에만 존재).
+  > - (별건) **T.PM=300초가 opus+effort:max PM엔 빠듯**(성공분 139~224초, 000660은 초과로 abort) → 타임아웃 상향 검토.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (제안) SSE `progress` 이벤트에 `reason` 필드 추가 → 재시도 카드에 "타임아웃/결론 파싱 실패" 표시(클라까지 관측성).
+  - (제안) 실패 사유를 DB 기록 → 토큰 대시보드에 "PM 타임아웃률" 등 패널(현재는 로그에만 존재).
+  - (별건) **T.PM=300초가 opus+effort:max PM엔 빠듯**(성공분 139~224초, 000660은 초과로 abort) → 타임아웃 상향 검토.
+
+### 2026-06-28 — feat(intraday): 장중 단타 판단(참고) decision-support + 봇 연동 + 시황 스케줄러 (#170)
+
+- **slug**: `intraday-scalping-agent` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/170
+- **요약**: 검증 게이트 AUTO-EDGE NO-GO(균형 12종목×15일 net 음수) → 자동 스캘퍼 폐기, 사람 집행 decision-support로 피벗. 분봉 데이터레이어·시그널 프로파일·검증 게이트 + 표면 3종(A 종목상세 카드 / B `/intraday` 워치 / C Slack) + 봇용 read 엔드포인트(`/api/cron/intraday-read`, 게이트 예외 JSON) + 시황 자동 갱신 in-process 스케줄러(`instrumentation.ts`, crontab 대체).
+- **현재 상태**: QA 통과(547 테스트·build green) · review-approved(자가 PR `--comment` fallback) · 머지
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 평일 장중 라이브 검증: 단타 read E2E(판단가 재시도) + 시황 스케줄러 발화 로그 + Supabase 적립
+  - 봇 단타 워치 라이브 테스트 (dev-manager-bot #60 연동, 동반 머지)
   - "AI 매매" 메뉴 네이밍 — 자동매매 신뢰 검증 후 재논의 (현재 "단타 워치" 유지)
   - 시황 스케줄러 단일 오너 강제 — 로그인 도입 시 (현재 수동 env 플래그 `MARKET_REFRESH_SELF_SCHEDULE`)
   - 봇 단타 워치 영속화(인메모리 → KV/파일) — 필요 시

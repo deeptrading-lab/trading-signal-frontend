@@ -17,6 +17,7 @@
  *   hooks/workbench/* · app/api/workbench/* 에 그대로 보존된다(라우트만 교체).
  */
 
+import { Suspense } from "react";
 import { AnalyzeTabsContainer } from "@/components/analyze/AnalyzeTabsContainer";
 import { ANALYZE_PAGE_SUBTITLE, ANALYZE_PAGE_TITLE } from "@/lib/copy/analyze/labels";
 
@@ -27,7 +28,10 @@ export default function AnalyzePage() {
         <h1 className="text-h1 text-text-strong">{ANALYZE_PAGE_TITLE}</h1>
         <p className="text-body-sm text-text-muted">{ANALYZE_PAGE_SUBTITLE}</p>
       </header>
-      <AnalyzeTabsContainer />
+      {/* useSearchParams(탭 상태) 가 Suspense 경계를 요구 — login 패턴과 동일. */}
+      <Suspense fallback={null}>
+        <AnalyzeTabsContainer />
+      </Suspense>
     </div>
   );
 }
