@@ -41,6 +41,27 @@ export interface ProviderRunStats {
   runCount: number;
 }
 
+/**
+ * run(분석 1회) 1건의 시계열 포인트 — 시간축 추세·회귀 감지용.
+ * 평균으로 뭉개는 AgentUsageRow 와 달리 run 단위 원시 합계를 보존한다.
+ */
+export interface RunSeriesPoint {
+  runId: string;
+  ticker: string;
+  /** run 종료 시각(ISO) = 해당 run 행들의 max(created_at) */
+  endedAt: string;
+  /** run wall-clock(ms). 산출은 ProviderRunStats 와 동일(span). */
+  wallClockMs: number | null;
+  /** 측정 비용 합(USD). 측정 행이 없으면(codex) null */
+  totalCost: number | null;
+  /** 입력 토큰 합 = 신규 입력 + 캐시 읽기 (measured 행) */
+  totalInput: number;
+  totalOutput: number;
+  totalCacheCreation: number;
+  /** 이 run 에 기록된 에이전트 행 수 */
+  agentCount: number;
+}
+
 /** /api/stock/ai-analysis/usage 응답. */
 export interface AgentUsageSummary {
   /** Supabase 미설정이면 false → 대시보드가 안내 표시 */
@@ -50,6 +71,8 @@ export interface AgentUsageSummary {
   byProvider: Record<AIAnalysisProvider, AgentUsageRow[]>;
   /** provider별 run 단위 소요시간 통계 (소요시간 카드용) */
   runStatsByProvider: Record<AIAnalysisProvider, ProviderRunStats>;
+  /** provider별 run 시계열 (오래된→최신 정렬). 추세·회귀 감지 차트용. */
+  runSeriesByProvider: Record<AIAnalysisProvider, RunSeriesPoint[]>;
   /** 가장 최근 분석을 실행한 provider (대시보드 기본 탭 정합용). 데이터 없으면 null */
   latestProvider: AIAnalysisProvider | null;
   generatedAt: string;

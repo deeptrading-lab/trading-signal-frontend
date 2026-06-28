@@ -10,7 +10,11 @@
 
 import type { AgentUsageRecord } from "@/lib/server/ai/agentUsageStore";
 import { AGENT_ORDER } from "@/lib/types/stock/aiAnalysis";
-import type { AgentUsageRow, ProviderRunStats } from "@/lib/types/stock/agentUsage";
+import type {
+  AgentUsageRow,
+  ProviderRunStats,
+  RunSeriesPoint,
+} from "@/lib/types/stock/agentUsage";
 
 export function mean(xs: number[]): number | null {
   if (xs.length === 0) return null;
@@ -83,4 +87,43 @@ export function runStats(rows: AgentUsageRecord[]): ProviderRunStats {
   }
   const wallClocks = nums([...byRun.values()].map(runWallClockMs));
   return { avgWallClockMs: mean(wallClocks), runCount: byRun.size };
+}
+
+/** 한 run(행 묶음)을 시계열 포인트 1개로 압축. */
+function toRunPoint(runRows: AgentUsageRecord[]): RunSeriesPoint {
+  const measured = runRows.filter((r) => r.measured);
+  const costs = nums(measured.map((r) => r.costUsd));
+  let endedAtMs = -Infinity;
+  for (const r of runRows) {
+    const t = Date.parse(r.createdAt);
+    if (!Number.isNaN(t) && t > endedAtMs) endedAtMs = t;
+  }
+  const endedAt =
+    endedAtMs === -Infinity ? runRows[0].createdAt : new Date(endedAtMs).toISOString();
+  const sum = (pick: (r: AgentUsageRecord) => number | null): number =>
+    measured.reduce((a, r) => a + (pick(r) ?? 0), 0);
+  return {
+    runId: runRows[0].runId,
+    ticker: runRows[0].ticker,
+    endedAt,
+    wallClockMs: runWallClockMs(runRows),
+    totalCost: costs.length ? costs.reduce((a, b) => a + b, 0) : null,
+    totalInput: sum((r) => r.inputTokens) + sum((r) => r.cacheReadInputTokens),
+    totalOutput: sum((r) => r.outputTokens),
+    totalCacheCreation: sum((r) => r.cacheCreationInputTokens),
+    agentCount: runRows.length,
+  };
+}
+
+/** 행 집합을 run 단위로 묶어 종료 시각 오름차순(오래된→최신) 시계열로. */
+export function runSeries(rows: AgentUsageRecord[]): RunSeriesPoint[] {
+  const byRun = new Map<string, AgentUsageRecord[]>();
+  for (const r of rows) {
+    const list = byRun.get(r.runId) ?? [];
+    list.push(r);
+    byRun.set(r.runId, list);
+  }
+  return [...byRun.values()]
+    .map(toRunPoint)
+    .sort((a, b) => Date.parse(a.endedAt) - Date.parse(b.endedAt));
 }

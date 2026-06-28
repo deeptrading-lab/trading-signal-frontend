@@ -115,6 +115,26 @@ export const LEGEND_FRESH_INPUT = "신규 입력";
 export const LEGEND_CACHE_READ = "캐시 입력";
 export const LEGEND_OUTPUT = "출력";
 
+// ─── 분석별 추세 (회귀 감지) ──────────────────────────────────────────────────────
+export const TREND_TITLE = "분석별 추세 (회귀 감지)";
+export const TREND_HINT =
+  "각 점이 분석 1회입니다. 중앙값(점선) 대비 30%(×1.3) 넘게 튀면 빨간 점으로 표시 — " +
+  "프롬프트·모델을 바꾼 뒤 비용/소요/토큰이 갑자기 늘었는지 잡습니다.";
+export const TREND_MEDIAN = "중앙값";
+export const TREND_LATEST = "최신 분석";
+export const TREND_NO_ANOMALY = "기준 초과 없음 — 추세 안정적이에요.";
+export const TREND_EMPTY = "추세를 그리기엔 분석 표본이 아직 부족해요(2회 이상 필요).";
+export const TREND_METRIC_NO_DATA = "이 지표는 측정값이 없어요(Codex는 비용 미측정).";
+export const trendAnomalyLabel = (anomaly: number, total: number): string =>
+  `분석 ${total}회 중 ${anomaly}회가 기준(중앙값×1.3) 초과`;
+const TREND_METRIC_LABEL: Record<"cost" | "duration" | "tokens", string> = {
+  cost: "비용",
+  duration: "소요",
+  tokens: "토큰",
+};
+export const trendMetricLabel = (m: "cost" | "duration" | "tokens"): string =>
+  TREND_METRIC_LABEL[m];
+
 // ─── 모델별 비용 분해 ────────────────────────────────────────────────────────────
 export const MODEL_COST_TITLE = "모델별 비용 (분석 1회 기준)";
 /** 단가 값은 components/analyze/modelBreakdown.ts MODEL_RATES 와 정합 유지. */

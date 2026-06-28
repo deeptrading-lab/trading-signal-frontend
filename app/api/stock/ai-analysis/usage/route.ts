@@ -21,8 +21,13 @@ import type {
   AgentUsageRow,
   AgentUsageSummary,
   ProviderRunStats,
+  RunSeriesPoint,
 } from "@/lib/types/stock/agentUsage";
-import { aggregateAgentRows, runStats } from "@/lib/server/ai/usageAggregate";
+import {
+  aggregateAgentRows,
+  runSeries,
+  runStats,
+} from "@/lib/server/ai/usageAggregate";
 
 const PROVIDERS: AIAnalysisProvider[] = ["claude", "codex"];
 const ROW_LIMIT = 1000;
@@ -31,10 +36,12 @@ const FALLBACK_TIMEOUT_MESSAGE = "토큰 사용량 조회가 지연되고 있어
 function buildSummary(rows: AgentUsageRecord[]): AgentUsageSummary {
   const byProvider = {} as Record<AIAnalysisProvider, AgentUsageRow[]>;
   const runStatsByProvider = {} as Record<AIAnalysisProvider, ProviderRunStats>;
+  const runSeriesByProvider = {} as Record<AIAnalysisProvider, RunSeriesPoint[]>;
   for (const provider of PROVIDERS) {
     const provRows = rows.filter((r) => r.provider === provider);
     byProvider[provider] = aggregateAgentRows(provRows);
     runStatsByProvider[provider] = runStats(provRows);
+    runSeriesByProvider[provider] = runSeries(provRows);
   }
 
   const runIds = new Set(rows.map((r) => r.runId));
@@ -43,6 +50,7 @@ function buildSummary(rows: AgentUsageRecord[]): AgentUsageSummary {
     runCount: runIds.size,
     byProvider,
     runStatsByProvider,
+    runSeriesByProvider,
     // rows 는 created_at desc → 첫 행이 가장 최근 분석.
     latestProvider: rows[0]?.provider ?? null,
     generatedAt: new Date().toISOString(),
@@ -59,6 +67,7 @@ export async function GET(): Promise<Response> {
         runCount: 0,
         byProvider: { claude: [], codex: [] },
         runStatsByProvider: { claude: emptyStats, codex: emptyStats },
+        runSeriesByProvider: { claude: [], codex: [] },
         latestProvider: null,
         generatedAt: new Date().toISOString(),
       };

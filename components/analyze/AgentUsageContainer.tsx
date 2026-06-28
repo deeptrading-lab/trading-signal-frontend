@@ -15,6 +15,7 @@ import { useQueryAgentUsage } from "@/hooks/stock/useQueryAgentUsage";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 import { CacheCostCards } from "./CacheCostCards";
 import { ModelCostBreakdown } from "./ModelCostBreakdown";
+import { RunTrendChart } from "./RunTrendChart";
 import { AgentTokenBarChart } from "./AgentTokenBarChart";
 import { StageInputTrendChart } from "./StageInputTrendChart";
 import { AgentUsageTable } from "./AgentUsageTable";
@@ -77,6 +78,7 @@ export function AgentUsageContainer() {
   const provider = picked ?? data.latestProvider ?? "claude";
   const rows = data.byProvider[provider] ?? [];
   const wallClockMs = data.runStatsByProvider[provider]?.avgWallClockMs ?? null;
+  const runSeries = data.runSeriesByProvider?.[provider] ?? [];
 
   return (
     <div className="flex flex-col gap-md">
@@ -128,6 +130,7 @@ export function AgentUsageContainer() {
         <>
           <CacheCostCards rows={rows} wallClockMs={wallClockMs} />
           <ModelCostBreakdown rows={rows} />
+          <RunTrendChart key={provider} series={runSeries} />
           <AgentTokenBarChart rows={rows} />
           <StageInputTrendChart rows={rows} />
           <AgentUsageTable rows={rows} />
