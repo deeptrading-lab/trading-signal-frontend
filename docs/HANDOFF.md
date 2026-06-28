@@ -4942,3 +4942,37 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **편향 진단(별건)**: 방향 섞일 다양 종목(성장/낙폭/안정 6~8개)으로 verdict 분포 확인 → 여전히 약세 쏠리면 순서-스왑 A/B로 정량화. 이 PR은 구조·근거를 바로잡고 효과는 진단으로 측정.
   - 필요시 RM 원시 리포트 슬라이스 config 파라미터화(토큰 튜닝).
+
+### 2026-06-28 — feat(ai-analysis): 토론 제시순서 A/B 레버(debateOrder) + 순서 편향 진단 (#174)
+
+- **slug**: `debate-order-lever` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/174
+- **요약**: feat(ai-analysis): 토론 제시순서 A/B 레버(debateOrder) + 순서 편향 진단
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 종합 단계(RM·트레이더·PM) 프롬프트의 **강세/약세 논거 제시 순서**를 config로 토글하는 진단 레버 `debateOrder` 추가. 기본 `bull-first`=현행 **바이트 동일**(무회귀). 순서/recency 편향을 A/B로 격리하기 위한 하니스 레버.
+  > 
+  > ## 왜
+  > 토론이 약세-라스트 구조 + 종합 프롬프트가 강세→약세 순이라 "마지막/순서 주장에 verdict가 쏠리나?" 우려. 순서만 뒤집어(bear-first) 같은 종목을 돌려 verdict 이동을 측정하기 위함.
+  > 
+  > ## 변경
+  > - `analysisConfig.ts`: `debateOrder` 필드 + DEFAULT(`bull-first`) + override + resolve 병합.
+  > - `aiAnalysis.ts`: `orderedDebate(s, bullBlock, bearBlock)` 헬퍼 — RM·트레이더·PM의 강세/약세 블록을 config 순서로. 기본 bull-first는 기존 출력과 바이트 동일.
+  > - 테스트 3: 순서 스왑 검증(RM/trader/PM).
+  > 
+  > ## 실측 A/B 결과 (이 레버로, 2026-06-28)
+  > 같은 6종목 bull-first vs bear-first(공통 5쌍, 042700 bear-first는 undici idle-timeout 실패):
+  > - **4/5 verdict 완전 동일**, 유일 변화(카카오) 약세 내 1칸(UNDER→REDUCE), 강세(한화에어로 OVERWEIGHT) **유지**.
+  > - → **제시 순서는 verdict에 유의미한 영향 없음(order-robust)**. UNDERWEIGHT 쏠림은 순서 편향이 아니라 regime/콘텐츠. RM 객관근거 주입(#173)과 함께, 판정이 순서에 robust함을 확인.
+  > 
+  > ## 무회귀/검증
+  > - 기본 bull-first 바이트 동일(analysisConfig.test 무회귀 11 통과). tsc 0·eslint 0·vitest 14.
+  > 
+  > ## 다음 작업
+  > - 평일/다른 국면에서 동일 6종목 재실행 → UNDERWEIGHT 쏠림이 regime 따라 움직이는지 확인(편향 vs regime 최종 분리).
+  > - (선택) DEBATE_ROUNDS=1 기본화 재검증을 방향-다양 골든셋으로.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 평일/다른 국면에서 동일 6종목 재실행 → UNDERWEIGHT 쏠림이 regime 따라 움직이는지 확인(편향 vs regime 최종 분리).
+  - (선택) DEBATE_ROUNDS=1 기본화 재검증을 방향-다양 골든셋으로.
