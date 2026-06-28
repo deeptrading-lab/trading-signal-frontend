@@ -129,6 +129,12 @@ export interface AIAnalysisDecisionSnapshot {
 
 export type AgentStatus = "pending" | "running" | "done" | "error";
 
+/**
+ * 에이전트 실패 사유 — 모니터링/UI 공용 분류.
+ * route.ts failAgent · aiAnalysis.ts logDebateFail 가 로그(`reason=…`)와 SSE 이벤트에 동일 값으로 싣는다.
+ */
+export type AgentFailReason = "timeout" | "cli-error" | "json-parse" | "verdict-invalid";
+
 export interface AgentMeta {
   key: AgentKey;
   label: string;
@@ -153,8 +159,8 @@ export const AGENT_META: AgentMeta[] = [
 // ─── SSE 이벤트 ───────────────────────────────────────────────────────────────
 
 export type AIAnalysisEvent =
-  /** 에이전트 상태 변경 (running 시작 / done 완료 / error 실패) */
-  | { type: "progress";      agent: AgentKey; status: "running" | "done" | "error" }
+  /** 에이전트 상태 변경 (running 시작 / done 완료 / error 실패). reason 은 error 일 때만 의미. */
+  | { type: "progress";      agent: AgentKey; status: "running" | "done" | "error"; reason?: AgentFailReason }
   /** 에이전트가 생성 중인 토큰 청크 (실시간 스트리밍) */
   | { type: "stream";        agent: AgentKey; chunk: string }
   /** 에이전트 완료 후 최종 전체 텍스트 */
@@ -213,6 +219,8 @@ export interface AgentState {
   status: AgentStatus;
   /** 현재 스트리밍 중인 누적 텍스트 (running 중에만 채워짐, done 시 '' 로 초기화) */
   streamingChunk: string;
+  /** status==="error" 일 때 실패 사유(SSE progress.reason). 재시도 카드에 표시. */
+  failReason?: AgentFailReason;
 }
 
 export interface DebateMessage {
