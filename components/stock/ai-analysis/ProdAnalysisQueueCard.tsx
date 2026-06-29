@@ -145,7 +145,7 @@ export function ProdAnalysisQueueCard({
         <>
           {/* S2: 신선도 낮은 이전 결론 — 재요청 안내 박스(아직 요청 안 했을 때만). S1(신선): CTA 숨김. */}
           {!requested && !fresh && (
-            <div className="w-full max-w-[44rem] rounded-lg border border-border-line bg-surface-muted p-card-px-mobile">
+            <div className="w-full rounded-lg border border-border-line bg-surface-muted p-card-px-mobile">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-body-sm-strong text-text-strong break-keep">
@@ -171,7 +171,7 @@ export function ProdAnalysisQueueCard({
 
           {/* S1: 신선하면 메타만 곁들이고 CTA 숨김(결과 소비). */}
           {!requested && fresh && (
-            <div className="w-full max-w-[44rem] px-1">
+            <div className="w-full px-1">
               <PreviousMeta
                 updatedAt={snapshot.updatedAt}
                 provider={snapshot.provider}
@@ -191,7 +191,7 @@ export function ProdAnalysisQueueCard({
         !requested && (
           <div
             className={cn(
-              "w-full max-w-[44rem] rounded-lg bg-surface-muted p-card-px-mobile text-center",
+              "w-full rounded-lg bg-surface-muted p-card-px-mobile text-center",
               "flex flex-col items-center gap-3",
             )}
           >

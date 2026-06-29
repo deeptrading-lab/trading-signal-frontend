@@ -37,7 +37,7 @@ export function ProdRequestCta({
       className={cn(
         // 모바일 풀폭(터치 타깃, DESIGN.md 모바일) · sm+ 자동폭(우측/중앙 정렬).
         "inline-flex h-button-primary-h w-full items-center justify-center gap-sm rounded-lg sm:w-auto",
-        "bg-accent-vivid text-surface text-button-sm",
+        "bg-accent-vivid text-surface text-button",
         "shadow-md shadow-accent-vivid/20 transition-all active:scale-95 cursor-pointer",
         "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80 disabled:active:scale-100",
         "px-card-px-mobile",

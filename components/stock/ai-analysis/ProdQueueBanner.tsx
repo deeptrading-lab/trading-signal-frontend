@@ -42,7 +42,7 @@ export function ProdQueueBanner({
       role="status"
       aria-live="polite"
       className={cn(
-        "w-full max-w-[44rem]",
+        "w-full",
         TONE_CLASS[tone],
       )}
     >
