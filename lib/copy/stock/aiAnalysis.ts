@@ -230,6 +230,12 @@ export const COPY = {
     /** 중복(S6) */
     duplicateTitle: "이미 분석 중이에요",
     duplicateDesc: "잠시 후 이 화면에서 결과를 확인할 수 있어요.",
+    /**
+     * 진행 중 선제 표시(unified-analysis-jobs 후속) — 패널을 열었을 때 이 종목이 이미 큐에서
+     * active(처리/대기 중)면 요청 CTA 대신 노출. desc 는 duplicateDesc 재사용.
+     */
+    activeProcessingTitle: "이 종목은 분석 중이에요",
+    activePendingTitle: "분석 대기 중이에요",
     /** 처리 중 뱃지(S7) — 워커가 분석을 돌리는 중(busy)일 때. */
     processing: "분석 중",
     /** 처리 중 뱃지 — 대기 큐 건수 칩("· 대기 N건" / "대기 N건"). */

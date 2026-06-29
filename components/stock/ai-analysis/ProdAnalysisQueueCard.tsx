@@ -39,6 +39,8 @@ interface ProdAnalysisQueueCardProps {
   ticker: string;
   /** 저장된 이전 결론(없으면 S3 빈 인트로). */
   snapshot: AIAnalysisDecisionSnapshot | null;
+  /** 이 종목이 분석 큐에서 진행 중(pending/processing)이면 — "분석 중" 선제 표시 + 요청 CTA 숨김. */
+  activeJob?: { status: "pending" | "processing" } | null;
 }
 
 function formatUpdatedAt(value: string): string {
@@ -112,13 +114,29 @@ function PreviousMeta({
 export function ProdAnalysisQueueCard({
   ticker,
   snapshot,
+  activeJob = null,
 }: ProdAnalysisQueueCardProps) {
   const request = useProdAnalysisRequest(ticker);
   const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   const banner = bannerOf(request.phase);
-  // 요청을 한 번이라도 보냈으면(배너 표시 중) 재요청 CTA 는 접고 배너만 유지 — 폭주 방지(S6 수렴).
-  const requested = banner != null || request.phase === "requesting";
+  // 이 종목이 이미 큐에서 진행 중이면 "분석 중/대기 중" 선제 표시(요청 CTA 대신). 방금 제출해 배너가
+  // 떠 있으면(banner) 그쪽 우선 — 중복 표시 방지. 완료되면 폴링이 active=null 로 떨궈 결과 카드로 전환.
+  const activeBanner =
+    activeJob && !banner
+      ? {
+          tone: "duplicate" as const,
+          title:
+            activeJob.status === "processing"
+              ? COPY.prodQueue.activeProcessingTitle
+              : COPY.prodQueue.activePendingTitle,
+          desc: COPY.prodQueue.duplicateDesc,
+        }
+      : null;
+  const shownBanner = banner ?? activeBanner;
+  // 요청을 보냈거나(배너) 이미 진행 중(activeJob)이면 재요청/첫요청 CTA 는 숨긴다 — 중복 요청 혼란 제거.
+  const requested =
+    banner != null || request.phase === "requesting" || activeJob != null;
   const fresh = snapshot ? isFresh(snapshot.updatedAt) : false;
   // 실패(error) 배너에는 "다시 요청" CTA 를 함께(S9 톤 — enqueue 자체 실패 재시도).
   const errorRetryCta =
@@ -132,15 +150,16 @@ export function ProdAnalysisQueueCard({
 
   return (
     <div className="w-full space-y-3">
-      {/* 워커 활동 뱃지(S7) — 처리 중/대기/오프라인. 활동 없으면 null(폴링은 마운트 동안만). */}
-      <WorkerActivityBadge />
+      {/* 워커 활동 뱃지(S7) — 처리 중/대기/오프라인. 이 종목이 active 면 아래 배너가 "분석 중"을
+          더 구체적으로 말하므로 전역 뱃지는 숨겨 중복 방지(요청 전 오프라인 경고용으론 유지). */}
+      {!activeJob && <WorkerActivityBadge />}
 
-      {/* 상태 배너(S4/S5/S6/실패) — 최상단. role=status + aria-live 로 전이 알림. */}
-      {banner && (
+      {/* 상태 배너(S4/S5/S6/실패/진행 중) — 최상단. role=status + aria-live 로 전이 알림. */}
+      {shownBanner && (
         <ProdQueueBanner
-          tone={banner.tone}
-          title={banner.title}
-          desc={banner.desc}
+          tone={shownBanner.tone}
+          title={shownBanner.title}
+          desc={shownBanner.desc}
           action={errorRetryCta}
         />
       )}
