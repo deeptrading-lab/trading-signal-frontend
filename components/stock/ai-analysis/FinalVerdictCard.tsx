@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
-import { TrendingUp, TrendingDown, Info, BadgeCheck, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Info, BadgeCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { roundToKrxTick } from "@/lib/utils/krxTick";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
@@ -170,7 +170,8 @@ export function FinalVerdictCard({
             )}>
               {bullish && <TrendingUp className="text-red-600 dark:text-red-400" size={22} />}
               {bearish && <TrendingDown className="text-blue-600 dark:text-blue-400" size={22} />}
-              {!bullish && !bearish && <TrendingUp className="text-slate-500" size={22} />}
+              {/* 중립 — 카드(AIDecisionCard)와 동일하게 Minus(평행선). 상승 화살표는 오해 소지. */}
+              {!bullish && !bearish && <Minus className="text-slate-500" size={22} />}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">
