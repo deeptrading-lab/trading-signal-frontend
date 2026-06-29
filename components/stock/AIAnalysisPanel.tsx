@@ -22,10 +22,17 @@ import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
 import { ProviderChooser } from "./ai-analysis/ProviderChooser";
 import { SlideToAnalyze } from "./ai-analysis/SlideToAnalyze";
+import { ProdAnalysisQueueCard } from "./ai-analysis/ProdAnalysisQueueCard";
 import type {
   AIAnalysisDecisionSnapshot,
   AIAnalysisProvider,
 } from "@/lib/types/stock/aiAnalysis";
+
+/**
+ * prod(Vercel) 판별 — 클라이언트. Vercel 이 `NEXT_PUBLIC_VERCEL_ENV` 를 빌드타임 인라인하므로
+ * 서버/클라 값이 동일 → 하이드레이션 불일치 없음(navItems.ts 선례). prod 한정 큐 카드 분기에만 사용.
+ */
+const IS_PROD = typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string";
 
 interface AIAnalysisPanelProps extends AIAnalysisContextValue {
   ticker: string;
@@ -543,13 +550,17 @@ export function AIAnalysisPanel({
                       )}
                     </AnimatePresence>
 
-                    {/* 시작 전 — 공급자 선택 화면(로컬 CLI 가용성 기반) */}
+                    {/* 시작 전 — prod 는 비동기 "요청 접수" 큐 카드, 로컬은 공급자 선택/슬라이드(라이브). */}
                     {isAllPending && !error && !isRunning && (
                       isPreviousDecisionLoading ? (
                         <div className="mx-auto w-full max-w-[22rem] px-6 py-16 text-center" role="status" aria-live="polite">
                           <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-slate-400" />
                           <p className="text-sm text-slate-400 break-keep">{COPY.previousDecision.loading}</p>
                         </div>
+                      ) : IS_PROD ? (
+                        // prod 한정 — enqueue 비동기 모델(이전 결론 신선도/접수/오프라인/중복).
+                        // 실시간 스트림·SlideToAnalyze 없음(로컬 전용 무회귀).
+                        <ProdAnalysisQueueCard ticker={ticker} snapshot={previousDecision} />
                       ) : previousDecision && !showProviderChooser ? (
                         <PreviousDecisionIntro
                           snapshot={previousDecision}

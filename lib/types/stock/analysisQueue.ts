@@ -28,3 +28,18 @@ export type EnqueueResult =
   | { status: "already"; id: number | null }
   | { status: "not_configured" }
   | { status: "error"; error: string };
+
+// ── 클라이언트(prod 카드)가 BFF 에서 받는 HTTP 응답 타입 ──────────────────────
+// 위 store 내부 타입과 달리, 브라우저가 enqueue route handler 응답을 그대로 받는 형태.
+// prod 큐 UX(상태 카드)가 소비한다. (PRD §3-1)
+
+/**
+ * `POST /api/stock/ai-analysis/enqueue` 성공 응답.
+ * - queued: 새 pending 적재 / already: 같은 ticker 가 이미 활성(중복 가드).
+ * - workerOffline: 로컬 워커 하트비트 부재 → "지금 분석 서버가 꺼져 있어요" 경고(S5)용.
+ */
+export interface EnqueueAnalysisResponse {
+  status: "queued" | "already";
+  id: number | null;
+  workerOffline: boolean;
+}

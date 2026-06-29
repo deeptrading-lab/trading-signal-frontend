@@ -49,8 +49,11 @@ import {
 export const MAX_CONCURRENT_ANALYSES = 3;
 /** 슬롯 누적 상한 — running 3 + 완료 잔여 몇 개. 초과 시 가장 오래된 완료 슬롯 evict. */
 const MAX_TOTAL_SLOTS = 6;
-/** 재분석 프롬프트 노출 임계 — 마지막 분석 완료가 이 시간 이상 지났을 때만 "새로 분석?" 안내(신선하면 미노출). */
-const REANALYSIS_PROMPT_MIN_AGE_MS = 30 * 60 * 1000;
+/**
+ * 재분석 프롬프트 노출 임계 — 마지막 분석 완료가 이 시간 이상 지났을 때만 "새로 분석?" 안내(신선하면 미노출).
+ * prod 큐 카드(ProdAnalysisQueueCard)도 동일 신선도 임계(S1: 30분 이내면 재요청 UI 숨김)를 공유한다.
+ */
+export const REANALYSIS_PROMPT_MIN_AGE_MS = 30 * 60 * 1000;
 
 // ── 종목별 분석 슬롯 ─────────────────────────────────────────────────────────
 
