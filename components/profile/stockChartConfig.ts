@@ -23,6 +23,9 @@ export const CHART_TYPES: { label: string; type: ChartType }[] = [
   { label: "라인", type: "line" },
 ];
 
+/** 매물대(가격대별 거래량) 오버레이 토글 라벨. */
+export const CHART_VOLUME_PROFILE_LABEL = "매물대";
+
 // ── 봉·기간 설정 ────────────────────────────────────────
 export type PeriodConfig = { label: string; period: ChartPeriod };
 export type RangeConfig = { label: string; days: number };
