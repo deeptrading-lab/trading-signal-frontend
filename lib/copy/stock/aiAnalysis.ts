@@ -215,6 +215,8 @@ export const COPY = {
     emptyDesc: "요청하면 잠시 뒤 이 화면에서 결과를 볼 수 있어요.",
     /** 신선도 낮은 이전 결론 위 재요청 안내(S2) */
     staleTitle: "더 최신 분석이 필요하면 다시 요청할 수 있어요",
+    /** 이전 결론 메타 한 줄 앞에 붙이는 라벨 — "최근 분석 날짜: 2026... · Claude 분석 결과" */
+    recentMetaLabel: "최근 분석 날짜",
     /** 요청 CTA(S2·S3) */
     request: "이 종목 분석 요청",
     /** CTA 누른 직후(enqueue 대기) */
