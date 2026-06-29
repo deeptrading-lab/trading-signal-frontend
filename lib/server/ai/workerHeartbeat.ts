@@ -11,6 +11,7 @@
  */
 
 import { getKisStore } from "@/lib/api/kis/store";
+import type { AnalysisWorkerStatus } from "@/lib/types/stock/analysisQueue";
 
 /** 하트비트 KV 키. */
 export const HEARTBEAT_KEY = "analysis:worker:heartbeat";
@@ -21,8 +22,8 @@ export const HEARTBEAT_KEY = "analysis:worker:heartbeat";
  */
 export const HEARTBEAT_TTL_SEC = 60;
 
-/** 워커 상태 — idle(대기) / busy(분석 처리 중). */
-export type WorkerStatus = "idle" | "busy";
+/** 워커 상태 — idle(대기) / busy(분석 처리 중). 값 SSOT = `AnalysisWorkerStatus`(공유 타입). */
+export type WorkerStatus = AnalysisWorkerStatus;
 
 export interface WorkerHeartbeat {
   /** 마지막 갱신 시각(epoch ms). */

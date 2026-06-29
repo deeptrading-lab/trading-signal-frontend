@@ -29,6 +29,7 @@ import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibra
 import { FinalVerdictCard } from "./FinalVerdictCard";
 import { ProdQueueBanner, type ProdQueueBannerTone } from "./ProdQueueBanner";
 import { ProdRequestCta } from "./ProdRequestCta";
+import { WorkerActivityBadge } from "./WorkerActivityBadge";
 import type {
   AIAnalysisDecisionSnapshot,
   AIAnalysisProvider,
@@ -131,6 +132,9 @@ export function ProdAnalysisQueueCard({
 
   return (
     <div className="w-full space-y-3">
+      {/* 워커 활동 뱃지(S7) — 처리 중/대기/오프라인. 활동 없으면 null(폴링은 마운트 동안만). */}
+      <WorkerActivityBadge />
+
       {/* 상태 배너(S4/S5/S6/실패) — 최상단. role=status + aria-live 로 전이 알림. */}
       {banner && (
         <ProdQueueBanner

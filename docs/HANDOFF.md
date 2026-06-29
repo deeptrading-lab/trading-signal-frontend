@@ -5022,3 +5022,44 @@
   - **Scope B(별도 PRD)**: 통합 `ai_analysis_jobs` 테이블로 prod·로컬·봇 일관 status 뱃지 + 로컬 3건 초과분 큐잉 + 봇 오버플로 큐(크로스 레포).
   - **완료 알림**: 워커 done 시 Slack 핑(봇 레포 연동, Scope B와 묶음).
   - **글로벌 큐 깊이 안전밸브**: 적체 관찰 시 도입(현재 ticker 중복가드로 충분, 인증 per-user 상한으로 흡수 예정).
+
+### 2026-06-29 — feat(ai-analysis): prod 분석 큐 처리중 뱃지(S7) — 워커 상태 폴링 표시 (#176)
+
+- **slug**: `queue-worker-status-badge` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/176
+- **요약**: feat(ai-analysis): prod 분석 큐 처리중 뱃지(S7) — 워커 상태 폴링 표시
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 
+  > PR#175 로 prod에서 AI 분석을 **요청→큐 적재→로컬 워커 드레인** 하는 비동기 모델이 들어갔지만, 요청자는 "접수됐어요"(S4) 배너 이후 **자기 요청이 실제 처리되는지** 알 길이 없었다(워커 켜짐? 지금 다른 분석 중? 대기 몇 건?). 이미 있던 `worker-status` 엔드포인트를 클라이언트가 폴링해, prod 큐 카드 상단에 **워커 활동 뱃지**를 띄운다. (HANDOFF #175 후속 S7)
+  > 
+  > ## 뱃지 상태 (poll ~15s, prod 카드 마운트 동안만)
+  > 
+  > | worker-status | 뱃지 |
+  > |---|---|
+  > | online · busy | 🔵 `분석 중` (+ `· 대기 N건`) + 스피너 |
+  > | online · idle · 대기>0 | 🔵 `대기 N건` (전이 구간) |
+  > | offline | ⚪ `분석 서버 꺼짐` (muted, 선제 안내) |
+  > | online · idle · 빈 큐 / 로딩 / 에러 | 숨김(null, fail-soft) |
+  > 
+  > ## 변경
+  > 
+  > - `useQueryWorkerStatus`(폴링) → `useWorkerActivity`(도메인 훅, 순수 `deriveWorkerActivity` 파생) → `WorkerActivityBadge`
+  > - `ProdAnalysisQueueCard` 상단 마운트(prod 분기 한정) · enqueue 성공 시 `workerStatus` invalidate(즉시 반영)
+  > - `AnalysisWorkerStatus` 공유 타입 SSOT 정렬 · 카피 키 `queuedCount`/`workerOfflineBadge`
+  > 
+  > ## 원칙
+  > 
+  > - BFF 경유(직접 fetch 0) · 신규 디자인 토큰 0(기존 합성 클래스 재사용) · 도메인 훅 의무 · query key 단일 위치
+  > - **로컬 라이브 경로 무회귀**(뱃지는 prod 분기에서만 마운트) · fail-soft(상태 미수신 시 카드 흐름 무영향)
+  > - `cn` 색-드롭 회귀 없음 확인(`text-caption`+색 토큰 공존)
+  > 
+  > ## 검증
+  > 
+  > - `typecheck` ✓ · `lint` ✓ · `test` ✓ (617 passed, 기존 610 + 신규 7) · `build` ✓
+  > - `deriveWorkerActivity` 7케이스(busy/busy+queue/idle+queue/idle+empty/offline/undefined/음수클램프)
+  > - 수동(prod 가시화): `NEXT_PUBLIC_VERCEL_ENV=preview npm run dev` 또는 Vercel 프리뷰 — 워커 끔→`분석 서버 꺼짐`, 다른 종목 분석 중 진입→`분석 중`
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **전역 큐 카드(/analyze)**: slack/로컬/prod 모든 분석 요청을 Supabase 큐에 적재하고, /analyze 분석 페이지에서 종목별로 `분석 중`/`대기 중` 카드를 결과 카드와 함께 표시(인플라이트 가시화). 현재는 prod만 enqueue하고 로컬·봇은 큐 우회 직접 실행 → 통합(Scope B) 필요. 별도 PRD.
+  - S9 decision-failed 필드 + "지난 분석 실패" 카드 / 인증(requested_by·per-user 상한) / 완료 Slack 알림 / 글로벌 큐 깊이 안전밸브 / FONT_SIZE_TOKENS↔theme 동기화 단위테스트

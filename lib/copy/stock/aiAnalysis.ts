@@ -230,8 +230,12 @@ export const COPY = {
     /** 중복(S6) */
     duplicateTitle: "이미 분석 중이에요",
     duplicateDesc: "잠시 후 이 화면에서 결과를 확인할 수 있어요.",
-    /** 처리 중 뱃지(S7) — v1 미사용(후속). 키는 디자인 정합 위해 보존. */
+    /** 처리 중 뱃지(S7) — 워커가 분석을 돌리는 중(busy)일 때. */
     processing: "분석 중",
+    /** 처리 중 뱃지 — 대기 큐 건수 칩("· 대기 N건" / "대기 N건"). */
+    queuedCount: (n: number) => `대기 ${n}건`,
+    /** 처리 중 뱃지 — 워커 오프라인 선제 안내(차분한 muted 칩). 제출 배너(offlineTitle)와 축이 다름. */
+    workerOfflineBadge: "분석 서버 꺼짐",
     /** 실패(S9) — decision 기반 failed 판정은 후속, v1 은 키만 보존. */
     failedTitle: "지난 분석 요청이 처리되지 못했어요",
     failedDesc: "아래 버튼으로 다시 요청할 수 있어요.",

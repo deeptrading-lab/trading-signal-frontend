@@ -43,6 +43,8 @@ export const queryKeys = {
     aiDecisions: ["stock", "ai-decisions"] as const,
     /** AI 분석 에이전트별 토큰 사용량 집계 — Supabase 이력 BFF. 종목 무관 단일 키. */
     agentUsage: ["stock", "ai-agent-usage"] as const,
+    /** 로컬 분석 워커 온라인/처리 상태 — prod 처리 중 뱃지(S7) 폴링. 종목 무관 단일 키. */
+    workerStatus: ["stock", "ai-worker-status"] as const,
   },
   flow: {
     /** 시장 전체 외국인/기관 순매수 Top10(수급 표면 A) — 당일/7일누적 모드별 분리 캐시. */
