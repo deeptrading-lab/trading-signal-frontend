@@ -252,6 +252,39 @@ export async function startProcessing(input: {
 }
 
 /**
+ * 활성(pending/processing) 작업 전체를 최신순(created_at desc)으로 반환한다(/analyze 인플라이트 합성용).
+ * 미설정/오류/컬럼 미적용 시 빈 배열(fail-soft) — 완료 결과 카드는 그대로 뜨고 인플라이트만 미표시.
+ */
+export async function getActiveJobs(limit = 200): Promise<AnalysisQueueRow[]> {
+  const config = supabaseConfig();
+  if (!config) return [];
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", SELECT_COLS);
+  url.searchParams.set("status", "in.(pending,processing)");
+  url.searchParams.set("order", "created_at.desc");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    queueLog.warn("활성 작업 조회 예외", error);
+    return null;
+  });
+
+  if (!res) return [];
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    queueLog.warn(`활성 작업 조회 실패 status=${res.status} ${text}`);
+    return [];
+  }
+  const rows = (await res.json().catch(() => [])) as SupabaseQueueRow[];
+  return Array.isArray(rows) ? rows.map(toRow) : [];
+}
+
+/**
  * 가장 오래된 pending row 1건을 processing 으로 전이하고 반환한다(없으면 null).
  *
  * v1 은 단일 워커 전제(PRD A3)라 select-then-update 로 단순화한다. 경합 최소화를 위해

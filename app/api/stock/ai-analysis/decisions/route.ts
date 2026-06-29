@@ -13,6 +13,7 @@ import {
   getAllAIDecisions,
   isAIDecisionStoreConfigured,
 } from "@/lib/server/ai/decisionStore";
+import { getActiveJobs } from "@/lib/server/ai/queueStore";
 import {
   getAgentUsageRows,
   type AgentUsageRecord,
@@ -26,6 +27,7 @@ import type {
   AIDecisionListItem,
   AIDecisionListResponse,
   AIDecisionTokens,
+  AIInflightItem,
 } from "@/lib/types/stock/aiAnalysisDecisions";
 
 const ROW_LIMIT = 1000;
@@ -76,20 +78,48 @@ function buildTokensByTicker(
 
 export async function GET(): Promise<Response> {
   try {
-    const [decisions, usageRows] = await withTimeout(
-      Promise.all([getAllAIDecisions(), getAgentUsageRows(ROW_LIMIT)]),
+    const [decisions, usageRows, activeJobs] = await withTimeout(
+      Promise.all([
+        getAllAIDecisions(),
+        getAgentUsageRows(ROW_LIMIT),
+        getActiveJobs(),
+      ]),
       5_000,
     );
 
     const tokensByTicker = buildTokensByTicker(usageRows ?? []);
-    const items: AIDecisionListItem[] = decisions.map((snapshot) => ({
-      ...snapshot,
-      tokens: tokensByTicker.get(snapshot.ticker) ?? null,
+
+    // 활성(pending/processing) 작업을 ticker 별 1건으로(최신순 첫 등장 = 최신, 중복가드로 보통 1건).
+    const activeByTicker = new Map<string, (typeof activeJobs)[number]>();
+    for (const job of activeJobs ?? []) {
+      if (!activeByTicker.has(job.ticker)) activeByTicker.set(job.ticker, job);
+    }
+
+    // 완료 결과 카드 — 같은 ticker 가 재분석 중이면 reanalysis 로 표시(결과는 그대로 유지).
+    const items: AIDecisionListItem[] = decisions.map((snapshot) => {
+      const job = activeByTicker.get(snapshot.ticker);
+      if (job) activeByTicker.delete(snapshot.ticker); // 결과 카드에 흡수 → 플레이스홀더에서 제외
+      return {
+        ...snapshot,
+        tokens: tokensByTicker.get(snapshot.ticker) ?? null,
+        reanalysis: job
+          ? { status: job.status as "pending" | "processing", source: job.source }
+          : null,
+      };
+    });
+
+    // 완료 결과 없이 진행중인 종목(첫 분석) → 플레이스홀더(최신순 — getActiveJobs 가 created_at desc).
+    const inflight: AIInflightItem[] = [...activeByTicker.values()].map((job) => ({
+      ticker: job.ticker,
+      status: job.status as "pending" | "processing",
+      source: job.source,
+      createdAt: job.createdAt,
     }));
 
     const payload: AIDecisionListResponse = {
       configured: isAIDecisionStoreConfigured(),
       items,
+      inflight,
       generatedAt: new Date().toISOString(),
     };
     return jsonWithDataSource(

@@ -7,6 +7,16 @@
  */
 
 import type { AIAnalysisDecisionSnapshot } from "@/lib/types/stock/aiAnalysis";
+import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
+
+/**
+ * 진행중 작업 표시(unified-analysis-jobs) — queue active 행을 카드용으로 압축.
+ * pending(대기)·processing(분석 중) + 출처(prod/local/bot).
+ */
+export interface AnalysisInflight {
+  status: "pending" | "processing";
+  source: AnalysisJobSource;
+}
 
 /**
  * 카드별 토큰 합계 — 해당 종목의 최신 run_id 행들 합산.
@@ -24,14 +34,30 @@ export interface AIDecisionTokens {
   measured: boolean;
 }
 
-/** 결론 스냅샷 + 토큰 합계(없으면 null). */
+/** 결론 스냅샷 + 토큰 합계(없으면 null) + (재분석 진행중이면) 인플라이트 표시. */
 export interface AIDecisionListItem extends AIAnalysisDecisionSnapshot {
   tokens: AIDecisionTokens | null;
+  /** 이 종목을 지금 재분석 중이면 표시(완료 결과는 그대로 유지). 없으면 null. */
+  reanalysis?: AnalysisInflight | null;
+}
+
+/**
+ * 완료 결과가 아직 없는 진행중 종목(첫 분석) — /analyze 플레이스홀더 카드.
+ * decisions snapshot 이 없으므로(verdict 미존재) 결과 카드와 분리해 별도 렌더한다.
+ */
+export interface AIInflightItem {
+  ticker: string;
+  status: "pending" | "processing";
+  source: AnalysisJobSource;
+  /** 요청/시작 시각(최신순 정렬용). */
+  createdAt: string;
 }
 
 export interface AIDecisionListResponse {
   /** Supabase 연결 여부 — false 면 빈 목록 + 안내 표면. */
   configured: boolean;
   items: AIDecisionListItem[];
+  /** 완료 결과 없이 진행중인 종목(첫 분석 플레이스홀더). 없으면 빈 배열. */
+  inflight: AIInflightItem[];
   generatedAt: string;
 }
