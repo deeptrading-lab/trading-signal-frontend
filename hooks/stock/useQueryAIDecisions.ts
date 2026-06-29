@@ -3,8 +3,9 @@
  *
  * - queryKey = `queryKeys.stock.aiDecisions` (종목 무관 단일 키).
  * - staleTime / gcTime = `queryConfig.stock.aiDecisions` (60s / 5min).
- * - 수동 새로고침 + 짧은 stale. **진행중(인플라이트) 항목이 있을 때만** ~15s 폴링(unified-analysis-jobs) —
- *   분석이 끝나면(인플라이트 0) 폴링이 자동으로 꺼져 불필요한 부하가 없다.
+ * - 진행중(인플라이트/재분석중)이면 ~15s, 없어도 ~30s 베이스라인 + 탭 복귀 시 갱신(unified-analysis-jobs) —
+ *   다른 곳(prod·봇·다른 탭)에서 새로 시작된 분석도 수동 새로고침 없이 ~30s 안에 카드로 뜬다.
+ *   (개인 도구라 가벼운 idle 베이스라인 부하는 수용 — 진행중이면 더 촘촘히.)
  */
 
 "use client";
@@ -16,8 +17,10 @@ import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
 
-/** 인플라이트(진행중/재분석중)가 있을 때 폴링 간격(ms). #176 워커 뱃지와 동일 톤. */
+/** 진행중(인플라이트/재분석중)일 때 촘촘한 폴링 간격(ms). #176 워커 뱃지와 동일 톤. */
 const INFLIGHT_POLL_MS = 15_000;
+/** 진행중이 없어도 새로 시작된 분석을 잡기 위한 가벼운 베이스라인 폴링(ms). */
+const IDLE_POLL_MS = 30_000;
 
 /** 응답에 진행중 항목(첫 분석 플레이스홀더 or 재분석중 카드)이 있으면 true. */
 function hasInflight(data: AIDecisionListResponse | undefined): boolean {
@@ -32,8 +35,9 @@ export function useQueryAIDecisions(): UseQueryResult<AIDecisionListResponse, Ap
     staleTime: queryConfig.stock.aiDecisions.staleTime,
     gcTime: queryConfig.stock.aiDecisions.gcTime,
     retry: 1,
-    refetchOnWindowFocus: false,
-    // 진행중 항목이 있을 때만 폴링, 모두 완료되면 false(폴링 정지).
-    refetchInterval: (query) => (hasInflight(query.state.data) ? INFLIGHT_POLL_MS : false),
+    refetchOnWindowFocus: true, // 탭 복귀 시 즉시 갱신(새 분석 빠르게 반영).
+    // 진행중이면 ~15s, 없어도 ~30s 베이스라인 — 새로 시작된 분석을 자동으로 카드에 반영.
+    refetchInterval: (query) =>
+      hasInflight(query.state.data) ? INFLIGHT_POLL_MS : IDLE_POLL_MS,
   });
 }

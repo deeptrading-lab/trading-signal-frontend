@@ -66,8 +66,12 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((it) => matchesQuery(it.ticker, q));
+    const base = q ? items.filter((it) => matchesQuery(it.ticker, q)) : items;
+    // 재분석 중(reanalysis)인 종목을 상단으로 — 진행 상태가 오래된(updated_at) 카드에 묻히지 않게.
+    // Array.sort 는 안정 정렬이라 나머지는 BFF 순서(updated_at desc, 최신순) 그대로 유지된다.
+    return [...base].sort(
+      (a, b) => (b.reanalysis ? 1 : 0) - (a.reanalysis ? 1 : 0),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, names, query]);
 
