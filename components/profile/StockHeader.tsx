@@ -100,13 +100,10 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
     // 모바일: 2줄 스택(이름 → 가격). 데스크탑(lg): 한 줄 — 좌측 이름·종목번호 / 우측 가격·등락.
     //   헤더를 한 줄로 압축해 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다.
     <div className="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between lg:gap-md">
-      {/* 좌: 종목명 + 종목번호 + 관심 별 토글 + AI 버튼 */}
+      {/* 좌: 종목명 + 관심 별 토글 + AI 버튼 */}
       <div className="flex items-center gap-sm flex-wrap">
         <h1 className="text-h1 text-text-strong inline-flex items-center gap-sm">
           {displayName}
-          <span className="text-badge px-sm py-[2px] rounded-sm font-normal bg-asset-stock-soft text-asset-stock">
-            {data.ticker}
-          </span>
         </h1>
         <WatchlistStarButton added={added} onToggle={toggleWatch} />
         {onAIAnalysis && (
