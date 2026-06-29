@@ -13,6 +13,8 @@ import {
   getAllAIDecisions,
   isAIDecisionStoreConfigured,
 } from "@/lib/server/ai/decisionStore";
+import { getActiveJobs } from "@/lib/server/ai/queueStore";
+import { mergeActiveJobs } from "@/lib/server/ai/inflightMerge";
 import {
   getAgentUsageRows,
   type AgentUsageRecord,
@@ -76,20 +78,28 @@ function buildTokensByTicker(
 
 export async function GET(): Promise<Response> {
   try {
-    const [decisions, usageRows] = await withTimeout(
-      Promise.all([getAllAIDecisions(), getAgentUsageRows(ROW_LIMIT)]),
+    const [decisions, usageRows, activeJobs] = await withTimeout(
+      Promise.all([
+        getAllAIDecisions(),
+        getAgentUsageRows(ROW_LIMIT),
+        getActiveJobs(),
+      ]),
       5_000,
     );
 
     const tokensByTicker = buildTokensByTicker(usageRows ?? []);
-    const items: AIDecisionListItem[] = decisions.map((snapshot) => ({
+    const decidedItems: AIDecisionListItem[] = decisions.map((snapshot) => ({
       ...snapshot,
       tokens: tokensByTicker.get(snapshot.ticker) ?? null,
     }));
 
+    // 완료 결과 + 활성 작업 합성 — 재분석중은 item.reanalysis, 결과없는 진행중은 inflight 플레이스홀더(순수 함수).
+    const { items, inflight } = mergeActiveJobs(decidedItems, activeJobs ?? []);
+
     const payload: AIDecisionListResponse = {
       configured: isAIDecisionStoreConfigured(),
       items,
+      inflight,
       generatedAt: new Date().toISOString(),
     };
     return jsonWithDataSource(

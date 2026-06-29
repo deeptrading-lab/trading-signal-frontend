@@ -61,6 +61,8 @@ import {
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { tryAcquire, release } from "@/lib/server/ai/concurrencyGate";
+import { startProcessing, markDone, markFailed } from "@/lib/server/ai/queueStore";
+import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
@@ -440,6 +442,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     session?: unknown;
     configId?: unknown;
     configLabel?: unknown;
+    jobId?: unknown;   // prod 워커가 claim 한 queue 행 id(있으면 핸들러는 종결 안 함 — owned=false)
+    source?: unknown;  // 작업 출처(prod/local/bot). 미전달 시 local(직접 실행)
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
@@ -560,6 +564,17 @@ export async function POST(req: NextRequest): Promise<Response> {
       params: configOverride,
     });
   }
+
+  // unified-analysis-jobs: 이 실행을 queue 에 processing 으로 기록(/analyze 인플라이트 트래킹).
+  // prod 워커가 jobId·source:'prod' 를 넘기면 그 행 재사용·종결은 워커(owned=false, 중복 행 방지 G4).
+  // 로컬/봇 직접 실행은 핸들러가 행 insert·종결(owned=true). fail-soft — 미설정/컬럼 미적용 시 미기록.
+  const jobSource: AnalysisJobSource =
+    body.source === "prod" || body.source === "bot" ? body.source : "local";
+  const callerJobId =
+    typeof body.jobId === "number" && Number.isFinite(body.jobId) ? body.jobId : null;
+  const job = await startProcessing({ ticker, source: jobSource, jobId: callerJobId });
+  // owned 작업 종결 분기 — 실제 에러면 failed, 그 외(성공·사용자 중지)면 done(아래 finally).
+  let jobFailed = false;
 
   // 스트림이 cancel(클라이언트 disconnect)·정상 종료로 닫혔는지 추적.
   // 클라이언트가 분석 도중 페이지를 떠나면 cancel()이 먼저 컨트롤러를 닫는데,
@@ -950,6 +965,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           aiLog("스트림 종료 (disconnect/abort)");
         } else {
           aiLog.error("예상치 못한 예외", err);
+          jobFailed = true; // 실제 에러만 failed 로 종결(disconnect/abort 는 done 취급).
           send({ type: "error", message: "분석 중 예상치 못한 오류가 발생했어요." });
         }
         safeClose();
@@ -958,6 +974,14 @@ export async function POST(req: NextRequest): Promise<Response> {
         // 세마포어 반납 — 분석 본문이 정상완료/에러/abort(cancel→abort) 어느 경로로 끝나든
         // 이 finally 단일 지점을 지난다. 여기서만 반납해 누수·조기반납(서브프로세스 종료 전 반납)을 막는다.
         releaseSlot();
+        // unified-analysis-jobs: 직접 실행(owned) queue 작업 종결. 실제 에러=failed, 그 외(성공·중지)=done.
+        // owned 행을 processing 에 안 남겨 recoverStuck 의 워커 재투입(로컬 작업 오실행)을 막는다.
+        // prod 워커 경로(owned=false)는 워커가 markDone/markFailed — 여기서 손대지 않는다(이중 종결 방지).
+        if (job.owned && job.jobId != null) {
+          void (jobFailed
+            ? markFailed(job.jobId, "분석 중 오류로 종료됨")
+            : markDone(job.jobId));
+        }
       }
     },
     cancel() {

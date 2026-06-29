@@ -9,6 +9,12 @@
 export type AnalysisQueueStatus = "pending" | "processing" | "done" | "failed";
 
 /**
+ * 작업 출처(unified-analysis-jobs) — prod enqueue / local 직접 실행 / bot.
+ * queue 가 prod 뿐 아니라 모든 소스 작업을 트래킹하도록 확장(/analyze 인플라이트 카드 출처 구분).
+ */
+export type AnalysisJobSource = "prod" | "local" | "bot";
+
+/**
  * 로컬 분석 워커 활동 상태 — idle(대기) / busy(분석 처리 중).
  * 하트비트(`lib/server/ai/workerHeartbeat.ts` WorkerStatus)와 worker-status BFF 응답이
  * 공유하는 SSOT. 서버 유틸이 이 타입을 import 해 값 중복을 피한다(타입 전용 — 런타임 결합 없음).
@@ -21,6 +27,8 @@ export interface AnalysisQueueRow {
   ticker: string;
   status: AnalysisQueueStatus;
   force: boolean;
+  /** 작업 출처(prod/local/bot). legacy 행(컬럼 미적용)은 'prod' 로 폴백. */
+  source: AnalysisJobSource;
   workerId: string | null;
   error: string | null;
   requestedBy: string | null;

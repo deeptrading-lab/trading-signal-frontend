@@ -18,6 +18,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { useQueryAIDecisions } from "@/hooks/stock/useQueryAIDecisions";
 import { useQueryStockNames } from "@/hooks/stock/useQueryStockNames";
 import { AIDecisionCard } from "./AIDecisionCard";
+import { InflightCard } from "./InflightCard";
 import { AIDecisionDetailSheet } from "./AIDecisionDetailSheet";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import {
@@ -47,19 +48,35 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
 
   // 종목명은 한 곳에서 해석 — 카드/시트 표시 + 검색 매칭에 공용. (hooks 순서 고정 위해 early return 위에서 호출)
   const items = useMemo(() => data?.items ?? [], [data]);
-  const tickers = useMemo(() => items.map((it) => it.ticker), [items]);
+  // 완료 결과 없이 진행중인 종목(첫 분석) — 플레이스홀더 카드(unified-analysis-jobs).
+  const inflight = useMemo(() => data?.inflight ?? [], [data]);
+  const tickers = useMemo(
+    () => [
+      ...new Set([
+        ...items.map((it) => it.ticker),
+        ...inflight.map((it) => it.ticker),
+      ]),
+    ],
+    [items, inflight],
+  );
   const names = useQueryStockNames(tickers);
   const nameOf = (ticker: string): string => names[ticker] ?? ticker;
+  const matchesQuery = (ticker: string, q: string): boolean =>
+    ticker.toLowerCase().includes(q) || nameOf(ticker).toLowerCase().includes(q);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter(
-      (it) =>
-        it.ticker.toLowerCase().includes(q) || nameOf(it.ticker).toLowerCase().includes(q),
-    );
+    return items.filter((it) => matchesQuery(it.ticker, q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, names, query]);
+
+  const filteredInflight = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return inflight;
+    return inflight.filter((it) => matchesQuery(it.ticker, q));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inflight, names, query]);
 
   if (isLoading) {
     return (
@@ -92,7 +109,7 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
     );
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && inflight.length === 0) {
     return (
       <div className="card" role="status">
         <h2 className="text-h3 text-text-strong mb-sm">{RESULTS_EMPTY_TITLE}</h2>
@@ -107,7 +124,7 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
       {toolbarSlot &&
         createPortal(
           <>
-            <span className="text-caption text-text-muted">{resultsCount(filtered.length)}</span>
+            <span className="text-caption text-text-muted">{resultsCount(filtered.length + filteredInflight.length)}</span>
             <button
               type="button"
               aria-label={USAGE_REFRESH}
@@ -131,13 +148,21 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
         aria-label={RESULTS_SEARCH_PLACEHOLDER}
       />
 
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && filteredInflight.length === 0 ? (
         <div className="card" role="status">
           <h2 className="text-h3 text-text-strong mb-sm">{RESULTS_SEARCH_EMPTY_TITLE}</h2>
           <p className="text-body-sm text-text-muted">{RESULTS_SEARCH_EMPTY_BODY}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+          {/* 진행중(첫 분석) 플레이스홀더 — 최신순, 결과 카드 위에. 완료되면 다음 폴링에 결과 카드로 대체. */}
+          {filteredInflight.map((item) => (
+            <InflightCard
+              key={`inflight-${item.ticker}`}
+              item={item}
+              name={nameOf(item.ticker)}
+            />
+          ))}
           {filtered.map((item) => (
             <AIDecisionCard
               key={item.ticker}
