@@ -72,6 +72,7 @@ function makeDecision(
         };
   return {
     ticker: overrides.ticker ?? "017670",
+    name: null,
     provider: "claude",
     decision,
     sentiment: null,

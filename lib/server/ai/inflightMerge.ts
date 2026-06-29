@@ -41,6 +41,7 @@ export function mergeActiveJobs(
   // 완료 결과 없는 활성 작업 → 첫 분석 플레이스홀더(최신순 유지).
   const inflight: AIInflightItem[] = [...activeByTicker.values()].map((job) => ({
     ticker: job.ticker,
+    name: job.name ?? null,
     status: activeStatus(job),
     source: job.source,
     createdAt: job.createdAt,

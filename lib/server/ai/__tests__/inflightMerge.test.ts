@@ -21,10 +21,12 @@ function job(
   status: AnalysisQueueStatus,
   source: AnalysisJobSource = "local",
   createdAt = "2026-06-29T01:00:00Z",
+  name: string | null = null,
 ): AnalysisQueueRow {
   return {
     id: Math.floor(createdAt.length),
     ticker,
+    name,
     status,
     force: false,
     source,
@@ -67,8 +69,16 @@ describe("mergeActiveJobs", () => {
     );
     expect(out.items).toEqual([]);
     expect(out.inflight).toEqual([
-      { ticker: "000660", status: "pending", source: "local", createdAt: "2026-06-29T02:00:00Z" },
+      { ticker: "000660", name: null, status: "pending", source: "local", createdAt: "2026-06-29T02:00:00Z" },
     ]);
+  });
+
+  it("종목명(name)이 인플라이트 플레이스홀더에 전파된다(decision-stock-name)", () => {
+    const out = mergeActiveJobs(
+      [],
+      [job("247540", "processing", "prod", "2026-06-29T02:00:00Z", "에코프로비엠")],
+    );
+    expect(out.inflight[0].name).toBe("에코프로비엠");
   });
 
   it("같은 ticker 활성 2건 → ticker 당 1건(최신순 첫 등장)으로 축약", () => {

@@ -37,6 +37,8 @@ import type {
 
 interface ProdAnalysisQueueCardProps {
   ticker: string;
+  /** 현재 해석된 종목명(decision-stock-name) — 요청 시 큐 행에 함께 적재해 대기중 카드도 즉시 종목명 표시. */
+  name?: string | null;
   /** 저장된 이전 결론(없으면 S3 빈 인트로). */
   snapshot: AIAnalysisDecisionSnapshot | null;
   /** 이 종목이 분석 큐에서 진행 중(pending/processing)이면 — "분석 중" 선제 표시 + 요청 CTA 숨김. */
@@ -114,10 +116,12 @@ function PreviousMeta({
 
 export function ProdAnalysisQueueCard({
   ticker,
+  name,
   snapshot,
   activeJob = null,
 }: ProdAnalysisQueueCardProps) {
-  const request = useProdAnalysisRequest(ticker);
+  // 종목명 우선순위: 현재 해석명(prop) → 이전 결론 저장명(snapshot). 서버가 pickStockName 으로 재정제.
+  const request = useProdAnalysisRequest(ticker, name ?? snapshot?.name ?? null);
   const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   const banner = bannerOf(request.phase);

@@ -13,6 +13,7 @@
 create table if not exists public.ai_analysis_queue (
   id           bigint      generated always as identity primary key,
   ticker       text        not null,
+  name         text,                                       -- 분석 시점 종목명(decision-stock-name). 진행중 카드 깜빡임 제거용. 없으면 null
   status       text        not null default 'pending'
                  check (status in ('pending', 'processing', 'done', 'failed')),
   force        boolean     not null default false,        -- 강제 재분석 여부(신선도 무시 요청)
@@ -53,6 +54,10 @@ alter table public.ai_analysis_queue
 -- (check 제약은 fresh create 에만 — 기존 DB 보강은 컬럼만, 값 검증은 앱(queueStore)에서.)
 alter table public.ai_analysis_queue
   add column if not exists source text not null default 'prod';
+
+-- decision-stock-name: 진행중 카드(분석중/대기중)의 종목명. 분석 핸들러가 KIS 종목명 확보 시 patch.
+alter table public.ai_analysis_queue
+  add column if not exists name text;
 
 comment on table public.ai_analysis_queue is
   'prod 분석 요청 큐. 로컬 워커가 pending 을 claim 해 기존 핸들러로 처리하고 결과는 ai_analysis_decisions 에 저장';

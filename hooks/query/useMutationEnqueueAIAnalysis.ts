@@ -19,9 +19,9 @@ export function useMutationEnqueueAIAnalysis() {
   return useMutation<
     EnqueueAnalysisResponse,
     ApiError,
-    { ticker: string; force?: boolean }
+    { ticker: string; force?: boolean; name?: string | null }
   >({
-    mutationFn: ({ ticker, force }) => enqueueAIAnalysis(ticker, force),
+    mutationFn: ({ ticker, force, name }) => enqueueAIAnalysis(ticker, force, name),
     onSuccess: () => {
       // 접수 직후 워커 상태 뱃지를 즉시 갱신(다음 폴링까지 안 기다림). 뱃지 미마운트면 무해.
       void queryClient.invalidateQueries({

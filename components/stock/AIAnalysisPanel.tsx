@@ -562,6 +562,7 @@ export function AIAnalysisPanel({
                         // 실시간 스트림·SlideToAnalyze 없음(로컬 전용 무회귀).
                         <ProdAnalysisQueueCard
                           ticker={ticker}
+                          name={stockData?.name ?? null}
                           snapshot={previousDecision}
                           activeJob={previousDecisionData?.active ?? null}
                         />

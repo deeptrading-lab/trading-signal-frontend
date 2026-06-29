@@ -25,6 +25,8 @@ export type AnalysisWorkerStatus = "idle" | "busy";
 export interface AnalysisQueueRow {
   id: number;
   ticker: string;
+  /** 분석 시점 종목명(decision-stock-name). 핸들러가 KIS 종목명 확보 시 patch. 없으면 null. */
+  name: string | null;
   status: AnalysisQueueStatus;
   force: boolean;
   /** 작업 출처(prod/local/bot). legacy 행(컬럼 미적용)은 'prod' 로 폴백. */

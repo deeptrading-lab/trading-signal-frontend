@@ -19,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isKisConfigured, fetchStockPrice, fetchInvestorTrend } from "@/lib/api/kis";
+import { isKisConfigured, fetchStockPrice, fetchInvestorTrend, getSymbolName } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
 import { evaluateSignal } from "@/lib/signal/engine";
 import { AXIS_LABEL } from "@/lib/copy/signal/labels";
@@ -61,8 +61,9 @@ import {
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { tryAcquire, release } from "@/lib/server/ai/concurrencyGate";
-import { startProcessing, markDone, markFailed } from "@/lib/server/ai/queueStore";
+import { startProcessing, markDone, markFailed, setJobName } from "@/lib/server/ai/queueStore";
 import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
+import { pickStockName } from "@/lib/utils/resolveStockName";
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
@@ -697,6 +698,17 @@ export async function POST(req: NextRequest): Promise<Response> {
         const investorData = investorSettled.status === "fulfilled" ? investorSettled.value : null;
         state.priceContext = formatPriceContextForPrompt(sorted, signalResult, priceData, investorData);
 
+        // 분석 시점 종목명(decision-stock-name) — KIS 현재가 응답명 → 시드(symbols.json) 폴백 순.
+        //   ⚠️ KIS inquire-price 의 hts_kor_isnm 은 prod 에서도 자주 비어 mapStockPrice 가 ticker 로 폴백한다
+        //      (reference_kis-api-conventions §1). 화면 BFF(/api/stock/price)와 동일하게 getSymbolName 시드로 보강.
+        //   ① 진행중 큐 행에 즉시 patch → /analyze 진행중 카드가 종목번호 대신 종목명 표시(깜빡임 제거, fire-and-forget).
+        //   ② 아래 PM 결론 저장(upsertAIDecision) 시 함께 기록 → 완료 카드도 DB 에서 바로 종목명.
+        const resolvedName = pickStockName(ticker, [
+          priceData?.name,
+          getSymbolName(ticker),
+        ]);
+        if (job.jobId != null && resolvedName) void setJobName(job.jobId, resolvedName);
+
         // 3. 에이전트 실행 — 3-phase ──────────────────────────────────────────
         const startIndex = startFrom ? AGENT_ORDER.indexOf(startFrom) : 0;
         if (startFrom) {
@@ -813,6 +825,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                 send({ type: "final", data: finalDecision });
                 const saveResult = await upsertAIDecision({
                   ticker,
+                  name: resolvedName,
                   provider,
                   decision: finalDecision,
                   sentiment: state.sentiment ?? null,

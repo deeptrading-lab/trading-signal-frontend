@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "analyze:worker": "node --env-file=.env.local --import tsx scripts/analysisWorker.ts",
+    "backfill:decision-names": "node --env-file=.env.local --import tsx scripts/backfillDecisionNames.ts",
     "all": "concurrently -n dev,worker -c blue,green \"npm run dev\" \"npm run analyze:worker\"",
     "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs"
   },

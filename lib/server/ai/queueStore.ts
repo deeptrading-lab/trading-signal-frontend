@@ -25,7 +25,7 @@ const queueLog = createLogger("analysis-queue");
 
 const TABLE = "ai_analysis_queue";
 const SELECT_COLS =
-  "id,ticker,status,force,source,worker_id,error,requested_by,created_at,claimed_at,finished_at";
+  "id,ticker,name,status,force,source,worker_id,error,requested_by,created_at,claimed_at,finished_at";
 
 /**
  * stuck 복구 시 pending 재투입 횟수를 추적하는 마커(PRD §9 q2 — 1회 재투입 후 2회째 failed).
@@ -36,6 +36,7 @@ const RECOVER_MARKER_RE = /\[recovered:(\d+)\]/;
 type SupabaseQueueRow = {
   id: number;
   ticker: string;
+  name: string | null;
   status: AnalysisQueueStatus;
   force: boolean;
   source: AnalysisJobSource | null;
@@ -66,6 +67,7 @@ function toRow(row: SupabaseQueueRow): AnalysisQueueRow {
   return {
     id: row.id,
     ticker: row.ticker,
+    name: row.name ?? null,
     status: row.status,
     force: row.force,
     source: row.source ?? "prod",
@@ -137,6 +139,8 @@ export async function findActiveByTicker(
 export async function enqueueAnalysis(input: {
   ticker: string;
   force?: boolean;
+  /** 분석 시점 종목명(decision-stock-name) — pending 카드도 즉시 종목명 표시용. 없으면 생략(컬럼 default null). */
+  name?: string | null;
 }): Promise<EnqueueResult> {
   const config = supabaseConfig();
   if (!config) return { status: "not_configured" };
@@ -145,6 +149,14 @@ export async function enqueueAnalysis(input: {
   const active = await findActiveByTicker(input.ticker);
   if (active) return { status: "already", id: active.id };
 
+  const insertBody: Record<string, unknown> = {
+    ticker: input.ticker,
+    status: "pending",
+    force: input.force ?? false,
+  };
+  // 종목명은 확보됐을 때만 적재 — 불필요한 null payload 를 피한다(미확보면 컬럼 default null).
+  if (input.name) insertBody.name = input.name;
+
   const res = await fetch(`${config.url}/rest/v1/${TABLE}`, {
     method: "POST",
     headers: {
@@ -152,11 +164,7 @@ export async function enqueueAnalysis(input: {
       // 삽입된 row 를 돌려받아 id 를 응답에 싣는다.
       Prefer: "return=representation",
     },
-    body: JSON.stringify({
-      ticker: input.ticker,
-      status: "pending",
-      force: input.force ?? false,
-    }),
+    body: JSON.stringify(insertBody),
   }).catch((error: unknown) => ({
     ok: false,
     status: 0,
@@ -356,6 +364,16 @@ export async function claimNextPending(
   const row = Array.isArray(rows) ? rows[0] : undefined;
   // 0행 = 그 사이 다른 워커가 가져감 → null(다음 폴링).
   return row ? toRow(row) : null;
+}
+
+/**
+ * 진행중 작업 행에 종목명을 기록한다(decision-stock-name). 분석 핸들러가 KIS 종목명 확보 시 호출 →
+ * /analyze 진행중 카드가 종목번호 대신 종목명을 즉시 표시(깜빡임 제거). name 이 빈 값이면 no-op,
+ * 컬럼 미적용 DB·오류는 patchById 가 흡수(fail-soft — 분석/큐 흐름 무회귀).
+ */
+export async function setJobName(id: number, name: string | null): Promise<void> {
+  if (!name) return;
+  await patchById(id, { name });
 }
 
 /** row 를 done 으로 종결(finished_at 세팅). 미설정/오류 시 no-op(fail-soft). */
