@@ -103,6 +103,7 @@ function PreviousMeta({
 }) {
   return (
     <p className="text-caption text-text-muted break-keep">
+      {COPY.prodQueue.recentMetaLabel}:{" "}
       {COPY.previousDecision.meta(
         formatUpdatedAt(updatedAt),
         COPY.provider[provider],

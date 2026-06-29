@@ -90,8 +90,6 @@ export const VERDICT_LABEL: Record<FinalVerdict, string> = {
 };
 export const isBullishVerdict = (v: FinalVerdict) => v === "BUY" || v === "OVERWEIGHT";
 export const isBearishVerdict = (v: FinalVerdict) => v === "SELL" || v === "REDUCE" || v === "UNDERWEIGHT";
-/** 신규 진입(롱) 자체가 없는 등급 — 손익비 "진입 없음" 표기용 */
-const isNoEntryVerdict = (v: FinalVerdict) => v === "UNDERWEIGHT" || v === "REDUCE" || v === "SELL";
 
 export function FinalVerdictCard({
   data,
@@ -268,7 +266,15 @@ export function FinalVerdictCard({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {/* 손익비는 값이 있을 때만 노출 — 없으면(진입 없음 등) 칸을 빼고 2열로. */}
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-2",
+              data.risk_reward_ratio !== null
+                ? "sm:grid-cols-3"
+                : "sm:grid-cols-2",
+            )}
+          >
             <div className={statCx(data.target_pct !== null && data.target_pct < 0 ? "blue" : "emerald")}>
               <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">
                 {data.target_pct !== null && data.target_pct < 0
@@ -290,25 +296,19 @@ export function FinalVerdictCard({
               <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">{COPY.verdict.stopLossLabel}</span>
               {renderPctStat(data.stop_loss_pct, "text-red-600 dark:text-red-400")}
             </div>
-            <div className={statCx("slate")}>
-              <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">{COPY.verdict.rrLabel}</span>
-              {data.risk_reward_ratio !== null ? (
+            {data.risk_reward_ratio !== null && (
+              <div className={statCx("slate")}>
+                <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">{COPY.verdict.rrLabel}</span>
                 <span className="text-lg font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">
                   {data.risk_reward_ratio} : 1
                 </span>
-              ) : (
-                <span className="text-sm font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                  {isNoEntryVerdict(data.verdict)
-                    ? "진입 없음"
-                    : "—"}
-                </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
         {(data.short_term_outlook || data.mid_term_outlook) && (
-          <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
             {data.short_term_outlook && (
               <div className="px-4 py-3 space-y-1">
                 <p className="text-[12px] font-bold text-slate-700 dark:text-slate-200">{COPY.verdict.shortTermLabel}</p>
