@@ -14,6 +14,7 @@
 
 import { createLogger } from "@/lib/server/logTag";
 import type {
+  AnalysisJobSource,
   AnalysisQueueRow,
   AnalysisQueueStatus,
   EnqueueResult,
@@ -24,7 +25,7 @@ const queueLog = createLogger("analysis-queue");
 
 const TABLE = "ai_analysis_queue";
 const SELECT_COLS =
-  "id,ticker,status,force,worker_id,error,requested_by,created_at,claimed_at,finished_at";
+  "id,ticker,status,force,source,worker_id,error,requested_by,created_at,claimed_at,finished_at";
 
 /**
  * stuck 복구 시 pending 재투입 횟수를 추적하는 마커(PRD §9 q2 — 1회 재투입 후 2회째 failed).
@@ -37,6 +38,7 @@ type SupabaseQueueRow = {
   ticker: string;
   status: AnalysisQueueStatus;
   force: boolean;
+  source: AnalysisJobSource | null;
   worker_id: string | null;
   error: string | null;
   requested_by: string | null;
@@ -66,6 +68,7 @@ function toRow(row: SupabaseQueueRow): AnalysisQueueRow {
     ticker: row.ticker,
     status: row.status,
     force: row.force,
+    source: row.source ?? "prod",
     workerId: row.worker_id,
     error: row.error,
     requestedBy: row.requested_by,
@@ -169,6 +172,83 @@ export async function enqueueAnalysis(input: {
   const rows = (await ("json" in res ? res.json() : Promise.resolve([])).catch(() => [])) as SupabaseQueueRow[];
   const id = Array.isArray(rows) && rows[0] ? rows[0].id : null;
   return { status: "queued", id };
+}
+
+/**
+ * 직접 실행(로컬/봇) 작업 1행을 `processing` 으로 insert 하고 id 반환(없으면 null).
+ * `source` 컬럼 미적용 DB 면 insert 실패 → null(인플라이트 미표시, 분석은 정상 진행 — fail-soft).
+ */
+async function insertProcessingRow(input: {
+  ticker: string;
+  source: AnalysisJobSource;
+  workerId?: string;
+}): Promise<number | null> {
+  const config = supabaseConfig();
+  if (!config) return null;
+
+  const res = await fetch(`${config.url}/rest/v1/${TABLE}`, {
+    method: "POST",
+    headers: { ...headers(config.key), Prefer: "return=representation" },
+    body: JSON.stringify({
+      ticker: input.ticker,
+      status: "processing",
+      source: input.source,
+      worker_id: input.workerId ?? null,
+      claimed_at: new Date().toISOString(),
+    }),
+  }).catch((error: unknown) => ({
+    ok: false,
+    status: 0,
+    text: async () => (error instanceof Error ? error.message : String(error)),
+    json: async () => [],
+  }));
+
+  if (!res.ok) {
+    const text = await ("text" in res ? res.text() : Promise.resolve("")).catch(() => "");
+    queueLog.warn(`processing insert 실패 ticker=${input.ticker} status=${res.status} ${text}`);
+    return null;
+  }
+  const rows = (await ("json" in res ? res.json() : Promise.resolve([])).catch(() => [])) as SupabaseQueueRow[];
+  return Array.isArray(rows) && rows[0] ? rows[0].id : null;
+}
+
+/**
+ * 분석 실행 시작을 queue 에 기록한다(unified-analysis-jobs §3-2/§3-3). 핸들러가 슬롯 획득 직후 호출.
+ *
+ * - `jobId` 가 주어지면(prod 워커가 이미 claim 한 행) 그 행을 **재사용**하고 핸들러는 종결하지 않는다
+ *   (`owned=false` → 워커가 markDone/markFailed). 추가 DB 쓰기 없음.
+ * - `jobId` 가 없으면(로컬/봇 직접 실행) 같은 ticker active 행이 있으면 재사용(pending 은 processing 으로 전이),
+ *   없으면 신규 `processing` 행 insert. 핸들러가 종결(`owned=true`).
+ *
+ * 미설정/오류/컬럼 미적용 시 `{ jobId:null, owned:false }`(fail-soft — 분석 정상 진행, 인플라이트만 미표시).
+ */
+export async function startProcessing(input: {
+  ticker: string;
+  source: AnalysisJobSource;
+  /** prod 워커가 claim 한 행 id. 있으면 핸들러는 종결 안 함(owned=false). */
+  jobId?: number | null;
+  workerId?: string;
+}): Promise<{ jobId: number | null; owned: boolean }> {
+  // prod 워커 경로 — 이미 claim 된 행 재사용, 종결은 워커가(중복 행·이중 종결 방지, G4).
+  if (input.jobId != null) return { jobId: input.jobId, owned: false };
+
+  // 직접 실행(로컬/봇) — 같은 ticker active 행 재사용 or 신규 insert. 종결은 핸들러가(owned=true).
+  const active = await findActiveByTicker(input.ticker);
+  if (active) {
+    if (active.status === "pending") {
+      await patchById(active.id, {
+        status: "processing",
+        claimed_at: new Date().toISOString(),
+      });
+    }
+    return { jobId: active.id, owned: true };
+  }
+  const id = await insertProcessingRow({
+    ticker: input.ticker,
+    source: input.source,
+    workerId: input.workerId,
+  });
+  return { jobId: id, owned: id != null };
 }
 
 /**

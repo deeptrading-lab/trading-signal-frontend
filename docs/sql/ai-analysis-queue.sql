@@ -16,6 +16,8 @@ create table if not exists public.ai_analysis_queue (
   status       text        not null default 'pending'
                  check (status in ('pending', 'processing', 'done', 'failed')),
   force        boolean     not null default false,        -- 강제 재분석 여부(신선도 무시 요청)
+  source       text        not null default 'prod'         -- 작업 출처(unified-analysis-jobs): prod enqueue / local 직접 / bot
+                 check (source in ('prod', 'local', 'bot')),
   worker_id    text,                                       -- claim 한 워커 식별자, pending 동안 null
   error        text,                                       -- markFailed 사유(실패 시), 그 외 null
   -- 인증 후속(PRD §4/§9 q5) 자리만 비워둠 — v1 은 ticker 단위로만 동작.
@@ -46,6 +48,11 @@ alter table public.ai_analysis_queue enable row level security;
 -- 기존 배포 DB 에 신규 컬럼 추가(멱등) — 이미 테이블이 있으면 컬럼만 보강.
 alter table public.ai_analysis_queue
   add column if not exists requested_by text;
+
+-- unified-analysis-jobs: 작업 출처 컬럼(전 소스 트래커). 기존 행은 모두 prod enqueue 분이므로 default 'prod' 안전(무손실).
+-- (check 제약은 fresh create 에만 — 기존 DB 보강은 컬럼만, 값 검증은 앱(queueStore)에서.)
+alter table public.ai_analysis_queue
+  add column if not exists source text not null default 'prod';
 
 comment on table public.ai_analysis_queue is
   'prod 분석 요청 큐. 로컬 워커가 pending 을 claim 해 기존 핸들러로 처리하고 결과는 ai_analysis_decisions 에 저장';
