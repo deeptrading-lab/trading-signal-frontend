@@ -20,6 +20,8 @@ interface ProdQueueBannerProps {
   desc: string;
   /** 실패(S9·enqueue 실패) 배너 하단 재요청 CTA 등. */
   action?: React.ReactNode;
+  /** 제목 왼쪽에 인라인 배치할 요소(예: 워커 활동 뱃지). 없으면 제목만. */
+  leading?: React.ReactNode;
 }
 
 // 톤 → 합성 클래스/유틸. 중복(duplicate)은 .card-info 보다 약한 옅은 파랑(accent-vivid-soft + primary).
@@ -36,6 +38,7 @@ export function ProdQueueBanner({
   title,
   desc,
   action,
+  leading,
 }: ProdQueueBannerProps) {
   return (
     <div
@@ -46,7 +49,11 @@ export function ProdQueueBanner({
         TONE_CLASS[tone],
       )}
     >
-      <p className="text-body-sm-strong break-keep">{title}</p>
+      {/* 제목 줄 — leading(워커 뱃지 등) 있으면 제목 왼쪽에 인라인. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {leading}
+        <p className="text-body-sm-strong break-keep">{title}</p>
+      </div>
       <p className="mt-1 text-body-sm leading-relaxed break-keep opacity-90">
         {desc}
       </p>
