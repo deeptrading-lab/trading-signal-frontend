@@ -19,6 +19,7 @@
 
 "use client";
 
+import { useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -59,6 +60,8 @@ import { LastPriceTag } from "./chart/LastPriceTag";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
+import { VolumeProfileLayer } from "./chart/VolumeProfileLayer";
+import { computeVolumeProfile } from "@/lib/utils/volumeProfile";
 
 export interface StockDailyChartProps {
   ticker: string;
@@ -69,9 +72,11 @@ export interface StockDailyChartProps {
   period: ChartPeriod;
   days: number;
   chartType: ChartType;
+  showVolumeProfile: boolean;
   onPeriodChange: (p: ChartPeriod) => void;
   onDaysChange: (d: number) => void;
   onChartTypeChange: (t: ChartType) => void;
+  onToggleVolumeProfile: () => void;
 }
 
 export function StockDailyChart({
@@ -82,9 +87,11 @@ export function StockDailyChart({
   period,
   days,
   chartType,
+  showVolumeProfile,
   onPeriodChange,
   onDaysChange,
   onChartTypeChange,
+  onToggleVolumeProfile,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } =
     useChartData(ticker, period, days);
@@ -93,7 +100,21 @@ export function StockDailyChart({
   const theme = useChartTheme();
   const { C, tooltipStyle, labelStyle, axisProps } = theme;
 
-  const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange };
+  // 매물대 — 보이는 봉(candleSeries)의 high/low 범위에 거래량(volSeries) 분배. 캔들/라인 공통.
+  //   index 정렬(둘 다 같은 보기 구간 슬라이스) → zip 안전. 토글 off 면 계산만 하고 렌더 생략.
+  const volumeProfile = useMemo(
+    () =>
+      computeVolumeProfile(
+        candleSeries.map((c, i) => ({
+          low: c.low,
+          high: c.high,
+          volume: volSeries[i]?.volume ?? 0,
+        })),
+      ),
+    [candleSeries, volSeries],
+  );
+
+  const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange, showVolumeProfile, onToggleVolumeProfile };
 
   // 데이터 부족 안내의 봉 단위(일/주/월) — 선택된 봉 종류에 따라 표기 변경.
   const periodUnit = PERIOD_UNIT[period];
@@ -157,6 +178,7 @@ export function StockDailyChart({
           {chartType === "candle" ? (
             <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
+              {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip content={<CandleTooltip />} />
@@ -181,6 +203,7 @@ export function StockDailyChart({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
+              {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />

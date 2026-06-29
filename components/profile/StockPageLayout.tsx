@@ -31,6 +31,8 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   const [period, setPeriod] = useState<ChartPeriod>(DEFAULT_PERIOD);
   const [days, setDays] = useState<number>(DEFAULT_DAYS);
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
+  // 매물대(가격대별 거래량) 오버레이 — 기본 off, 토글로 on/off. 확대/축소 리마운트에도 보존.
+  const [showVolumeProfile, setShowVolumeProfile] = useState(false);
 
   function handlePeriodChange(p: ChartPeriod) {
     setPeriod(p);
@@ -41,9 +43,11 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     period,
     days,
     chartType,
+    showVolumeProfile,
     onPeriodChange: handlePeriodChange,
     onDaysChange: setDays,
     onChartTypeChange: setChartType,
+    onToggleVolumeProfile: () => setShowVolumeProfile((v) => !v),
   };
 
   // 레이아웃 전환 시 fade-out → 상태 변경 → fade-in (데스크탑 확대/축소 한정)

@@ -15,6 +15,7 @@ import { STOCK_DETAIL_PRICE_CHART_TITLE } from "@/lib/copy/profile/stockDetail";
 import { ChartRangeDropdown } from "@/components/profile/ChartRangeDropdown";
 import {
   CHART_TYPES,
+  CHART_VOLUME_PROFILE_LABEL,
   PERIODS,
   RANGES,
   type ChartType,
@@ -31,6 +32,8 @@ export function ChartShell({
   onDaysChange,
   chartType,
   onChartTypeChange,
+  showVolumeProfile,
+  onToggleVolumeProfile,
 }: {
   children: React.ReactNode;
   expanded?: boolean;
@@ -42,6 +45,8 @@ export function ChartShell({
   onDaysChange: (d: number) => void;
   chartType: ChartType;
   onChartTypeChange: (t: ChartType) => void;
+  showVolumeProfile: boolean;
+  onToggleVolumeProfile: () => void;
 }) {
   const { isMobile } = useBreakpoint();
   const hasToggle = onExpand || onCollapse;
@@ -105,6 +110,20 @@ export function ChartShell({
               </button>
             ))}
           </div>
+          {/* 매물대(가격대별 거래량) 오버레이 토글 — 가격축에 가로 히스토그램. 기본 off. */}
+          <button
+            type="button"
+            onClick={onToggleVolumeProfile}
+            aria-pressed={showVolumeProfile}
+            className={cn(
+              "px-sm py-[3px] rounded-sm text-caption font-medium transition-colors cursor-pointer border",
+              showVolumeProfile
+                ? "bg-accent-vivid text-surface border-accent-vivid"
+                : "text-text-muted border-border-line hover:text-text-strong hover:bg-surface-muted",
+            )}
+          >
+            {CHART_VOLUME_PROFILE_LABEL}
+          </button>
         </div>
         {/* 우측: 기간 범위 — 모바일은 드롭다운(줄바꿈 방지), 데스크탑은 버튼 목록 */}
         {isMobile ? (
