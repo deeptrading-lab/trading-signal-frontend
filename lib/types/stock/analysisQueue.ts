@@ -8,6 +8,13 @@
 /** 큐 row 상태 머신. pending→processing→(done|failed). recoverStuck 시 processing→pending 복구. */
 export type AnalysisQueueStatus = "pending" | "processing" | "done" | "failed";
 
+/**
+ * 로컬 분석 워커 활동 상태 — idle(대기) / busy(분석 처리 중).
+ * 하트비트(`lib/server/ai/workerHeartbeat.ts` WorkerStatus)와 worker-status BFF 응답이
+ * 공유하는 SSOT. 서버 유틸이 이 타입을 import 해 값 중복을 피한다(타입 전용 — 런타임 결합 없음).
+ */
+export type AnalysisWorkerStatus = "idle" | "busy";
+
 /** Supabase ai_analysis_queue row 를 camelCase 로 변환한 조회 결과. */
 export interface AnalysisQueueRow {
   id: number;
@@ -43,3 +50,12 @@ export interface EnqueueAnalysisResponse {
   id: number | null;
   workerOffline: boolean;
 }
+
+/**
+ * `GET /api/stock/ai-analysis/worker-status` 응답 — prod 처리 중 뱃지(S7)가 폴링으로 소비.
+ * 하트비트(KV)가 만료/부재면 `online:false`(오프라인), 신선하면 `online:true` + 워커 상태·큐 깊이.
+ * (route handler `app/api/stock/ai-analysis/worker-status/route.ts` 와 형태 일치.)
+ */
+export type WorkerStatusResponse =
+  | { online: false }
+  | { online: true; status: AnalysisWorkerStatus; queueDepth: number };

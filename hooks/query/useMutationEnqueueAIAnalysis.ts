@@ -8,17 +8,25 @@
 
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { enqueueAIAnalysis } from "@/lib/api/stock/aiAnalysisQueue";
+import { queryKeys } from "@/hooks/query/queryKeys";
 import type { ApiError } from "@/lib/api/errors";
 import type { EnqueueAnalysisResponse } from "@/lib/types/stock/analysisQueue";
 
 export function useMutationEnqueueAIAnalysis() {
+  const queryClient = useQueryClient();
   return useMutation<
     EnqueueAnalysisResponse,
     ApiError,
     { ticker: string; force?: boolean }
   >({
     mutationFn: ({ ticker, force }) => enqueueAIAnalysis(ticker, force),
+    onSuccess: () => {
+      // 접수 직후 워커 상태 뱃지를 즉시 갱신(다음 폴링까지 안 기다림). 뱃지 미마운트면 무해.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.workerStatus,
+      });
+    },
   });
 }

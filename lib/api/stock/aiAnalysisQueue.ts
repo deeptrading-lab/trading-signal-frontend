@@ -6,12 +6,15 @@
  *
  * 실제 분석 SSE 스트림(`aiAnalysis.ts fetchAIAnalysisStream`)과 별개 — prod 큐 카드 전용.
  *
- * v1 은 워커 온라인 여부를 enqueue 응답의 `workerOffline` 으로만 판정한다(S5). worker-status GET
- * 폴링(S7 처리 중 뱃지)은 후속 — 백엔드 route handler 는 이미 있으니 그때 클라이언트 훅만 더한다.
+ * - `enqueueAIAnalysis` : 분석 요청 적재(S2~S6). 응답의 `workerOffline` 으로 오프라인 1차 판정(S5).
+ * - `fetchWorkerStatus` : 워커 온라인/처리 상태 폴링(S7 처리 중 뱃지). `WorkerActivityBadge` 가 소비.
  */
 
 import { httpClient } from "@/lib/api/client";
-import type { EnqueueAnalysisResponse } from "@/lib/types/stock/analysisQueue";
+import type {
+  EnqueueAnalysisResponse,
+  WorkerStatusResponse,
+} from "@/lib/types/stock/analysisQueue";
 
 /**
  * prod 분석 요청 적재. 성공 시 queued|already + workerOffline 플래그.
@@ -25,6 +28,20 @@ export async function enqueueAIAnalysis(
   const res = await httpClient.post<EnqueueAnalysisResponse>(
     "/stock/ai-analysis/enqueue",
     { ticker, force },
+    { signal },
+  );
+  return res.data;
+}
+
+/**
+ * 로컬 분석 워커 상태 조회(S7). 하트비트 부재면 `{ online:false }`, 신선하면 상태·큐 깊이 동반.
+ * 폴링으로 호출되며, 실패(네트워크/미설정)는 호출 측 query 훅이 흡수해 뱃지를 숨긴다(fail-soft).
+ */
+export async function fetchWorkerStatus(
+  signal?: AbortSignal,
+): Promise<WorkerStatusResponse> {
+  const res = await httpClient.get<WorkerStatusResponse>(
+    "/stock/ai-analysis/worker-status",
     { signal },
   );
   return res.data;
