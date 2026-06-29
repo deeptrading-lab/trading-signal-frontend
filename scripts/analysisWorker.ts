@@ -61,12 +61,20 @@ function pickProvider(): "claude" | "codex" | null {
   return null;
 }
 
-/** 분석 핸들러를 HTTP 로 호출하고 SSE 를 done 까지 끝까지 소비한다. 429 면 BusyError. */
-async function runAnalysis(ticker: string, provider: "claude" | "codex"): Promise<void> {
+/**
+ * 분석 핸들러를 HTTP 로 호출하고 SSE 를 done 까지 끝까지 소비한다. 429 면 BusyError.
+ * jobId·source:'prod' 를 동봉 — 핸들러가 이미 claim 한 queue 행을 **재사용**(중복 행 방지, owned=false)하고
+ * 종결(markDone/markFailed)은 워커가 한다(unified-analysis-jobs §3-4 G4).
+ */
+async function runAnalysis(
+  ticker: string,
+  provider: "claude" | "codex",
+  jobId: number,
+): Promise<void> {
   const res = await fetch(`${BASE_URL}/api/stock/ai-analysis`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker, provider }),
+    body: JSON.stringify({ ticker, provider, jobId, source: "prod" }),
   });
   if (res.status === 429) throw new BusyError("전역 동시성 가득(429)");
   if (!res.ok || !res.body) throw new Error(`분석 핸들러 HTTP ${res.status}`);
@@ -114,7 +122,7 @@ async function processOne(): Promise<boolean> {
     let attempt = 0;
     for (;;) {
       try {
-        await runAnalysis(job.ticker, provider);
+        await runAnalysis(job.ticker, provider, job.id);
         break;
       } catch (err) {
         if (err instanceof BusyError && attempt < MAX_BUSY_RETRIES) {
