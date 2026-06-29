@@ -38,10 +38,13 @@ export async function fetchAIAnalysisDecision(
 ): Promise<{
   configured: boolean;
   decision: AIAnalysisDecisionSnapshot | null;
+  /** 이 종목이 분석 큐에서 진행 중이면(pending/processing) 표시. 없으면 null. */
+  active: { status: "pending" | "processing" } | null;
 }> {
   const res = await httpClient.get<{
     configured: boolean;
     decision: AIAnalysisDecisionSnapshot | null;
+    active: { status: "pending" | "processing" } | null;
   }>("/stock/ai-analysis/decision", {
     params: { ticker },
     signal,

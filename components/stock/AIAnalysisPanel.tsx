@@ -560,7 +560,11 @@ export function AIAnalysisPanel({
                       ) : IS_PROD ? (
                         // prod 한정 — enqueue 비동기 모델(이전 결론 신선도/접수/오프라인/중복).
                         // 실시간 스트림·SlideToAnalyze 없음(로컬 전용 무회귀).
-                        <ProdAnalysisQueueCard ticker={ticker} snapshot={previousDecision} />
+                        <ProdAnalysisQueueCard
+                          ticker={ticker}
+                          snapshot={previousDecision}
+                          activeJob={previousDecisionData?.active ?? null}
+                        />
                       ) : previousDecision && !showProviderChooser ? (
                         <PreviousDecisionIntro
                           snapshot={previousDecision}

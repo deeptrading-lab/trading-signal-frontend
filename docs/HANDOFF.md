@@ -5104,3 +5104,35 @@
   - **SQL 적용 후 라이브 E2E**: prod/로컬/봇 각각 분석 시작 → `/analyze` 인플라이트 카드 → 완료 시 결과 카드 전환 확인(AC-2/3/4/6).
   - **봇 경유 여부 확정**(q1): 봇이 프론트 핸들러 경유면 `source:'bot'` 자동, 비경유면 봇 레포 후속 티켓.
   - retention(전 소스 누적, q5) · 인증(`requested_by` per-user, q7) · 완료 Slack 알림 — 별도 후속.
+
+### 2026-06-29 — fix(analyze): prod 패널 — 진행중 종목엔 요청 CTA 대신 '분석 중' 선제 표시 (#178)
+
+- **slug**: `prod-panel-inflight-state` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/178
+- **요약**: fix(analyze): prod 패널 — 진행중 종목엔 요청 CTA 대신 '분석 중' 선제 표시
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 
+  > #177 후속 폴리시. prod에서 분석 요청 후 사이드 패널을 다시 열면, **이 종목이 이미 분석 중인데도 "이 종목 분석 요청" CTA가 그대로** 떠서 혼란스러웠다(`/analyze`는 "분석 중"으로 잘 뜨는데 패널은 모름). 패널이 **이 종목의 진행 상태**를 알게 해, 진행 중이면 "분석 중/대기 중"을 선제 표시하고 요청 CTA를 숨긴다.
+  > 
+  > > 데이터 무결성 이슈는 없었음 — 다시 눌러도 enqueue 가드(`findActiveByTicker`)가 `already`로 막아 중복 적재 X. 순수 UX 갭이었다.
+  > 
+  > ## 변경
+  > 
+  > - **`/api/stock/ai-analysis/decision`**: `findActiveByTicker` 로 이 종목 active 여부를 응답에 동봉 — `active: { status:'pending'|'processing' } | null` (큐 미설정/오류 시 null, fail-soft).
+  > - **`useQueryAIDecision`**: `active` 면 ~12s 폴링 → 완료 시 **같은 응답으로 결과(decision)+active 종료**를 함께 받아 "분석 중" → 결과 카드 자동 전환. active 없으면 폴링 안 함.
+  > - **`ProdAnalysisQueueCard`**: active 면 `이 종목은 분석 중이에요`/`분석 대기 중이에요` 배너(ProdQueueBanner duplicate 톤 재사용) + 요청 CTA 숨김. 이 종목 active 일 땐 전역 워커 뱃지(#176) 숨겨 "분석 중" 중복 제거(요청 전 오프라인 경고용으론 유지).
+  > 
+  > ## 검증
+  > 
+  > - typecheck ✓ · lint ✓ · test ✓ (623, 무회귀) · build ✓
+  > - 라이브(:3000): `decision?ticker=018260` → `active` 필드 정상 반환(완료 종목은 active:null + 결과). 스키마 변경 없음(마이그레이션 불요).
+  > - 로컬 라이브 SSE 경로 무영향(분석 중 isRunning=true → 이 쿼리 disabled).
+  > 
+  > ## 다음 작업
+  > 
+  > - pending vs processing 문구는 분리했고, 완료 알림/봇 경유 확정(q1)/retention 은 unified-analysis-jobs 후속 그대로.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - pending vs processing 문구는 분리했고, 완료 알림/봇 경유 확정(q1)/retention 은 unified-analysis-jobs 후속 그대로.
