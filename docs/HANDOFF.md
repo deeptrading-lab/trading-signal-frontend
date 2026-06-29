@@ -5183,3 +5183,20 @@
   > - (선택) 진행중 카드를 별도 '진행 중' 섹션으로 시각 그룹핑하면 더 명확.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (선택) 진행중 카드를 별도 '진행 중' 섹션으로 시각 그룹핑하면 더 명확.
+
+### 2026-06-29 — fix(ai-analysis): 중립 verdict 아이콘 카드와 통일 (상세 ↗ → —) (#181)
+
+- **slug**: `fix/verdict-neutral-icon` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/181
+- **요약**: fix(ai-analysis): 중립 verdict 아이콘 카드와 통일 (상세 ↗ → —)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 같은 '중립' verdict인데 /analyze 카드는 `Minus`(—), 상세(FinalVerdictCard)는 `TrendingUp`(↗)으로 아이콘이 달랐다(중립인데 상승 화살표 = 오해 소지). 상세의 중립 아이콘을 `Minus`로 통일.
+  > 
+  > ## 변경
+  > `FinalVerdictCard`: 중립(`!bullish && !bearish`) 아이콘 `TrendingUp` → `Minus`(카드와 동일). 강세(TrendingUp)/약세(TrendingDown)는 무변경.
+  > 
+  > ## 검증
+  > typecheck·lint·test·build ✓. 아이콘 1개 변경(로직·색·토큰 무관).
+- **다음 작업 후보**: _PR 본문에 별도 섹션 없음. 본문 참고하여 판단._
