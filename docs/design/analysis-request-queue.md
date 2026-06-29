@@ -255,7 +255,7 @@ prod 상태 배너는 **이전 결론 카드(또는 빈 인트로) 위 단독 �
 | 오프라인 경고 (S5) | `offline-banner` | warn 주황 | `.card-warn` | "분석 요청은 접수됐지만, 지금 분석 서버가 꺼져 있어요" |
 | 중복 (S6) | `duplicate-banner` | 옅은 파랑 | `bg-accent-vivid-soft text-primary` (또는 `.card-info` 약화) | "이미 분석 중이에요" |
 | 실패 (S9) | `failed-banner` | critical 빨강 | `.card-critical` | "지난 분석 요청이 처리되지 못했어요" |
-| 처리 중 뱃지 (S7) | `processing-badge` | 옅은 파랑 | `.badge-info` (+ 펄스 점) | "분석 중" |
+| 처리 중 뱃지 (S7) | `processing-badge` | 옅은 파랑 | `bg-accent-vivid-soft text-primary text-badge` 인라인 (+ 펄스 점) — front matter/Colors 표 정합(`.badge-info` 아님) | "분석 중" |
 | 요청 CTA (S2/S3/S9) | `request-cta` | primary 파랑 | `bg-accent-vivid text-surface rounded-control` | "이 종목 분석 요청" / "다시 요청" |
 | 빈 인트로 (S3) | `empty-intro` | 중립 | `bg-surface-muted text-text-muted` | "아직 분석 결과가 없어요" |
 | 중립 제목행 | `banner-title` | 중립 | `text-text-strong` (배너/인트로 제목 텍스트) | 의미색이 없는 제목(S3 인트로 등) 텍스트 |
