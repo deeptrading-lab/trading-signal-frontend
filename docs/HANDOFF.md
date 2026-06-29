@@ -5063,3 +5063,44 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **전역 큐 카드(/analyze)**: slack/로컬/prod 모든 분석 요청을 Supabase 큐에 적재하고, /analyze 분석 페이지에서 종목별로 `분석 중`/`대기 중` 카드를 결과 카드와 함께 표시(인플라이트 가시화). 현재는 prod만 enqueue하고 로컬·봇은 큐 우회 직접 실행 → 통합(Scope B) 필요. 별도 PRD.
   - S9 decision-failed 필드 + "지난 분석 실패" 카드 / 인증(requested_by·per-user 상한) / 완료 Slack 알림 / 글로벌 큐 깊이 안전밸브 / FONT_SIZE_TOKENS↔theme 동기화 단위테스트
+
+### 2026-06-29 — feat(analyze): 모든 소스 분석 작업 인플라이트 카드 (/analyze) + queue 전 소스 트래커 (unified-analysis-jobs) (#177)
+
+- **slug**: `unified-analysis-jobs` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/177
+- **요약**: feat(analyze): 모든 소스 분석 작업 인플라이트 카드 (/analyze) + queue 전 소스 트래커 (unified-analysis-jobs)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 
+  > `/analyze` 는 지금 **끝난 분석 결론만** 카드로 보여준다 — prod·로컬·봇 어디서 분석을 시작해도 완료 전까지 화면이 깜깜하다. 이 PR 은 **모든 소스의 진행중 작업을 `/analyze` 에 인플라이트 카드(분석 중 / 대기 중)로** 표시하고, 끝나면 같은 자리에 결과가 채워지게 한다. (PRD `docs/prd/unified-analysis-jobs.md`, PR#175/#176 후속)
+  > 
+  > **테이블 결정(사용자)**: 두 테이블 **유지**. `ai_analysis_decisions`(완료 결과)는 **손대지 않고**, `ai_analysis_queue` 를 **모든 소스 작업 트래커**로 확장. `/analyze` BFF 가 둘을 읽어 합성. (병합 대비 — 라이브 결과 테이블 마이그레이션 0, 기존 reader 무회귀.)
+  > 
+  > ## 설계
+  > 
+  > - **queue 확장**: `source`(prod/local/bot) 컬럼(멱등 alter) + `startProcessing(jobId?)` — prod 워커가 jobId 넘기면 행 **재사용**(owned=false, 워커 종결) / 로컬·봇 직접 실행은 핸들러가 행 insert·종결(owned=true). **중복 행·이중 종결 방지.**
+  > - **핸들러**(`route.ts`): `tryAcquire` 성공 직후 `startProcessing` → finally 에서 owned 면 `markDone`/`markFailed`(실제 에러=failed, 성공·중지=done). 로컬 라이브 SSE 경로·세마포어·격리 **무변경**.
+  > - **합성 BFF**: decisions(완료) + queue active 를 `mergeActiveJobs`(순수 함수)로 합성 — 재분석중은 `item.reanalysis`, 결과없는 진행중은 `inflight[]` 플레이스홀더.
+  > - **/analyze UI**: 진행중 배지(#176 톤 재사용)·첫 분석 플레이스홀더 카드·인플라이트 있을 때만 ~15s 폴링. 신규 디자인 토큰 0.
+  > 
+  > ## ⚠️ 운영 — SQL 1회 실행 필요
+  > 
+  > 확장된 `docs/sql/ai-analysis-queue.sql` 의 **`source` 컬럼 alter 를 Supabase SQL Editor 에서 1회 실행**해야 인플라이트가 동작한다(PR#175 선례). 미실행 시 `getActiveJobs` fail-soft → 인플라이트만 graceful 미표시, 기존 결과 카드·분석은 정상. 로컬 워커 상시 가동(`npm run all`) 전제도 그대로.
+  > 
+  > ## 검증
+  > 
+  > - `typecheck` ✓ · `lint` ✓ · `test` ✓ (623 passed = 기존 617 + 신규 6 `mergeActiveJobs`) · `build` ✓
+  > - **라이브 스모크**(dev :3000): decisions BFF HTTP 200, `items:31`(무회귀), `inflight:[]` 필드 존재, `reanalysis:null` — 마이그레이션 전 fail-soft 확인.
+  > - 핸들러 dup-prevention/owned 종결·worker jobId 전달은 코드+추론 검증, 라이브 E2E 는 SQL 적용 후(아래 다음 작업).
+  > 
+  > ## 다음 작업
+  > 
+  > - **SQL 적용 후 라이브 E2E**: prod/로컬/봇 각각 분석 시작 → `/analyze` 인플라이트 카드 → 완료 시 결과 카드 전환 확인(AC-2/3/4/6).
+  > - **봇 경유 여부 확정**(q1): 봇이 프론트 핸들러 경유면 `source:'bot'` 자동, 비경유면 봇 레포 후속 티켓.
+  > - retention(전 소스 누적, q5) · 인증(`requested_by` per-user, q7) · 완료 Slack 알림 — 별도 후속.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **SQL 적용 후 라이브 E2E**: prod/로컬/봇 각각 분석 시작 → `/analyze` 인플라이트 카드 → 완료 시 결과 카드 전환 확인(AC-2/3/4/6).
+  - **봇 경유 여부 확정**(q1): 봇이 프론트 핸들러 경유면 `source:'bot'` 자동, 비경유면 봇 레포 후속 티켓.
+  - retention(전 소스 누적, q5) · 인증(`requested_by` per-user, q7) · 완료 Slack 알림 — 별도 후속.
