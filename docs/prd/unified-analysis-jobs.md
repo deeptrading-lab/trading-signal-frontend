@@ -243,32 +243,48 @@ Supabase 미설정 또는 `source` 컬럼 미적용 → queue 기록·합성 조
 
 ---
 
-## 9. OPEN QUESTION (사용자 결정 필요 — 각 항목 PM 권고 동봉)
+## 9. OPEN QUESTION → RESOLVED (사용자 결정 2026-06-29)
 
-- **[OPEN QUESTION] q1. 봇(`dev-manager-bot`) 실행 경로 — 프론트 핸들러 경유 여부(크로스 레포, 이 레포에서 확정 불가).**
+### 9-0. 결정 요약
+
+| # | 결정 |
+|---|---|
+| q1 | 봇 경로 **확인 필요 → 일단 "핸들러 경유" 가정**으로 설계·구현. 추후 봇 코드로 확정(비경유 판명 시 봇 인플라이트만 후속 티켓, 이 PRD 무수정·graceful). |
+| q2 | 중복 방지 **안1 채택** — 워커가 핸들러 호출 시 `jobId`+`source:'prod'` 명시 전달. prod=행 재사용·워커 종결 / 로컬·봇=핸들러 insert·핸들러 종결. |
+| q3 | queue `source` 컬럼 **추가**(`default 'prod'` 멱등 alter, 무손실). |
+| q4 | PM 미도달 실패=`markFailed`(사유), **사용자 중지(AbortError)=failed 아님**. |
+| q5 | retention **v1 미정리 + stuck 복구(20분)만**, 합성 BFF 는 active-only 조회로 누적 흡수. |
+| q6 | 인플라이트/플레이스홀더 UX **기존 패턴 재사용(디자이너 생략)** — #176 뱃지 톤 + skeleton/card 합성 클래스, 신규 토큰 0, 바로 구현. 폴링은 active 있을 때만 ~15s. |
+| q7 | 인증(`requested_by` per-user) **별도 후속**(PR#175 동일, 컬럼 자리만). |
+
+아래는 각 항목 상세·PM 권고(결정 근거 보존).
+
+
+
+- **[RESOLVED] q1. 봇(`dev-manager-bot`) 실행 경로 — 프론트 핸들러 경유 여부(크로스 레포, 이 레포에서 확정 불가).**
   봇이 분석할 때 프론트 `/api/stock/ai-analysis` 핸들러를 HTTP 로 거치나, 봇 자체 분석 경로(핸들러 비경유)인가? 거치면 §3-3 핸들러 status 기록으로 **봇 작업이 `/analyze` 에 자동 트래킹**(`source:'bot'` 태깅, 이 레포 변경 0). 비경유면 봇 레포에서 queue 행 기록 필요(후속 티켓).
   - **PM 권고**: **세마포어 정황상 핸들러 경유 가능성이 높다**(전역 세마포어가 "브라우저·봇·워커 합산"을 한 프로세스 카운터로 캡한다고 PR#175 가 명시 — 봇 비경유면 그 합산 캡이 성립 안 함, 1-2.#7). v1 은 **핸들러 경유로 가정**하고 사용자가 봇 코드로 확인해주면 확정. 비경유면 봇 인플라이트만 graceful 미표시 + 봇 레포 후속 티켓(이 PRD 무수정).
 
-- **[OPEN QUESTION] q2. [신규·핵심] 핸들러의 "prod-claimed vs 직접 호출" 중복 행 방지 구분 방식.**
+- **[RESOLVED] q2. [신규·핵심] 핸들러의 "prod-claimed vs 직접 호출" 중복 행 방지 구분 방식.**
   prod 경로는 워커가 이미 queue 행을 claim 했으니 핸들러가 또 만들면 안 된다(G4/AC-3). 핸들러가 둘을 어떻게 구분할지: (안1) **워커가 핸들러 호출 시 body 에 `jobId`(claim 한 행 id) + `source:'prod'` 전달** → 핸들러는 그 행 재사용·prod 태깅(owned=false), 종결도 워커 / (안2) **핸들러가 `findActiveByTicker` 로 active 행 존재 시 재사용, 없으면 신규**(소스는 헤더/플래그).
   - **PM 권고**: **안1(워커가 jobId·source 명시 전달).** 명시적이라 경합·오판이 없고, 종결 주체 단일화(prod=워커, 로컬/봇=핸들러)가 깔끔하다. 안2 는 동시 진입 시 active 판정 race 여지(단일 워커 전제라 작지만 불필요한 모호함). 워커 호출 body 에 `jobId`/`source:'prod'` 한 줄 추가(현재 `{ ticker, provider }` 만 보냄, 1-2.#6) — 변경 최소.
 
-- **[OPEN QUESTION] q3. [신규] queue `source`/`origin` 컬럼(prod/local/bot) 추가 여부.**
+- **[RESOLVED] q3. [신규] queue `source`/`origin` 컬럼(prod/local/bot) 추가 여부.**
   어느 출처 작업인지 카드·운영에서 구분하려면 소스 식별 컬럼이 유용. v1 에 넣을지, 인플라이트 표시엔 status 만으로 충분한지.
   - **PM 권고**: **추가 권장(`source text default 'prod'`).** 카드에 출처 배지(예: "봇 요청")를 달거나 retention·디버깅에 유용하고, 멱등 alter 한 줄(default 'prod' 로 기존 무손실)이라 비용이 작다. 인플라이트 표시 자체는 status 로 충분하지만 소스 구분은 운영 가치가 있어 선제 도입 권고. (안 넣으면 봇/로컬/prod 인플라이트가 시각적으로 구분 안 됨 — 카드 출처 배지 포기.)
 
-- **[OPEN QUESTION] q4. 실패/중지 시 queue 행 정리 정책.**
+- **[RESOLVED] q4. 실패/중지 시 queue 행 정리 정책.**
   분석이 PM 도달 전 실패(timeout·cli-error)하거나 사용자가 중지(AbortError)하면 직접 실행(로컬/봇, owned=true) 행 status 를 어떻게 둘지: `failed`(error 동봉) vs 정리. 사용자 중지는 실패가 아님(현재 로그 info "중지").
   - **PM 권고**: **PM 미도달 실패 = `markFailed`(error 사유)**, 카드엔 active 가 아니므로 인플라이트에서 사라짐(완료 결과가 따로 있으면 그 결과 카드 유지). **사용자 중지(AbortError) = failed 아님** — 직접 실행 행은 `markDone` 대신 정리(또는 미종결 후 stuck 복구 위임). prod 경로는 워커가 기존 `markFailed` 판정(현행). v1 카드에 failed 노출 여부는 §9 q6 와 함께(최소 표시 또는 숨김 — PR#175 "S9 decision-failed" 후속과 정합).
 
-- **[OPEN QUESTION] q5. retention 정책 — queue 가 전 소스 작업으로 더 빨리 누적.**
+- **[RESOLVED] q5. retention 정책 — queue 가 전 소스 작업으로 더 빨리 누적.**
   이제 prod 뿐 아니라 로컬·봇 작업까지 done/failed 행이 영구 누적(1-2.#9, R7). 정리 잡을 v1 에 둘지.
   - **PM 권고**: **v1 미정리 + stuck 복구만**(AC-10). 합성 BFF 는 active(pending/processing)만 인플라이트로 읽어 done/failed 누적이 카드 성능·정확성에 영향이 작다. 정기 정리(예: done/failed 30일 경과 삭제)는 적체 관찰 후 후속(사적 도구). (병합안 대비 누적 속도가 빨라지는 유일한 트레이드오프지만 active-only 조회로 흡수.)
 
-- **[OPEN QUESTION] q6. 인플라이트/플레이스홀더 카드 UX + 디자이너 합류 여부 + 폴링.**
+- **[RESOLVED] q6. 인플라이트/플레이스홀더 카드 UX + 디자이너 합류 여부 + 폴링.**
   플레이스홀더 카드(완료 결과 없음)의 시각(스켈레톤 + `분석 중`/`대기 중` 배지 + 스피너?), 재분석 중 카드 배지 톤, 폴링 주기(인플라이트 있을 때만 ~15s).
   - **PM 권고**: **UX/UI 디자이너 가벼운 합류 권장.** 플레이스홀더는 기존 `skeleton`/`card` 합성 클래스 + #176 워커 뱃지 톤 재사용으로 신규 토큰 0 가능하나, "재분석 중 이전 결과 + 진행 배지" 조합은 토스톤 판단이 낫다. DESIGN.md 필요 시 같은 브랜치 commit. 문구는 #176 카피(`분석 중`/`대기 N건`/`분석 서버 꺼짐`)와 일관. 폴링은 active 항목 있을 때만(AC-9).
 
-- **[OPEN QUESTION] q7. 인증(`requested_by` per-user 상한) 분리 — PR#175 와 동일 정책 유지 여부.**
+- **[RESOLVED] q7. 인증(`requested_by` per-user 상한) 분리 — PR#175 와 동일 정책 유지 여부.**
   prod enqueue 무인(누구나 요청). 인증·소유권·per-user 상한을 별도 후속으로.
   - **PM 권고**: **PR#175 와 동일하게 별도 후속 티켓**(queue 에 `requested_by` 자리 이미 있음, 동작 ticker 단위). 배포 주소 본격 공유 직전 인증 PRD 착수. 두 테이블 유지라 이 부분은 PR#175 와 동일하게 흘러간다.
