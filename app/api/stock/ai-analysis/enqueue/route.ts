@@ -11,11 +11,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enqueueAnalysis } from "@/lib/server/ai/queueStore";
 import { readHeartbeat } from "@/lib/server/ai/workerHeartbeat";
+import { getSymbolName } from "@/lib/api/kis";
+import { pickStockName } from "@/lib/utils/resolveStockName";
 
 export async function POST(req: NextRequest): Promise<Response> {
   const body = (await req.json().catch(() => null)) as {
     ticker?: unknown;
     force?: unknown;
+    name?: unknown;
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
@@ -29,7 +32,13 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const force = body.force === true;
-  const result = await enqueueAnalysis({ ticker, force });
+  // 종목명(decision-stock-name) — 대기중(pending) 카드도 즉시 종목명 표시용. 클라 전달명 → 시드 폴백 순.
+  //   클라(AI 패널)는 BFF 경유로 이미 보강된 종목명을 보내지만, 없을 때 서버 시드(getSymbolName)로 보강.
+  const name = pickStockName(ticker, [
+    typeof body.name === "string" ? body.name : undefined,
+    getSymbolName(ticker),
+  ]);
+  const result = await enqueueAnalysis({ ticker, force, name });
 
   if (result.status === "not_configured") {
     return NextResponse.json(

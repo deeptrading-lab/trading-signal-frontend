@@ -127,6 +127,26 @@ describe("analysis queue store — 중복 가드", () => {
     expect(insertCall[1].body).toContain("\"status\":\"pending\"");
     expect(insertCall[1].body).toContain("\"force\":true");
   });
+
+  it("종목명이 있으면 INSERT body 에 name 포함, 없으면 생략(decision-stock-name)", async () => {
+    // name 있는 경우.
+    const withName = vi
+      .fn()
+      .mockResolvedValueOnce(jsonRes([]))
+      .mockResolvedValueOnce(jsonRes([{ id: 7 }]));
+    vi.stubGlobal("fetch", withName);
+    await enqueueAnalysis({ ticker: "247540", name: "에코프로비엠" });
+    expect(withName.mock.calls[1][1].body).toContain('"name":"에코프로비엠"');
+
+    // name 없는 경우 — 키 생략(컬럼 default null).
+    const noName = vi
+      .fn()
+      .mockResolvedValueOnce(jsonRes([]))
+      .mockResolvedValueOnce(jsonRes([{ id: 8 }]));
+    vi.stubGlobal("fetch", noName);
+    await enqueueAnalysis({ ticker: "005930" });
+    expect(noName.mock.calls[1][1].body).not.toContain('"name"');
+  });
 });
 
 describe("analysis queue store — claim", () => {

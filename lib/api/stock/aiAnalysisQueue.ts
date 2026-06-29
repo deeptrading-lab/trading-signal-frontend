@@ -23,11 +23,13 @@ import type {
 export async function enqueueAIAnalysis(
   ticker: string,
   force?: boolean,
+  /** 분석 시점 종목명(decision-stock-name) — 대기중(pending) 카드도 즉시 종목명 표시용. 서버에서 정제. */
+  name?: string | null,
   signal?: AbortSignal,
 ): Promise<EnqueueAnalysisResponse> {
   const res = await httpClient.post<EnqueueAnalysisResponse>(
     "/stock/ai-analysis/enqueue",
-    { ticker, force },
+    { ticker, force, name: name ?? undefined },
     { signal },
   );
   return res.data;

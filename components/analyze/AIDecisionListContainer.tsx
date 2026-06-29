@@ -50,17 +50,28 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
   const items = useMemo(() => data?.items ?? [], [data]);
   // 완료 결과 없이 진행중인 종목(첫 분석) — 플레이스홀더 카드(unified-analysis-jobs).
   const inflight = useMemo(() => data?.inflight ?? [], [data]);
+  // DB 에 저장된 종목명(decision-stock-name) — 완료/진행중 카드가 들고 온 name. 깜빡임 없이 즉시 표시.
+  const dbNames = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const it of items) if (it.name) m.set(it.ticker, it.name);
+    for (const it of inflight) if (it.name && !m.has(it.ticker)) m.set(it.ticker, it.name);
+    return m;
+  }, [items, inflight]);
+  // KIS 종목명 해석은 DB name 이 없는 ticker 만(폴백) — 이미 이름이 있으면 KIS 호출을 건너뛴다(호출 수 감소).
   const tickers = useMemo(
-    () => [
-      ...new Set([
-        ...items.map((it) => it.ticker),
-        ...inflight.map((it) => it.ticker),
-      ]),
-    ],
-    [items, inflight],
+    () =>
+      [
+        ...new Set([
+          ...items.map((it) => it.ticker),
+          ...inflight.map((it) => it.ticker),
+        ]),
+      ].filter((t) => !dbNames.has(t)),
+    [items, inflight, dbNames],
   );
   const names = useQueryStockNames(tickers);
-  const nameOf = (ticker: string): string => names[ticker] ?? ticker;
+  // 우선순위: DB 종목명 → KIS 폴백 → ticker.
+  const nameOf = (ticker: string): string =>
+    dbNames.get(ticker) ?? names[ticker] ?? ticker;
   const matchesQuery = (ticker: string, q: string): boolean =>
     ticker.toLowerCase().includes(q) || nameOf(ticker).toLowerCase().includes(q);
 
@@ -73,14 +84,14 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
       (a, b) => (b.reanalysis ? 1 : 0) - (a.reanalysis ? 1 : 0),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, names, query]);
+  }, [items, names, dbNames, query]);
 
   const filteredInflight = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return inflight;
     return inflight.filter((it) => matchesQuery(it.ticker, q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inflight, names, query]);
+  }, [inflight, names, dbNames, query]);
 
   if (isLoading) {
     return (

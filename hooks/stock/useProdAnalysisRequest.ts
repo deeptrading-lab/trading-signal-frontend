@@ -40,7 +40,11 @@ export interface ProdAnalysisRequest {
   reset: () => void;
 }
 
-export function useProdAnalysisRequest(ticker: string): ProdAnalysisRequest {
+export function useProdAnalysisRequest(
+  ticker: string,
+  /** 분석 시점 종목명(decision-stock-name) — 대기중 카드도 즉시 종목명 표시용. 큐 행에 함께 적재. */
+  name?: string | null,
+): ProdAnalysisRequest {
   const mutation = useMutationEnqueueAIAnalysis();
   // 서버 응답을 phase 로 확정해 보관(낙관적 표시 금지 — 응답 후에만 배너 전이).
   const [settled, setSettled] = useState<ProdRequestPhase | null>(null);
@@ -51,7 +55,7 @@ export function useProdAnalysisRequest(ticker: string): ProdAnalysisRequest {
       if (!target || mutation.isPending) return;
       setSettled(null);
       mutation.mutate(
-        { ticker: target, force: opts?.force },
+        { ticker: target, force: opts?.force, name },
         {
           onSuccess: (data) => {
             if (data.status === "already") {
@@ -68,7 +72,7 @@ export function useProdAnalysisRequest(ticker: string): ProdAnalysisRequest {
         },
       );
     },
-    [ticker, mutation],
+    [ticker, name, mutation],
   );
 
   const reset = useCallback(() => {

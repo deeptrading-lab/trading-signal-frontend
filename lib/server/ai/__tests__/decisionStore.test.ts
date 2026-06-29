@@ -73,6 +73,7 @@ describe("AI decision Supabase store", () => {
       ok: true,
       json: async () => [{
         ticker: "005930",
+        name: "삼성전자",
         provider: "codex",
         decision,
         sentiment: null,
@@ -92,6 +93,7 @@ describe("AI decision Supabase store", () => {
     );
     expect(result).toEqual({
       ticker: "005930",
+      name: "삼성전자",
       provider: "codex",
       decision,
       sentiment: null,
@@ -124,6 +126,39 @@ describe("AI decision Supabase store", () => {
         }),
         body: expect.stringContaining("\"signal\":{\"score\":72"),
       }),
+    );
+  });
+
+  it("종목명(name)이 있으면 함께 upsert 하고, 없으면 키를 생략한다(decision-stock-name)", async () => {
+    configureEnv();
+
+    // 있으면 body 에 name 포함.
+    const withName = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", withName);
+    await upsertAIDecision({
+      ticker: "005930",
+      name: "삼성전자",
+      provider: "claude",
+      decision,
+      sentiment: null,
+      signal: null,
+    });
+    expect((withName.mock.calls[0][1] as { body: string }).body).toContain(
+      '"name":"삼성전자"',
+    );
+
+    // 없으면 키 생략 → merge-duplicates 가 기존(백필) 종목명을 보존.
+    const noName = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", noName);
+    await upsertAIDecision({
+      ticker: "005930",
+      provider: "claude",
+      decision,
+      sentiment: null,
+      signal: null,
+    });
+    expect((noName.mock.calls[0][1] as { body: string }).body).not.toContain(
+      '"name"',
     );
   });
 

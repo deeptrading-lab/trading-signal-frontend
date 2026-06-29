@@ -119,6 +119,8 @@ export interface DecisionSignal {
  */
 export interface AIAnalysisDecisionSnapshot {
   ticker: string;
+  /** 분석 시점 종목명(KIS hts_kor_isnm). legacy(이 컬럼 추가 이전) 행은 null → 읽기 시 KIS 폴백. */
+  name: string | null;
   provider: AIAnalysisProvider;
   decision: FinalDecision;
   sentiment: SentimentReport | null;

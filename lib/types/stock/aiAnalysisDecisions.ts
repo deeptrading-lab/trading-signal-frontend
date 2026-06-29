@@ -47,6 +47,8 @@ export interface AIDecisionListItem extends AIAnalysisDecisionSnapshot {
  */
 export interface AIInflightItem {
   ticker: string;
+  /** 분석 시점 종목명(decision-stock-name). 큐에 기록됐으면 채워짐 — 없으면 null → 읽기 시 KIS 폴백. */
+  name: string | null;
   status: "pending" | "processing";
   source: AnalysisJobSource;
   /** 요청/시작 시각(최신순 정렬용). */
