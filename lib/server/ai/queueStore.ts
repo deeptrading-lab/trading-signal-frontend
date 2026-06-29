@@ -1,0 +1,402 @@
+/**
+ * prod 분석 요청 큐 저장소 — Supabase REST(service role) 기반 서버 전용 유틸.
+ *
+ * PRD analysis-request-queue §3-3. `decisionStore.ts`·`agentUsageStore.ts` 와 **동일한**
+ * service role REST 연결·fail-soft 패턴을 따른다(미설정/오류는 throw 대신 no-op/빈 결과).
+ *
+ * 흐름:
+ * - enqueue BFF 가 `enqueueAnalysis` 로 pending 1행 적재(중복 가드 내장).
+ * - 로컬 워커가 폴링으로 `recoverStuck` → `claimNextPending` → 처리 → `markDone`/`markFailed`.
+ *
+ * ⚠️ service role key 는 서버(BFF·워커)에서만 사용하며 브라우저로 노출하지 않는다.
+ * ⚠️ ai_analysis_queue 테이블 미생성 시 모든 함수가 fail-soft(빈 결과/no-op) — 분석 흐름 무회귀.
+ */
+
+import { createLogger } from "@/lib/server/logTag";
+import type {
+  AnalysisQueueRow,
+  AnalysisQueueStatus,
+  EnqueueResult,
+} from "@/lib/types/stock/analysisQueue";
+
+/** `[analysis-queue]` 콘솔 로그 — 앞에 `HH:MM:SS.mmm(KST)` 시각 프리픽스 부착. */
+const queueLog = createLogger("analysis-queue");
+
+const TABLE = "ai_analysis_queue";
+const SELECT_COLS =
+  "id,ticker,status,force,worker_id,error,requested_by,created_at,claimed_at,finished_at";
+
+/**
+ * stuck 복구 시 pending 재투입 횟수를 추적하는 마커(PRD §9 q2 — 1회 재투입 후 2회째 failed).
+ * 별도 컬럼을 추가하지 않고 error 텍스트에 `[recovered:N]` 를 누적해 카운트한다(스키마 최소 변경).
+ */
+const RECOVER_MARKER_RE = /\[recovered:(\d+)\]/;
+
+type SupabaseQueueRow = {
+  id: number;
+  ticker: string;
+  status: AnalysisQueueStatus;
+  force: boolean;
+  worker_id: string | null;
+  error: string | null;
+  requested_by: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  finished_at: string | null;
+};
+
+function supabaseConfig(): { url: string; key: string } | null {
+  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key) return null;
+  return { url: url.replace(/\/+$/, ""), key };
+}
+
+function headers(key: string): HeadersInit {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+  };
+}
+
+function toRow(row: SupabaseQueueRow): AnalysisQueueRow {
+  return {
+    id: row.id,
+    ticker: row.ticker,
+    status: row.status,
+    force: row.force,
+    workerId: row.worker_id,
+    error: row.error,
+    requestedBy: row.requested_by,
+    createdAt: row.created_at,
+    claimedAt: row.claimed_at,
+    finishedAt: row.finished_at,
+  };
+}
+
+/** 분석 큐 store(Supabase service role)가 설정돼 있는지. */
+export function isAnalysisQueueStoreConfigured(): boolean {
+  return supabaseConfig() !== null;
+}
+
+/** error 마커에서 누적 재투입 횟수 파싱(없으면 0). */
+function recoverCountOf(error: string | null): number {
+  if (!error) return 0;
+  const m = error.match(RECOVER_MARKER_RE);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * 같은 ticker 가 pending/processing(활성) 상태인 row 1건을 반환(없으면 null).
+ * 중복 가드(enqueue)·UI 처리 중 판정에 쓴다. 미설정/오류 시 null(fail-soft).
+ */
+export async function findActiveByTicker(
+  ticker: string,
+): Promise<AnalysisQueueRow | null> {
+  const config = supabaseConfig();
+  if (!config) return null;
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", SELECT_COLS);
+  url.searchParams.set("ticker", `eq.${ticker}`);
+  // PostgREST `in` 필터 — pending 또는 processing.
+  url.searchParams.set("status", "in.(pending,processing)");
+  url.searchParams.set("order", "created_at.desc");
+  url.searchParams.set("limit", "1");
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    queueLog.warn(`활성 조회 예외 ticker=${ticker}`, error);
+    return null;
+  });
+
+  if (!res) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    queueLog.warn(`활성 조회 실패 ticker=${ticker} status=${res.status} ${text}`);
+    return null;
+  }
+
+  const rows = (await res.json().catch(() => [])) as SupabaseQueueRow[];
+  const row = Array.isArray(rows) ? rows[0] : undefined;
+  return row ? toRow(row) : null;
+}
+
+/**
+ * 분석 요청을 큐에 적재한다. **중복 가드 내장** — 같은 ticker 가 이미 pending/processing 이면
+ * INSERT 하지 않고 `{ status:'already' }` 반환(PRD G5/AC-4). 신규면 pending 1행 INSERT.
+ * 미설정 시 `not_configured`, 오류 시 `error`(둘 다 throw 하지 않음 — fail-soft).
+ */
+export async function enqueueAnalysis(input: {
+  ticker: string;
+  force?: boolean;
+}): Promise<EnqueueResult> {
+  const config = supabaseConfig();
+  if (!config) return { status: "not_configured" };
+
+  // 중복 가드 — 활성 row 가 있으면 INSERT 안 함.
+  const active = await findActiveByTicker(input.ticker);
+  if (active) return { status: "already", id: active.id };
+
+  const res = await fetch(`${config.url}/rest/v1/${TABLE}`, {
+    method: "POST",
+    headers: {
+      ...headers(config.key),
+      // 삽입된 row 를 돌려받아 id 를 응답에 싣는다.
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      ticker: input.ticker,
+      status: "pending",
+      force: input.force ?? false,
+    }),
+  }).catch((error: unknown) => ({
+    ok: false,
+    status: 0,
+    text: async () => (error instanceof Error ? error.message : String(error)),
+    json: async () => [],
+  }));
+
+  if (!res.ok) {
+    const text = await ("text" in res ? res.text() : Promise.resolve("")).catch(() => "");
+    return { status: "error", error: `enqueue 실패 status=${res.status} ${text}` };
+  }
+
+  const rows = (await ("json" in res ? res.json() : Promise.resolve([])).catch(() => [])) as SupabaseQueueRow[];
+  const id = Array.isArray(rows) && rows[0] ? rows[0].id : null;
+  return { status: "queued", id };
+}
+
+/**
+ * 가장 오래된 pending row 1건을 processing 으로 전이하고 반환한다(없으면 null).
+ *
+ * v1 은 단일 워커 전제(PRD A3)라 select-then-update 로 단순화한다. 경합 최소화를 위해
+ * UPDATE 의 WHERE 에 `status=eq.pending` 을 함께 걸어, 다른 워커가 먼저 가져간 row 면
+ * 0행 반영(빈 결과) → 그 사이클은 그냥 다음 폴링으로 넘어간다.
+ *
+ * 미설정/오류/없음 시 null(fail-soft).
+ */
+export async function claimNextPending(
+  workerId: string,
+): Promise<AnalysisQueueRow | null> {
+  const config = supabaseConfig();
+  if (!config) return null;
+
+  // 1) 가장 오래된 pending 1건 조회(FIFO).
+  const findUrl = new URL(`${config.url}/rest/v1/${TABLE}`);
+  findUrl.searchParams.set("select", "id");
+  findUrl.searchParams.set("status", "eq.pending");
+  findUrl.searchParams.set("order", "created_at.asc");
+  findUrl.searchParams.set("limit", "1");
+
+  const findRes = await fetch(findUrl, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    queueLog.warn("pending 조회 예외", error);
+    return null;
+  });
+
+  if (!findRes) return null;
+  if (!findRes.ok) {
+    const text = await findRes.text().catch(() => "");
+    queueLog.warn(`pending 조회 실패 status=${findRes.status} ${text}`);
+    return null;
+  }
+
+  const found = (await findRes.json().catch(() => [])) as { id: number }[];
+  const target = Array.isArray(found) ? found[0] : undefined;
+  if (!target) return null;
+
+  // 2) 조건부 UPDATE — 여전히 pending 일 때만 processing 으로 전이(경합 가드).
+  const updUrl = new URL(`${config.url}/rest/v1/${TABLE}`);
+  updUrl.searchParams.set("id", `eq.${target.id}`);
+  updUrl.searchParams.set("status", "eq.pending");
+
+  const updRes = await fetch(updUrl, {
+    method: "PATCH",
+    headers: { ...headers(config.key), Prefer: "return=representation" },
+    body: JSON.stringify({
+      status: "processing",
+      worker_id: workerId,
+      claimed_at: new Date().toISOString(),
+    }),
+  }).catch((error: unknown) => ({
+    ok: false,
+    status: 0,
+    text: async () => (error instanceof Error ? error.message : String(error)),
+    json: async () => [],
+  }));
+
+  if (!updRes.ok) {
+    const text = await ("text" in updRes ? updRes.text() : Promise.resolve("")).catch(() => "");
+    queueLog.warn(`claim 전이 실패 id=${target.id} status=${updRes.status} ${text}`);
+    return null;
+  }
+
+  const rows = (await ("json" in updRes ? updRes.json() : Promise.resolve([])).catch(() => [])) as SupabaseQueueRow[];
+  const row = Array.isArray(rows) ? rows[0] : undefined;
+  // 0행 = 그 사이 다른 워커가 가져감 → null(다음 폴링).
+  return row ? toRow(row) : null;
+}
+
+/** row 를 done 으로 종결(finished_at 세팅). 미설정/오류 시 no-op(fail-soft). */
+export async function markDone(id: number): Promise<void> {
+  await patchById(id, {
+    status: "done",
+    finished_at: new Date().toISOString(),
+    error: null,
+  });
+}
+
+/** row 를 failed 로 종결(error·finished_at 세팅). 미설정/오류 시 no-op(fail-soft). */
+export async function markFailed(id: number, error: string): Promise<void> {
+  await patchById(id, {
+    status: "failed",
+    finished_at: new Date().toISOString(),
+    error: error.slice(0, 500),
+  });
+}
+
+/** id 로 row 부분 갱신 — 공통 PATCH 헬퍼. 미설정/오류는 흡수(fail-soft). */
+async function patchById(
+  id: number,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const config = supabaseConfig();
+  if (!config) return;
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("id", `eq.${id}`);
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { ...headers(config.key), Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  }).catch((error: unknown) => ({
+    ok: false,
+    status: 0,
+    text: async () => (error instanceof Error ? error.message : String(error)),
+  }));
+
+  if (!res.ok) {
+    const text = await ("text" in res ? res.text() : Promise.resolve("")).catch(() => "");
+    queueLog.warn(`row 갱신 실패 id=${id} status=${res.status} ${text}`);
+  }
+}
+
+/**
+ * processing 에 `timeoutMs` 초과 잔류한(워커가 죽은) row 를 복구한다(PRD AC-10/§9 q2).
+ *
+ * 정책: **pending 재투입 1회**, 2회째도 stuck 이면 **failed 종결**(무한 루프 방지).
+ *   재투입 횟수는 error 텍스트의 `[recovered:N]` 마커로 추적한다.
+ *
+ * @returns 이번 사이클에 복구(pending 재투입)되거나 failed 종결된 row 수.
+ * 미설정/오류 시 0(fail-soft).
+ */
+export async function recoverStuck(timeoutMs: number): Promise<number> {
+  const config = supabaseConfig();
+  if (!config) return 0;
+
+  const cutoff = new Date(Date.now() - timeoutMs).toISOString();
+
+  // claimed_at 이 cutoff 이전인 processing row 들을 조회.
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", "id,error,claimed_at");
+  url.searchParams.set("status", "eq.processing");
+  url.searchParams.set("claimed_at", `lt.${cutoff}`);
+  url.searchParams.set("limit", "50");
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    queueLog.warn("stuck 조회 예외", error);
+    return null;
+  });
+
+  if (!res) return 0;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    queueLog.warn(`stuck 조회 실패 status=${res.status} ${text}`);
+    return 0;
+  }
+
+  const rows = (await res.json().catch(() => [])) as {
+    id: number;
+    error: string | null;
+    claimed_at: string | null;
+  }[];
+  if (!Array.isArray(rows) || rows.length === 0) return 0;
+
+  let recovered = 0;
+  for (const row of rows) {
+    const prevCount = recoverCountOf(row.error);
+    if (prevCount >= 1) {
+      // 이미 1회 재투입했는데 또 stuck → failed 종결(무한 루프 방지).
+      await markFailed(
+        row.id,
+        `처리가 반복적으로 멈춰 실패 처리했어요. [recovered:${prevCount}]`,
+      );
+      queueLog.warn(`stuck 재발 → failed 종결 id=${row.id} (recovered=${prevCount})`);
+    } else {
+      // 첫 stuck → pending 재투입 + 마커 1.
+      await patchById(row.id, {
+        status: "pending",
+        worker_id: null,
+        claimed_at: null,
+        error: "[recovered:1]",
+      });
+      queueLog.warn(`stuck → pending 재투입 id=${row.id}`);
+    }
+    recovered += 1;
+  }
+  return recovered;
+}
+
+/** 현재 pending row 수(하트비트 value 에 실어 보냄). 미설정/오류 시 0(fail-soft). */
+export async function getQueueDepth(): Promise<number> {
+  const config = supabaseConfig();
+  if (!config) return 0;
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", "id");
+  url.searchParams.set("status", "eq.pending");
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      ...headers(config.key),
+      Accept: "application/json",
+      // 정확한 count 를 헤더로 받되, body 도 함께 받아 폴백 카운트 가능.
+      Prefer: "count=exact",
+    },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    queueLog.warn("큐 깊이 조회 예외", error);
+    return null;
+  });
+
+  if (!res) return 0;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    queueLog.warn(`큐 깊이 조회 실패 status=${res.status} ${text}`);
+    return 0;
+  }
+
+  // Content-Range: `0-24/25` 형태에서 total 파싱 → 없으면 body 길이로 폴백.
+  const range = res.headers.get("content-range");
+  const total = range?.split("/")?.[1];
+  if (total && total !== "*") {
+    const n = Number(total);
+    if (Number.isFinite(n)) return n;
+  }
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(rows) ? rows.length : 0;
+}

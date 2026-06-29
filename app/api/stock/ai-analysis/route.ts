@@ -60,6 +60,7 @@ import {
   isMarketAnalysisFresh,
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
+import { tryAcquire, release } from "@/lib/server/ai/concurrencyGate";
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
 import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
@@ -405,6 +406,28 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
+  // 전역 동시성 세마포어(PRD §3-5) — 503 가드 다음, 분석 시작 전에 슬롯을 점유한다.
+  // 브라우저·봇·워커 모든 출처 합산이 전역 N(=3)을 넘으면 분석을 시작하지 않고 429/busy 로 거절.
+  // ⚠️ 세마포어는 순수 카운터(요청 데이터 0). 격리 원칙(AC-8)은 concurrencyGate 모듈이 보장.
+  if (!tryAcquire()) {
+    return NextResponse.json(
+      {
+        error: "busy",
+        retryable: true,
+        message: "지금 분석이 가득 찼어요. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 429 },
+    );
+  }
+  // acquire 성공당 정확히 1번만 release 되도록 멱등 래퍼로 감싼다(중복 호출 안전).
+  // 모든 종료 경로(early-return·스트림 finally·cancel)에서 이 함수를 호출한다.
+  let slotReleased = false;
+  const releaseSlot = (): void => {
+    if (slotReleased) return;
+    slotReleased = true;
+    release();
+  };
+
   // Body: { ticker, provider?, startFrom?, state?, runId?, config? }
   // runId·config 는 A/B 하니스 전용(일반 클라이언트는 안 보냄). 미주입 시 기존 동작.
   const body = await req.json().catch(() => null) as {
@@ -420,16 +443,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
+    releaseSlot();
     return NextResponse.json({ error: "요청 형식이 올바르지 않아요." }, { status: 400 });
   }
 
   const ticker = body.ticker.trim().replace(/[^A-Za-z0-9_-]/g, "");
   if (!ticker) {
+    releaseSlot();
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
   }
 
   const rawProvider = body.provider ?? "claude";
   if (rawProvider !== "claude" && rawProvider !== "codex") {
+    releaseSlot();
     return NextResponse.json(
       { error: "지원하지 않는 AI 공급자입니다." },
       { status: 400 },
@@ -471,6 +497,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     : {};
 
   if (!isKisConfigured()) {
+    releaseSlot();
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
   }
 
@@ -928,6 +955,9 @@ export async function POST(req: NextRequest): Promise<Response> {
         safeClose();
       } finally {
         clearTimeout(timeoutId);
+        // 세마포어 반납 — 분석 본문이 정상완료/에러/abort(cancel→abort) 어느 경로로 끝나든
+        // 이 finally 단일 지점을 지난다. 여기서만 반납해 누수·조기반납(서브프로세스 종료 전 반납)을 막는다.
+        releaseSlot();
       }
     },
     cancel() {

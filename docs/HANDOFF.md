@@ -4976,3 +4976,49 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 평일/다른 국면에서 동일 6종목 재실행 → UNDERWEIGHT 쏠림이 regime 따라 움직이는지 확인(편향 vs regime 최종 분리).
   - (선택) DEBATE_ROUNDS=1 기본화 재검증을 방향-다양 골든셋으로.
+
+### 2026-06-29 — feat(queue): prod 분석 요청 큐 — enqueue→로컬 워커 드레인 + 전역 세마포어 (#175)
+
+- **slug**: `analysis-request-queue` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/175
+- **요약**: feat(queue): prod 분석 요청 큐 — enqueue→로컬 워커 드레인 + 전역 세마포어
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > prod 배포 주소에서도 AI 종합분석을 **요청**할 수 있게 한다. AI 분석은 로컬 CLI 셸 호출이라 prod(Vercel)에선 503으로 막혀, 배포 주소를 공유받은 사람은 새 분석을 못 했다. 이를 **Supabase를 큐 중계소로** 끼워 해결한다 — prod는 요청만 적재(INSERT), 실행·저장은 기존 로컬 경로 그대로(신규 분석 로직 0).
+  > 
+  > ```
+  > prod 클릭 → enqueue BFF(무가드, INSERT) → ai_analysis_queue(pending)
+  >               ↓ (큐 내구성 — 로컬 꺼져 있어도 적재 유지)
+  > 로컬 워커 폴링 → claim → 기존 분석 핸들러(SSE) done까지 소비 → upsertAIDecision 자동 저장 → done
+  >               ↓
+  > 요청자 재방문 → /analyze · 종목 카드에서 결과 확인
+  > ```
+  > 
+  > 부수 효과로 **전역 동시성 세마포어(N=3)** 를 추가해, 그동안 클라이언트에만 있던 캡(브라우저·봇 합산 6+ 가능)을 실행 핸들러 프로세스에서 출처 무관 합산 캡으로 닫았다.
+  > 
+  > ## 변경 (Scope A)
+  > 
+  > - **SQL** `docs/sql/ai-analysis-queue.sql` — `ai_analysis_queue` 테이블(상태머신 pending→processing→done/failed, 인덱스, RLS, `requested_by` nullable). ⚠️ Supabase SQL Editor 수동 1회 실행(완료됨).
+  > - **큐 store** `lib/server/ai/queueStore.ts` — `decisionStore` 패턴 fail-soft. enqueue(중복가드)·claim·markDone/Failed·recoverStuck(1회 재투입 후 failed)·getQueueDepth.
+  > - **세마포어** `lib/server/ai/concurrencyGate.ts` + `route.ts` 배선 — globalThis 단일 카운터(N=3, **순수 카운터·요청데이터 0**), 503 가드 다음 tryAcquire→429, 모든 종료경로(조기리턴·스트림 finally) release.
+  > - **BFF** `enqueue/route.ts`(무가드 POST, AC-1)·`worker-status/route.ts`(GET) + `workerHeartbeat.ts`(KV TTL=freshness, cross-process).
+  > - **워커** `scripts/analysisWorker.ts`(tsx) — 폴링·claim·SSE done까지 소비·provider 자동선택(claude→codex)·429 백오프·하트비트 타이머·graceful shutdown. `npm run all`(dev+워커)·`analyze:worker`.
+  > - **prod UX** `ProdAnalysisQueueCard`·`ProdQueueBanner`·`ProdRequestCta` + `AIAnalysisPanel` IS_PROD 분기 + 도메인훅/뮤테이션/axios + `prodQueue.*` 카피. 상태 S1~S6 + enqueue 실패(신규 빌드 토큰 0, 기존 합성 클래스 재사용).
+  > 
+  > ## 검증
+  > 
+  > - `typecheck`/`lint`/`test`(610 pass, 3 skip)/`build`(56/56, 신규 라우트 등록) **전부 0 에러**.
+  > - **AC-1~12 PASS**(QA 리포트 `docs/qa/analysis-request-queue.md`) — 큐 happy path(queued/already/workerOffline) 라이브 실측, 세마포어 over-cap·격리·stuck 복구 단위테스트, 로컬 라이브 경로 무회귀(IS_PROD 분기만 추가).
+  > - 세마포어 release 누수 버그(스트림 정상완료/cancel 경로 미반납 → 3건 후 영구 429) 발견·수정.
+  > 
+  > ## 운영 선행
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **풀 분석 E2E(수동)**: 워커가 실제 종목을 claim→수 분짜리 CLI 분석→decision 저장→prod 카드 결과 표시까지 1건을 `npm run all` 기동 후 prod에서 육안 확인(실제 CLI 비용이라 QA 미실행). 기존 핸들러 재사용이라 회귀 위험 낮음.
+  - **S9 decision-based failed**: `AIAnalysisDecisionSnapshot`에 failed 상태 필드 추가 후 "지난 분석이 실패했어요" 카드 노출(v1은 enqueue 자체 실패만 critical 처리).
+  - **S7 처리 중 폴링 뱃지**: worker-status를 폴링해 "분석 중" 뱃지 노출(엔드포인트는 이미 존재, 클라이언트 훅만). R3대로 v1 생략.
+  - **인증(별도 PRD)**: Google 로그인 + 승인제 → `ai_analysis_queue.requested_by` 채움 + per-user pending 상한 + "내 분석만 보기". 배포 주소 본격 공유 직전 착수.
+  - **Scope B(별도 PRD)**: 통합 `ai_analysis_jobs` 테이블로 prod·로컬·봇 일관 status 뱃지 + 로컬 3건 초과분 큐잉 + 봇 오버플로 큐(크로스 레포).
+  - **완료 알림**: 워커 done 시 Slack 핑(봇 레포 연동, Scope B와 묶음).
+  - **글로벌 큐 깊이 안전밸브**: 적체 관찰 시 도입(현재 ticker 중복가드로 충분, 인증 per-user 상한으로 흡수 예정).

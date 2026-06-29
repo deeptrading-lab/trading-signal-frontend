@@ -204,4 +204,42 @@ export const COPY = {
   errorState: {
     retry: "다시 시도",
   },
+  /**
+   * prod(Vercel) 배포 주소 한정 — 비동기 분석 "요청 접수" 카드 카피(DESIGN.md S2~S9).
+   * 로컬 라이브 경로는 위 chooser/previousDecision/reanalysis 키를 그대로 쓴다(무회귀).
+   * 색·간격은 신규 토큰 0 — 기존 .card-info/.card-warn/.card-critical + accent-vivid 재사용.
+   */
+  prodQueue: {
+    /** 빈 결과 인트로(S3) */
+    emptyTitle: "아직 분석 결과가 없어요",
+    emptyDesc: "요청하면 잠시 뒤 이 화면에서 결과를 볼 수 있어요.",
+    /** 신선도 낮은 이전 결론 위 재요청 안내(S2) */
+    staleTitle: "더 최신 분석이 필요하면 다시 요청할 수 있어요",
+    /** 요청 CTA(S2·S3) */
+    request: "이 종목 분석 요청",
+    /** CTA 누른 직후(enqueue 대기) */
+    requesting: "요청 보내는 중…",
+    /** 접수 성공(S4) */
+    acceptedTitle: "분석 요청이 접수됐어요",
+    acceptedDesc:
+      "보통 몇 분 뒤 이 화면에서 결과를 볼 수 있어요. 잠시 후 다시 들러 주세요.",
+    /** 오프라인 경고(S5) — 접수 + 경고 */
+    offlineTitle: "분석 요청은 접수됐지만, 지금 분석 서버가 꺼져 있어요",
+    offlineDesc:
+      "서버가 켜지면 자동으로 처리돼요. 처리되면 이 화면에서 결과를 확인할 수 있어요.",
+    /** 중복(S6) */
+    duplicateTitle: "이미 분석 중이에요",
+    duplicateDesc: "잠시 후 이 화면에서 결과를 확인할 수 있어요.",
+    /** 처리 중 뱃지(S7) — v1 미사용(후속). 키는 디자인 정합 위해 보존. */
+    processing: "분석 중",
+    /** 실패(S9) — decision 기반 failed 판정은 후속, v1 은 키만 보존. */
+    failedTitle: "지난 분석 요청이 처리되지 못했어요",
+    failedDesc: "아래 버튼으로 다시 요청할 수 있어요.",
+    retry: "다시 요청",
+    /** enqueue 자체 실패(네트워크/미설정 fail-soft) */
+    enqueueErrorTitle: "요청을 보내지 못했어요",
+    enqueueErrorDesc: "잠시 후 다시 시도해 주세요.",
+    /** 상태 변화 aria-live 안내(스크린리더) — 접수 시 1회 */
+    ariaAccepted: "분석 요청이 접수됐어요",
+  },
 };
