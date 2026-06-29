@@ -150,17 +150,20 @@ export function ProdAnalysisQueueCard({
 
   return (
     <div className="w-full space-y-3">
-      {/* 워커 활동 뱃지(S7) — 처리 중/대기/오프라인. 이 종목이 active 면 아래 배너가 "분석 중"을
-          더 구체적으로 말하므로 전역 뱃지는 숨겨 중복 방지(요청 전 오프라인 경고용으론 유지). */}
-      {!activeJob && <WorkerActivityBadge />}
+      {/* 워커 활동 뱃지(S7) — 상태 배너가 없을 때만 단독으로(요청 전 오프라인 경고용).
+          상태 배너가 있으면 아래에서 제목 왼쪽 leading 으로 넣는다(한 묶음으로 보이게). */}
+      {!shownBanner && <WorkerActivityBadge />}
 
-      {/* 상태 배너(S4/S5/S6/실패/진행 중) — 최상단. role=status + aria-live 로 전이 알림. */}
+      {/* 상태 배너(S4/S5/S6/실패/진행 중) — role=status + aria-live 로 전이 알림.
+          상태 배너(접수/오프라인/중복/실패)엔 워커 뱃지를 제목 왼쪽에. 진행 중(activeBanner)은
+          배너 자체가 "분석 중"을 말하므로 뱃지 생략(중복 방지). */}
       {shownBanner && (
         <ProdQueueBanner
           tone={shownBanner.tone}
           title={shownBanner.title}
           desc={shownBanner.desc}
           action={errorRetryCta}
+          leading={banner ? <WorkerActivityBadge /> : undefined}
         />
       )}
 

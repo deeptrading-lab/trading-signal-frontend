@@ -5136,3 +5136,25 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - pending vs processing 문구는 분리했고, 완료 알림/봇 경유 확정(q1)/retention 은 unified-analysis-jobs 후속 그대로.
+
+### 2026-06-29 — fix(analyze): prod 상태 배너에 워커 '분석 중' 뱃지를 제목 왼쪽 inline 으로 (#179)
+
+- **slug**: `prod-banner-worker-badge` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/179
+- **요약**: fix(analyze): prod 상태 배너에 워커 '분석 중' 뱃지를 제목 왼쪽 inline 으로
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 
+  > prod 패널에서 "분석 중" 워커 뱃지가 상태 배너 **위에 따로** 떠 분리돼 보였다(사용자 제안). 상태 배너(접수/오프라인/중복/실패)가 있으면 그 **배너 안 제목 왼쪽**에 뱃지를 넣어 한 묶음으로.
+  > 
+  > - `ProdQueueBanner`: `leading` 슬롯 추가(제목 왼쪽 인라인, flex)
+  > - `ProdAnalysisQueueCard`: 상태 배너면 워커 뱃지를 `leading` 으로, 배너 없으면 단독(요청 전 오프라인 경고용), 진행중(active) 배너는 자체로 "분석 중"이라 뱃지 생략(중복 방지)
+  > 
+  > ## 검증
+  > typecheck·lint·test(623)·build ✓. 신규 토큰 0(기존 뱃지/배너 재사용). 로직 무변경(레이아웃만).
+  > 
+  > ## 다음 작업
+  > - (눈으로 확인) 배너 안 뱃지 색 대비 — accent-vivid-soft 뱃지가 info-soft 배너 위에서 묻히면 border/톤 미세조정.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (눈으로 확인) 배너 안 뱃지 색 대비 — accent-vivid-soft 뱃지가 info-soft 배너 위에서 묻히면 border/톤 미세조정.
