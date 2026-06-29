@@ -31,6 +31,15 @@ export const RESULTS_EMPTY_BODY =
 
 export const resultsCount = (n: number): string => `종목 ${n}개`;
 
+// ─── 진행중(인플라이트) 표시 (unified-analysis-jobs) ──────────────────────────
+/** 카드·플레이스홀더 진행 상태 배지. */
+export const INFLIGHT_PROCESSING = "분석 중";
+export const INFLIGHT_PENDING = "대기 중";
+/** 첫 분석(완료 결과 없음) 플레이스홀더 카드 보조 안내. */
+export const INFLIGHT_PLACEHOLDER_HINT = "분석이 끝나면 결과가 여기에 표시돼요.";
+/** 진행중 작업 출처 배지(봇 요청만 노출, prod·local 은 숨김). */
+export const INFLIGHT_SOURCE_BOT = "봇 요청";
+
 /** 결과 카드 검색. */
 export const RESULTS_SEARCH_PLACEHOLDER = "종목명 또는 코드로 검색";
 export const RESULTS_SEARCH_EMPTY_TITLE = "검색 결과가 없어요";

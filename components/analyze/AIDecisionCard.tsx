@@ -23,6 +23,7 @@ import {
 import type { FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { AIDecisionCardMenu } from "./AIDecisionCardMenu";
+import { InflightBadge } from "./InflightBadge";
 import {
   CARD_OVERLAY_VIEW,
   CARD_TOKENS_NONE,
@@ -148,8 +149,12 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-body-strong text-text-strong truncate">{name}</div>
-          <div className={cn("text-body-sm-strong", VERDICT_TEXT[tone])}>
-            {VERDICT_LABEL[verdict]}
+          <div className="flex items-center gap-xs">
+            <span className={cn("text-body-sm-strong", VERDICT_TEXT[tone])}>
+              {VERDICT_LABEL[verdict]}
+            </span>
+            {/* 재분석 진행중이면 배지(이전 결론은 그대로 유지). */}
+            {item.reanalysis && <InflightBadge status={item.reanalysis.status} />}
           </div>
         </div>
         <div className="flex-shrink-0 self-start">
