@@ -5158,3 +5158,28 @@
   > - (눈으로 확인) 배너 안 뱃지 색 대비 — accent-vivid-soft 뱃지가 info-soft 배너 위에서 묻히면 border/톤 미세조정.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (눈으로 확인) 배너 안 뱃지 색 대비 — accent-vivid-soft 뱃지가 info-soft 배너 위에서 묻히면 border/톤 미세조정.
+
+### 2026-06-29 — fix(analyze): 진행중(재분석) 종목 목록 상단 노출 + 새 분석 자동 반영(베이스라인 폴링) (#180)
+
+- **slug**: `analyze-surface-inflight` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/180
+- **요약**: fix(analyze): 진행중(재분석) 종목 목록 상단 노출 + 새 분석 자동 반영(베이스라인 폴링)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 
+  > 진행 중인 종목이 /analyze 에 안 뜨는 것처럼 보이던 문제. 원인 2가지:
+  > 1. **재분석 중인 종목이 묻힘** — 이미 분석된 종목을 재분석하면 기존 카드에 `reanalysis` 배지가 붙는데(정상), 그 카드는 `updated_at`(예: 12일 전) 순서라 목록 한참 아래에 있어 '분석 중'이 안 보였다.
+  > 2. **진행중 없을 때 폴링 꺼짐(AC-9)** — idle 상태에서 새로 시작된 분석이 수동 새로고침 전까지 자동으로 안 떴다.
+  > 
+  > ## 변경
+  > - `AIDecisionListContainer`: `filtered` 를 **reanalysis 우선 정렬**(Array.sort 안정 → 나머지는 최신순 유지). 플레이스홀더(첫 분석)+재분석중 카드가 상단에 모인다.
+  > - `useQueryAIDecisions`: **idle 30s 베이스라인 폴링 + refetchOnWindowFocus** 추가(진행중이면 15s). 다른 곳에서 시작된 분석도 ~30s 안에 카드로 뜬다. (개인 도구라 가벼운 idle 부하 수용.)
+  > 
+  > ## 검증
+  > typecheck·lint·test(623)·build ✓. BFF 데이터로 원인 확정(090430: 큐 processing + 12일 전 decision → reanalysis 배지가 하단에 묻힘). 정렬은 클라 표시 레이어, 로직 무변경.
+  > 
+  > ## 다음 작업
+  > - (선택) 진행중 카드를 별도 '진행 중' 섹션으로 시각 그룹핑하면 더 명확.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (선택) 진행중 카드를 별도 '진행 중' 섹션으로 시각 그룹핑하면 더 명확.
