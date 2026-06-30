@@ -37,6 +37,7 @@ import {
 } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockMarketIndices } from "@/lib/mock/market/indices";
+import { indexCache } from "./cache";
 import {
   withTimeout,
   delay,
@@ -66,9 +67,8 @@ const FALLBACK_TIMEOUT_MESSAGE =
 const FALLBACK_SERVER_MESSAGE =
   "지수 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
 
-/** 모듈 레벨 in-memory TTL 캐시 — code 단위. 같은 인스턴스 warm 상태에서 KIS 실호출 보호. */
-type CacheEntry = { value: MarketIndexQuote; expiresAt: number };
-const indexCache = new Map<string, CacheEntry>();
+// 모듈 레벨 in-memory TTL 캐시(code 단위)는 `./cache` 로 분리 — 라우트는 캐시 Map 만 import.
+// (테스트용 `resetIndicesCacheForTest` 를 라우트에서 export 하면 next build 타입체크 위반.)
 
 // KIS 는 한국(서울) 서버다. 함수가 미 동부(iad1)에서 실행되면 해외 지수 엔드포인트가 HTTP 500 을
 // 반환해 SPX/COMP 가 드롭되는 현상(2026-06-03 진단)을 회피하기 위해 실행 리전을 서울(icn1)로 고정한다.
@@ -218,9 +218,4 @@ function mapErrorToResponse(error: unknown, codes: string[]): NextResponse {
     { error: FALLBACK_SERVER_MESSAGE },
     { status: 502, headers: { "Cache-Control": "no-store" } },
   );
-}
-
-/** 테스트 전용 — 모듈 레벨 캐시 초기화. */
-export function resetIndicesCacheForTest(): void {
-  indexCache.clear();
 }

@@ -37,7 +37,8 @@ vi.mock("@/lib/api/kis", async () => {
   };
 });
 
-import { GET, resetIndicesCacheForTest } from "../route";
+import { GET } from "../route";
+import { resetIndicesCacheForTest } from "../cache";
 import { makeApiError } from "@/lib/api/errors";
 import type { MarketIndexQuote } from "@/lib/api/kis";
 
