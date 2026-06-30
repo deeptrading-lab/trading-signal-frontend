@@ -24,6 +24,7 @@
 
 import { Fragment } from "react";
 import { useQueryMarketTicker } from "@/hooks/market/useQueryMarketTicker";
+import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { HEADER_MARKET_TICKER_ARIA } from "@/lib/copy/layout/navCopy";
 import { cn } from "@/lib/utils/cn";
 
@@ -31,7 +32,10 @@ import { cn } from "@/lib/utils/cn";
 const TICKER_PLACEHOLDER_SLOTS = 5;
 
 export function HeaderMarketTicker() {
-  const { data, isLoading } = useQueryMarketTicker();
+  // 티커는 데스크탑 전용(`hidden lg:flex`) — 모바일/태블릿에서는 BFF 왕복(/api/market/ticker)을
+  // 아예 막는다(perf WS-4). useBreakpoint 는 SSR 모바일 퍼스트라 비-데스크탑에선 쿼리 미발화.
+  const { isDesktop } = useBreakpoint();
+  const { data, isLoading } = useQueryMarketTicker({ enabled: isDesktop });
   const tickers = data ?? [];
 
   // 로딩 중이거나(초기) 아직 데이터가 비면 헤더 높이를 유지하는 placeholder 를 렌더한다.
