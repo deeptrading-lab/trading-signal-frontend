@@ -22,9 +22,12 @@ const DAY = 24 * HOUR;
 
 export const queryConfig = {
   stock: {
-    /** 현재가 — 실시간성 우선. 매 키 입력마다 호출은 과함. */
+    /**
+     * 현재가 — 실시간성 우선. 매 키 입력마다 호출은 과함. perf: 라우트 재진입 시 재요청 억제 위해
+     * 10s→30s 상향(5분 내 재방문 캐시 히트 목표). 조회·분석 전용 스코프라 30s 허용.
+     */
     price: {
-      staleTime: 10 * SECOND,
+      staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
     /** 일자별 차트 — 장 종료 후 갱신. 장중에는 당일치만 invalidate 필요. */
@@ -110,26 +113,27 @@ export const queryConfig = {
    */
   profile: {
     holdings: {
-      staleTime: 10 * SECOND,
+      staleTime: 30 * SECOND, // perf: stock.price 와 동일 tier — 10s→30s 정합 상향.
       gcTime: 5 * MINUTE,
     },
   },
   market: {
     /**
      * 시장 지수 — 실시간성 요구 낮음. KIS `inquire-index-price` rate limit 보호 위해
-     * staleTime 30s (PRD `market-real-data` §9 q7=b). 단일 진실 원천.
+     * staleTime 60s (PRD `market-real-data` §9 q7=b 의 30s 를 perf 상 60s 로 상향 — rate-limit
+     * 의도 강화 + 라우트 재진입 재요청 억제). 단일 진실 원천.
      */
     indices: {
-      staleTime: 30 * SECOND,
+      staleTime: 60 * SECOND,
       gcTime: 5 * MINUTE,
     },
     /**
      * 헤더 글로벌 마켓 티커 5종 — 거시 표시용 보조 정보. 짧을 필요 없음 →
-     * staleTime 60s(PRD `header-market-ticker` §9 q1). BFF 소스별 TTL(국내 30s/해외
-     * 10분/BTC 3분)이 실호출을 추가 보호. 단일 진실 원천.
+     * staleTime 120s(PRD `header-market-ticker` §9 q1 의 60s 를 perf 상 상향 — 헤더는 전 라우트
+     * 공통이라 재진입 재요청 비용이 큼). BFF 소스별 TTL(국내 30s/해외 10분/BTC 3분)이 실호출 추가 보호.
      */
     ticker: {
-      staleTime: 60 * SECOND,
+      staleTime: 120 * SECOND,
       gcTime: 5 * MINUTE,
     },
     /**
@@ -171,12 +175,13 @@ export const queryConfig = {
     },
   },
   paperTrading: {
+    // perf: 5s→30s 상향 — 페이퍼트레이딩 세션은 틱이 분 단위라 5s 폴링 stale 재검증은 과함.
     sessions: {
-      staleTime: 5 * SECOND,
+      staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
     session: {
-      staleTime: 5 * SECOND,
+      staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
   },
