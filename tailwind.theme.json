@@ -40,6 +40,7 @@
         "chart-vol-up": "#fca5a5",
         "chart-vol-down": "#93c5fd",
         "chart-down": "#2563eb",
+        "chart-bb": "#0d9488",
         "fng-extreme-fear": "#1d6fb8",
         "fng-extreme-fear-soft": "#e3f0fa",
         "fng-fear": "#256353",

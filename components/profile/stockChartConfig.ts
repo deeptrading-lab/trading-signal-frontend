@@ -26,6 +26,21 @@ export const CHART_TYPES: { label: string; type: ChartType }[] = [
 /** 매물대(가격대별 거래량) 오버레이 토글 라벨. */
 export const CHART_VOLUME_PROFILE_LABEL = "매물대";
 
+/** 차트 오버레이 옵션 드롭다운 트리거 라벨. */
+export const CHART_OPTIONS_LABEL = "옵션";
+
+/**
+ * 차트 오버레이 옵션 목록 — "옵션 ▾" 드롭다운의 체크박스 항목.
+ * `key` 는 `ChartOptions`(lib/store/chart/chartOptions) 필드와 1:1.
+ */
+export const CHART_OVERLAY_OPTIONS: {
+  key: "volumeProfile" | "bollinger";
+  label: string;
+}[] = [
+  { key: "volumeProfile", label: CHART_VOLUME_PROFILE_LABEL },
+  { key: "bollinger", label: "볼린저밴드" },
+];
+
 // ── 봉·기간 설정 ────────────────────────────────────────
 export type PeriodConfig = { label: string; period: ChartPeriod };
 export type RangeConfig = { label: string; days: number };

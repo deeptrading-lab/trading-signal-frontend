@@ -10,7 +10,7 @@ import {
   useQueryStockChart,
   type ChartPeriod,
 } from "@/hooks/stock/useQueryStockChart";
-import { calcMACD, calcRSI } from "@/lib/utils/technicalIndicators";
+import { calcMACD, calcRSI, calcBollinger } from "@/lib/utils/technicalIndicators";
 import type { ApiError } from "@/lib/api/errors";
 
 /**
@@ -20,7 +20,19 @@ import type { ApiError } from "@/lib/api/errors";
 const WARMUP_DAYS: Record<ChartPeriod, number> = { D: 60, W: 280, M: 1100 };
 const MAX_FETCH_DAYS = 3000; // 라우트 MAX_DAYS 와 정합(초과 클램프)
 
-export type PriceDatum = { date: string; price: number };
+/**
+ * 볼린저밴드(20/2) 오버레이 필드 — 가격 시리즈(캔들·라인)에 함께 실어 메인 차트에 그린다.
+ *   `bbRange`=[하단, 상단] 은 recharts 범위 Area(음영 밴드)용(캔들 wickRange 와 동일 메커니즘).
+ *   룩백(20봉) 전 봉은 null → 렌더에서 미표시.
+ */
+export type BollingerFields = {
+  bbUpper: number | null;
+  bbMid: number | null;
+  bbLower: number | null;
+  bbRange: [number, number] | null;
+};
+
+export type PriceDatum = { date: string; price: number } & BollingerFields;
 export type CandleDatum = {
   date: string;
   wickRange: [number, number];
@@ -31,7 +43,7 @@ export type CandleDatum = {
   isUp: boolean;
   change: number | null;
   changePct: number | null;
-};
+} & BollingerFields;
 export type VolDatum = { date: string; volume: number; isUp: boolean };
 export type MacdDatum = {
   date: string;
@@ -80,6 +92,18 @@ export function useChartData(
     const closes = sorted.map((c) => c.close);
     const macd = calcMACD(closes);
     const rsi = calcRSI(closes);
+    const bb = calcBollinger(closes); // 20기간·2σ(기본). 워밍업이 룩백 20봉 커버.
+
+    // 볼린저 4필드 매핑 — 가격·캔들 시리즈 공통 주입(같은 인덱스). null 이면 렌더 미표시.
+    const bbFields = (i: number): BollingerFields => ({
+      bbUpper: bb[i].upper,
+      bbMid: bb[i].mid,
+      bbLower: bb[i].lower,
+      bbRange:
+        bb[i].lower !== null && bb[i].upper !== null
+          ? [bb[i].lower as number, bb[i].upper as number]
+          : null,
+    });
 
     // 2) 보기 구간 컷오프 — 마지막 봉 날짜에서 days 캘린더일 이전. 워밍업 구간은 표시에서 잘라낸다.
     const lastDate = sorted[sorted.length - 1].date; // "YYYY-MM-DD"
@@ -92,9 +116,10 @@ export function useChartData(
     if (visibleStart < 0) visibleStart = 0;
 
     // 3) 전체 시리즈 빌드 후 보기 구간으로 슬라이스(지표는 워밍업 덕에 첫 봉부터 값이 있음).
-    const fullPrice: PriceDatum[] = sorted.map((c) => ({
+    const fullPrice: PriceDatum[] = sorted.map((c, i) => ({
       date: c.date.slice(5),
       price: c.close,
+      ...bbFields(i),
     }));
     const fullCandle: CandleDatum[] = sorted.map((c, i) => {
       // 등락률 — 직전 봉 종가 대비(일봉=전일/주봉=전주/월봉=전월). 워밍업 구간 덕에 첫 표시 봉도 직전값 존재.
@@ -114,6 +139,7 @@ export function useChartData(
         isUp: c.close >= c.open,
         change,
         changePct,
+        ...bbFields(i),
       };
     });
     const fullVol: VolDatum[] = sorted.map((c) => ({
