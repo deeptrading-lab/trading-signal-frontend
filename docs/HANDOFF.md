@@ -5301,3 +5301,30 @@
   - [ ] 차트 오버레이 드롭다운 키보드 접근성 개선(Escape 닫기·화살표 네비) — 형제 `ChartRangeDropdown`과 일괄 적용
   - [ ] 매물대(Volume Profile) 시각 리디자인 — 문서화된 스펙 없음, 별도 PRD/작업으로 분리
   - [ ] (선택) 볼린저 파라미터(20/2) 라벨/툴팁 노출 여부 검토
+
+### 2026-07-01 — fix(stock): 차트 옵션 배지 제거 + 캔들/라인 단일 토글 (#194)
+
+- **slug**: `chart-toggle-polish` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/194
+- **요약**: fix(stock): 차트 옵션 배지 제거 + 캔들/라인 단일 토글
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 종목 차트 UI 소소 폴리시 2건 ([#193](https://github.com/deeptrading-lab/trading-signal-frontend/pull/193) 볼린저밴드 후속).
+  > 
+  > ## 변경 내용
+  > - **ChartOptionsDropdown**: "옵션" 버튼 옆 활성 개수(`· N`) 배지 제거 — 불필요. 활성 시 강조 스타일은 유지.
+  > - **ChartShell**: 캔들/라인 2버튼 세그먼트 → **단일 토글 버튼**. 현재 종류를 아이콘(`ChartCandlestick`/`ChartLine`)+라벨로 표시하고, 탭하면 다른 종류로 전환. 툴바 공간 절약.
+  > 
+  > ## 검증
+  > - `tsc` 0 · `eslint` 0
+  > - 실앱(삼성전자, 헤드리스 CDP): 옵션 둘 다 켜도 배지 미표시(`optionHasDigit:false`), 캔들↔라인 단일 토글 전환 + 아이콘/라벨 갱신 확인(다크·라이트). 콘솔 error 0.
+  > - 트리비얼 cosmetic 범위라 QA/리뷰 서브에이전트 대신 인라인 자체 검증.
+  > 
+  > ## 다음 작업
+  > - [ ] 차트 오버레이 드롭다운 키보드 접근성(Escape·화살표 네비) — 형제 `ChartRangeDropdown`과 일괄 적용
+  > - [ ] 매물대(Volume Profile) 시각 리디자인 — 별도 작업
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 차트 오버레이 드롭다운 키보드 접근성(Escape·화살표 네비) — 형제 `ChartRangeDropdown`과 일괄 적용
+  - [ ] 매물대(Volume Profile) 시각 리디자인 — 별도 작업
