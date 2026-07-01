@@ -5227,3 +5227,28 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 봇(dev-manager-bot): 3슬롯 꽉 차면 '대기 중' 답 후 슬롯 나면 네이티브 스트리밍(별도 봇레포 작업, 조사 중).
   - (선택) recoverStuck 20분 타임아웃은 분석>20분 시 재큐 가능성 — 현행 유지.
+
+### 2026-07-01 — feat(ai-analysis): 봇 capacity/request 엔드포인트 — 지금 시작 vs 대기 순번 안내 (프론트 계약) (#191)
+
+- **slug**: `bot-capacity-request` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/191
+- **요약**: feat(ai-analysis): 봇 capacity/request 엔드포인트 — 지금 시작 vs 대기 순번 안내 (프론트 계약)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > 봇이 분석 요청 시 '지금 바로 될지 / 대기해야 할지'를 먼저 판정하려면 프론트 계약이 필요. 봇은 이 응답으로 **빈 슬롯이면 네이티브 스트리밍 실행, 꽉 차면 '대기 N번째 · 약 M분 후' 안내**한다.
+  > 
+  > ## 변경 (프론트만 — 봇 레포 연동은 후속)
+  > - **POST /api/stock/ai-analysis/request**: freeSlots>0 → `{mode:'start-now'}` / 꽉 참 → enqueue(source='bot') + `{mode:'queued', position, etaMinutes}`.
+  > - `enqueueAnalysis(source?)` 추가(봇 요청은 source='bot' 태깅) — name 과 동일 조건부 insert.
+  > - 빈 슬롯 = `MAX_CONCURRENT(3) − currentCount()`(전 소스 합산), 순번 = getQueueDepth(pending 수), ETA = 순번×10분(러프).
+  > 
+  > ## 검증
+  > typecheck·lint·test·build ✓.
+  > 
+  > ## 다음 작업 (봇 레포 dev-manager-bot)
+  > - analyze 핸들러: 네이티브 스트림 만들기 **전에** /request 호출 → start-now면 기존 흐름, queued면 스트림 안 만들고 '대기 N번째·약 M분' 메시지. (race: 네이티브 POST 429 시 폴백)
+  > - 워커가 봇 대기분 드레인(완료 시 Slack 알림은 별도 후속).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - analyze 핸들러: 네이티브 스트림 만들기 **전에** /request 호출 → start-now면 기존 흐름, queued면 스트림 안 만들고 '대기 N번째·약 M분' 메시지. (race: 네이티브 POST 429 시 폴백)
+  - 워커가 봇 대기분 드레인(완료 시 Slack 알림은 별도 후속).
