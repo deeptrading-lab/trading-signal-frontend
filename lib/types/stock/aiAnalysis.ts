@@ -161,6 +161,12 @@ export const AGENT_META: AgentMeta[] = [
 // ─── SSE 이벤트 ───────────────────────────────────────────────────────────────
 
 export type AIAnalysisEvent =
+  /**
+   * 대기 안내(봇 SSE 통로 전용) — 전역 동시성이 꽉 차 이 요청이 큐에 적재됐을 때 발행.
+   * 슬롯이 나면 같은 연결로 곧바로 progress/… 라이브 스트림이 이어진다. position=대기 순번, etaMinutes=대략 소요.
+   * 브라우저 로컬 라이브 경로는 이 이벤트를 받지 않는다(봇 요청만 대기 경로).
+   */
+  | { type: "queued";        position: number; etaMinutes: number }
   /** 에이전트 상태 변경 (running 시작 / done 완료 / error 실패). reason 은 error 일 때만 의미. */
   | { type: "progress";      agent: AgentKey; status: "running" | "done" | "error"; reason?: AgentFailReason }
   /** 에이전트가 생성 중인 토큰 청크 (실시간 스트리밍) */

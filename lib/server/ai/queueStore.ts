@@ -312,9 +312,13 @@ export async function claimNextPending(
   if (!config) return null;
 
   // 1) 가장 오래된 pending 1건 조회(FIFO).
+  //    ⚠️ source='bot' 행은 제외한다 — 봇 요청은 봇이 연 SSE 통로(핸들러) 위에서 직접 드레인하므로,
+  //    워커가 집으면 헤드리스로 이중 실행돼 Slack 라이브 스트림이 사라진다(bot-analysis-sse-tunnel).
+  //    source 컬럼은 마이그레이션에서 기존 행을 'prod' 로 백필했고 default 도 'prod' 라 null 은 없다.
   const findUrl = new URL(`${config.url}/rest/v1/${TABLE}`);
   findUrl.searchParams.set("select", "id");
   findUrl.searchParams.set("status", "eq.pending");
+  findUrl.searchParams.set("source", "neq.bot");
   findUrl.searchParams.set("order", "created_at.asc");
   findUrl.searchParams.set("limit", "1");
 
@@ -442,7 +446,7 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
 
   // claimed_at 이 cutoff 이전인 processing row 들을 조회.
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
-  url.searchParams.set("select", "id,error,claimed_at");
+  url.searchParams.set("select", "id,error,claimed_at,source");
   url.searchParams.set("status", "eq.processing");
   url.searchParams.set("claimed_at", `lt.${cutoff}`);
   url.searchParams.set("limit", "50");
@@ -467,11 +471,20 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
     id: number;
     error: string | null;
     claimed_at: string | null;
+    source: AnalysisJobSource | null;
   }[];
   if (!Array.isArray(rows) || rows.length === 0) return 0;
 
   let recovered = 0;
   for (const row of rows) {
+    // 봇 처리행이 멈춤 = 그 행을 드레인하던 SSE 통로(핸들러 연결)가 죽은 것 → 재투입해도 워커가 skip(neq.bot)해
+    // '대기중' 유령이 된다. 재개할 연결이 없으니 바로 failed 종결한다(bot-analysis-sse-tunnel).
+    if (row.source === "bot") {
+      await markFailed(row.id, "봇 분석 연결이 끊겨 중단됐어요.");
+      queueLog.warn(`stuck bot 처리행 → failed 종결 id=${row.id}(연결 유실)`);
+      recovered += 1;
+      continue;
+    }
     const prevCount = recoverCountOf(row.error);
     if (prevCount >= 1) {
       // 이미 1회 재투입했는데 또 stuck → failed 종결(무한 루프 방지).

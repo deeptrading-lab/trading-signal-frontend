@@ -61,7 +61,14 @@ import {
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { tryAcquire, release } from "@/lib/server/ai/concurrencyGate";
-import { startProcessing, markDone, markFailed, setJobName } from "@/lib/server/ai/queueStore";
+import {
+  startProcessing,
+  markDone,
+  markFailed,
+  setJobName,
+  enqueueAnalysis,
+  getQueueDepth,
+} from "@/lib/server/ai/queueStore";
 import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { isVercelEnv } from "@/lib/server/env";
@@ -92,6 +99,15 @@ const STALE_MAX_BUSINESS_DAYS = 7;
 // Phase A(6m) + Phase B(20m) + research_manager(5m) + trader/effort:high(6m)
 //   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
 const TIMEOUT_TOTAL_MS = 3_000_000;
+
+/**
+ * 봇 SSE 통로 대기 파라미터. 봇 요청이 꽉 찬 슬롯을 만나면 연결을 끊지 않고(429 대신) 큐에 적재한 뒤
+ * 슬롯을 폴링하며 기다린다 — QUEUE_POLL_MS 마다 재점유 시도, QUEUED_REFRESH_MS 마다 순번(queued) 갱신.
+ * ETA = 순번 × MINUTES_PER_ANALYSIS (러프 오버에스티메이트, 3동시라 실제론 더 빠를 수 있음).
+ */
+const QUEUE_POLL_MS = 2_000;
+const QUEUED_REFRESH_MS = 15_000;
+const MINUTES_PER_ANALYSIS = 10;
 
 
 // ─── SSE 헬퍼 ─────────────────────────────────────────────────────────────────
@@ -409,29 +425,18 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  // 전역 동시성 세마포어(PRD §3-5) — 503 가드 다음, 분석 시작 전에 슬롯을 점유한다.
-  // 브라우저·봇·워커 모든 출처 합산이 전역 N(=3)을 넘으면 분석을 시작하지 않고 429/busy 로 거절.
-  // ⚠️ 세마포어는 순수 카운터(요청 데이터 0). 격리 원칙(AC-8)은 concurrencyGate 모듈이 보장.
-  if (!tryAcquire()) {
-    return NextResponse.json(
-      {
-        error: "busy",
-        retryable: true,
-        message: "지금 분석이 가득 찼어요. 잠시 후 다시 시도해 주세요.",
-      },
-      { status: 429 },
-    );
-  }
   // acquire 성공당 정확히 1번만 release 되도록 멱등 래퍼로 감싼다(중복 호출 안전).
-  // 모든 종료 경로(early-return·스트림 finally·cancel)에서 이 함수를 호출한다.
+  // ⚠️ `acquired` 가 true 일 때만 반납한다 — 봇은 슬롯을 스트림 본문에서 뒤늦게 점유하므로,
+  //    점유 전(대기 중 취소·검증 실패)에 release 를 부르면 남의 슬롯을 깎는 조기반납이 된다.
+  let acquired = false;
   let slotReleased = false;
   const releaseSlot = (): void => {
-    if (slotReleased) return;
+    if (slotReleased || !acquired) return;
     slotReleased = true;
     release();
   };
 
-  // Body: { ticker, provider?, startFrom?, state?, runId?, config? }
+  // Body: { ticker, provider?, startFrom?, state?, runId?, config?, jobId?, source?, name? }
   // runId·config 는 A/B 하니스 전용(일반 클라이언트는 안 보냄). 미주입 시 기존 동작.
   const body = await req.json().catch(() => null) as {
     ticker?: unknown;
@@ -445,17 +450,42 @@ export async function POST(req: NextRequest): Promise<Response> {
     configLabel?: unknown;
     jobId?: unknown;   // prod 워커가 claim 한 queue 행 id(있으면 핸들러는 종결 안 함 — owned=false)
     source?: unknown;  // 작업 출처(prod/local/bot). 미전달 시 local(직접 실행)
+    name?: unknown;    // 봇이 넘기는 종목명 — 대기 카드가 종목번호 대신 종목명 즉시 표시(없으면 분석 시작 시 patch)
   } | null;
 
   if (!body || typeof body.ticker !== "string") {
-    releaseSlot();
     return NextResponse.json({ error: "요청 형식이 올바르지 않아요." }, { status: 400 });
   }
 
   const ticker = body.ticker.trim().replace(/[^A-Za-z0-9_-]/g, "");
   if (!ticker) {
-    releaseSlot();
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
+  }
+
+  // 작업 출처 — 봇만 "열린 SSE 통로 대기" 경로를 쓴다(꽉 차면 429 대신 큐 적재 + queued 이벤트 후 슬롯 대기).
+  // 브라우저 로컬(local)·프로드 워커(prod)는 기존대로 즉시 점유하고, 꽉 차면 429 로 거절한다(무변경).
+  const jobSource: AnalysisJobSource =
+    body.source === "prod" || body.source === "bot" ? body.source : "local";
+  const isBotWait = jobSource === "bot";
+  const reqName =
+    typeof body.name === "string" && body.name.trim() ? body.name.trim() : null;
+
+  // 전역 동시성 세마포어(PRD §3-5) — 503 가드 다음, 분석 시작 전에 슬롯을 점유한다.
+  // 비봇(브라우저·워커)은 여기서 즉시 점유하고, 꽉 차면 429/busy 로 거절한다.
+  // 봇은 점유를 스트림 본문으로 미룬다 — 꽉 차 있어도 연결을 끊지 않고 대기(queued)한 뒤 슬롯이 나면 점유.
+  // ⚠️ 세마포어는 순수 카운터(요청 데이터 0). 격리 원칙(AC-8)은 concurrencyGate 모듈이 보장.
+  if (!isBotWait) {
+    if (!tryAcquire()) {
+      return NextResponse.json(
+        {
+          error: "busy",
+          retryable: true,
+          message: "지금 분석이 가득 찼어요. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 429 },
+      );
+    }
+    acquired = true;
   }
 
   const rawProvider = body.provider ?? "claude";
@@ -569,11 +599,15 @@ export async function POST(req: NextRequest): Promise<Response> {
   // unified-analysis-jobs: 이 실행을 queue 에 processing 으로 기록(/analyze 인플라이트 트래킹).
   // prod 워커가 jobId·source:'prod' 를 넘기면 그 행 재사용·종결은 워커(owned=false, 중복 행 방지 G4).
   // 로컬/봇 직접 실행은 핸들러가 행 insert·종결(owned=true). fail-soft — 미설정/컬럼 미적용 시 미기록.
-  const jobSource: AnalysisJobSource =
-    body.source === "prod" || body.source === "bot" ? body.source : "local";
   const callerJobId =
     typeof body.jobId === "number" && Number.isFinite(body.jobId) ? body.jobId : null;
-  const job = await startProcessing({ ticker, source: jobSource, jobId: callerJobId });
+  // 비봇: 슬롯을 이미 점유했으니 지금 processing 기록. 봇: 슬롯 대기 후 스트림 본문에서 기록(아래 prelude).
+  let job: { jobId: number | null; owned: boolean } = { jobId: null, owned: false };
+  if (!isBotWait) {
+    job = await startProcessing({ ticker, source: jobSource, jobId: callerJobId });
+  }
+  // 봇 대기 경로가 적재한 pending 행 id — 대기 중 취소 시 정리(‘대기중’ 카드 제거)에 쓴다.
+  let botWaitRowId: number | null = null;
   // owned 작업 종결 분기 — 실제 에러면 failed, 그 외(성공·사용자 중지)면 done(아래 finally).
   let jobFailed = false;
 
@@ -594,6 +628,48 @@ export async function POST(req: NextRequest): Promise<Response> {
         closed = true;
         try { controller.close(); } catch { /* 이미 cancel로 닫힘 */ }
       };
+
+      // ── 봇 SSE 통로 대기 prelude ──────────────────────────────────────────────
+      // 봇 요청은 슬롯이 꽉 차 있어도 429 로 끊지 않는다. 대신 이 열린 연결 위에서:
+      //   ① pending 적재(/analyze '대기중' 카드) ② queued 이벤트로 순번 안내(주기 갱신)
+      //   ③ 슬롯이 나면 점유 → processing 전이 → 아래 라이브 스트림이 같은 연결로 그대로 이어진다.
+      // 프론트가 큐를 100% 소유하고, 봇은 이 이벤트들을 Slack 에 중계만 한다.
+      if (isBotWait && !acquired) {
+        if (tryAcquire()) {
+          acquired = true; // 빈 슬롯 즉시 확보 — 대기 없이 바로 분석(start-now).
+        } else {
+          // 꽉 참 → 큐 적재(카드=대기중) + 순번 안내. 슬롯이 날 때까지 이 연결을 유지한다.
+          const enq = await enqueueAnalysis({ ticker, name: reqName, source: "bot" });
+          // queued/already 면 행 id 확보(대기 카드·정리용). not_configured/error 면 id 없음(fail-soft — 대기·분석은 계속).
+          botWaitRowId = "id" in enq ? enq.id ?? null : null;
+          const emitQueued = async (): Promise<void> => {
+            const depth = await getQueueDepth().catch(() => 0);
+            const position = Math.max(1, depth);
+            send({ type: "queued", position, etaMinutes: position * MINUTES_PER_ANALYSIS });
+          };
+          await emitQueued();
+          const posTimer = setInterval(() => { void emitQueued(); }, QUEUED_REFRESH_MS);
+          try {
+            // 슬롯 폴링 — 다른 분석이 끝나 releaseSlot 로 카운터가 내려가면 다음 폴에서 점유.
+            while (!combinedSignal.aborted && !tryAcquire()) {
+              await new Promise((r) => setTimeout(r, QUEUE_POLL_MS));
+            }
+          } finally {
+            clearInterval(posTimer);
+          }
+          if (combinedSignal.aborted) {
+            // 대기 중 봇 연결 종료(disconnect)·타임아웃 → 적재한 pending 행 정리('대기중' 카드 제거) 후 조용히 종료.
+            // 아래 try/finally 를 타지 않는 early-return 이므로 타임아웃 타이머를 여기서 직접 정리한다(슬롯은 미점유라 반납 불요).
+            if (botWaitRowId != null) await markFailed(botWaitRowId, "대기 중 연결 종료");
+            clearTimeout(timeoutId);
+            safeClose();
+            return;
+          }
+          acquired = true;
+        }
+        // 슬롯 확보 — 봇 작업을 processing 으로 기록(적재해 둔 pending 행 재사용). owned=true → 아래 finally 가 종결.
+        job = await startProcessing({ ticker, source: "bot" });
+      }
 
       const state: AnalysisState = {
         ticker,
