@@ -45,6 +45,7 @@ const VAR_KEYS = {
   volUp: "chart-vol-up", // 거래량 상승 봉
   volDown: "chart-vol-down", // 거래량 하락 봉
   down: "chart-down", // 하락 캔들/라인 (파랑)
+  bb: "chart-bb", // 볼린저밴드 상/하단·중심선·음영 (teal, 매물대 회색/보라와 구분)
   surface: "surface", // 차트 배경 — 최신가 태그 외곽선 녹아웃(겹친 요소와 경계 분리)
 } as const;
 

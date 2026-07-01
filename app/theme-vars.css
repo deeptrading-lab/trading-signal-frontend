@@ -39,6 +39,7 @@
   --fs-chart-vol-up: #fca5a5;
   --fs-chart-vol-down: #93c5fd;
   --fs-chart-down: #2563eb;
+  --fs-chart-bb: #0d9488;
   --fs-fng-extreme-fear: #1d6fb8;
   --fs-fng-extreme-fear-soft: #e3f0fa;
   --fs-fng-fear: #256353;
@@ -91,6 +92,7 @@ html.dark {
   --fs-chart-vol-up: #7a3f3f;
   --fs-chart-vol-down: #35527a;
   --fs-chart-down: #5b9bff;
+  --fs-chart-bb: #2dd4bf;
   --fs-fng-extreme-fear: #4d9fe0;
   --fs-fng-extreme-fear-soft: #13283b;
   --fs-fng-fear: #3fae93;

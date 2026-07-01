@@ -5270,3 +5270,34 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - analyze 핸들러: 네이티브 스트림 만들기 **전에** /request 호출 → start-now면 기존 흐름, queued면 스트림 안 만들고 '대기 N번째·약 M분' 메시지. (race: 네이티브 POST 429 시 폴백)
   - 워커가 봇 대기분 드레인(완료 시 Slack 알림은 별도 후속).
+
+### 2026-07-01 — feat(stock): 메인 차트 볼린저밴드 오버레이 + 오버레이 옵션 드롭다운 (#193)
+
+- **slug**: `stock-bollinger-bands` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/193
+- **요약**: feat(stock): 메인 차트 볼린저밴드 오버레이 + 오버레이 옵션 드롭다운
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 종목 상세 메인 가격 차트에 **볼린저밴드(20/2) 오버레이**를 추가하고, 늘어나는 오버레이 토글을 **"옵션 ▾" 드롭다운 체크박스**로 통합했습니다. 설정값은 localStorage로 지속됩니다.
+  > 
+  > ## 변경 내용
+  > - **볼린저밴드 렌더** (`StockDailyChart`): 음영 밴드(recharts 범위 `Area`, `type=monotone`, fillOpacity 0.1) + 상/하단 실선 + 중심선(SMA20) 점선. 캔들·라인 차트 타입 양쪽. 기존 `calcBollinger()`(20/2) 재사용, 워밍업으로 첫 표시봉부터 유효, 데이터 부족 시 미표시.
+  > - **매물대와 색 구분**: teal 신규 토큰 `chart-bb`(light `#0d9488` / dark `#2dd4bf`)를 DESIGN.md SSOT에 추가 → `design:sync`로 `tailwind.theme.json`·`app/theme-vars.css` 재생성 → `useChartTheme` 매핑. 매물대(회색/보라)와 동시에 켜도 판독 가능.
+  > - **옵션 드롭다운**(`ChartOptionsDropdown` 신규): 기존 단독 "매물대" 버튼을 흡수, 매물대·볼린저밴드 체크박스로 통합(모바일 툴바 절약). 공용 `useOutsideClick`·`.dropdown-panel` 재사용, `role=menu`/`menuitemcheckbox`/`aria-checked`.
+  > - **localStorage 지속**(`lib/store/chart/chartOptions.ts` + `useChartOptions` 신규): 기존 theme store `hasWindow()` 가드 패턴, SSR-safe 마운트 후 swap. 기본값 둘 다 off.
+  > 
+  > ## 검증
+  > - 게이트: `tsc` 0 · `eslint` 0 · `build` 성공 · `vitest` 633/633(calcBollinger 포함) · `design:sync` 멱등(light/dark 1:1 정합)
+  > - 브라우저 플로우(실 KIS 데이터, CDP 계측): 캔들·라인·다크·라이트·월봉 렌더, 매물대 공존, 드롭다운 aria/다중토글/외부클릭, localStorage 지속, 워밍업, 모바일 375 툴바, 콘솔 error/hydration 0
+  > - QA: `docs/qa/stock-bollinger-bands.md` PASS(이슈 0) / 리뷰: approved(minor 1건 = 음영 밴드 보간 통일, 본 PR에서 수정 완료)
+  > 
+  > ## 다음 작업
+  > - [ ] 차트 오버레이 드롭다운 키보드 접근성 개선(Escape 닫기·화살표 네비) — 형제 `ChartRangeDropdown`과 일괄 적용
+  > - [ ] 매물대(Volume Profile) 시각 리디자인 — 문서화된 스펙 없음, 별도 PRD/작업으로 분리
+  > - [ ] (선택) 볼린저 파라미터(20/2) 라벨/툴팁 노출 여부 검토
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 차트 오버레이 드롭다운 키보드 접근성 개선(Escape 닫기·화살표 네비) — 형제 `ChartRangeDropdown`과 일괄 적용
+  - [ ] 매물대(Volume Profile) 시각 리디자인 — 문서화된 스펙 없음, 별도 PRD/작업으로 분리
+  - [ ] (선택) 볼린저 파라미터(20/2) 라벨/툴팁 노출 여부 검토

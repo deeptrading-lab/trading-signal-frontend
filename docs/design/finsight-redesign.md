@@ -41,6 +41,7 @@ colors:
   chart-vol-up: "#fca5a5"
   chart-vol-down: "#93c5fd"
   chart-down: "#2563eb"
+  chart-bb: "#0d9488"
   fng-extreme-fear: "#1d6fb8"
   fng-extreme-fear-soft: "#e3f0fa"
   fng-fear: "#256353"
@@ -91,6 +92,7 @@ colors-dark:
   chart-vol-up: "#7a3f3f"
   chart-vol-down: "#35527a"
   chart-down: "#5b9bff"
+  chart-bb: "#2dd4bf"
   fng-extreme-fear: "#4d9fe0"
   fng-extreme-fear-soft: "#13283b"
   fng-fear: "#3fae93"
@@ -682,6 +684,8 @@ v7 rev2 가 `accent-vivid` 를 도입했을 때의 사용처는 CTA 버튼 + dro
 **차트 지표 색 토큰 (`chart-*` 11 키) — StockDailyChart 가격·거래량·MACD·RSI 서브플롯 전용**:
 
 차트 캔버스의 지표 라인·기준선·거래량 봉 색을 `components/profile/chart/chartTheme.ts` 의 hex 직타에서 토큰 참조로 이관하기 위한 11 키. **값 보존(value-preserving) 등록** — 기존 차트가 쓰던 hex 를 한 자도 바꾸지 않고 그대로 토큰화한다. 팔레트 재설계가 아니라 코드 hex 직타 제거가 목적이므로 시각 회귀 0. 신규 키: `chart-macd` `#2563eb` (MACD 라인 파랑), `chart-signal` `#f59e0b` (MACD 시그널 라인 앰버), `chart-hist-up` `#16a34a` / `chart-hist-down` `#dc2626` (MACD 히스토그램 부호별 초록/빨강), `chart-rsi` `#7c3aed` (RSI 라인 보라), `chart-ref-ob` `#dc2626` / `chart-ref-os` `#2563eb` / `chart-ref-mid` `#9ca3af` (RSI 과매수 70·과매도 30·중립 50 기준선 빨강/파랑/회색), `chart-vol-up` `#fca5a5` / `chart-vol-down` `#93c5fd` (거래량 봉 상승/하락 연빨강/연파랑), `chart-down` `#2563eb` (하락 캔들·라인 파랑).
+
+**볼린저밴드 추가 키(후속)** — `chart-bb` `#0d9488` (light, teal-600) / `#2dd4bf` (dark, teal-400). 메인 가격 차트 볼린저밴드 상·하단선·중심선(SMA20 점선)·음영 밴드에 공통 사용하는 단일 키. **의도적으로 매물대(회색 `text-muted`·POC 보라 `chart-rsi`)와 다른 teal 계열** — 두 오버레이를 동시에 켜도 색으로 구분되게 하기 위함. 다크는 어두운 캔버스 시인성 위해 명도 상향(teal-400). 상·하단은 실선, 중심선은 점선, 음영은 저투명(fillOpacity 0.1)으로 역할 구분하므로 단일 키로 충분.
 
 **의도적 동일 hex 별도 토큰** — `chart-macd` = `chart-ref-os` = `chart-down` = `#2563eb`, `chart-hist-down` = `chart-ref-ob` = `#dc2626` 으로 값이 겹치지만 역할(MACD 라인 / RSI 과매도선 / 하락 캔들, MACD 히스토그램 음수 / RSI 과매수선)이 달라 별도 키로 박는다. v8 의 `gradient-ai-to` = `accent-vivid` = `signal-down` (동일 `#1d4ed8`, 의미 단위 분리) 선례와 동일 철학 — 추후 차트 색 재조정 시 역할별 독립 변경 가능. 차트의 상승색은 기존 `signal-up` `#c81e1e` 재사용, 축 눈금 `text-muted` / 그리드 `border-line` / 툴팁 텍스트 `text-strong` 재사용으로 신규 키 불필요. 툴팁 배경은 rgba 투명색이라 토큰화 제외(코드 리터럴 유지). `chart-*` 토큰은 차트 캔버스(데이터 시각화) 전용 — 본문 텍스트·등락률·배지에는 사용 금지(등락은 `signal-up` / `signal-down`, 자산은 `asset-*` 영역).
 

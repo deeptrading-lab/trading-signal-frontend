@@ -10,6 +10,7 @@ import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
+import { useChartOptions } from "@/hooks/stock/useChartOptions";
 import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
@@ -31,8 +32,9 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   const [period, setPeriod] = useState<ChartPeriod>(DEFAULT_PERIOD);
   const [days, setDays] = useState<number>(DEFAULT_DAYS);
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
-  // 매물대(가격대별 거래량) 오버레이 — 기본 off, 토글로 on/off. 확대/축소 리마운트에도 보존.
-  const [showVolumeProfile, setShowVolumeProfile] = useState(false);
+  // 오버레이 옵션(매물대·볼린저밴드) — 기본 off, 드롭다운 체크박스로 토글. localStorage 지속.
+  //   확대/축소 리마운트에도 보존(부모 소유 + 저장값).
+  const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
 
   function handlePeriodChange(p: ChartPeriod) {
     setPeriod(p);
@@ -43,11 +45,13 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     period,
     days,
     chartType,
-    showVolumeProfile,
+    showVolumeProfile: chartOptions.volumeProfile,
+    showBollinger: chartOptions.bollinger,
     onPeriodChange: handlePeriodChange,
     onDaysChange: setDays,
     onChartTypeChange: setChartType,
-    onToggleVolumeProfile: () => setShowVolumeProfile((v) => !v),
+    onToggleVolumeProfile: () => toggleChartOption("volumeProfile"),
+    onToggleBollinger: () => toggleChartOption("bollinger"),
   };
 
   // 레이아웃 전환 시 fade-out → 상태 변경 → fade-in (데스크탑 확대/축소 한정)
