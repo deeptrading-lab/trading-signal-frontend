@@ -5364,3 +5364,30 @@
   - (선택) 대기 진입 시 프론트 prep 를 슬롯 확보 후로 미뤄 "데이터 수집 중" 1~2초 깜빡 제거.
   - (선택) 대기 순번 라이브 카운트다운(chat_update).
   - 짝 PR(dev-manager-bot `feature/bot-sse-queued-relay`): 봇 `_check_capacity` 제거 + queued 이벤트 처리.
+
+### 2026-07-01 — fix(stock): 모바일 기간 드롭다운 사이즈를 툴바와 통일 (#196)
+
+- **slug**: `chart-range-size` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/196
+- **요약**: fix(stock): 모바일 기간 드롭다운 사이즈를 툴바와 통일
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 모바일 차트 툴바의 **기간 선택 드롭다운(`3개월 ▾`)** 이 옆 버튼(캔들·봉·옵션)보다 유독 커 보이던 것을 동일 사이즈로 통일.
+  > 
+  > ## 변경 내용
+  > - `ChartRangeDropdown`(모바일 전용) 트리거 버튼: `px-md py-sm text-body-sm-strong` → `px-sm py-[3px] text-caption font-medium`, 셰브론 `h-4 w-4` → `h-3.5 w-3.5`.
+  > - `bg-surface-muted`+border(현재 범위 값 표시)는 유지, 사이즈만 이웃과 일치.
+  > 
+  > ## 검증
+  > - `tsc` 0 · `eslint` 0
+  > - 실앱(모바일 390 뷰포트, CDP 실측): 기간 드롭다운 높이 24.8px·폰트 12px·패딩 3px = 캔들·옵션과 동일. 스크린샷 육안 확인.
+  > - 데스크톱은 인라인 버튼 목록이라 영향 없음.
+  > 
+  > ## 다음 작업
+  > - [ ] 차트 오버레이 드롭다운 키보드 접근성(Escape·화살표 네비) — `ChartRangeDropdown`/`ChartOptionsDropdown` 일괄
+  > - [ ] 매물대(Volume Profile) 시각 리디자인 — 별도 작업
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 차트 오버레이 드롭다운 키보드 접근성(Escape·화살표 네비) — `ChartRangeDropdown`/`ChartOptionsDropdown` 일괄
+  - [ ] 매물대(Volume Profile) 시각 리디자인 — 별도 작업
