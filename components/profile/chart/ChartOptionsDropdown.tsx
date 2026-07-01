@@ -47,7 +47,6 @@ export function ChartOptionsDropdown({ options, onToggle }: ChartOptionsDropdown
       >
         <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {CHART_OPTIONS_LABEL}
-        {activeCount > 0 && <span className="text-caption">· {activeCount}</span>}
         <ChevronDown
           className={cn(
             "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
