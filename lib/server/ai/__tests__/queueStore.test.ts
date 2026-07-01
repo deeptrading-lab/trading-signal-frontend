@@ -203,6 +203,14 @@ describe("analysis queue store — claim", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(claimNextPending("worker-1")).resolves.toBeNull();
   });
+
+  it("claim 조회는 source=neq.bot 로 봇 행을 제외(봇은 자기 SSE 연결이 드레인 — 워커 이중실행 방지)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonRes([])); // pending 없음
+    vi.stubGlobal("fetch", fetchMock);
+    await claimNextPending("worker-1");
+    // 첫 호출(find 쿼리) URL 에 source=neq.bot 필터 포함.
+    expect(String(fetchMock.mock.calls[0][0])).toContain("source=neq.bot");
+  });
 });
 
 describe("analysis queue store — recoverStuck (1회 재투입 후 failed)", () => {
@@ -253,6 +261,40 @@ describe("analysis queue store — recoverStuck (1회 재투입 후 failed)", ()
     vi.stubGlobal("fetch", fetchMock);
     await expect(recoverStuck(20 * 60 * 1000)).resolves.toBe(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("봇 처리행이 55분 미만이면 건드리지 않음(건강한 장시간 분석 오탐 종결 방지)", async () => {
+    // 30분 전 claim → 봇 분석은 최대 ~50분 정상 실행 → 아직 진행 중일 수 있어 skip.
+    const recentClaim = new Date(Date.now() - 30 * 60_000).toISOString();
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonRes([{ id: 11, error: null, claimed_at: recentClaim, source: "bot" }]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 조회만 — 종결 PATCH 없음
+  });
+
+  it("봇 처리행이 55분 초과면 failed 종결(연결 유실 — 재투입 안 함)", async () => {
+    const staleClaim = new Date(Date.now() - 60 * 60_000).toISOString(); // 60분 전 → 55분 초과
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonRes([{ id: 12, error: null, claimed_at: staleClaim, source: "bot" }]),
+      )
+      // markFailed 의 patchById.
+      .mockResolvedValueOnce(jsonRes([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(1);
+    const patchCall = fetchMock.mock.calls[1];
+    expect(patchCall[1].body).toContain("\"status\":\"failed\"");
+    // 봇 행은 재투입(pending)이 아니라 failed 여야 한다.
+    expect(patchCall[1].body).not.toContain("\"status\":\"pending\"");
   });
 });
 

@@ -640,8 +640,9 @@ export async function POST(req: NextRequest): Promise<Response> {
         } else {
           // 꽉 참 → 큐 적재(카드=대기중) + 순번 안내. 슬롯이 날 때까지 이 연결을 유지한다.
           const enq = await enqueueAnalysis({ ticker, name: reqName, source: "bot" });
-          // queued/already 면 행 id 확보(대기 카드·정리용). not_configured/error 면 id 없음(fail-soft — 대기·분석은 계속).
-          botWaitRowId = "id" in enq ? enq.id ?? null : null;
+          // 내가 새로 적재한(queued) 행일 때만 소유·정리 대상으로 잡는다. already(같은 ticker 를 다른 소스가
+          // 이미 분석 중)면 그 행은 남의 것 — abort 시 markFailed 로 남의 라이브 분석 행을 오종결하면 안 되므로 null.
+          botWaitRowId = enq.status === "queued" ? enq.id ?? null : null;
           const emitQueued = async (): Promise<void> => {
             const depth = await getQueueDepth().catch(() => 0);
             const position = Math.max(1, depth);

@@ -33,6 +33,14 @@ const SELECT_COLS =
  */
 const RECOVER_MARKER_RE = /\[recovered:(\d+)\]/;
 
+/**
+ * 봇 processing 행 stuck 판정 임계(ms). 봇 분석은 핸들러 TIMEOUT_TOTAL_MS(~50분)까지 정상 실행되고
+ * 진행 중엔 그 행이 살아있다(핸들러 SSE 연결이 소유). prod 의 짧은 재투입 컷오프(worker STUCK_TIMEOUT_MS
+ * ~20분)를 봇 행에 그대로 쓰면 **건강한 장시간 분석**의 인플라이트 카드를 오탐 failed 처리한다.
+ * → 최대 실행시간+마진(55분)을 넘겨 '연결 유실(핸들러 프로세스 크래시)'이 확실할 때만 failed 종결한다.
+ */
+const BOT_STUCK_MS = 55 * 60_000;
+
 type SupabaseQueueRow = {
   id: number;
   ticker: string;
@@ -477,11 +485,18 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
 
   let recovered = 0;
   for (const row of rows) {
-    // 봇 처리행이 멈춤 = 그 행을 드레인하던 SSE 통로(핸들러 연결)가 죽은 것 → 재투입해도 워커가 skip(neq.bot)해
-    // '대기중' 유령이 된다. 재개할 연결이 없으니 바로 failed 종결한다(bot-analysis-sse-tunnel).
+    // 봇 처리행: 진행 중엔 핸들러 SSE 연결이 살아있고 최대 ~50분까지 정상 실행된다. 재개할 연결이 없어
+    // 재투입(pending)하면 워커가 skip(neq.bot)해 '대기중' 유령이 되므로 failed 로 종결하되 — 20분 컷오프만으로
+    // 끄면 건강한 장시간 분석을 오탐한다. BOT_STUCK_MS(55분)을 넘겨 연결 유실(핸들러 크래시)이 확실할 때만 종결.
     if (row.source === "bot") {
+      const claimedMs = row.claimed_at ? Date.parse(row.claimed_at) : Number.NaN;
+      if (!Number.isFinite(claimedMs) || Date.now() - claimedMs < BOT_STUCK_MS) {
+        continue; // 아직 진행 중일 수 있음 — 손대지 않음(카드 오탐 종결 방지)
+      }
       await markFailed(row.id, "봇 분석 연결이 끊겨 중단됐어요.");
-      queueLog.warn(`stuck bot 처리행 → failed 종결 id=${row.id}(연결 유실)`);
+      queueLog.warn(
+        `stuck bot 처리행 → failed 종결 id=${row.id}(연결 유실, ${Math.round((Date.now() - claimedMs) / 60_000)}분 경과)`,
+      );
       recovered += 1;
       continue;
     }
