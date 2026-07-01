@@ -9,16 +9,38 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryAgentUsage } from "@/hooks/stock/useQueryAgentUsage";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 import { CacheCostCards } from "./CacheCostCards";
 import { ModelCostBreakdown } from "./ModelCostBreakdown";
-import { RunTrendChart } from "./RunTrendChart";
-import { AgentTokenBarChart } from "./AgentTokenBarChart";
-import { StageInputTrendChart } from "./StageInputTrendChart";
 import { AgentUsageTable } from "./AgentUsageTable";
+
+// recharts 차트 3종은 recharts(≈109kB gzip)를 끌어오므로 next/dynamic 으로 지연 로드 —
+// Usage 탭에 데이터가 있을 때만(아래 조건부 렌더) 청크 로드(perf WS-4). 차트 래퍼(section.card)와
+// 높이를 맞춘 스켈레톤으로 레이아웃 시프트 최소화.
+function ChartSkeleton({ heightClass }: { heightClass: string }) {
+  return (
+    <section className="card" aria-hidden="true">
+      <div className="mb-md h-4 w-40 animate-pulse rounded bg-surface-muted" />
+      <div className={cn("w-full animate-pulse rounded-lg bg-surface-muted", heightClass)} />
+    </section>
+  );
+}
+const RunTrendChart = dynamic(
+  () => import("./RunTrendChart").then((m) => m.RunTrendChart),
+  { ssr: false, loading: () => <ChartSkeleton heightClass="h-[280px]" /> },
+);
+const AgentTokenBarChart = dynamic(
+  () => import("./AgentTokenBarChart").then((m) => m.AgentTokenBarChart),
+  { ssr: false, loading: () => <ChartSkeleton heightClass="h-[320px]" /> },
+);
+const StageInputTrendChart = dynamic(
+  () => import("./StageInputTrendChart").then((m) => m.StageInputTrendChart),
+  { ssr: false, loading: () => <ChartSkeleton heightClass="h-[300px]" /> },
+);
 import {
   CODEX_UNMEASURED_NOTICE,
   PROVIDER_TAB_CLAUDE,
