@@ -5200,3 +5200,30 @@
   > ## 검증
   > typecheck·lint·test·build ✓. 아이콘 1개 변경(로직·색·토큰 무관).
 - **다음 작업 후보**: _PR 본문에 별도 섹션 없음. 본문 참고하여 판단._
+
+### 2026-07-01 — feat(worker): 큐 동시 N(기본3) 병렬 드레인 — prod 여러 요청 동시 처리 (#190)
+
+- **slug**: `worker-concurrent-drain` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/190
+- **요약**: feat(worker): 큐 동시 N(기본3) 병렬 드레인 — prod 여러 요청 동시 처리
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > prod에서 3개 분석 요청 → **1개만 돌고 2개 대기**했다. 원인: 로컬 워커가 큐를 **1건씩 순차** 처리(claim→끝까지→다음). N=3 세마포어는 '전체 동시 상한(천장)'이라 워커가 1슬롯만 쓰던 것.
+  > 
+  > → 워커가 **여유 슬롯만큼(WORKER_CONCURRENCY, 기본 3) 큐를 FIFO로 집어 병렬 드레인**하도록 변경. prod 3개가 동시에 처리된다.
+  > 
+  > ## 변경 (scripts/analysisWorker.ts)
+  > - `inFlight` Set 로 동시 처리 프라미스 관리 → `while(inFlight.size < N) claim` 로 슬롯 채우고, 꽉 차면 `Promise.race(inFlight)`로 하나 끝날 때까지 대기 후 재claim.
+  > - `processClaimedJob`(절대 throw X, 항상 markDone/markFailed) + busy 하트비트는 inFlight.size 로 판정.
+  > - **전역 세마포어(concurrencyGate, =3)가 여전히 하드 캡** — WORKER_CONCURRENCY 가 커도 실제 동시 실행 ≤3. 로컬/봇과 슬롯 나누려면 env 로 낮춤.
+  > 
+  > ## 검증
+  > typecheck·lint·test(633)·build ✓. 잔여 참조(busy/processOne) 정리 확인. 로컬 라이브 SSE·prod 격리 무변경.
+  > 
+  > ## 다음 작업
+  > - 봇(dev-manager-bot): 3슬롯 꽉 차면 '대기 중' 답 후 슬롯 나면 네이티브 스트리밍(별도 봇레포 작업, 조사 중).
+  > - (선택) recoverStuck 20분 타임아웃은 분석>20분 시 재큐 가능성 — 현행 유지.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 봇(dev-manager-bot): 3슬롯 꽉 차면 '대기 중' 답 후 슬롯 나면 네이티브 스트리밍(별도 봇레포 작업, 조사 중).
+  - (선택) recoverStuck 20분 타임아웃은 분석>20분 시 재큐 가능성 — 현행 유지.
