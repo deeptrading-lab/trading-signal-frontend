@@ -33,6 +33,14 @@ const SELECT_COLS =
  */
 const RECOVER_MARKER_RE = /\[recovered:(\d+)\]/;
 
+/**
+ * 봇 processing 행 stuck 판정 임계(ms). 봇 분석은 핸들러 TIMEOUT_TOTAL_MS(~50분)까지 정상 실행되고
+ * 진행 중엔 그 행이 살아있다(핸들러 SSE 연결이 소유). prod 의 짧은 재투입 컷오프(worker STUCK_TIMEOUT_MS
+ * ~20분)를 봇 행에 그대로 쓰면 **건강한 장시간 분석**의 인플라이트 카드를 오탐 failed 처리한다.
+ * → 최대 실행시간+마진(55분)을 넘겨 '연결 유실(핸들러 프로세스 크래시)'이 확실할 때만 failed 종결한다.
+ */
+const BOT_STUCK_MS = 55 * 60_000;
+
 type SupabaseQueueRow = {
   id: number;
   ticker: string;
@@ -312,9 +320,13 @@ export async function claimNextPending(
   if (!config) return null;
 
   // 1) 가장 오래된 pending 1건 조회(FIFO).
+  //    ⚠️ source='bot' 행은 제외한다 — 봇 요청은 봇이 연 SSE 통로(핸들러) 위에서 직접 드레인하므로,
+  //    워커가 집으면 헤드리스로 이중 실행돼 Slack 라이브 스트림이 사라진다(bot-analysis-sse-tunnel).
+  //    source 컬럼은 마이그레이션에서 기존 행을 'prod' 로 백필했고 default 도 'prod' 라 null 은 없다.
   const findUrl = new URL(`${config.url}/rest/v1/${TABLE}`);
   findUrl.searchParams.set("select", "id");
   findUrl.searchParams.set("status", "eq.pending");
+  findUrl.searchParams.set("source", "neq.bot");
   findUrl.searchParams.set("order", "created_at.asc");
   findUrl.searchParams.set("limit", "1");
 
@@ -442,7 +454,7 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
 
   // claimed_at 이 cutoff 이전인 processing row 들을 조회.
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
-  url.searchParams.set("select", "id,error,claimed_at");
+  url.searchParams.set("select", "id,error,claimed_at,source");
   url.searchParams.set("status", "eq.processing");
   url.searchParams.set("claimed_at", `lt.${cutoff}`);
   url.searchParams.set("limit", "50");
@@ -467,11 +479,27 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
     id: number;
     error: string | null;
     claimed_at: string | null;
+    source: AnalysisJobSource | null;
   }[];
   if (!Array.isArray(rows) || rows.length === 0) return 0;
 
   let recovered = 0;
   for (const row of rows) {
+    // 봇 처리행: 진행 중엔 핸들러 SSE 연결이 살아있고 최대 ~50분까지 정상 실행된다. 재개할 연결이 없어
+    // 재투입(pending)하면 워커가 skip(neq.bot)해 '대기중' 유령이 되므로 failed 로 종결하되 — 20분 컷오프만으로
+    // 끄면 건강한 장시간 분석을 오탐한다. BOT_STUCK_MS(55분)을 넘겨 연결 유실(핸들러 크래시)이 확실할 때만 종결.
+    if (row.source === "bot") {
+      const claimedMs = row.claimed_at ? Date.parse(row.claimed_at) : Number.NaN;
+      if (!Number.isFinite(claimedMs) || Date.now() - claimedMs < BOT_STUCK_MS) {
+        continue; // 아직 진행 중일 수 있음 — 손대지 않음(카드 오탐 종결 방지)
+      }
+      await markFailed(row.id, "봇 분석 연결이 끊겨 중단됐어요.");
+      queueLog.warn(
+        `stuck bot 처리행 → failed 종결 id=${row.id}(연결 유실, ${Math.round((Date.now() - claimedMs) / 60_000)}분 경과)`,
+      );
+      recovered += 1;
+      continue;
+    }
     const prevCount = recoverCountOf(row.error);
     if (prevCount >= 1) {
       // 이미 1회 재투입했는데 또 stuck → failed 종결(무한 루프 방지).

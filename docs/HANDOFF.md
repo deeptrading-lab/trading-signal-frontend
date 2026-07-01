@@ -5328,3 +5328,39 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - [ ] 차트 오버레이 드롭다운 키보드 접근성(Escape·화살표 네비) — 형제 `ChartRangeDropdown`과 일괄 적용
   - [ ] 매물대(Volume Profile) 시각 리디자인 — 별도 작업
+
+### 2026-07-01 — feat(ai-analysis): 봇 대기 요청을 SSE 통로로 흡수 — 대기 후 네이티브 스트림 이어받기 (#195)
+
+- **slug**: `bot-analysis-sse-tunnel` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/195
+- **요약**: feat(ai-analysis): 봇 대기 요청을 SSE 통로로 흡수 — 대기 후 네이티브 스트림 이어받기
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 봇 대기 요청을 **봇이 이미 여는 SSE 연결 하나**로 흡수한다. 프론트가 큐를 100% 소유하고(enqueue·순번·상태·/analyze 카드), 봇은 이벤트를 Slack에 중계만 한다. `/request` 사전 capacity 판정(#191)을 폐기하고, 꽉 찼을 때의 대기·시작을 같은 스트림 위에서 처리한다.
+  > 
+  > ## 배경
+  > PR#175/#190/#191 로 prod·봇 요청을 큐+워커로 비동기 처리했으나, **대기(queued)했던 봇 요청은 워커가 헤드리스로 드레인**해 Slack 에 아무 출력도 없었다(네이티브 스트림·결과 카드 X — /analyze 에만 표시). "대기 후 분석 시작되면 네이티브 스트림" 요구의 뒤 절반이 빠져 있던 것. 원인: `/request` 가 순번만 리턴하고 닫혀, 나중에 생성되는 응답을 봇에 전달할 통로가 없었음.
+  > 
+  > ## 변경
+  > - **핸들러(route.ts)**: `source:'bot'` 요청은 꽉 차도 429 로 끊지 않고 — pending 적재(/analyze 대기중 카드) + `{type:'queued',position,etaMinutes}` 이벤트(15s 갱신=keepalive) + 슬롯 폴링(2s) 대기 → 확보 시 processing 전이 후 같은 연결로 라이브 스트림. **비봇(브라우저·워커)은 기존 429 완전 무변경**(가드 `isBotWait`, `releaseSlot` 은 `acquired` 일 때만 반납해 조기반납 방지).
+  > - `AIAnalysisEvent` 에 `queued` 이벤트 추가(클라 reducer 는 `default` 로 안전 무시 — 브라우저는 애초에 안 받음).
+  > - `claimNextPending`: `source=neq.bot` — 봇 행은 봇 연결이 드레인(워커 이중실행 방지). `recoverStuck`: 봇 처리행 stuck 시 재투입 대신 failed 종결(연결 유실).
+  > - **`/api/stock/ai-analysis/request`(#191) 삭제** — SSE 통로로 흡수(봇 사전 capacity 판정 폐기).
+  > 
+  > ## 검증
+  > - typecheck / lint / test(633) / build 그린.
+  > - 비봇 경로 무변경(브라우저 로컬 라이브 SSE·워커 429 재시도 무영향).
+  > - ⚠️ 라이브 E2E(봇 꽉참→대기→스트림)는 `npm run all`+봇 재기동 환경 필요 — 별도 확인.
+  > 
+  > ## 다음 작업
+  > - 라이브 E2E: 봇에서 연달아 4종목 요청 → 3개 스트리밍 + 4번째 "대기 N번째" 안내 후 슬롯 나면 네이티브 스트림 시작 확인(동시에 /analyze 대기중 카드).
+  > - (선택) 대기 진입 시 프론트 prep 를 슬롯 확보 후로 미뤄 "데이터 수집 중" 1~2초 깜빡 제거.
+  > - (선택) 대기 순번 라이브 카운트다운(chat_update).
+  > - 짝 PR(dev-manager-bot `feature/bot-sse-queued-relay`): 봇 `_check_capacity` 제거 + queued 이벤트 처리.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 라이브 E2E: 봇에서 연달아 4종목 요청 → 3개 스트리밍 + 4번째 "대기 N번째" 안내 후 슬롯 나면 네이티브 스트림 시작 확인(동시에 /analyze 대기중 카드).
+  - (선택) 대기 진입 시 프론트 prep 를 슬롯 확보 후로 미뤄 "데이터 수집 중" 1~2초 깜빡 제거.
+  - (선택) 대기 순번 라이브 카운트다운(chat_update).
+  - 짝 PR(dev-manager-bot `feature/bot-sse-queued-relay`): 봇 `_check_capacity` 제거 + queued 이벤트 처리.
