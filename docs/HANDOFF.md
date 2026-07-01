@@ -5228,6 +5228,24 @@
   - 봇(dev-manager-bot): 3슬롯 꽉 차면 '대기 중' 답 후 슬롯 나면 네이티브 스트리밍(별도 봇레포 작업, 조사 중).
   - (선택) recoverStuck 20분 타임아웃은 분석>20분 시 재큐 가능성 — 현행 유지.
 
+### 2026-07-01 — fix(analyze): 분석 중/대기 중 인플라이트 배지 색 구분 (파랑 vs 앰버) (#192)
+
+- **slug**: `fix/inflight-badge-colors` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/192
+- **요약**: fix(analyze): 분석 중/대기 중 인플라이트 배지 색 구분 (파랑 vs 앰버)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을 / 왜
+  > /analyze 인플라이트 배지가 '분석 중'·'대기 중' 둘 다 파랑에 **펄스 유무만** 차이라 눈에 잘 안 띄었다(사용자 피드백). 색으로 뚜렷이 구분:
+  > - **분석 중**: 파랑(accent-vivid-soft + primary) + **펄스** 점(실행 중)
+  > - **대기 중**: 앰버(amber, 대기/보류 관례) + **정적** 점
+  > 
+  > 점 색은 `bg-current` 라 글자색 따라 파랑/앰버로 자동 구분.
+  > 
+  > ## 검증
+  > typecheck·lint·test·build ✓. cn 색-드롭 없음(text-caption + text-primary/text-amber 공존 경험적 확인). 신규 디자인 토큰 0(기존 amber 유틸=WarnChip 선례).
+- **다음 작업 후보**: _PR 본문에 별도 섹션 없음. 본문 참고하여 판단._
+
 ### 2026-07-01 — feat(ai-analysis): 봇 capacity/request 엔드포인트 — 지금 시작 vs 대기 순번 안내 (프론트 계약) (#191)
 
 - **slug**: `bot-capacity-request` · **author**: @HY0118
