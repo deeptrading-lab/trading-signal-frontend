@@ -1,6 +1,7 @@
 "use client";
 
-import { AIAnalysisPanel } from "./AIAnalysisPanel";
+import { memo, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockNames } from "@/hooks/stock/useQueryStockNames";
 
@@ -16,11 +17,23 @@ import { useQueryStockNames } from "@/hooks/stock/useQueryStockNames";
  * 미해석 ticker 는 슬롯 캐시(name)→ticker 폴백.
  *
  * panelTicker: 열림=viewTicker(보는 종목), 닫힘=analyzingTicker(분석 주인). null 이면 미렌더.
+ *
+ * 코드 스플리팅(perf WS-1): 패널은 분석이 실제로 열릴 때만 필요하므로 `next/dynamic({ssr:false})`
+ * 로 지연 로드한다. 이로써 motion/react-markdown + 14개 ai-analysis 서브컴포넌트가 셸 청크에서
+ * 빠지고, 패널이 닫힌(panelTicker=null) 비-AI 라우트에서는 해당 청크가 로드되지 않는다.
  */
-export function GlobalAIAnalysis() {
+const AIAnalysisPanel = dynamic(
+  () => import("./AIAnalysisPanel").then((m) => m.AIAnalysisPanel),
+  { ssr: false },
+);
+
+export const GlobalAIAnalysis = memo(function GlobalAIAnalysis() {
   const ctx = useAIAnalysisContext();
-  const names = useQueryStockNames(ctx.tabs.map((t) => t.ticker));
+  // 탭 ticker 배열을 메모이즈 — 매 렌더 새 배열 생성으로 인한 useQueries 매핑 churn 방지.
+  // (조건부 hook 호출 금지: panelTicker 와 무관하게 항상 호출하고, 빈/불변 배열로 게이트.)
+  const tabTickers = useMemo(() => ctx.tabs.map((t) => t.ticker), [ctx.tabs]);
+  const names = useQueryStockNames(tabTickers);
   if (!ctx.panelTicker) return null;
   const tabs = ctx.tabs.map((t) => ({ ...t, name: names[t.ticker] ?? t.name }));
   return <AIAnalysisPanel {...ctx} tabs={tabs} ticker={ctx.panelTicker} />;
-}
+});

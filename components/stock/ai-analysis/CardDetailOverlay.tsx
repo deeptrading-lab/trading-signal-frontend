@@ -1,22 +1,27 @@
 "use client";
 
 import { motion } from "motion/react";
+import dynamic from "next/dynamic";
 import { ArrowLeft, MessageSquareQuote } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 
-const PROSE =
-  "prose prose-sm prose-slate dark:prose-invert max-w-none " +
-  "prose-headings:text-slate-900 dark:prose-headings:text-white prose-headings:font-bold prose-headings:mt-3 prose-headings:mb-1.5 " +
-  "prose-p:text-slate-600 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:my-1 " +
-  "prose-li:text-slate-600 dark:prose-li:text-slate-300 prose-li:my-0.5 " +
-  "prose-strong:text-slate-800 dark:prose-strong:text-slate-100 " +
-  "prose-table:text-xs prose-table:w-full " +
-  "prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-semibold prose-th:px-2 prose-th:py-1.5 prose-th:text-left " +
-  "prose-td:px-2 prose-td:py-1.5 prose-td:border-b prose-td:border-slate-200 dark:prose-td:border-slate-700 " +
-  "prose-code:text-blue-600 dark:prose-code:text-blue-400 prose-code:bg-blue-50 dark:prose-code:bg-blue-900/20 prose-code:px-1 prose-code:rounded prose-code:text-[11px] " +
-  "prose-hr:border-slate-200 dark:prose-hr:border-slate-700";
+/**
+ * 마크다운 본문은 별도 청크로 지연 로드 — react-markdown + remark-gfm(≈39kB gzip)을 패널 청크에서
+ * 분리(perf WS-1). 상세 카드를 펼치기 전까지 로드 안 됨. 청크 로드 중 스켈레톤 표시.
+ */
+const MarkdownContent = dynamic(
+  () => import("./MarkdownContent").then((m) => m.MarkdownContent),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-2" aria-hidden="true">
+        <div className="h-3 w-3/4 animate-pulse rounded bg-surface-muted" />
+        <div className="h-3 w-full animate-pulse rounded bg-surface-muted" />
+        <div className="h-3 w-5/6 animate-pulse rounded bg-surface-muted" />
+      </div>
+    ),
+  },
+);
 
 interface CardDetailOverlayProps {
   title: string;
@@ -57,9 +62,7 @@ export function CardDetailOverlay({ title, content, highlight, onClose }: CardDe
             </div>
           </div>
         )}
-        <div className={PROSE}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-        </div>
+        <MarkdownContent content={content} />
       </div>
     </motion.div>
   );
