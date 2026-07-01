@@ -30,6 +30,7 @@ import {
 } from "@/lib/api/kis";
 import { fetchBtcKrw } from "@/lib/api/coingecko/btc";
 import type { BtcQuote } from "@/lib/api/coingecko/types";
+import { indexCache, getBtcCache, setBtcCache } from "./cache";
 import { HEADER_MARKET_TICKERS } from "@/lib/mock/layout/marketTickers";
 import type { MarketTicker } from "@/lib/types/layout/marketTicker";
 import { formatNumber } from "@/lib/utils/formatMoney";
@@ -65,9 +66,8 @@ const CACHE_TTL_MS = {
   btc: 3 * 60_000, // BTC 3분(CoinGecko 한도 보호).
 } as const;
 
-type CacheEntry<T> = { value: T; expiresAt: number };
-const indexCache = new Map<string, CacheEntry<MarketIndexQuote>>();
-let btcCache: CacheEntry<BtcQuote> | null = null;
+// 모듈 레벨 in-memory TTL 캐시(지수 Map + BTC)는 `./cache` 로 분리 — 라우트는 접근자만 import.
+// (테스트용 `resetTickerCacheForTest` 를 라우트에서 export 하면 next build 타입체크 위반.)
 
 // KIS 는 한국(서울) 서버다. 함수가 미 동부(iad1)에서 실행되면 해외 지수 엔드포인트가 HTTP 500 을
 // 반환해 SPX/COMP 가 드롭되는 현상(2026-06-03 진단)을 회피하기 위해 실행 리전을 서울(icn1)로 고정한다.
@@ -191,12 +191,13 @@ async function loadKisIndices(): Promise<Map<string, MarketIndexQuote>> {
 
 /** BTC — 캐시 적중 시 즉시, 미스 시 실호출(실패는 null 로 부분 성공). */
 async function loadBtc(): Promise<BtcQuote | null> {
-  if (btcCache && btcCache.expiresAt > Date.now()) {
-    return btcCache.value;
+  const cached = getBtcCache();
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
   }
   try {
     const quote = await fetchBtcKrw();
-    btcCache = { value: quote, expiresAt: Date.now() + CACHE_TTL_MS.btc };
+    setBtcCache({ value: quote, expiresAt: Date.now() + CACHE_TTL_MS.btc });
     return quote;
   } catch {
     return null;
@@ -277,10 +278,4 @@ function resolveSource(
   if (allKis && btcFulfilled) return "kis";
   const anyLive = (kisLive && kisFulfilled > 0) || btcFulfilled;
   return anyLive ? "mixed" : "mock";
-}
-
-/** 테스트 전용 — 모듈 레벨 캐시 초기화. */
-export function resetTickerCacheForTest(): void {
-  indexCache.clear();
-  btcCache = null;
 }

@@ -39,7 +39,8 @@ vi.mock("@/lib/api/coingecko/btc", () => ({
   fetchBtcKrw: mocks.fetchBtcKrw,
 }));
 
-import { GET, resetTickerCacheForTest } from "../route";
+import { GET } from "../route";
+import { resetTickerCacheForTest } from "../cache";
 import type { MarketIndexQuote } from "@/lib/api/kis";
 import type { BtcQuote } from "@/lib/api/coingecko/types";
 
