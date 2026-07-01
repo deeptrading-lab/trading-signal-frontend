@@ -7,7 +7,7 @@
 
 "use client";
 
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, ChartCandlestick, ChartLine } from "lucide-react";
 import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { cn } from "@/lib/utils/cn";
@@ -56,6 +56,11 @@ export function ChartShell({
   const hasToggle = onExpand || onCollapse;
   const ranges = RANGES[period];
 
+  // 캔들/라인 단일 토글 — 현재 종류를 표시하고, 탭하면 다른 종류로 전환.
+  const nextChartType: ChartType = chartType === "candle" ? "line" : "candle";
+  const chartTypeLabel = CHART_TYPES.find((ct) => ct.type === chartType)?.label ?? "";
+  const ChartTypeIcon = chartType === "candle" ? ChartCandlestick : ChartLine;
+
   return (
     <section className="card" aria-label={STOCK_DETAIL_PRICE_CHART_TITLE}>
       {/* 헤더 행 1: 타이틀 + 확대/축소 버튼 */}
@@ -78,25 +83,18 @@ export function ChartShell({
 
       {/* 헤더 행 2: 차트타입 + 봉 선택 / 기간 선택 */}
       <div className="flex items-center justify-between mb-md gap-sm flex-wrap">
-        {/* 좌측: 라인/캔들 토글 + 봉 종류 */}
+        {/* 좌측: 캔들/라인 토글 + 봉 종류 */}
         <div className="flex items-center gap-sm">
-          <div className="flex items-center rounded-sm overflow-hidden border border-border-line">
-            {CHART_TYPES.map((ct) => (
-              <button
-                key={ct.type}
-                type="button"
-                onClick={() => onChartTypeChange(ct.type)}
-                className={cn(
-                  "px-sm py-[3px] text-caption font-medium transition-colors cursor-pointer",
-                  chartType === ct.type
-                    ? "bg-accent-vivid text-surface"
-                    : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
-                )}
-              >
-                {ct.label}
-              </button>
-            ))}
-          </div>
+          {/* 캔들/라인 단일 토글 — 현재 종류 표시, 탭하면 전환 */}
+          <button
+            type="button"
+            onClick={() => onChartTypeChange(nextChartType)}
+            aria-label={`차트 종류: ${chartTypeLabel} (탭하여 전환)`}
+            className="flex items-center gap-xs px-sm py-[3px] rounded-sm text-caption font-medium transition-colors cursor-pointer border border-border-line text-text-muted hover:text-text-strong hover:bg-surface-muted"
+          >
+            <ChartTypeIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {chartTypeLabel}
+          </button>
           <div className="flex items-center gap-xs">
             {PERIODS.map((p) => (
               <button
