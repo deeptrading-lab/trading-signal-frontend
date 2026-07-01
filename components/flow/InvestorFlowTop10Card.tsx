@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { formatNetBuyAmount, formatNetBuyQty } from "@/lib/utils/formatNetBuy";
+import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import type { FlowMode, InvestorFlowRow } from "@/lib/types/flow/top10";
 import {
   FLOW_TOP10_ASOF_PREFIX,
@@ -76,7 +77,7 @@ function FlowRow({ row, rank }: { row: InvestorFlowRow; rank: number }) {
 
   const go = () => {
     prefetch(row.ticker);
-    router.push(`/stock/${row.ticker}`);
+    router.push(stockDetailPath(row.ticker, row.name));
   };
 
   return (

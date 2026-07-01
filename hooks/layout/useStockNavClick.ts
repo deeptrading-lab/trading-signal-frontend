@@ -17,6 +17,7 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { readRecentSearches } from "@/lib/utils/recentSearch";
+import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 
 export function useStockNavClick() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export function useStockNavClick() {
       const recent = readRecentSearches();
       if (recent.length > 0) {
         const { ticker, name } = recent[0];
-        router.push(`/stock/${ticker}?q=${encodeURIComponent(name)}`);
+        router.push(stockDetailPath(ticker, name));
       } else {
         router.push("/stock");
       }

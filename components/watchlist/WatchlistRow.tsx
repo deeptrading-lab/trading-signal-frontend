@@ -31,6 +31,7 @@ import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
+import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
 import {
   WATCHLIST_REMOVE_LABEL,
@@ -116,13 +117,13 @@ function WatchlistRowBase({
       aria-label={`${displayName} 상세 보기`}
       onClick={() => {
         prefetch(quote.ticker);
-        router.push(`/stock/${quote.ticker}`);
+        router.push(stockDetailPath(quote.ticker, displayName));
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           prefetch(quote.ticker);
-          router.push(`/stock/${quote.ticker}`);
+          router.push(stockDetailPath(quote.ticker, displayName));
         }
       }}
       onMouseEnter={() => onIntent(quote.ticker)}
