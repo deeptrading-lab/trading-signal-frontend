@@ -41,7 +41,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        className="flex items-center gap-sm px-md py-sm rounded-sm text-body-sm-strong bg-surface-muted text-text-strong border border-border-line cursor-pointer"
+        className="flex items-center gap-xs px-sm py-[3px] rounded-sm text-caption font-medium bg-surface-muted text-text-strong border border-border-line cursor-pointer"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -49,7 +49,7 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
         {current.label}
         <ChevronDown
           className={cn(
-            "h-4 w-4 shrink-0 text-text-muted transition-transform duration-200",
+            "h-3.5 w-3.5 shrink-0 text-text-muted transition-transform duration-200",
             open && "rotate-180",
           )}
           aria-hidden="true"
