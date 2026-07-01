@@ -141,6 +141,8 @@ export async function enqueueAnalysis(input: {
   force?: boolean;
   /** 분석 시점 종목명(decision-stock-name) — pending 카드도 즉시 종목명 표시용. 없으면 생략(컬럼 default null). */
   name?: string | null;
+  /** 작업 출처(prod/local/bot). 미지정 시 컬럼 default 'prod'. */
+  source?: AnalysisJobSource;
 }): Promise<EnqueueResult> {
   const config = supabaseConfig();
   if (!config) return { status: "not_configured" };
@@ -156,6 +158,8 @@ export async function enqueueAnalysis(input: {
   };
   // 종목명은 확보됐을 때만 적재 — 불필요한 null payload 를 피한다(미확보면 컬럼 default null).
   if (input.name) insertBody.name = input.name;
+  // 출처 지정 시 태깅(봇 등). 미지정이면 컬럼 default 'prod'.
+  if (input.source) insertBody.source = input.source;
 
   const res = await fetch(`${config.url}/rest/v1/${TABLE}`, {
     method: "POST",
