@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, History, Pause, Play, X } from "lucide-react";
+import { ChevronDown, ExternalLink, History, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
 import { isApiError } from "@/lib/api/errors";
@@ -51,7 +51,6 @@ const T = P.table;
 const BTN_BASE =
   "inline-flex h-8 items-center justify-center rounded-md px-sm text-caption font-medium whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default";
 const BTN_PRIMARY = `${BTN_BASE} border-0 bg-accent-vivid text-surface hover:bg-accent-vivid/90`;
-const BTN_NEUTRAL = `${BTN_BASE} border border-border-line bg-surface-base text-text-strong hover:bg-surface-muted`;
 /** 틴트 필 버튼 — 테두리형(input·select 와 닮음) 대신 은은한 액센트 배경으로 '버튼'임을 구분. */
 const BTN_TONAL = `${BTN_BASE} border-0 bg-accent-vivid/10 text-accent-vivid hover:bg-accent-vivid/20`;
 const ICON_BTN =
@@ -357,6 +356,11 @@ function WatchRow({
   const position = detail?.positions.find((p) => p.quantity >= 1) ?? null;
   const lastTick = detail?.ticks.at(-1) ?? null;
   const running = current?.status === "running";
+  // 펼침 미니 체결 로그 — 최근 5건(최신 위). 전체 내역·손익 합계는 시트(행 🕘 아이콘).
+  const recentOrders = (detail?.ticks ?? [])
+    .flatMap((tick) => tick.orders.map((order) => ({ ...order, at: tick.tickWindowStart })))
+    .slice(-5)
+    .reverse();
 
   const runRead = () => {
     if (!provider || read.isPending) return;
@@ -510,9 +514,20 @@ function WatchRow({
           )}
         </td>
 
-        {/* 관리 — 제거 · 펼침 */}
+        {/* 관리 — 전체 화면(세션 시) · 제거 · 펼침 */}
         <td className="py-sm pr-lg">
           <div className="flex items-center justify-end gap-xs">
+            {current ? (
+              <Link
+                href={`/dashboard/paper-trading/${current.id}`}
+                className={ICON_BTN}
+                aria-label={P.detailLink}
+                title={P.detailLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="size-4" aria-hidden />
+              </Link>
+            ) : null}
             <button
               type="button"
               className={ICON_BTN}
@@ -568,13 +583,47 @@ function WatchRow({
               ) : null}
 
               {current ? (
-                <div className="flex flex-wrap items-center gap-xs">
-                  <button type="button" className={BTN_NEUTRAL} onClick={() => setSheetOpen(true)}>
-                    {T.ordersButton}
-                  </button>
-                  <Link href={`/dashboard/paper-trading/${current.id}`} className={BTN_NEUTRAL}>
-                    {P.detailLink}
-                  </Link>
+                <div className="flex flex-col gap-xs">
+                  {/* 왜 이런 판단 — 최근 판단 근거 메모 */}
+                  {lastTick ? (
+                    <p className="text-caption text-text-muted">
+                      {P.lastDecision}: {lastTick.rationale}
+                    </p>
+                  ) : null}
+                  {/* 미니 체결 로그 — 펼치자마자 보이게(전체·손익 합계는 행의 체결 내역 아이콘) */}
+                  <span className="text-caption text-text-muted">{P.sheet.ordersTitle}</span>
+                  {recentOrders.length === 0 ? (
+                    <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
+                  ) : (
+                    <ul className="flex flex-col gap-[2px] text-body-sm tabular-nums">
+                      {recentOrders.map((order, index) => (
+                        <li key={`${order.at}-${index}`} className="flex flex-wrap items-center gap-sm">
+                          <span className="text-text-muted">{kstHhmm(order.at)}</span>
+                          <span
+                            className={cn(
+                              "font-medium",
+                              order.side === "BUY" ? "text-signal-up" : "text-signal-down",
+                            )}
+                          >
+                            {order.side === "BUY" ? P.sheet.sideBuy : P.sheet.sideSell}
+                          </span>
+                          <span className="text-text-strong">
+                            {order.quantity}주 × {formatMoney(order.price)}
+                          </span>
+                          {order.realizedPnl != null ? (
+                            <span
+                              className={
+                                order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"
+                              }
+                            >
+                              {order.realizedPnl >= 0 ? "+" : ""}
+                              {formatMoney(order.realizedPnl)}
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ) : null}
             </div>

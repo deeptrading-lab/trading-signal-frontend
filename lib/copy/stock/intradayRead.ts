@@ -128,7 +128,7 @@ export const INTRADAY_PAPER_COPY = {
     ordersButton: "체결 내역",
     removeAria: "워치에서 제거",
     expandAria: "상세 접기/펼치기",
-    expandEmpty: "AI 진단을 누르면 판단 결과가, 모의 시작 후엔 체결 내역 진입이 여기에 표시돼요.",
+    expandEmpty: "AI 진단을 누르면 판단 결과가, 모의 시작 후엔 최근 체결 로그가 여기에 표시돼요.",
     cashPresetAria: "금액 빠른 선택",
   },
 
