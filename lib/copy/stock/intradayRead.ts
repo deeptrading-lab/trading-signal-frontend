@@ -121,7 +121,7 @@ export const INTRADAY_PAPER_COPY = {
     colPaper: "모의 매매",
     colManage: "관리",
     none: "—",
-    readRun: "AI 진단",
+    readRun: "진단 받기",
     readRunning: "진단 중",
     readTitle: "매매 없이 지금 시점의 단타 판단만 받아봐요",
     startRun: "모의 시작",

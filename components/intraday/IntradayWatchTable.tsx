@@ -10,7 +10,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, History, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
@@ -52,6 +52,8 @@ const BTN_BASE =
   "inline-flex h-8 items-center justify-center rounded-md px-sm text-caption font-medium whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default";
 const BTN_PRIMARY = `${BTN_BASE} border-0 bg-accent-vivid text-surface hover:bg-accent-vivid/90`;
 const BTN_NEUTRAL = `${BTN_BASE} border border-border-line bg-surface-base text-text-strong hover:bg-surface-muted`;
+/** 틴트 필 버튼 — 테두리형(input·select 와 닮음) 대신 은은한 액센트 배경으로 '버튼'임을 구분. */
+const BTN_TONAL = `${BTN_BASE} border-0 bg-accent-vivid/10 text-accent-vivid hover:bg-accent-vivid/20`;
 const ICON_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
 
@@ -114,6 +116,92 @@ export function IntradayWatchTable({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── 주기 셀렉트 (커스텀 드롭다운) ────────────────────────────────────────────
+
+/**
+ * 네이티브 select 는 팝업 방향(위로 뜸)·화살표 여백을 제어할 수 없어 커스텀으로 대체.
+ * 메뉴는 position:fixed 로 띄워 표의 overflow 클리핑을 피하고 **항상 버튼 아래**에 연다.
+ * 스크롤/리사이즈 시 닫는다(고정 좌표 어긋남 방지).
+ */
+function IntervalSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onMove() {
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open]);
+
+  function toggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    setOpen((v) => !v);
+  }
+
+  return (
+    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={T.colInterval}
+        className="inline-flex h-8 cursor-pointer items-center gap-xs rounded-md border border-border-line bg-surface-base pl-sm pr-xs text-body-sm text-text-strong tabular-nums transition-colors hover:bg-surface-muted"
+        onClick={toggle}
+      >
+        {value}분
+        <ChevronDown
+          className={cn("size-4 text-text-muted transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      {open && menuPos ? (
+        <div
+          role="listbox"
+          className="dropdown-panel z-50 overflow-hidden"
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
+        >
+          {PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.map((min) => (
+            <button
+              key={min}
+              type="button"
+              role="option"
+              aria-selected={min === value}
+              className={cn(
+                "block w-full cursor-pointer px-md py-xs text-left text-body-sm tabular-nums transition-colors hover:bg-surface-muted",
+                min === value ? "font-medium text-accent-vivid" : "text-text-strong",
+              )}
+              onClick={() => {
+                onChange(min);
+                setOpen(false);
+              }}
+            >
+              {min}분
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -266,19 +354,7 @@ function WatchRow({
           {current ? (
             <span className="tabular-nums text-text-muted">{current.tickIntervalMinutes}분</span>
           ) : (
-            <select
-              className="h-8 rounded-md border border-border-line bg-surface-base px-sm text-body-sm text-text-strong tabular-nums"
-              value={intervalMin}
-              aria-label={T.colInterval}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setIntervalMin(Number(e.target.value))}
-            >
-              {PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.map((min) => (
-                <option key={min} value={min}>
-                  {min}분
-                </option>
-              ))}
-            </select>
+            <IntervalSelect value={intervalMin} onChange={setIntervalMin} />
           )}
         </td>
 
@@ -286,7 +362,7 @@ function WatchRow({
         <td className="py-sm pr-md text-center">
           <button
             type="button"
-            className={BTN_NEUTRAL}
+            className={BTN_TONAL}
             disabled={!provider || read.isPending}
             title={T.readTitle}
             onClick={(e) => {
