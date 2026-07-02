@@ -1,9 +1,9 @@
 /**
  * IntradayWatchTable — 워치 종목 컴팩트 표 (토스 랭킹 표 스타일). intraday-paper-watch.
  *
- * 행 = 종목 | 현재가 | 등락률 | 모의 수익률 | 평가금액 | 포지션 | 최근 판단 | 액션(일시정지·제거·펼침).
- * 행 클릭(또는 펼침 버튼) → 아래로 확장: 장중 단타 판단(참고) 받기/결과 카드 + AI 모의 단타
- * 시작 폼(미시작) 또는 체결 내역 시트 진입(진행 중). 종목 코드는 표시하지 않는다(피드백).
+ * 행 = 종목 | 현재가 | 등락률 | 모의 수익률 | 평가금액 | 포지션 | 최근 판단 | 모의 투자금(input)
+ *      | 액션(판단·모의 시작·일시정지·제거·펼침 — 전부 컬럼 속성으로, 피드백 반영).
+ * 종목 코드는 표시하지 않는다. 행 클릭(또는 펼침) → 판단 결과 카드·체결 내역 진입.
  * ⚠️ 의사결정 보조·가상 체결 — 자동 수익/집행 주장 없음.
  */
 
@@ -11,7 +11,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { FormEvent } from "react";
 import { ChevronDown, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatMoney } from "@/lib/utils/formatMoney";
@@ -40,8 +39,8 @@ import type {
 
 const T = P.table;
 
-/** 확장 패널·행 공용 컴팩트 버튼(utilities 가 components 레이어를 덮는다). */
-const BTN_COMPACT = "px-sm py-xs text-caption";
+/** 컴팩트 버튼(utilities 가 components 레이어를 덮는다) / 아이콘 버튼. */
+const BTN_COMPACT = "px-sm py-xs text-caption whitespace-nowrap";
 const ICON_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
 
@@ -81,6 +80,7 @@ export function IntradayWatchTable({
               <th className="py-sm pr-md text-right font-normal">{T.colValue}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
               <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
+              <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
               <th className="py-sm pr-lg" aria-label="액션" />
             </tr>
           </thead>
@@ -142,12 +142,41 @@ function WatchRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [cash, setCash] = useState("10000000");
+  const [startError, setStartError] = useState<string | null>(null);
+
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
   const { detail, isPatching, setStatus } = usePaperTradingSession(session?.id ?? "");
+  const { data: providers } = useQueryAIProviders();
+  const read = useMutationIntradayRead();
+  const provider = providers?.available[0];
+
   const current = detail?.session ?? session;
   const position = detail?.positions.find((p) => p.quantity >= 1) ?? null;
   const lastTick = detail?.ticks.at(-1) ?? null;
   const running = current?.status === "running";
+
+  const runRead = () => {
+    if (!provider || read.isPending) return;
+    read.mutate({ ticker: item.ticker, provider });
+    setExpanded(true);
+  };
+
+  async function handleStart() {
+    const amount = Number(cash.replace(/[^0-9]/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setStartError(P.cashInvalid);
+      setExpanded(true);
+      return;
+    }
+    setStartError(null);
+    try {
+      await onStart({ ticker: item.ticker, name: item.name }, amount);
+    } catch (err) {
+      setStartError(isApiError(err) ? err.message : P.error);
+      setExpanded(true);
+    }
+  }
 
   return (
     <>
@@ -155,9 +184,9 @@ function WatchRow({
         onClick={() => setExpanded((v) => !v)}
         className="cursor-pointer border-t border-border-line transition-colors hover:bg-surface-muted"
       >
-        {/* 종목 — 코드 없이 이름만 + 세션 상태 뱃지 */}
+        {/* 종목 — 코드 없이 이름만 + 세션 상태 */}
         <td className="py-sm pl-lg pr-md">
-          <div className="flex items-center gap-xs">
+          <div className="flex items-center gap-xs whitespace-nowrap">
             <span className="text-body-sm-strong text-text-strong">{item.name}</span>
             {current ? (
               <span className="text-caption text-text-muted">{STATUS_LABEL[current.status]}</span>
@@ -167,7 +196,12 @@ function WatchRow({
         <td className="py-sm pr-md text-right tabular-nums text-text-strong">
           {quote ? formatMoney(quote.price) : T.none}
         </td>
-        <td className={cn("py-sm pr-md text-right tabular-nums", quote ? changeTone(quote.changePercent) : "text-text-muted")}>
+        <td
+          className={cn(
+            "py-sm pr-md text-right tabular-nums",
+            quote ? changeTone(quote.changePercent) : "text-text-muted",
+          )}
+        >
           {quote ? formatPct(quote.changePercent) : T.none}
         </td>
         <td
@@ -194,8 +228,37 @@ function WatchRow({
             T.none
           )}
         </td>
+
+        {/* 모의 투자금 — 미시작이면 input, 시작 후엔 시작 투자금 표시 */}
+        <td className="py-sm pr-md text-right">
+          {current ? (
+            <span className="tabular-nums text-text-muted">{formatMoney(current.initialCash)}</span>
+          ) : (
+            <input
+              className="h-8 w-[7.5rem] rounded-md border border-border-line bg-surface-base px-sm text-right text-body-sm text-text-strong tabular-nums"
+              inputMode="numeric"
+              value={cash}
+              aria-label={P.cashLabel}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setCash(e.target.value)}
+            />
+          )}
+        </td>
+
+        {/* 액션 — 판단 · 모의 시작/일시정지 · 제거 · 펼침 */}
         <td className="py-sm pr-lg">
           <div className="flex items-center justify-end gap-xs">
+            <button
+              type="button"
+              className={cn("button-secondary", BTN_COMPACT)}
+              disabled={!provider || read.isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                runRead();
+              }}
+            >
+              {read.isPending ? T.readRunning : T.readRun}
+            </button>
             {current ? (
               <button
                 type="button"
@@ -209,7 +272,19 @@ function WatchRow({
               >
                 {running ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
               </button>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                className={cn("button-primary", BTN_COMPACT)}
+                disabled={isCreating}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleStart();
+                }}
+              >
+                {isCreating ? P.creating : T.startRun}
+              </button>
+            )}
             <button
               type="button"
               className={ICON_BTN}
@@ -240,16 +315,51 @@ function WatchRow({
         </td>
       </tr>
 
+      {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
       {expanded ? (
         <tr className="border-t border-border-line">
-          <td colSpan={8} className="bg-surface-muted px-lg py-md">
-            <ExpandedPanel
-              item={item}
-              session={current}
-              isCreating={isCreating}
-              onStart={onStart}
-              onOpenSheet={() => setSheetOpen(true)}
-            />
+          <td colSpan={9} className="bg-surface-muted px-lg py-md">
+            <div className="flex flex-col gap-sm">
+              {startError ? (
+                <p className="text-caption text-signal-down" role="alert">
+                  {startError}
+                </p>
+              ) : null}
+              {!provider ? <p className="text-caption text-text-muted">{C.localOnly}</p> : null}
+              {read.isPending ? (
+                <p className="text-caption text-text-muted">
+                  {C.loading} {C.loadingHint}
+                </p>
+              ) : null}
+              {read.isError ? (
+                <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
+              ) : null}
+              {read.data ? <IntradayReadCard data={read.data} /> : null}
+
+              {current ? (
+                <div className="flex flex-wrap items-center gap-xs">
+                  <button
+                    type="button"
+                    className={cn("button-secondary", BTN_COMPACT)}
+                    onClick={() => setSheetOpen(true)}
+                  >
+                    {T.ordersButton}
+                  </button>
+                  <Link
+                    href={`/dashboard/paper-trading/${current.id}`}
+                    className={cn("button-secondary", BTN_COMPACT)}
+                  >
+                    {P.detailLink}
+                  </Link>
+                </div>
+              ) : (
+                <p className="text-caption text-text-muted">{P.startHint}</p>
+              )}
+
+              <p className="text-caption text-text-muted">
+                {C.disclaimer} {P.disclaimer}
+              </p>
+            </div>
           </td>
         </tr>
       ) : null}
@@ -262,138 +372,5 @@ function WatchRow({
         />
       ) : null}
     </>
-  );
-}
-
-// ─── 확장 패널 — 장중 단타 판단 + AI 모의 단타 ────────────────────────────────
-
-function ExpandedPanel({
-  item,
-  session,
-  isCreating,
-  onStart,
-  onOpenSheet,
-}: {
-  item: WatchItem;
-  session: PaperTradingSession | null;
-  isCreating: boolean;
-  onStart: IntradayWatchTableProps["onStart"];
-  onOpenSheet: () => void;
-}) {
-  const { data: providers, isLoading: gateLoading } = useQueryAIProviders();
-  const read = useMutationIntradayRead();
-  const provider = providers?.available[0];
-
-  const onRun = () => {
-    if (provider) read.mutate({ ticker: item.ticker, provider });
-  };
-
-  return (
-    <div className="flex flex-col gap-md">
-      {/* 컨트롤 행 — 판단 받기 + 모의 단타(시작 폼 또는 체결 내역) */}
-      <div className="flex flex-wrap items-center gap-md">
-        <div className="flex items-center gap-xs">
-          <span className="text-caption text-text-muted">{C.title}</span>
-          {gateLoading ? null : !provider ? (
-            <span className="text-caption text-text-muted">{C.localOnly}</span>
-          ) : (
-            <button
-              type="button"
-              className={cn("button-secondary", BTN_COMPACT)}
-              onClick={onRun}
-              disabled={read.isPending}
-            >
-              {read.isPending ? C.loading : read.data ? T.readRerun : T.readRun}
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-xs">
-          <span className="text-caption text-text-muted">{P.title}</span>
-          {session ? (
-            <>
-              <button
-                type="button"
-                className={cn("button-secondary", BTN_COMPACT)}
-                onClick={onOpenSheet}
-              >
-                {T.ordersButton}
-              </button>
-              <Link
-                href={`/dashboard/paper-trading/${session.id}`}
-                className={cn("button-secondary", BTN_COMPACT)}
-              >
-                {P.detailLink}
-              </Link>
-            </>
-          ) : (
-            <StartInlineForm item={item} isCreating={isCreating} onStart={onStart} />
-          )}
-        </div>
-      </div>
-
-      {/* 판단 결과 카드 */}
-      {read.isError ? (
-        <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
-      ) : null}
-      {read.isPending ? (
-        <p className="text-caption text-text-muted">{C.loadingHint}</p>
-      ) : null}
-      {read.data ? <IntradayReadCard data={read.data} /> : null}
-
-      <p className="text-caption text-text-muted">
-        {C.disclaimer} {P.disclaimer}
-      </p>
-    </div>
-  );
-}
-
-function StartInlineForm({
-  item,
-  isCreating,
-  onStart,
-}: {
-  item: WatchItem;
-  isCreating: boolean;
-  onStart: IntradayWatchTableProps["onStart"];
-}) {
-  const [cash, setCash] = useState("10000000");
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const amount = Number(cash.replace(/[^0-9]/g, ""));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError(P.cashInvalid);
-      return;
-    }
-    setError(null);
-    try {
-      await onStart({ ticker: item.ticker, name: item.name }, amount);
-    } catch (err) {
-      setError(isApiError(err) ? err.message : P.error);
-    }
-  }
-
-  return (
-    <form className="flex flex-wrap items-center gap-xs" onSubmit={handleSubmit}>
-      <label className="flex items-center gap-xs text-caption text-text-muted">
-        <span>{P.cashLabel}</span>
-        <input
-          className="h-8 w-[9rem] rounded-md border border-border-line bg-surface-base px-sm text-body-sm text-text-strong tabular-nums"
-          inputMode="numeric"
-          value={cash}
-          onChange={(event) => setCash(event.target.value)}
-        />
-      </label>
-      <button type="submit" className={cn("button-primary", BTN_COMPACT)} disabled={isCreating}>
-        {isCreating ? P.creating : P.startLabel}
-      </button>
-      {error ? (
-        <span className="text-caption text-signal-down" role="alert">
-          {error}
-        </span>
-      ) : null}
-    </form>
   );
 }

@@ -10,10 +10,33 @@ export const PAPER_TRADING_SESSION_HARD_STOP_PCT = -7;
 export const PAPER_TRADING_MAX_TURNOVER_PER_TICK_PCT = 50;
 
 // ─── 장중 단타(cli-agent) 전용 ────────────────────────────────────────────────
-/** 단타 기본 틱/판단 주기(분) — 백테스트 확정 전 5분으로 시작. */
-export const PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES = 5;
-/** 분봉 단위(분) — 시그널/레벨 계산 타임프레임. 3/5/15 중 선택, 기본 5. */
-export const PAPER_TRADING_INTRADAY_TIMEFRAME = 5;
+
+/** env 정수 파서 — 미설정/비정상은 fallback. */
+function envInt(name: string, fallback: number, min: number, max: number): number {
+  const raw = Number.parseInt(process.env[name] ?? "", 10);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, raw));
+}
+
+/**
+ * 단타 틱/판단 주기(분) — `INTRADAY_TICK_INTERVAL_MINUTES` 로 조절(기본 5, 1~30).
+ * 2분 등 단축 시 LLM 콜 빈도가 비례 증가(로컬 CLI 구독이라 토큰 과금은 없음).
+ */
+export const PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES = envInt(
+  "INTRADAY_TICK_INTERVAL_MINUTES",
+  5,
+  1,
+  30,
+);
+/**
+ * 분봉 단위(분) — `INTRADAY_TIMEFRAME` 로 조절. 1/3/5/15 지원, 기본 5.
+ * ⚠️ 1분봉은 페치 볼륨이 크다(KIS 30봉/콜 vs 토스 200봉/콜) — 1분 운용은
+ * `MARKET_DATA_SOURCE=toss` 병행을 권장.
+ */
+export const PAPER_TRADING_INTRADAY_TIMEFRAME = ((): number => {
+  const v = envInt("INTRADAY_TIMEFRAME", 5, 1, 15);
+  return [1, 3, 5, 15].includes(v) ? v : 5;
+})();
 /** 단타 익절 목표 캡(%) — 과욕 차단(사후 게이트). */
 export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = 5;
 /** 세션 일일 손실 kill(%) — 도달 시 신규 진입 차단(관리/청산만). */

@@ -69,6 +69,12 @@ export interface IntradayContext {
   previousDecision: IntradayDecisionEcho | null;
   /** 장중 시각 "HH:mm"(KST) — 15:00 이후 신규진입 금지 게이트. */
   nowHhmm: string;
+  /**
+   * 캔들 미시구조 피처 블록(결정론 산출, 한국어 포맷) — 마감봉 꼬리·스윙 구조(저점 붕괴/전고
+   * 돌파)·피보나치 되돌림·단기 박스. `lib/signal/intradayFeatures` 가 만들고 프롬프트에 그대로
+   * 끼운다. 봉 부족 시 빈 문자열(무주입).
+   */
+  featuresText?: string;
 }
 
 /** LLM(②진입·청산 판단가)이 생성하는 부분 — 서버가 메타로 보강. */

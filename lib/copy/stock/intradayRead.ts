@@ -98,7 +98,7 @@ export const INTRADAY_PAPER_COPY = {
   error: "모의 단타 세션 처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
   disclaimer: "가상 체결 기록이에요. 실제 주문은 발생하지 않아요.",
 
-  /* 워치 표 (토스 랭킹 표 스타일) — 컬럼 헤더·행 액션. */
+  /* 워치 표 (토스 랭킹 표 스타일) — 컬럼 헤더·행 액션(input·버튼 컬럼 포함). */
   table: {
     colStock: "종목",
     colPrice: "현재가",
@@ -107,9 +107,11 @@ export const INTRADAY_PAPER_COPY = {
     colValue: "평가금액",
     colPosition: "포지션",
     colLast: "최근 판단",
+    colCash: "모의 투자금(원)",
     none: "—",
-    readRun: "판단 받기",
-    readRerun: "다시 판단",
+    readRun: "판단",
+    readRunning: "판단 중",
+    startRun: "모의 시작",
     ordersButton: "체결 내역",
     removeAria: "워치에서 제거",
     expandAria: "상세 접기/펼치기",

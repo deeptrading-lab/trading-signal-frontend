@@ -9,6 +9,10 @@
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
+import {
+  extractIntradayFeatures,
+  formatIntradayFeatures,
+} from "@/lib/signal/intradayFeatures";
 import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
 import {
   FLOW_ANALYST_SYSTEM,
@@ -150,6 +154,11 @@ function buildContext(
   signal: DecisionSignal,
   levels: IntradayLevels,
 ): IntradayContext {
+  // 캔들 미시구조(마감봉 꼬리·스윙·피보나치·박스) — 결정론 산출, 봉 부족 시 빈 문자열.
+  const profile = resolveIntradayProfile(input.timeframe);
+  const featuresText = formatIntradayFeatures(
+    extractIntradayFeatures(input.minuteCandles, input.timeframe, profile.structureLookback),
+  );
   return {
     ticker: input.ticker,
     name: input.name,
@@ -162,6 +171,7 @@ function buildContext(
     position: input.position,
     previousDecision: input.previousDecision,
     nowHhmm: input.nowHhmm,
+    featuresText,
   };
 }
 
