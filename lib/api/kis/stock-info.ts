@@ -28,6 +28,7 @@ import type {
   StockInfo,
 } from "./types";
 import { withTossFallback } from "@/lib/api/marketdata/source";
+import { createKisMetaLoader } from "./tossEnrich";
 import { fetchStockInfoToss } from "@/lib/api/toss/stockMaster";
 
 type AuthHeaders = {
@@ -54,10 +55,36 @@ async function buildAuthHeaders(trId: string): Promise<AuthHeaders> {
  *
  * @param ticker 6자리 종목코드 — `PDNO` 로 그대로 사용 (응답 pdno 는 12자리 패딩이지만 입력값 유지).
  */
+/**
+ * 토스 모드 종목정보 보강 — 표준산업분류명(industryName)·관리종목(isAdminItem)·코스피200 은
+ * 토스 미제공이라 KIS `search-stock-info` 값을 best-effort 합성한다. isAdminItem=false 고정
+ * 문제(리뷰 지적 — 관리종목 경고 거짓 음성)도 보강 성공 시 해소된다.
+ * ⚠️ KIS 쪽은 실전(prod) 전용 — vts/실패는 실패 캐시로 조용히 스킵(기존 디그레이드 유지).
+ */
+const loadKisInfoDetail = createKisMetaLoader({
+  ttlMs: 60 * 60_000,
+  failureTtlMs: 60_000,
+  budgetMs: 1_200,
+  fetcher: async (ticker: string) => {
+    const kis = await fetchStockInfoKis(ticker);
+    return {
+      industryName: kis.industryName,
+      isAdminItem: kis.isAdminItem,
+      isKospi200: kis.isKospi200,
+    };
+  },
+});
+
+async function enrichTossInfo(info: StockInfo): Promise<StockInfo> {
+  const detail = await loadKisInfoDetail(info.ticker);
+  if (!detail) return info;
+  return { ...info, ...detail };
+}
+
 export async function fetchStockInfo(ticker: string): Promise<StockInfo> {
   return withTossFallback(
     "종목정보",
-    () => fetchStockInfoToss(ticker),
+    () => fetchStockInfoToss(ticker).then(enrichTossInfo),
     () => fetchStockInfoKis(ticker),
   );
 }
