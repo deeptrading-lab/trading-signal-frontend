@@ -191,6 +191,7 @@ export async function resolveIntradayTickDecision(
     name: stock.name,
     minuteCandles,
     timeframe,
+    tickIntervalMinutes: session.tickIntervalMinutes,
     dailyRegime,
     price,
     nowHhmm,

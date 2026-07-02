@@ -104,15 +104,15 @@ export async function createPaperTradingSession(
   );
   const targetReturnPct = sanitizePositiveNumber(request.targetReturnPct, 5);
   const stocks = normalizeStocks(request);
-  // 요청 provider 를 존중(화이트리스트). cli-agent 는 단타 주기(5분)로 — 30분이면 5분 cron 이 같은
-  // 틱 윈도로 묶여 중복 제거되므로 단타 루프가 동작하지 않는다.
+  // 요청 provider 를 존중(화이트리스트). cli-agent 는 단타 주기로 — 세션별 요청값(표 드랍다운) 우선,
+  // 미지정 시 env 기본(INTRADAY_TICK_INTERVAL_MINUTES, 기본 5). mock 은 30분 유지.
   const decisionProvider =
     request.decisionProvider === "cli-agent" || request.decisionProvider === "existing-ai"
       ? request.decisionProvider
       : "mock";
   const tickIntervalMinutes =
     decisionProvider === "cli-agent"
-      ? PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES
+      ? (request.tickIntervalMinutes ?? PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES)
       : PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES;
   const session: PaperTradingSession = {
     id: randomUUID(),

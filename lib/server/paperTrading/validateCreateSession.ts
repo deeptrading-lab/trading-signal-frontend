@@ -7,7 +7,10 @@
  * - `existing-ai` 는 runTick 미구현(무단 mock 폴백 방지)이라 계속 거절한다.
  */
 
-import type { CreatePaperTradingSessionRequest } from "@/lib/types/paperTrading/paperTrading";
+import {
+  PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS,
+  type CreatePaperTradingSessionRequest,
+} from "@/lib/types/paperTrading/paperTrading";
 
 export function validateCreateSessionRequest(
   body: Partial<CreatePaperTradingSessionRequest>,
@@ -36,6 +39,14 @@ export function validateCreateSessionRequest(
     body.decisionProvider !== "cli-agent"
   ) {
     return "판단 방식은 MVP(mock) 또는 장중 단타 에이전트(cli-agent)만 사용할 수 있어요. 실행에는 Codex 또는 Claude CLI가 필요합니다.";
+  }
+  if (
+    body.tickIntervalMinutes !== undefined &&
+    !(PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS as readonly number[]).includes(
+      body.tickIntervalMinutes,
+    )
+  ) {
+    return `판단 주기는 ${PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.join("·")}분 중에서 선택해 주세요.`;
   }
   return null;
 }

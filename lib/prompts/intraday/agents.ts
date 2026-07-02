@@ -36,7 +36,7 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     : "없음 (첫 틱)";
 
   return [
-    `종목: ${ctx.ticker} ${ctx.name} | 시각: ${ctx.nowHhmm} KST | 현재가: ${won(ctx.price)} | ${ctx.timeframe}분봉`,
+    `종목: ${ctx.ticker} ${ctx.name} | 시각: ${ctx.nowHhmm} KST | 현재가: ${won(ctx.price)} | ${ctx.timeframe}분봉 | 판단 주기 ${ctx.intervalMinutes}분(다음 점검은 약 ${ctx.intervalMinutes}분 후)`,
     "",
     `[분봉 시그널] 종합 ${s.action} | 점수 ${s.score.toFixed(0)}/100 | 동의도 ${Math.round(s.confidence * 100)}% | 레짐 ${regimeLabel}`,
     `  축별: ${axes}`,
@@ -117,6 +117,16 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
 - 오프닝 레인지(~09:30): 상단 돌파 유지면 추세 단서(거래량 확인), 레인지 안 왕복이면 관망.
 - RSI 다이버전스: 가격 저점은 낮아지는데 RSI 저점이 높아지면(강세 다이버전스) 반전 단서 —
   단독 진입 금지, 아래꼬리·양봉 전환 같은 캔들 확인 후 진입. 약세 다이버전스는 익절·경계 단서.
+
+[판단 주기 인지 — 시야를 주기에 맞추기]
+컨텍스트의 "판단 주기 N분"은 다음 점검까지 개입할 수 없는 시간입니다. 그 사이 목표/손절 외엔
+아무 조치도 못 하므로 시야(horizon)를 주기에 맞추세요:
+- 1~3분 주기: 초단타 — 짧은 모멘텀·꼬리 반응까지 활용 가능. 다만 노이즈에 과민 반응 금지.
+- 5분 이상 주기: **다음 주기까지 견딜 셋업만 진입**(주기 내 변동을 감당할 목표·손절 폭),
+  순간 체결을 노리는 틱 스캘핑식 진입 금지. 판단은 "지금 N분 뒤를 내다보고" 내리세요.
+- 10~15분 주기: 시간당 4~6회 점검 — 초단타가 아니라 짧은 스윙 관점. 직전 주기 대비 구조
+  변화(레벨 돌파/이탈·구조 전환) 위주로 판단하고, 목표는 2~5% 범위에서 여유 있게.
+- expectedHoldingMinutes 는 판단 주기의 배수로 제시하세요.
 
 [포지션 크기 — 분할 매수·분할 매도]
 포지션 크기도 판단의 일부입니다. 그때그때 보수적/공격적 접근을 스스로 정하세요.

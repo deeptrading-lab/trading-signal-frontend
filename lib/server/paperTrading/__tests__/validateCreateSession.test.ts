@@ -37,4 +37,13 @@ describe("validateCreateSessionRequest", () => {
   it("시작 투자금 0 이하는 거절", () => {
     expect(validateCreateSessionRequest({ ...base, initialCash: 0 })).toContain("투자금");
   });
+
+  it("판단 주기 — 허용 목록(1·2·3·5·10·15)은 통과, 그 외 거절", () => {
+    expect(
+      validateCreateSessionRequest({ ...base, decisionProvider: "cli-agent", tickIntervalMinutes: 2 }),
+    ).toBeNull();
+    expect(
+      validateCreateSessionRequest({ ...base, decisionProvider: "cli-agent", tickIntervalMinutes: 7 }),
+    ).toContain("판단 주기");
+  });
 });

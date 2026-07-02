@@ -117,7 +117,7 @@ describe("paper trading session store", () => {
 });
 
 describe("cli-agent 세션 생성 (intraday-paper-watch)", () => {
-  it("단타 주기(5분)로 강제되고, KIS 미설정 환경에선 결정론 폴백으로 첫 틱을 만든다", async () => {
+  it("단타 주기(기본 5분)로 강제되고, KIS 미설정 환경에선 결정론 폴백으로 첫 틱을 만든다", async () => {
     resetPaperTradingStoreForTest();
     const detail = await createPaperTradingSession({
       name: "단타 모의 · 삼성전자",
@@ -136,6 +136,34 @@ describe("cli-agent 세션 생성 (intraday-paper-watch)", () => {
     // 테스트 환경 = KIS 미설정 → 분봉 없음 → 사전 게이트가 LLM 을 스킵하고 결정론 폴백(HOLD).
     expect(detail.latestDecision?.action).toBe("HOLD");
     expect(detail.ticks[0]?.rationale).toContain("결정론 폴백");
+  });
+
+  it("요청 주기(2분)가 있으면 세션에 그대로 반영된다", async () => {
+    resetPaperTradingStoreForTest();
+    const detail = await createPaperTradingSession({
+      name: "단타 모의 · 삼성전자",
+      tickers: ["005930"],
+      stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+      initialCash: 1_000_000,
+      targetReturnPct: 5,
+      riskMode: "balanced",
+      decisionProvider: "cli-agent",
+      tickIntervalMinutes: 2,
+    }, { priceSnapshotProvider: testPriceProvider });
+
+    expect(detail.session.tickIntervalMinutes).toBe(2);
+    // mock 세션은 요청 주기를 무시하고 30분 유지.
+    const mock = await createPaperTradingSession({
+      name: "mock",
+      tickers: ["005930"],
+      stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+      initialCash: 1_000_000,
+      targetReturnPct: 5,
+      riskMode: "balanced",
+      decisionProvider: "mock",
+      tickIntervalMinutes: 2,
+    }, { priceSnapshotProvider: testPriceProvider });
+    expect(mock.session.tickIntervalMinutes).toBe(30);
   });
 });
 

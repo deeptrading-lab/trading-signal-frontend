@@ -74,6 +74,7 @@ export function useIntradayPaperWatch(watchTickers: string[]) {
   const start = (
     stock: PaperTradingSelectedStock,
     initialCash: number,
+    tickIntervalMinutes: number,
   ): Promise<PaperTradingSessionDetail> =>
     create({
       name: `단타 모의 · ${stock.name}`,
@@ -83,6 +84,7 @@ export function useIntradayPaperWatch(watchTickers: string[]) {
       targetReturnPct: 5,
       riskMode: "balanced",
       decisionProvider: "cli-agent",
+      tickIntervalMinutes,
     });
 
   return { sessionByTicker, runningOrphans, runningSessionIds, isCreating, start };

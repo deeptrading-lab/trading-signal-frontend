@@ -60,6 +60,8 @@ export interface IntradayCliInput {
   /** 오름차순 분봉(date="YYYY-MM-DDTHH:mm"). */
   minuteCandles: StockMinuteCandle[];
   timeframe: number;
+  /** 판단 주기(분) — 세션 tickIntervalMinutes. 프롬프트 horizon 인지용. */
+  tickIntervalMinutes: number;
   /** 일봉 레짐(-1/0/1) — 분봉 평가 regimeOverride. */
   dailyRegime: RuleDirection;
   /** 현재가(원). */
@@ -165,6 +167,7 @@ function buildContext(
     asOf: signal.asOf,
     price: input.price,
     timeframe: input.timeframe,
+    intervalMinutes: input.tickIntervalMinutes,
     signal,
     levels,
     recentBars: buildRecentBars(input.minuteCandles),

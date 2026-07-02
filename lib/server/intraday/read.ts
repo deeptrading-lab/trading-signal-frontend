@@ -18,6 +18,7 @@ import { kstHhmm } from "@/lib/server/paperTrading/intradayTickDecision";
 import {
   PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
   PAPER_TRADING_INTRADAY_PRIOR_DAYS,
+  PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES,
   PAPER_TRADING_INTRADAY_TIMEFRAME,
 } from "@/lib/server/paperTrading/constants";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
@@ -70,6 +71,8 @@ export async function readIntraday(
     name,
     minuteCandles,
     timeframe,
+    // on-demand 단독 판단엔 세션 주기가 없다 — env 기본 주기를 참고 시야로 전달.
+    tickIntervalMinutes: PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES,
     dailyRegime,
     price,
     nowHhmm,

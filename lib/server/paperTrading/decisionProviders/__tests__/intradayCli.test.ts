@@ -54,6 +54,7 @@ function ctx(over: Partial<IntradayContext> = {}): IntradayContext {
     asOf: "2026-06-28T10:00",
     price: 10_000,
     timeframe: 5,
+    intervalMinutes: 5,
     signal: signal(),
     levels: levels(),
     recentBars: [],

@@ -31,11 +31,15 @@ import {
   STATUS_LABEL,
 } from "@/lib/copy/paperTrading/labels";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
-import type {
-  PaperTradingSelectedStock,
-  PaperTradingSession,
-  PaperTradingSessionDetail,
+import {
+  PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS,
+  type PaperTradingSelectedStock,
+  type PaperTradingSession,
+  type PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
+
+/** 주기 드랍다운 기본값(분) — 초단타 기본. */
+const DEFAULT_INTERVAL_MIN = 2;
 
 const T = P.table;
 
@@ -62,6 +66,7 @@ export interface IntradayWatchTableProps {
   onStart: (
     stock: PaperTradingSelectedStock,
     initialCash: number,
+    tickIntervalMinutes: number,
   ) => Promise<PaperTradingSessionDetail>;
   onRemove: (ticker: string) => void;
 }
@@ -88,6 +93,7 @@ export function IntradayWatchTable({
               <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
               <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
+              <th className="py-sm pr-md text-center font-normal">{T.colInterval}</th>
               <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
               <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
               <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
@@ -152,6 +158,7 @@ function WatchRow({
   const [expanded, setExpanded] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cash, setCash] = useState("10000000");
+  const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
   const [startError, setStartError] = useState<string | null>(null);
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
@@ -180,7 +187,7 @@ function WatchRow({
     }
     setStartError(null);
     try {
-      await onStart({ ticker: item.ticker, name: item.name }, amount);
+      await onStart({ ticker: item.ticker, name: item.name }, amount, intervalMin);
     } catch (err) {
       setStartError(isApiError(err) ? err.message : P.error);
       setExpanded(true);
@@ -251,6 +258,27 @@ function WatchRow({
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => setCash(e.target.value)}
             />
+          )}
+        </td>
+
+        {/* 판단 주기 — 미시작이면 드랍다운, 시작 후엔 세션 주기 표시 */}
+        <td className="py-sm pr-md text-center">
+          {current ? (
+            <span className="tabular-nums text-text-muted">{current.tickIntervalMinutes}분</span>
+          ) : (
+            <select
+              className="h-8 rounded-md border border-border-line bg-surface-base px-sm text-body-sm text-text-strong tabular-nums"
+              value={intervalMin}
+              aria-label={T.colInterval}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setIntervalMin(Number(e.target.value))}
+            >
+              {PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.map((min) => (
+                <option key={min} value={min}>
+                  {min}분
+                </option>
+              ))}
+            </select>
           )}
         </td>
 
@@ -351,7 +379,7 @@ function WatchRow({
       {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
       {expanded ? (
         <tr className="border-t border-border-line">
-          <td colSpan={11} className="bg-surface-muted px-lg py-md">
+          <td colSpan={12} className="bg-surface-muted px-lg py-md">
             <div className="flex flex-col gap-sm">
               {startError ? (
                 <p className="text-caption text-signal-down" role="alert">

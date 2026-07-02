@@ -46,6 +46,7 @@ export async function POST(request: Request): Promise<Response> {
       targetReturnPct: body.targetReturnPct ?? 5,
       riskMode: body.riskMode ?? "balanced",
       decisionProvider: body.decisionProvider ?? "mock",
+      tickIntervalMinutes: body.tickIntervalMinutes,
     });
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch {

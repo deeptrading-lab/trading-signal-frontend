@@ -167,6 +167,9 @@ export type PaperTradingSessionDetail = {
   latestDecision: PaperTradingDecision | null;
 };
 
+/** 단타(cli-agent) 판단 주기 선택지(분) — UI 드랍다운·서버 검증 공용. 15분 초과는 단타 아님. */
+export const PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS = [1, 2, 3, 5, 10, 15] as const;
+
 export type CreatePaperTradingSessionRequest = {
   name: string;
   tickers: string[];
@@ -175,6 +178,8 @@ export type CreatePaperTradingSessionRequest = {
   targetReturnPct: number;
   riskMode: PaperTradingRiskMode;
   decisionProvider: PaperTradingDecisionProvider;
+  /** 단타(cli-agent) 판단 주기(분) — 미지정 시 서버 기본(env). mock 세션에선 무시. */
+  tickIntervalMinutes?: number;
 };
 
 export type PaperTradingSessionsResponse = {

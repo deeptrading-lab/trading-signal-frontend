@@ -60,6 +60,11 @@ export interface IntradayContext {
   price: number;
   /** 분봉 단위(분). */
   timeframe: number;
+  /**
+   * 판단 주기(분) — 다음 점검까지 개입할 수 없는 시간. LLM 이 진입/청산 시야(horizon)를
+   * 주기에 맞추도록 컨텍스트에 노출한다(5분 이상 = 다음 주기까지 견딜 셋업만).
+   */
+  intervalMinutes: number;
   /** 분봉 결정론 시그널 압축본(4축/score/action/regime). */
   signal: DecisionSignal;
   levels: IntradayLevels;
