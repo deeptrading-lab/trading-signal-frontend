@@ -1,19 +1,20 @@
 /**
  * IntradayWatchWorkspace — 단타 워치 워크스페이스 (B). intraday-scalping-agent §0 + intraday-paper-watch.
  *
- * 수급 상위 후보(flow/top10)·종목 검색에서 종목을 골라 워치 목록에 추가 → 각 종목의 장중 단타
- * 판단(참고)을 on-demand 로 보고, 카드 하단 "AI 모의 단타"로 cli-agent 모의투자 세션을 시작한다.
- * 화면이 열려 있는 동안 useIntradayPaperAutoTick 이 장중 5분 창 단위 자동 판단·가상 체결을 민다.
+ * 상단 공용 종목 검색(StockSearchPicker) → 아래 추천 후보(수급 상위 + 거래량 상위) → 워치 목록.
+ * 각 워치 카드에서 장중 단타 판단(참고)을 on-demand 로 보고, "AI 모의 단타"로 cli-agent
+ * 모의투자 세션을 시작한다. 화면이 열려 있는 동안 useIntradayPaperAutoTick 이 장중 5분 창 단위
+ * 자동 판단·가상 체결을 민다.
  * ⚠️ 의사결정 보조 — 자동 수익/집행 주장 없음, 실제 매매는 사람이 직접.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
-import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
+import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import {
   intradaySessionStock,
   useIntradayPaperWatch,
@@ -21,6 +22,7 @@ import {
 import { useIntradayPaperAutoTick } from "@/hooks/intraday/useIntradayPaperAutoTick";
 import { IntradayReadSection } from "@/components/stock/IntradayReadSection";
 import { IntradayPaperControls } from "@/components/intraday/IntradayPaperControls";
+import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
   INTRADAY_WATCH_COPY as W,
@@ -28,6 +30,9 @@ import {
 import type { InvestorFlowRow } from "@/lib/types/flow/top10";
 
 type Watch = { ticker: string; name: string };
+
+/** 추천 칩 1개 데이터 — 수급·거래량 소스 공통 최소 형태. */
+type Candidate = { ticker: string; name: string; changePercent: number };
 
 const MAX_CANDIDATES = 14;
 
@@ -45,35 +50,21 @@ function dedupCandidates(rows: InvestorFlowRow[]): InvestorFlowRow[] {
 
 export function IntradayWatchWorkspace() {
   const [watch, setWatch] = useState<Watch[]>([]);
-  const [keyword, setKeyword] = useState("");
-  const [debouncedKeyword, setDebouncedKeyword] = useState("");
-  const { data: flow, isLoading } = useQueryFlowTop10("today");
-  const { data: searchResults = [], isPending: isSearching } = useQueryStockSearch(
-    debouncedKeyword,
-    { enabled: debouncedKeyword.length > 0 },
-  );
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedKeyword(keyword.trim()), 180);
-    return () => window.clearTimeout(id);
-  }, [keyword]);
+  const { data: flow, isLoading: flowLoading } = useQueryFlowTop10("today");
+  const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
 
   const watchTickers = watch.map((item) => item.ticker);
   const { sessionByTicker, runningOrphans, runningSessionIds, isCreating, start } =
     useIntradayPaperWatch(watchTickers);
   const { isTicking } = useIntradayPaperAutoTick(runningSessionIds);
 
-  const candidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
+  const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
+  const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
   const watching = new Set(watchTickers);
 
   const add = (item: Watch) =>
     setWatch((prev) => (prev.some((x) => x.ticker === item.ticker) ? prev : [...prev, item]));
   const remove = (ticker: string) => setWatch((prev) => prev.filter((x) => x.ticker !== ticker));
-  const addFromSearch = (item: Watch) => {
-    add(item);
-    setKeyword("");
-    setDebouncedKeyword("");
-  };
 
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
@@ -86,82 +77,32 @@ export function IntradayWatchWorkspace() {
         {isTicking ? <span className="ml-auto badge-info">{P.autoTicking}</span> : null}
       </header>
 
-      {/* 수급 상위 후보 + 종목 검색 */}
-      <section className="card flex flex-col gap-sm" aria-label={W.candidatesTitle}>
-        <div className="flex items-baseline gap-sm">
-          <h2 className="text-h2 text-text-strong">{W.candidatesTitle}</h2>
-          <span className="text-caption text-text-muted">{W.candidatesHint}</span>
-        </div>
-        {isLoading ? (
-          <div className="text-body text-text-muted">{W.candidatesLoading}</div>
-        ) : candidates.length === 0 ? (
-          <div className="text-body text-text-muted">{W.candidatesEmpty}</div>
-        ) : (
-          <div className="flex flex-wrap gap-xs">
-            {candidates.map((c) => (
-              <button
-                key={c.ticker}
-                type="button"
-                onClick={() => add({ ticker: c.ticker, name: c.name })}
-                disabled={watching.has(c.ticker)}
-                className={cn(
-                  "text-caption px-sm py-xs rounded-pill border border-border-line transition-colors cursor-pointer",
-                  "hover:bg-surface-muted disabled:opacity-40 disabled:cursor-default",
-                )}
-              >
-                <span className="text-text-strong">{c.name}</span>{" "}
-                <span
-                  className={cn(
-                    "tabular-nums",
-                    c.changePercent > 0 ? "text-signal-up" : c.changePercent < 0 ? "text-signal-down" : "text-text-muted",
-                  )}
-                >
-                  {c.changePercent >= 0 ? "+" : ""}
-                  {c.changePercent.toFixed(1)}%
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+      {/* 종목 검색(공용 피커) + 추천 후보 */}
+      <section className="card flex flex-col gap-md" aria-label={W.recommendTitle}>
+        <StockSearchPicker
+          placeholder={W.searchPlaceholder}
+          onSelect={(stock) => add({ ticker: stock.ticker, name: stock.name })}
+        />
 
-        {/* 종목 검색 — 수급 후보 밖 종목도 워치에 추가 */}
-        <label className="relative flex flex-col gap-xs">
-          <span className="sr-only">{W.searchPlaceholder}</span>
-          <input
-            className="h-input-h w-full rounded-md border border-border-line bg-surface-base px-md text-body-sm text-text-strong"
-            value={keyword}
-            placeholder={W.searchPlaceholder}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
-          {debouncedKeyword.length > 0 ? (
-            <div className="dropdown-panel absolute left-0 right-0 top-full z-20 mt-xs flex max-h-[260px] flex-col gap-[2px] overflow-y-auto">
-              {isSearching && searchResults.length === 0 ? (
-                <p className="px-md py-dropdown-item-py text-body-sm text-text-muted">{W.searching}</p>
-              ) : searchResults.length === 0 ? (
-                <p className="px-md py-dropdown-item-py text-body-sm text-text-muted">{W.searchEmpty}</p>
-              ) : (
-                searchResults.map((stockItem) => (
-                  <button
-                    key={stockItem.ticker}
-                    type="button"
-                    className="search-result-item w-full text-left"
-                    onClick={() => addFromSearch({ ticker: stockItem.ticker, name: stockItem.name })}
-                  >
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-body-sm-strong text-text-strong">{stockItem.name}</span>
-                      <span className="search-result-item-meta">
-                        {stockItem.ticker} · {stockItem.market}
-                      </span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          ) : null}
-        </label>
+        <CandidateChips
+          title={W.flowTitle}
+          hint={W.flowHint}
+          isLoading={flowLoading}
+          candidates={flowCandidates}
+          watching={watching}
+          onAdd={add}
+        />
+        <CandidateChips
+          title={W.volumeTitle}
+          hint={W.volumeHint}
+          isLoading={volumeLoading}
+          candidates={volumeCandidates}
+          watching={watching}
+          onAdd={add}
+        />
       </section>
 
-      {/* 진행 중 모의 세션 복원 칩 — 새로고침으로 워치가 비어도 세션은 서버에 살아있다 */}
+      {/* 진행 중 모의 세션 복원 칩 — 새로고침으로 워치가 비어도 세션은 살아있다 */}
       {runningOrphans.length > 0 ? (
         <section className="card flex flex-col gap-xs" aria-label={W.runningTitle}>
           <div className="flex items-baseline gap-sm">
@@ -219,6 +160,67 @@ export function IntradayWatchWorkspace() {
       )}
 
       <p className="text-caption text-text-muted">{W.disclaimer}</p>
+    </div>
+  );
+}
+
+/** 추천 후보 칩 행 — 수급/거래량 공통 렌더(이미 워치면 비활성). */
+function CandidateChips({
+  title,
+  hint,
+  isLoading,
+  candidates,
+  watching,
+  onAdd,
+}: {
+  title: string;
+  hint: string;
+  isLoading: boolean;
+  candidates: Candidate[];
+  watching: Set<string>;
+  onAdd: (item: Watch) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-xs" aria-label={title}>
+      <div className="flex items-baseline gap-sm">
+        <h2 className="text-body-strong text-text-strong">{title}</h2>
+        <span className="text-caption text-text-muted">{hint}</span>
+      </div>
+      {isLoading ? (
+        <div className="text-body-sm text-text-muted">{W.candidatesLoading}</div>
+      ) : candidates.length === 0 ? (
+        <div className="text-body-sm text-text-muted">{W.candidatesEmpty}</div>
+      ) : (
+        <div className="flex flex-wrap gap-xs">
+          {candidates.map((c) => (
+            <button
+              key={c.ticker}
+              type="button"
+              onClick={() => onAdd({ ticker: c.ticker, name: c.name })}
+              disabled={watching.has(c.ticker)}
+              className={cn(
+                "text-caption px-sm py-xs rounded-pill border border-border-line transition-colors cursor-pointer",
+                "hover:bg-surface-muted disabled:opacity-40 disabled:cursor-default",
+              )}
+            >
+              <span className="text-text-strong">{c.name}</span>{" "}
+              <span
+                className={cn(
+                  "tabular-nums",
+                  c.changePercent > 0
+                    ? "text-signal-up"
+                    : c.changePercent < 0
+                      ? "text-signal-down"
+                      : "text-text-muted",
+                )}
+              >
+                {c.changePercent >= 0 ? "+" : ""}
+                {c.changePercent.toFixed(1)}%
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

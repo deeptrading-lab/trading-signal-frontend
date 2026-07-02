@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatMoney } from "@/lib/utils/formatMoney";
 import { isApiError } from "@/lib/api/errors";
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
+import { IntradayPaperDetailSheet } from "@/components/intraday/IntradayPaperDetailSheet";
 import { INTRADAY_PAPER_COPY as P } from "@/lib/copy/stock/intradayRead";
 import {
   ACTION_LABEL,
@@ -55,7 +56,7 @@ export function IntradayPaperControls({
         <span className="ml-auto text-caption text-text-muted">{P.disclaimer}</span>
       </div>
       {session ? (
-        <SessionSummary session={session} />
+        <SessionSummary session={session} stock={stock} />
       ) : (
         <StartForm stock={stock} isCreating={isCreating} onStart={onStart} />
       )}
@@ -130,69 +131,109 @@ function kstHhmm(iso: string): string {
   }).format(new Date(iso));
 }
 
-function SessionSummary({ session }: { session: PaperTradingSession }) {
+function SessionSummary({
+  session,
+  stock,
+}: {
+  session: PaperTradingSession;
+  stock: PaperTradingSelectedStock;
+}) {
   const { detail, isPatching, setStatus } = usePaperTradingSession(session.id);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const current = detail?.session ?? session;
   const position = detail?.positions.find((item) => item.quantity >= 1) ?? null;
   const lastTick = detail?.ticks.at(-1) ?? null;
   const running = current.status === "running";
+  const tone = current.returnPct >= 0 ? "text-signal-up" : "text-signal-down";
 
   return (
-    <div className="flex flex-col gap-xs">
-      <div className="flex flex-wrap items-center gap-sm text-body-sm">
-        <span className="badge-info">{STATUS_LABEL[current.status]}</span>
-        <span
-          className={cn(
-            "text-body-sm-strong tabular-nums",
-            current.returnPct >= 0 ? "text-signal-up" : "text-signal-down",
-          )}
-        >
-          {P.metricReturn} {formatPct(current.returnPct)}
-        </span>
-        <span className="text-text-muted tabular-nums">
-          {P.metricValue} {formatMoney(current.portfolioValue)}
-        </span>
-        <span className="text-text-muted tabular-nums">
-          {P.metricCash} {formatMoney(current.cash)}
-        </span>
-        <div className="ml-auto flex items-center gap-xs">
-          <button
-            type="button"
-            className="button-secondary inline-flex items-center gap-xs"
-            disabled={isPatching}
-            onClick={() => setStatus(running ? "paused" : "running")}
-          >
-            {running ? (
-              <Pause className="size-3" aria-hidden />
-            ) : (
-              <Play className="size-3" aria-hidden />
-            )}
-            {running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
-          </button>
-          <Link href={`/dashboard/paper-trading/${current.id}`} className="button-secondary">
-            {P.detailLink}
-          </Link>
+    <>
+      {/* 카드 본문 클릭 → 체결 내역 상세 시트. 내부 버튼은 전파 차단. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`${stock.name} ${P.sheet.ariaLabel} 열기`}
+        onClick={() => setSheetOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setSheetOpen(true);
+          }
+        }}
+        className={cn(
+          "group relative flex cursor-pointer flex-col gap-xs rounded-md border-l-4 bg-surface-base p-sm",
+          "transition-colors hover:bg-surface-muted",
+          current.returnPct >= 0 ? "border-signal-up" : "border-signal-down",
+        )}
+      >
+        <div className="flex flex-wrap items-center gap-sm text-body-sm">
+          <span className="badge-info">{STATUS_LABEL[current.status]}</span>
+          <span className={cn("text-body-sm-strong tabular-nums", tone)}>
+            {P.metricReturn} {formatPct(current.returnPct)}
+          </span>
+          <span className="text-text-muted tabular-nums">
+            {P.metricValue} {formatMoney(current.portfolioValue)}
+          </span>
+          <span className="text-text-muted tabular-nums">
+            {P.metricCash} {formatMoney(current.cash)}
+          </span>
+          <div className="ml-auto flex items-center gap-xs">
+            <button
+              type="button"
+              className="button-secondary inline-flex items-center gap-xs"
+              disabled={isPatching}
+              onClick={(e) => {
+                e.stopPropagation();
+                void setStatus(running ? "paused" : "running");
+              }}
+            >
+              {running ? (
+                <Pause className="size-3" aria-hidden />
+              ) : (
+                <Play className="size-3" aria-hidden />
+              )}
+              {running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
+            </button>
+            <Link
+              href={`/dashboard/paper-trading/${current.id}`}
+              className="button-secondary"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {P.detailLink}
+            </Link>
+          </div>
         </div>
+
+        <div className="flex flex-wrap gap-sm text-caption text-text-muted">
+          <span className="tabular-nums">
+            {P.positionLabel}{" "}
+            {position
+              ? `${position.quantity}주 · 평단 ${formatMoney(position.avgEntryPrice)} · 미실현 ${formatPct(position.unrealizedPnlPct)}`
+              : P.positionNone}
+          </span>
+          <span className="tabular-nums">
+            {P.ticksLabel} {detail ? `${detail.ticks.length}회` : "—"}
+          </span>
+          <span className="ml-auto text-accent-vivid opacity-0 transition-opacity group-hover:opacity-100">
+            {P.cardOpenHint}
+          </span>
+        </div>
+
+        <p className="truncate text-caption text-text-muted">
+          {P.lastDecision}:{" "}
+          {lastTick
+            ? `${ACTION_LABEL[lastTick.decision.action]} · ${kstHhmm(lastTick.tickWindowStart)} — ${lastTick.rationale}`
+            : P.noDecision}
+        </p>
       </div>
 
-      <div className="flex flex-wrap gap-sm text-caption text-text-muted">
-        <span className="tabular-nums">
-          {P.positionLabel}{" "}
-          {position
-            ? `${position.quantity}주 · 평단 ${formatMoney(position.avgEntryPrice)} · 미실현 ${formatPct(position.unrealizedPnlPct)}`
-            : P.positionNone}
-        </span>
-        <span className="tabular-nums">
-          {P.ticksLabel} {detail ? `${detail.ticks.length}회` : "—"}
-        </span>
-      </div>
-
-      <p className="truncate text-caption text-text-muted">
-        {P.lastDecision}:{" "}
-        {lastTick
-          ? `${ACTION_LABEL[lastTick.decision.action]} · ${kstHhmm(lastTick.tickWindowStart)} — ${lastTick.rationale}`
-          : P.noDecision}
-      </p>
-    </div>
+      {sheetOpen ? (
+        <IntradayPaperDetailSheet
+          session={current}
+          stockName={stock.name}
+          onClose={() => setSheetOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }

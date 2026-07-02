@@ -66,6 +66,8 @@ export const queryKeys = {
     ticker: ["market", "ticker"] as const,
     /** CNN(미국) 공포·탐욕 지수 — 단일, 인자 없음. */
     fearGreed: ["market", "fear-greed"] as const,
+    /** 거래량 순위 상위(단타워치 후보 추천) — 인자 없음. */
+    volumeRank: ["market", "volume-rank"] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>

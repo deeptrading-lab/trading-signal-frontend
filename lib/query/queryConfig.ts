@@ -144,6 +144,14 @@ export const queryConfig = {
       staleTime: 30 * MINUTE,
       gcTime: 1 * HOUR,
     },
+    /**
+     * 거래량 순위 상위 — 단타워치 후보 추천. 실전 전용 랭킹 TR 보호 위해 flow.top10 과 동일하게
+     * staleTime 60s + 재진입 갱신. 단일 진실 원천.
+     */
+    volumeRank: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   watchlist: {
     /**
