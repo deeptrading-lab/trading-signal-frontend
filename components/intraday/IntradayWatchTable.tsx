@@ -120,18 +120,17 @@ export function IntradayWatchTable({
   );
 }
 
-// ─── 주기 셀렉트 (커스텀 드롭다운) ────────────────────────────────────────────
+// ─── 커스텀 드롭다운 공용 훅 ──────────────────────────────────────────────────
 
 /**
  * 네이티브 select 는 팝업 방향(위로 뜸)·화살표 여백을 제어할 수 없어 커스텀으로 대체.
- * 메뉴는 position:fixed 로 띄워 표의 overflow 클리핑을 피하고 **항상 버튼 아래**에 연다.
- * 스크롤/리사이즈 시 닫는다(고정 좌표 어긋남 방지).
+ * 메뉴는 position:fixed 로 띄워 표의 overflow 클리핑을 피하고 **항상 앵커 아래**에 연다.
+ * 스크롤/리사이즈 시 닫는다(고정 좌표 어긋남 방지). 주기 셀렉트·금액 프리셋 공용.
  */
-function IntervalSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function useFixedMenu() {
   const [open, setOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -151,37 +150,60 @@ function IntervalSelect({ value, onChange }: { value: number; onChange: (v: numb
     };
   }, [open]);
 
-  function toggle() {
-    if (!open && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  function toggle(anchor: HTMLElement | null) {
+    if (!open && anchor) {
+      const rect = anchor.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
     }
     setOpen((v) => !v);
   }
 
+  return { open, pos, rootRef, toggle, close: () => setOpen(false) };
+}
+
+function MenuPanel({
+  pos,
+  children,
+}: {
+  pos: { top: number; left: number; width: number };
+  children: React.ReactNode;
+}) {
   return (
-    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div
+      role="listbox"
+      className="dropdown-panel z-50 overflow-hidden"
+      style={{ position: "fixed", top: pos.top, left: pos.left, minWidth: pos.width }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── 주기 셀렉트 ──────────────────────────────────────────────────────────────
+
+function IntervalSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const menu = useFixedMenu();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <div ref={menu.rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <button
         ref={buttonRef}
         type="button"
         aria-haspopup="listbox"
-        aria-expanded={open}
+        aria-expanded={menu.open}
         aria-label={T.colInterval}
         className="inline-flex h-8 cursor-pointer items-center gap-xs rounded-md border border-border-line bg-surface-base pl-sm pr-xs text-body-sm text-text-strong tabular-nums transition-colors hover:bg-surface-muted"
-        onClick={toggle}
+        onClick={() => menu.toggle(buttonRef.current)}
       >
         {value}분
         <ChevronDown
-          className={cn("size-4 text-text-muted transition-transform", open && "rotate-180")}
+          className={cn("size-4 text-text-muted transition-transform", menu.open && "rotate-180")}
           aria-hidden
         />
       </button>
-      {open && menuPos ? (
-        <div
-          role="listbox"
-          className="dropdown-panel z-50 overflow-hidden"
-          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
-        >
+      {menu.open && menu.pos ? (
+        <MenuPanel pos={menu.pos}>
           {PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.map((min) => (
             <button
               key={min}
@@ -194,13 +216,85 @@ function IntervalSelect({ value, onChange }: { value: number; onChange: (v: numb
               )}
               onClick={() => {
                 onChange(min);
-                setOpen(false);
+                menu.close();
               }}
             >
               {min}분
             </button>
           ))}
-        </div>
+        </MenuPanel>
+      ) : null}
+    </div>
+  );
+}
+
+// ─── 금액 입력 (직접 입력 + 프리셋 드롭다운) ─────────────────────────────────
+
+/** 모의 투자금 빠른 선택 프리셋(원). */
+const CASH_PRESETS = [
+  1_000_000, 3_000_000, 5_000_000, 10_000_000, 30_000_000, 50_000_000, 100_000_000,
+] as const;
+
+function presetLabel(amount: number): string {
+  return amount >= 100_000_000
+    ? `${(amount / 100_000_000).toLocaleString("ko-KR")}억원`
+    : `${(amount / 10_000).toLocaleString("ko-KR")}만원`;
+}
+
+function CashInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const menu = useFixedMenu();
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div ref={menu.rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <div ref={boxRef} className="relative">
+        <input
+          className="h-8 w-[9rem] rounded-md border border-border-line bg-surface-base pl-sm pr-7 text-right text-body-sm text-text-strong tabular-nums"
+          inputMode="numeric"
+          value={value}
+          aria-label={P.cashLabel}
+          onChange={(e) => onChange(formatKrwInput(e.target.value))}
+        />
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={menu.open}
+          aria-label={T.cashPresetAria}
+          className="absolute inset-y-0 right-0 flex w-7 cursor-pointer items-center justify-center text-text-muted transition-colors hover:text-text-strong"
+          onClick={() => menu.toggle(boxRef.current)}
+        >
+          <ChevronDown
+            className={cn("size-4 transition-transform", menu.open && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+      </div>
+      {menu.open && menu.pos ? (
+        <MenuPanel pos={menu.pos}>
+          {CASH_PRESETS.map((amount) => {
+            const formatted = formatKrwInput(String(amount));
+            const selected = value === formatted;
+            return (
+              <button
+                key={amount}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={cn(
+                  "flex w-full cursor-pointer items-center justify-between gap-md px-md py-xs text-left text-body-sm transition-colors hover:bg-surface-muted",
+                  selected ? "font-medium text-accent-vivid" : "text-text-strong",
+                )}
+                onClick={() => {
+                  onChange(formatted);
+                  menu.close();
+                }}
+              >
+                <span>{presetLabel(amount)}</span>
+                <span className="tabular-nums text-caption text-text-muted">{formatted}</span>
+              </button>
+            );
+          })}
+        </MenuPanel>
       ) : null}
     </div>
   );
@@ -338,14 +432,7 @@ function WatchRow({
           {current ? (
             <span className="tabular-nums text-text-muted">{formatMoney(current.initialCash)}</span>
           ) : (
-            <input
-              className="h-8 w-[7.5rem] rounded-md border border-border-line bg-surface-base px-sm text-right text-body-sm text-text-strong tabular-nums"
-              inputMode="numeric"
-              value={cash}
-              aria-label={P.cashLabel}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setCash(formatKrwInput(e.target.value))}
-            />
+            <CashInput value={cash} onChange={setCash} />
           )}
         </td>
 

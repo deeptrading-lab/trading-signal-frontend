@@ -129,6 +129,7 @@ export const INTRADAY_PAPER_COPY = {
     removeAria: "워치에서 제거",
     expandAria: "상세 접기/펼치기",
     expandEmpty: "AI 진단을 누르면 판단 결과가, 모의 시작 후엔 체결 내역 진입이 여기에 표시돼요.",
+    cashPresetAria: "금액 빠른 선택",
   },
 
   /* 상세 시트 — 카드 클릭 시 체결 내역·거래별 손익. */
