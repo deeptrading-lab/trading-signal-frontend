@@ -1,10 +1,9 @@
 /**
  * IntradayWatchWorkspace — 단타 워치 워크스페이스 (B). intraday-scalping-agent §0 + intraday-paper-watch.
  *
- * 상단 공용 종목 검색(StockSearchPicker) → 아래 추천 후보(수급 상위 + 거래량 상위) → 워치 목록.
- * 각 워치 카드에서 장중 단타 판단(참고)을 on-demand 로 보고, "AI 모의 단타"로 cli-agent
- * 모의투자 세션을 시작한다. 화면이 열려 있는 동안 useIntradayPaperAutoTick 이 장중 5분 창 단위
- * 자동 판단·가상 체결을 민다.
+ * 구조(피드백 반영): 최상단 단독 종목 검색(StockSearchPicker) → 추천 후보 카드(수급·거래량, 검색과
+ * 분리) → 워치 **표**(IntradayWatchTable, 토스 랭킹 표 스타일 — 행 확장으로 판단/모의 단타 진입).
+ * 화면이 열려 있는 동안 useIntradayPaperAutoTick 이 장중 5분 창 단위 자동 판단·가상 체결을 민다.
  * ⚠️ 의사결정 보조 — 자동 수익/집행 주장 없음, 실제 매매는 사람이 직접.
  */
 
@@ -15,13 +14,13 @@ import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
+import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import {
   intradaySessionStock,
   useIntradayPaperWatch,
 } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperAutoTick } from "@/hooks/intraday/useIntradayPaperAutoTick";
-import { IntradayReadSection } from "@/components/stock/IntradayReadSection";
-import { IntradayPaperControls } from "@/components/intraday/IntradayPaperControls";
+import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
@@ -54,6 +53,7 @@ export function IntradayWatchWorkspace() {
   const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
 
   const watchTickers = watch.map((item) => item.ticker);
+  const { data: quotes = [] } = useQueryWatchlist(watchTickers);
   const { sessionByTicker, runningOrphans, runningSessionIds, isCreating, start } =
     useIntradayPaperWatch(watchTickers);
   const { isTicking } = useIntradayPaperAutoTick(runningSessionIds);
@@ -77,13 +77,14 @@ export function IntradayWatchWorkspace() {
         {isTicking ? <span className="ml-auto badge-info">{P.autoTicking}</span> : null}
       </header>
 
-      {/* 종목 검색(공용 피커) + 추천 후보 */}
-      <section className="card flex flex-col gap-md" aria-label={W.recommendTitle}>
-        <StockSearchPicker
-          placeholder={W.searchPlaceholder}
-          onSelect={(stock) => add({ ticker: stock.ticker, name: stock.name })}
-        />
+      {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}
+      <StockSearchPicker
+        placeholder={W.searchPlaceholder}
+        onSelect={(stock) => add({ ticker: stock.ticker, name: stock.name })}
+      />
 
+      {/* 추천 후보 — 수급 상위 + 거래량 상위 */}
+      <section className="card flex flex-col gap-md" aria-label={W.recommendTitle}>
         <CandidateChips
           title={W.flowTitle}
           hint={W.flowHint}
@@ -136,27 +137,18 @@ export function IntradayWatchWorkspace() {
         </section>
       ) : null}
 
-      {/* 워치 목록 */}
+      {/* 워치 표 */}
       {watch.length === 0 ? (
         <div className="card-info text-body">{W.empty}</div>
       ) : (
-        <div className="flex flex-col gap-md">
-          {watch.map((item) => (
-            <IntradayReadSection
-              key={item.ticker}
-              ticker={item.ticker}
-              heading={`${item.name} ${item.ticker}`}
-              onRemove={() => remove(item.ticker)}
-            >
-              <IntradayPaperControls
-                stock={{ ticker: item.ticker, name: item.name }}
-                session={sessionByTicker.get(item.ticker) ?? null}
-                isCreating={isCreating}
-                onStart={start}
-              />
-            </IntradayReadSection>
-          ))}
-        </div>
+        <IntradayWatchTable
+          items={watch}
+          quotes={quotes}
+          sessionByTicker={sessionByTicker}
+          isCreating={isCreating}
+          onStart={start}
+          onRemove={remove}
+        />
       )}
 
       <p className="text-caption text-text-muted">{W.disclaimer}</p>

@@ -98,6 +98,23 @@ export const INTRADAY_PAPER_COPY = {
   error: "모의 단타 세션 처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
   disclaimer: "가상 체결 기록이에요. 실제 주문은 발생하지 않아요.",
 
+  /* 워치 표 (토스 랭킹 표 스타일) — 컬럼 헤더·행 액션. */
+  table: {
+    colStock: "종목",
+    colPrice: "현재가",
+    colChange: "등락률",
+    colReturn: "모의 수익률",
+    colValue: "평가금액",
+    colPosition: "포지션",
+    colLast: "최근 판단",
+    none: "—",
+    readRun: "판단 받기",
+    readRerun: "다시 판단",
+    ordersButton: "체결 내역",
+    removeAria: "워치에서 제거",
+    expandAria: "상세 접기/펼치기",
+  },
+
   /* 상세 시트 — 카드 클릭 시 체결 내역·거래별 손익. */
   sheet: {
     ariaLabel: "모의 단타 상세",
