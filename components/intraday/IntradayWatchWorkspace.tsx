@@ -24,7 +24,6 @@ import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
-  INTRADAY_READ_COPY as C,
   INTRADAY_WATCH_COPY as W,
 } from "@/lib/copy/stock/intradayRead";
 import type { InvestorFlowRow } from "@/lib/types/flow/top10";
@@ -143,9 +142,11 @@ export function IntradayWatchWorkspace() {
         <div className="card-info text-body">{W.empty}</div>
       ) : (
         <>
-          <p className="text-caption text-text-muted">
-            {P.startHint} {C.disclaimer} {P.disclaimer}
-          </p>
+          <div className="flex flex-col gap-[2px] text-caption text-text-muted">
+            {P.noticeLines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
           <IntradayWatchTable
             items={watch}
             quotes={quotes}
