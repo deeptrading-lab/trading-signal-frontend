@@ -64,4 +64,35 @@ export const INTRADAY_WATCH_COPY = {
   candidatesLoading: "후보를 불러오는 중…",
   candidatesEmpty: "수급 후보를 불러올 수 없어요(장중·prod KIS 필요).",
   empty: "위 후보에서 종목을 추가하면 장중 단타 판단을 받아볼 수 있어요.",
+  /* 종목 검색 — 수급 후보 밖 종목도 워치에 추가. */
+  searchPlaceholder: "종목명·코드로 검색해 워치에 추가",
+  searching: "검색 중이에요.",
+  searchEmpty: "검색 결과가 없어요.",
+  /* 진행 중 모의 세션 복원 칩 — 새로고침으로 워치가 비어도 세션은 서버에 살아있다. */
+  runningTitle: "진행 중 모의 단타",
+  runningHint: "눌러서 워치에 다시 추가하면 현황이 보여요.",
+} as const;
+
+/** 워치 카드 하단 "AI 모의 단타" 시작/현황 카피 — intraday-paper-watch. */
+export const INTRADAY_PAPER_COPY = {
+  title: "AI 모의 단타",
+  badge: "가상",
+  startLabel: "모의 단타 시작",
+  cashLabel: "모의 투자금(원)",
+  cashInvalid: "모의 투자금은 0보다 큰 숫자여야 해요.",
+  creating: "세션 생성 중…",
+  startHint:
+    "장중(평일 09:00~15:30) 이 화면이 열려 있는 동안 5분마다 AI가 판단해 가상 체결해요. 체결가에 수수료·제세금·슬리피지를 반영해요.",
+  autoTicking: "자동 판단 동작 중",
+  metricReturn: "수익률",
+  metricValue: "평가",
+  metricCash: "현금",
+  positionLabel: "포지션",
+  positionNone: "무포지션",
+  lastDecision: "최근 판단",
+  noDecision: "아직 판단 기록이 없어요.",
+  ticksLabel: "판단",
+  detailLink: "상세",
+  error: "모의 단타 세션 처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  disclaimer: "가상 체결 기록이에요. 실제 주문은 발생하지 않아요.",
 } as const;

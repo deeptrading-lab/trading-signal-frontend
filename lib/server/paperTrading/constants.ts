@@ -1,3 +1,5 @@
+import type { PaperTradingCostModel } from "@/lib/types/paperTrading/paperTrading";
+
 export const PAPER_TRADING_DEFAULT_INITIAL_CASH = 10_000_000;
 export const PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES = 30;
 export const PAPER_TRADING_DEFAULT_MAX_POSITION_PCT = 50;
@@ -20,3 +22,13 @@ export const PAPER_TRADING_DAILY_LOSS_KILL_PCT = -3;
 export const PAPER_TRADING_CLOSE_FLATTEN_HHMM = "15:20";
 /** 단타 warmup 전일 분봉 prefetch 거래일 수. */
 export const PAPER_TRADING_INTRADAY_PRIOR_DAYS = 1;
+/**
+ * 단타 가상 체결 거래 비용 — cli-agent 세션에만 적용(mock 무변경).
+ * 위탁수수료 0.015%/편도 + 매도 제세금 0.15% + 슬리피지 0.05%/편도 ≈ 왕복 ~0.28%.
+ * 과거 단타 검증에서 비용이 net 수익 부호를 갈랐으므로 판단 품질 테스트의 전제 조건.
+ */
+export const PAPER_TRADING_INTRADAY_COSTS: PaperTradingCostModel = {
+  feeBpPerSide: 1.5,
+  sellTaxBp: 15,
+  slippageBp: 5,
+};

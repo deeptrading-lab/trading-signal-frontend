@@ -158,10 +158,7 @@ export async function runPaperTradingSessionTick(
   if (entry.session.status !== "running") return toDetail(entry);
 
   const tickWindowStart =
-    options.tickWindowStart ??
-    (entry.session.lastTickWindowStart
-      ? addTickWindow(entry.session.lastTickWindowStart, entry.session.tickIntervalMinutes)
-      : floorToTickWindow(new Date(), entry.session.tickIntervalMinutes));
+    options.tickWindowStart ?? resolveNextTickWindow(entry.session, new Date());
 
   const result = await runPaperTradingTick({
     session: entry.session,
@@ -184,6 +181,23 @@ export async function runPaperTradingSessionTick(
 
 export function resetPaperTradingStoreForTest(): void {
   getStore().sessions.clear();
+}
+
+/**
+ * 다음 틱 윈도 산출 (tickWindowStart 미지정 시 폴백).
+ * - 단타(cli-agent): **벽시계 현재 창으로 고정** — 브라우저 폴링·crontab 이 몇 번 오든 창당 1틱으로
+ *   dedup 되고, 폴링이 끊겼다 재개돼도 라벨이 과거에 머무는 드리프트가 없다(15:00 게이트·15:20
+ *   flatten 판정이 tickWindowStart 기준이라 정확한 벽시계가 필수).
+ * - mock 등 기존 provider: 마지막 창 +interval (기존 동작 유지 — "지금 재판단" 버튼이 창과 무관하게
+ *   항상 새 틱을 만드는 UX 를 보존).
+ */
+export function resolveNextTickWindow(session: PaperTradingSession, now: Date): string {
+  if (session.decisionProvider === "cli-agent") {
+    return floorToTickWindow(now, session.tickIntervalMinutes);
+  }
+  return session.lastTickWindowStart
+    ? addTickWindow(session.lastTickWindowStart, session.tickIntervalMinutes)
+    : floorToTickWindow(now, session.tickIntervalMinutes);
 }
 
 function toDetail(entry: StoredSession): PaperTradingSessionDetail {

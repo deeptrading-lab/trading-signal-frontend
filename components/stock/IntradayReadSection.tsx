@@ -7,6 +7,7 @@
 
 "use client";
 
+import type { ReactNode } from "react";
 import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { useMutationIntradayRead } from "@/hooks/stock/useMutationIntradayRead";
 import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
@@ -18,9 +19,11 @@ export interface IntradayReadSectionProps {
   heading?: string;
   /** 워치 목록에서 제거(워크스페이스 전용). 미지정 시 제거 버튼 없음. */
   onRemove?: () => void;
+  /** 카드 하단 확장 슬롯 — 단타워치가 AI 모의 단타 현황(IntradayPaperControls)을 끼워 넣는다. */
+  children?: ReactNode;
 }
 
-export function IntradayReadSection({ ticker, heading, onRemove }: IntradayReadSectionProps) {
+export function IntradayReadSection({ ticker, heading, onRemove, children }: IntradayReadSectionProps) {
   const { data: providers, isLoading: gateLoading } = useQueryAIProviders();
   const read = useMutationIntradayRead();
 
@@ -74,6 +77,8 @@ export function IntradayReadSection({ ticker, heading, onRemove }: IntradayReadS
           </button>
         </div>
       )}
+
+      {children}
     </section>
   );
 }

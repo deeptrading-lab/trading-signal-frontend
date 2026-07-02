@@ -56,9 +56,25 @@ export type PaperTradingOrder = {
   name: string;
   side: "BUY" | "SELL";
   quantity: number;
+  /** 체결가(원) — 비용 모델 주입 시 슬리피지가 반영된 가격. */
   price: number;
   notional: number;
+  /** 수수료+제세금(원) — 비용 모델 미주입 시 0. 슬리피지는 price 에 반영. */
+  costKrw?: number;
   reason: string;
+};
+
+/**
+ * 가상 체결 거래 비용 모델(bp, 1bp=0.01%) — 단타(cli-agent) 세션에서 주입한다.
+ * 미주입(undefined)이면 비용 0 = 기존 동작 무변경. 수익률 낙관 편향 방지용.
+ */
+export type PaperTradingCostModel = {
+  /** 위탁수수료 bp/편도 — 매수·매도 각각 부과. */
+  feeBpPerSide: number;
+  /** 매도 제세금 bp — 증권거래세+농특세(매도에만). */
+  sellTaxBp: number;
+  /** 슬리피지 bp/편도 — 시장가 체결 가정, 체결가를 불리한 쪽으로 조정. */
+  slippageBp: number;
 };
 
 export type PaperTradingPosition = {

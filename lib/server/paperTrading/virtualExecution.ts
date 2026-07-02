@@ -4,6 +4,7 @@ import {
   PAPER_TRADING_MAX_STALE_PRICE_SECONDS,
 } from "@/lib/server/paperTrading/constants";
 import type {
+  PaperTradingCostModel,
   PaperTradingDecision,
   PaperTradingOrder,
   PaperTradingPosition,
@@ -17,6 +18,11 @@ export type VirtualExecutionInput = {
   priceSnapshot: PaperTradingPriceSnapshot[];
   maxPositionPct?: number;
   cashBufferPct?: number;
+  /**
+   * 거래 비용 모델(bp) — 슬리피지는 체결가에, 수수료·제세금은 현금에 반영.
+   * 미지정이면 비용 0 = 기존 동작 그대로(mock 경로 무회귀).
+   */
+  costs?: PaperTradingCostModel;
   /**
    * 단타 청산 트리거 — 보유 포지션이 도달 시 결정을 무시하고 강제 EXIT(리스크 룰 우선).
    * `executeVirtualTrade` 가 마크투마켓 후 사전 판정한다. mock/일봉 경로는 미지정(무영향).
@@ -74,6 +80,11 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
   const minimumCash = portfolioBefore * (cashBufferPct / 100);
   const maxInvestableValue = Math.max(0, portfolioBefore - minimumCash);
 
+  // 거래 비용율 — costs 미주입 시 전부 0 = 기존 동작 그대로.
+  const slipRate = (input.costs?.slippageBp ?? 0) / 10_000;
+  const feeRate = (input.costs?.feeBpPerSide ?? 0) / 10_000;
+  const sellTaxRate = (input.costs?.sellTaxBp ?? 0) / 10_000;
+
   const targets = normalizeTargets(decision, input.priceSnapshot, maxPositionPct);
   if (targets.adjustedForMax) {
     guardAdjustments.push("종목별 최대 비중에 맞춰 주문 크기를 줄였어요.");
@@ -115,10 +126,15 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
     }
 
     const side: PaperTradingOrder["side"] = deltaQuantity > 0 ? "BUY" : "SELL";
+    // 체결가 — 시장가 체결 가정, 슬리피지만큼 불리한 방향으로(매수 위, 매도 아래).
+    const fillPrice =
+      side === "BUY"
+        ? Math.round(snapshot.price * (1 + slipRate))
+        : Math.round(snapshot.price * (1 - slipRate));
     const availableCash = Math.max(0, nextCash - minimumCash);
     const executableQuantity =
       side === "BUY"
-        ? Math.min(deltaQuantity, Math.floor(availableCash / snapshot.price))
+        ? Math.min(deltaQuantity, Math.floor(availableCash / (fillPrice * (1 + feeRate))))
         : Math.min(Math.abs(deltaQuantity), Math.floor(currentQuantity));
 
     if (executableQuantity <= 0) {
@@ -135,14 +151,18 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
     }
 
     const signedQuantity = side === "BUY" ? executableQuantity : -executableQuantity;
-    const notional = executableQuantity * snapshot.price;
-    nextCash = side === "BUY" ? nextCash - notional : nextCash + notional;
+    const notional = executableQuantity * fillPrice;
+    // 수수료(양편) + 매도 제세금 — 체결과 별도로 현금에서 차감.
+    const costKrw = Math.round(
+      notional * feeRate + (side === "SELL" ? notional * sellTaxRate : 0),
+    );
+    nextCash = side === "BUY" ? nextCash - notional - costKrw : nextCash + notional - costKrw;
     const nextQuantity = Math.max(0, Math.floor(currentQuantity) + signedQuantity);
     const nextAvgEntryPrice =
       side === "BUY" && position
-        ? weightedAverage(position.avgEntryPrice, Math.floor(currentQuantity), snapshot.price, executableQuantity)
+        ? weightedAverage(position.avgEntryPrice, Math.floor(currentQuantity), fillPrice, executableQuantity)
         : side === "BUY"
-          ? snapshot.price
+          ? fillPrice
           : position?.avgEntryPrice ?? snapshot.price;
 
     const nextPosition: PaperTradingPosition = {
@@ -166,8 +186,9 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
       name: snapshot.name,
       side,
       quantity: executableQuantity,
-      price: snapshot.price,
+      price: fillPrice,
       notional,
+      costKrw,
       reason: target.rationale,
     });
   }
