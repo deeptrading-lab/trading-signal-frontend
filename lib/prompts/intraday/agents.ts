@@ -28,7 +28,7 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     : "—";
 
   const pos = ctx.position
-    ? `평단 ${won(ctx.position.avgEntryPrice)} | 미실현 ${pct(ctx.position.unrealizedPnlPct)} | 보유 ${ctx.position.heldMinutes}분 | 수량 ${ctx.position.quantity}`
+    ? `평단 ${won(ctx.position.avgEntryPrice)} | 미실현 ${pct(ctx.position.unrealizedPnlPct)} | 보유 ${ctx.position.heldMinutes}분 | 수량 ${ctx.position.quantity} | 포트폴리오 비중 ${ctx.position.allocationPct.toFixed(1)}%`
     : "없음 (신규 진입 검토 가능)";
 
   const prev = ctx.previousDecision
@@ -92,6 +92,14 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
 - 데이터가 모호하거나 박스권 횡보면 HOLD 가 정답. 억지 진입 금지.
 - 모든 가격은 절대 원화 가격(정수). 현재가 대비 %가 아닙니다.
 
+[포지션 크기 — 분할 매수·분할 매도]
+포지션 크기도 판단의 일부입니다. 그때그때 보수적/공격적 접근을 스스로 정하세요.
+- BUY 의 entryPositionPct = 포트폴리오 대비 목표 비중(%). 확신 낮음·변동성 큼 → 20~40(보수적 분할),
+  표준 셋업 → 50~60, 강한 확신 + RRR 우수 → 70~100(공격적). 서버가 종목 최대 비중으로 상한을 캡합니다.
+  이미 보유 중인데 더 담을 가치가 있으면 현재 비중보다 큰 값을 제시하세요(분할 추가 매수).
+- SELL 의 sellRatioPct = 보유 수량 중 청산 비율(%). 일부 익절·리스크 축소 → 25~50(분할 매도),
+  논거 훼손·손절 → 100(전량). 컨텍스트의 "포트폴리오 비중"이 현재 크기입니다.
+
 반드시 아래 JSON 스키마와 정확히 일치하는 단일 JSON 객체로만 응답하세요.
 코드펜스·설명·주석 금지. 모든 텍스트 필드는 한국어 개조식.
 
@@ -99,6 +107,8 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
   "action": "BUY" | "HOLD" | "SELL",
   "confidence": "HIGH" | "MEDIUM" | "LOW",
   "entryZone": { "low": <원>, "high": <원> } | null,   // BUY 일 때만, 아니면 null
+  "entryPositionPct": <5~100 숫자> | null,             // BUY 일 때만 — 목표 비중(%), 분할 진입 크기
+  "sellRatioPct": <10~100 숫자> | null,                // SELL 일 때만 — 청산 비율(%), 100=전량
   "targetPrice": <원> | null,
   "stopPrice": <원> | null,
   "invalidationPrice": <원> | null,

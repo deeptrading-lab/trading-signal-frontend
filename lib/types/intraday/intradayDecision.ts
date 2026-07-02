@@ -37,6 +37,8 @@ export interface IntradayPositionView {
   unrealizedPnlPct: number;
   /** 진입 후 경과 분. */
   heldMinutes: number;
+  /** 포트폴리오 대비 현재 비중(%) — AI 분할 청산 비율의 기준. */
+  allocationPct: number;
 }
 
 /** 직전 틱 결정 요약 — "열린 거래 관리" 연속성 인식용. */
@@ -82,6 +84,16 @@ export interface IntradayDecisionLlm {
   /** 논거 무효가(이 가격 이탈 시 추적). */
   invalidationPrice: number | null;
   expectedHoldingMinutes: number | null;
+  /**
+   * BUY 시 포트폴리오 대비 목표 비중(%, 5~100) — AI 가 확신·손익비·변동성에 따라 분할 진입
+   * 크기를 정한다. null 이면 리스크모드 기본값. 서버가 maxPositionPct 로 상한 캡.
+   */
+  entryPositionPct: number | null;
+  /**
+   * SELL 시 보유 수량 중 청산 비율(%, 10~100) — 100 미만이면 분할 청산(REDUCE).
+   * null 이면 전량(100). HOLD/BUY 에선 무시.
+   */
+  sellRatioPct: number | null;
   /** 한국어 개조식 1~2문장. */
   rationale: string;
   riskNotes: string[];

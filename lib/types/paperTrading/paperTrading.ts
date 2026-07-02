@@ -61,6 +61,8 @@ export type PaperTradingOrder = {
   notional: number;
   /** 수수료+제세금(원) — 비용 모델 미주입 시 0. 슬리피지는 price 에 반영. */
   costKrw?: number;
+  /** 매도 실현손익(원, 비용 차감 후) — SELL 주문에만. 거래별 +/− 결과 표시용. */
+  realizedPnl?: number;
   reason: string;
 };
 

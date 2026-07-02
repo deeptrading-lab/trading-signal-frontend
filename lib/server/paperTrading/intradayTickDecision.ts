@@ -146,6 +146,7 @@ function buildPositionView(
     quantity: p.quantity,
     unrealizedPnlPct: p.unrealizedPnlPct,
     heldMinutes,
+    allocationPct: p.allocationPct,
   };
 }
 

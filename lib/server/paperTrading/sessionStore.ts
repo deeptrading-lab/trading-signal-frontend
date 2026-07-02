@@ -7,6 +7,11 @@ import {
   PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES,
 } from "@/lib/server/paperTrading/constants";
 import { addTickWindow, floorToTickWindow } from "@/lib/server/paperTrading/time";
+import {
+  loadPersistedPaperTrading,
+  persistPaperSession,
+  persistPaperTick,
+} from "@/lib/server/paperTrading/persistence";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
@@ -29,6 +34,8 @@ type StoredSession = {
 
 type PaperTradingStore = {
   sessions: Map<string, StoredSession>;
+  /** Supabase 저장본 1회 hydrate(single-flight) — 프로세스 첫 접근에서 시작. */
+  hydration?: Promise<void>;
 };
 
 const STORE_KEY = "__paperTradingStore";
@@ -45,15 +52,41 @@ function getStore(): PaperTradingStore {
   return globalStore[STORE_KEY];
 }
 
-export function listPaperTradingSessions(): PaperTradingSession[] {
+/**
+ * Supabase 저장본을 메모리로 1회 복원(멱등) — dev 재시작 후에도 세션·틱 이력이 이어진다.
+ * 메모리에 이미 있는 id 는 건드리지 않는다(메모리가 더 최신). 미설정/실패는 조용히 skip.
+ */
+async function ensureHydrated(): Promise<void> {
+  const store = getStore();
+  if (!store.hydration) {
+    store.hydration = (async () => {
+      const persisted = await loadPersistedPaperTrading();
+      if (!persisted) return;
+      for (const entry of persisted) {
+        if (!store.sessions.has(entry.session.id)) {
+          store.sessions.set(entry.session.id, {
+            session: entry.session,
+            positions: entry.positions,
+            ticks: entry.ticks,
+          });
+        }
+      }
+    })().catch(() => undefined);
+  }
+  return store.hydration;
+}
+
+export async function listPaperTradingSessions(): Promise<PaperTradingSession[]> {
+  await ensureHydrated();
   return Array.from(getStore().sessions.values())
     .map((entry) => entry.session)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export function getPaperTradingSessionDetail(
+export async function getPaperTradingSessionDetail(
   sessionId: string,
-): PaperTradingSessionDetail | null {
+): Promise<PaperTradingSessionDetail | null> {
+  await ensureHydrated();
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
   return toDetail(entry);
@@ -63,6 +96,7 @@ export async function createPaperTradingSession(
   request: CreatePaperTradingSessionRequest,
   options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider } = {},
 ): Promise<PaperTradingSessionDetail> {
+  await ensureHydrated();
   const now = new Date().toISOString();
   const initialCash = sanitizePositiveNumber(
     request.initialCash,
@@ -125,13 +159,17 @@ export async function createPaperTradingSession(
   entry.ticks = [firstTick.tick];
 
   getStore().sessions.set(entry.session.id, entry);
+  // write-through(fail-soft) — 실패해도 세션 생성 흐름 비차단.
+  void persistPaperSession(entry.session, entry.positions);
+  void persistPaperTick(firstTick.tick);
   return toDetail(entry);
 }
 
-export function patchPaperTradingSessionStatus(
+export async function patchPaperTradingSessionStatus(
   sessionId: string,
   status: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">,
-): PaperTradingSessionDetail | null {
+): Promise<PaperTradingSessionDetail | null> {
+  await ensureHydrated();
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
 
@@ -142,6 +180,7 @@ export function patchPaperTradingSessionStatus(
     endedAt: status === "completed" ? now : entry.session.endedAt,
     updatedAt: now,
   };
+  void persistPaperSession(entry.session, entry.positions);
   return toDetail(entry);
 }
 
@@ -153,6 +192,7 @@ export async function runPaperTradingSessionTick(
     priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
   },
 ): Promise<PaperTradingSessionDetail | null> {
+  await ensureHydrated();
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
   if (entry.session.status !== "running") return toDetail(entry);
@@ -174,13 +214,19 @@ export async function runPaperTradingSessionTick(
   entry.positions = result.positions;
   if (!alreadyExists) {
     entry.ticks = [...entry.ticks, result.tick];
+    // write-through(fail-soft) — 새 틱이 실제로 생겼을 때만 저장(멱등 dedup 반환은 무기록).
+    void persistPaperSession(entry.session, entry.positions);
+    void persistPaperTick(result.tick);
   }
 
   return toDetail(entry);
 }
 
 export function resetPaperTradingStoreForTest(): void {
-  getStore().sessions.clear();
+  const store = getStore();
+  store.sessions.clear();
+  // 테스트 격리 — hydration single-flight 도 초기화(테스트 env 는 Supabase 미설정이라 즉시 no-op).
+  store.hydration = undefined;
 }
 
 /**

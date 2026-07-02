@@ -156,6 +156,11 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
     const costKrw = Math.round(
       notional * feeRate + (side === "SELL" ? notional * sellTaxRate : 0),
     );
+    // 매도 실현손익 — (체결가 − 평단) × 수량 − 비용. 거래별 +/− 결과 표시용.
+    const realizedPnl =
+      side === "SELL" && position
+        ? Math.round((fillPrice - position.avgEntryPrice) * executableQuantity - costKrw)
+        : undefined;
     nextCash = side === "BUY" ? nextCash - notional - costKrw : nextCash + notional - costKrw;
     const nextQuantity = Math.max(0, Math.floor(currentQuantity) + signedQuantity);
     const nextAvgEntryPrice =
@@ -189,6 +194,7 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
       price: fillPrice,
       notional,
       costKrw,
+      realizedPnl,
       reason: target.rationale,
     });
   }

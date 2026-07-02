@@ -199,6 +199,7 @@ export function applyPostGate(
     if (d.action === "BUY") {
       d.action = "HOLD";
       d.entryZone = null;
+      d.entryPositionPct = null;
       adj.push(reason);
     }
   };
@@ -244,6 +245,8 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
       action: "BUY",
       confidence: "LOW",
       entryZone: { low: Math.round(ctx.price * 0.999), high: Math.round(ctx.price * 1.002) },
+      entryPositionPct: null, // 리스크모드 기본 비중으로 진입.
+      sellRatioPct: null,
       targetPrice: lv.tpPrice,
       stopPrice: lv.slPrice,
       invalidationPrice: lv.slPrice,
@@ -259,6 +262,8 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
       action: "SELL",
       confidence: "LOW",
       entryZone: null,
+      entryPositionPct: null,
+      sellRatioPct: 100, // 폴백은 전량 정리(보수적).
       targetPrice: null,
       stopPrice: null,
       invalidationPrice: null,
@@ -272,6 +277,8 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
     action: "HOLD",
     confidence: "LOW",
     entryZone: null,
+    entryPositionPct: null,
+    sellRatioPct: null,
     targetPrice: ctx.previousDecision?.targetPrice ?? null,
     stopPrice: ctx.previousDecision?.stopPrice ?? null,
     invalidationPrice: ctx.previousDecision?.invalidationPrice ?? null,
@@ -285,6 +292,12 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
 
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** null 통과 clamp — LLM 이 범위 밖 값을 내면 안전 범위로 자른다. */
+function clampOrNull(v: number | null, min: number, max: number): number | null {
+  if (v == null) return null;
+  return Math.min(max, Math.max(min, v));
 }
 
 function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
@@ -305,6 +318,9 @@ function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
       ? d.confidence
       : "MEDIUM") as IntradayDecisionLlm["confidence"],
     entryZone,
+    // AI 분할 비율 — 진입 비중 5~100%, 청산 비율 10~100% 로 clamp(범위 밖 환각 차단).
+    entryPositionPct: action === "BUY" ? clampOrNull(num(d.entryPositionPct), 5, 100) : null,
+    sellRatioPct: action === "SELL" ? clampOrNull(num(d.sellRatioPct), 10, 100) : null,
     targetPrice: num(d.targetPrice),
     stopPrice: num(d.stopPrice),
     invalidationPrice: num(d.invalidationPrice),
@@ -324,24 +340,46 @@ function riskTargetPct(riskMode: PaperTradingRiskMode): number {
   return 60;
 }
 
-function toPaperTradingDecision(
+/**
+ * IntradayDecision → PaperTradingDecision 목표 비중 매핑 — AI 분할 매수·분할 매도.
+ *
+ * - BUY: AI 가 정한 목표 비중(entryPositionPct, 없으면 리스크모드 기본)으로 진입/추가 매수.
+ *   maxPositionPct 로 상한 캡. **기존 비중보다 낮춰 잡진 않는다**(BUY 액션이 매도를 유발하는
+ *   역전 방지 — 수익으로 비중이 캡을 넘어도 유지).
+ * - SELL: sellRatioPct(없으면 100=전량). 100 미만 + 보유 중이면 분할 청산(REDUCE) —
+ *   목표 비중 = 현재 비중 × (1 − 비율).
+ * - HOLD: **현재 비중 그대로**(리밸런싱 트레이드 금지 — 이전엔 리스크모드 기본 비중으로
+ *   재조정 주문이 발생할 수 있었다).
+ *
+ * 테스트를 위해 export (CLI 없이 순수 매핑 검증).
+ */
+export function toPaperTradingDecision(
   intraday: IntradayDecision,
-  input: IntradayCliInput,
+  input: Pick<IntradayCliInput, "ticker" | "name" | "position" | "riskMode" | "maxPositionPct">,
 ): PaperTradingDecision {
   const { action } = intraday;
-  // 단타 단일 종목: BUY→목표비중 진입, SELL→전량 청산, HOLD→유지.
-  const targetPct =
-    action === "BUY"
-      ? Math.min(input.maxPositionPct, riskTargetPct(input.riskMode))
-      : action === "SELL"
-        ? 0
-        : input.position
-          ? input.position.quantity > 0
-            ? Math.min(input.maxPositionPct, riskTargetPct(input.riskMode))
-            : 0
-          : 0;
+  const currentPct = input.position?.allocationPct ?? 0;
 
-  const ptAction = action === "SELL" ? (input.position ? "EXIT" : "SELL") : action;
+  let targetPct: number;
+  let ptAction: PaperTradingDecision["action"];
+
+  if (action === "BUY") {
+    const desired = intraday.entryPositionPct ?? riskTargetPct(input.riskMode);
+    targetPct = Math.max(currentPct, Math.min(input.maxPositionPct, desired));
+    ptAction = "BUY";
+  } else if (action === "SELL") {
+    const ratio = intraday.sellRatioPct ?? 100;
+    if (input.position && ratio < 100) {
+      targetPct = round2(currentPct * (1 - ratio / 100));
+      ptAction = "REDUCE";
+    } else {
+      targetPct = 0;
+      ptAction = input.position ? "EXIT" : "SELL";
+    }
+  } else {
+    targetPct = input.position && input.position.quantity > 0 ? currentPct : 0;
+    ptAction = "HOLD";
+  }
 
   return {
     action: ptAction,
@@ -363,6 +401,10 @@ function toPaperTradingDecision(
     targetPrice: intraday.targetPrice ?? null,
     source: "cli-agent",
   };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 // ─── 공개 진입점 ──────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ import type {
 
 export async function GET(): Promise<Response> {
   const payload: PaperTradingSessionsResponse = {
-    sessions: listPaperTradingSessions(),
+    sessions: await listPaperTradingSessions(),
     generatedAt: new Date().toISOString(),
   };
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });

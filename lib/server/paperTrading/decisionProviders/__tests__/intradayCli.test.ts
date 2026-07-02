@@ -10,6 +10,7 @@ import {
   applyPostGate,
   deriveFromSignal,
   intradayEffort,
+  toPaperTradingDecision,
 } from "../intradayCli";
 import type {
   IntradayContext,
@@ -68,6 +69,8 @@ function buyLlm(over: Partial<IntradayDecisionLlm> = {}): IntradayDecisionLlm {
     action: "BUY",
     confidence: "MEDIUM",
     entryZone: { low: 9_990, high: 10_020 },
+    entryPositionPct: null,
+    sellRatioPct: null,
     targetPrice: 10_400,
     stopPrice: 9_850,
     invalidationPrice: 9_850,
@@ -94,7 +97,7 @@ describe("evaluatePreGate", () => {
   });
   it("포지션 보유 시 → LLM 호출", () => {
     const c = ctx({
-      position: { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: 1, heldMinutes: 20 },
+      position: { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: 1, heldMinutes: 20, allocationPct: 50 },
       signal: signal({ action: "HOLD" }),
     });
     expect(evaluatePreGate(c, false).callLlm).toBe(true);
@@ -165,8 +168,69 @@ describe("deriveFromSignal (폴백)", () => {
   it("포지션 보유 + SELL 시그널 → SELL", () => {
     const c = ctx({
       signal: signal({ action: "SELL" }),
-      position: { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: -2, heldMinutes: 30 },
+      position: { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: -2, heldMinutes: 30, allocationPct: 50 },
     });
     expect(deriveFromSignal(c, false).action).toBe("SELL");
+  });
+});
+
+describe("toPaperTradingDecision (AI 분할 매수·분할 매도)", () => {
+  const base = { ticker: "005930", name: "삼성전자", riskMode: "balanced" as const, maxPositionPct: 50 };
+  const position = { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: 1, heldMinutes: 20, allocationPct: 40 };
+
+  function intraday(over: Partial<IntradayDecisionLlm> = {}) {
+    return {
+      ...buyLlm(over),
+      basePrice: 10_000,
+      rrr: 2,
+      signal: signal(),
+      source: "intraday-cli" as const,
+      gateAdjustments: [],
+    };
+  }
+
+  it("BUY — AI 목표 비중을 maxPositionPct 로 캡", () => {
+    const d = toPaperTradingDecision(intraday({ entryPositionPct: 80 }), { ...base, position: null });
+    expect(d.action).toBe("BUY");
+    expect(d.targetAllocationPct).toBe(50);
+  });
+
+  it("BUY — 보수적 분할 진입(작은 비중)은 그대로 반영", () => {
+    const d = toPaperTradingDecision(intraday({ entryPositionPct: 25 }), { ...base, position: null });
+    expect(d.targetAllocationPct).toBe(25);
+  });
+
+  it("BUY — 미지정이면 리스크모드 기본(균형=60→캡 50)", () => {
+    const d = toPaperTradingDecision(intraday({ entryPositionPct: null }), { ...base, position: null });
+    expect(d.targetAllocationPct).toBe(50);
+  });
+
+  it("BUY — 기존 비중보다 낮춰 잡지 않는다(매도 역전 방지)", () => {
+    const d = toPaperTradingDecision(intraday({ entryPositionPct: 20 }), { ...base, position });
+    expect(d.targetAllocationPct).toBe(40);
+  });
+
+  it("SELL — 분할 청산 50% → REDUCE, 목표 비중 = 현 비중의 절반", () => {
+    const d = toPaperTradingDecision(
+      intraday({ action: "SELL", sellRatioPct: 50 }),
+      { ...base, position },
+    );
+    expect(d.action).toBe("REDUCE");
+    expect(d.targetAllocationPct).toBe(20);
+  });
+
+  it("SELL — 비율 미지정/100 이면 전량(EXIT)", () => {
+    const d = toPaperTradingDecision(
+      intraday({ action: "SELL", sellRatioPct: null }),
+      { ...base, position },
+    );
+    expect(d.action).toBe("EXIT");
+    expect(d.targetAllocationPct).toBe(0);
+  });
+
+  it("HOLD — 현재 비중 유지(리밸런싱 주문 방지)", () => {
+    const d = toPaperTradingDecision(intraday({ action: "HOLD" }), { ...base, position });
+    expect(d.action).toBe("HOLD");
+    expect(d.targetAllocationPct).toBe(40);
   });
 });
