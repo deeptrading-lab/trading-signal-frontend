@@ -90,7 +90,10 @@ export function IntradayWatchTable({
               <th className="py-sm pl-lg pr-md text-left font-normal">{T.colStock}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colPrice}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colChange}</th>
-              <th className="py-sm pr-md text-right font-normal">{T.colReturn}</th>
+              {/* 여기부터 모의 투자 데이터 — 종목 정보와 세로 구분선으로 분리(피드백). */}
+              <th className="border-l border-border-line py-sm pl-md pr-md text-right font-normal">
+                {T.colReturn}
+              </th>
               <th className="py-sm pr-md text-right font-normal">{T.colValue}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
               <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
@@ -127,10 +130,9 @@ export function IntradayWatchTable({
  * 메뉴는 position:fixed 로 띄워 표의 overflow 클리핑을 피하고 **항상 앵커 아래**에 연다.
  * 스크롤/리사이즈 시 닫는다(고정 좌표 어긋남 방지). 주기 셀렉트·금액 프리셋 공용.
  */
-function useFixedMenu() {
+function useFixedMenu(rootRef: React.RefObject<HTMLDivElement | null>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -148,7 +150,7 @@ function useFixedMenu() {
       window.removeEventListener("scroll", onMove, true);
       window.removeEventListener("resize", onMove);
     };
-  }, [open]);
+  }, [open, rootRef]);
 
   function toggle(anchor: HTMLElement | null) {
     if (!open && anchor) {
@@ -158,7 +160,7 @@ function useFixedMenu() {
     setOpen((v) => !v);
   }
 
-  return { open, pos, rootRef, toggle, close: () => setOpen(false) };
+  return { open, pos, toggle, close: () => setOpen(false) };
 }
 
 function MenuPanel({
@@ -182,11 +184,12 @@ function MenuPanel({
 // ─── 주기 셀렉트 ──────────────────────────────────────────────────────────────
 
 function IntervalSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const menu = useFixedMenu();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menu = useFixedMenu(rootRef);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div ref={menu.rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <button
         ref={buttonRef}
         type="button"
@@ -242,11 +245,12 @@ function presetLabel(amount: number): string {
 }
 
 function CashInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const menu = useFixedMenu();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menu = useFixedMenu(rootRef);
   const boxRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={menu.rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <div ref={boxRef} className="relative">
         <input
           className="h-8 w-[9rem] rounded-md border border-border-line bg-surface-base pl-sm pr-7 text-right text-body-sm text-text-strong tabular-nums"
@@ -404,7 +408,7 @@ function WatchRow({
         </td>
         <td
           className={cn(
-            "py-sm pr-md text-right tabular-nums text-body-sm-strong",
+            "border-l border-border-line py-sm pl-md pr-md text-right tabular-nums text-body-sm-strong",
             current ? changeTone(current.returnPct) : "text-text-muted",
           )}
         >
