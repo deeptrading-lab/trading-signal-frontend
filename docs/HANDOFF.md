@@ -5457,3 +5457,33 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - snapshot·ai-analysis 등 다중 소스 합성 라우트에 동일 추적 확장(필요 시)
   - 폴백 데드라인 전파·관심종목 토스 전환 등 #199 잔여 후속 유지
+
+### 2026-07-02 — feat(toss): KIS 메타 하이브리드 보강 — 토스 모드 업종·외인비율·관리종목 채움 (#201)
+
+- **slug**: `toss-kis-meta-enrich` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/201
+- **요약**: feat(toss): KIS 메타 하이브리드 보강 — 토스 모드 업종·외인비율·관리종목 채움
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > 토스 모드에서 비었던 KIS 전용 메타를 best-effort 로 보강한다 — PR#199 에서 문서화한 디그레이드 중 3건(종목 수급 카드 외인 보유율 "-", 기업개요 업종 라벨 소실, AI 분석 프롬프트 업종/외인 메타 누락) 해소. 주 시세는 여전히 토스, KIS 는 보조 메타만.
+  > 
+  > ## 설계 (경량 플로우)
+  > 
+  > - `lib/api/kis/tossEnrich.ts` — 제네릭 로더: 티커 캐시 + single-flight + **예산 캡 1.2s**(KIS 행이 라우트 5s 예산을 갉지 않게, 초과 시 이번 응답 미보강+백그라운드 로드 지속) + **실패 캐시 60s**(장애 중 재시도 폭주 방지). 절대 throw 안 함.
+  > - 현재가: sector·foreignRatio (inquire-price, 10분 TTL) / 종목정보: industryName·isAdminItem·isKospi200 (search-stock-info, 1h TTL, vts 자동 스킵)
+  > - X-Data-Source 는 "toss" 유지(주 데이터 출처 기준 — 의도된 동작)
+  > 
+  > ## 검증
+  > 
+  > - 단위 +8케이스(병합 규칙·best-effort·예산캡·실패캐시·가드·single-flight), 전체 674 passed
+  > - 라이브: KIS 야간 점검 500 실창에서 fail-soft 확인(무지연·무손상). 성공 병합은 배선 테스트로 고정 — `docs/qa/toss-kis-meta-enrich.md`
+  > 
+  > ## 다음 작업
+  > 
+  > - 주간 장중 토스 모드 종목 화면에서 외인 보유율·업종 라벨 실표기 1회 확인 (QA 비고 1)
+  > - AI 종합분석 모델 sonnet-4-6 → claude-sonnet-5 업데이트 (별도 브랜치 진행 중)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 주간 장중 토스 모드 종목 화면에서 외인 보유율·업종 라벨 실표기 1회 확인 (QA 비고 1)
+  - AI 종합분석 모델 sonnet-4-6 → claude-sonnet-5 업데이트 (별도 브랜치 진행 중)
