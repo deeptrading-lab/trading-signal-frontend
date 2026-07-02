@@ -41,6 +41,10 @@ export type PaperTradingDecision = {
   confidence: PaperTradingConfidence;
   rationale: string;
   riskNotes: string[];
+  /** ① 흐름·세력 분석가 진단 원문 — 단타 cli-agent 만. "왜 이런 판단"의 배경 메모. */
+  analystNote?: string;
+  /** 사후 룰 게이트가 LLM 결정을 조정한 내역(과욕 캡·레짐 veto 등) — 단타 cli-agent 만. */
+  gateAdjustments?: string[];
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**

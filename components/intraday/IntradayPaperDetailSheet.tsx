@@ -186,7 +186,8 @@ export function IntradayPaperDetailSheet({
                       <th className="py-xs pr-md text-right font-normal">{P.sheet.colPrice}</th>
                       <th className="py-xs pr-md text-right font-normal">{P.sheet.colNotional}</th>
                       <th className="py-xs pr-md text-right font-normal">{P.sheet.colCost}</th>
-                      <th className="py-xs text-right font-normal">{P.sheet.colPnl}</th>
+                      <th className="py-xs pr-md text-right font-normal">{P.sheet.colPnl}</th>
+                      <th className="py-xs text-left font-normal">{P.sheet.colNote}</th>
                     </tr>
                   </thead>
                   <tbody className="tabular-nums">
@@ -209,7 +210,7 @@ export function IntradayPaperDetailSheet({
                         <td className="py-xs pr-md text-right text-text-muted">
                           {formatMoney(order.costKrw ?? 0)}
                         </td>
-                        <td className="py-xs text-right">
+                        <td className="py-xs pr-md text-right">
                           {order.realizedPnl != null ? (
                             <span
                               className={
@@ -222,6 +223,13 @@ export function IntradayPaperDetailSheet({
                           ) : (
                             <span className="text-text-muted">—</span>
                           )}
+                        </td>
+                        {/* 왜 이런 판단 — 주문을 만든 결정의 근거 메모(전문은 title). */}
+                        <td
+                          className="max-w-[18rem] truncate py-xs text-left text-caption text-text-muted"
+                          title={order.reason}
+                        >
+                          {order.reason}
                         </td>
                       </tr>
                     ))}
@@ -238,30 +246,42 @@ export function IntradayPaperDetailSheet({
               <p className="text-body-sm text-text-muted">{P.noDecision}</p>
             ) : (
               <ul className="flex flex-col gap-xs">
-                {recentDecisions.map((tick) => (
-                  <li key={tick.id} className="rounded-md bg-surface-muted p-sm">
-                    <div className="flex flex-wrap items-center gap-sm text-caption text-text-muted">
-                      <span className="tabular-nums">{kstTime(tick.tickWindowStart)}</span>
-                      <span className="text-body-sm-strong text-text-strong">
-                        {ACTION_LABEL[tick.decision.action]}
-                      </span>
-                      <span
-                        className={cn(
-                          "ml-auto tabular-nums",
-                          tick.returnPctAfter >= 0 ? "text-signal-up" : "text-signal-down",
-                        )}
-                      >
-                        {formatPct(tick.returnPctAfter)}
-                      </span>
-                    </div>
-                    <p className="mt-xs text-body-sm text-text-muted">{tick.rationale}</p>
-                    {tick.guardAdjustments.length > 0 ? (
-                      <p className="mt-xs text-caption text-text-muted">
-                        {P.sheet.gatePrefix}: {tick.guardAdjustments.join(" · ")}
-                      </p>
-                    ) : null}
-                  </li>
-                ))}
+                {recentDecisions.map((tick) => {
+                  // 룰 조정 = 판단 게이트(decision.gateAdjustments) + 체결 가드(tick.guardAdjustments).
+                  const adjustments = [
+                    ...(tick.decision.gateAdjustments ?? []),
+                    ...tick.guardAdjustments,
+                  ];
+                  return (
+                    <li key={tick.id} className="rounded-md bg-surface-muted p-sm">
+                      <div className="flex flex-wrap items-center gap-sm text-caption text-text-muted">
+                        <span className="tabular-nums">{kstTime(tick.tickWindowStart)}</span>
+                        <span className="text-body-sm-strong text-text-strong">
+                          {ACTION_LABEL[tick.decision.action]}
+                        </span>
+                        <span
+                          className={cn(
+                            "ml-auto tabular-nums",
+                            tick.returnPctAfter >= 0 ? "text-signal-up" : "text-signal-down",
+                          )}
+                        >
+                          {formatPct(tick.returnPctAfter)}
+                        </span>
+                      </div>
+                      <p className="mt-xs text-body-sm text-text-muted">{tick.rationale}</p>
+                      {tick.decision.analystNote ? (
+                        <p className="mt-xs text-caption text-text-muted line-clamp-2">
+                          {P.sheet.analystPrefix}: {tick.decision.analystNote}
+                        </p>
+                      ) : null}
+                      {adjustments.length > 0 ? (
+                        <p className="mt-xs text-caption text-text-muted">
+                          {P.sheet.gatePrefix}: {adjustments.join(" · ")}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

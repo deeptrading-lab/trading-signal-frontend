@@ -405,6 +405,9 @@ export function toPaperTradingDecision(
     confidence: intraday.confidence,
     rationale: intraday.rationale,
     riskNotes: intraday.riskNotes,
+    // "왜 이런 판단" 메모 — 분석가 진단·룰 조정 내역을 틱 로그(체결 내역 시트)까지 보존.
+    analystNote: intraday.analystNote,
+    gateAdjustments: intraday.gateAdjustments,
     expectedHoldingMinutes: intraday.expectedHoldingMinutes ?? undefined,
     // 청산 트리거(virtualExecution forced-exit): 손절가 우선, 없으면 무효화가.
     invalidationPrice: intraday.stopPrice ?? intraday.invalidationPrice ?? null,
