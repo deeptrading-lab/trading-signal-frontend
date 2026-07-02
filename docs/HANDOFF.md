@@ -5487,3 +5487,29 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 주간 장중 토스 모드 종목 화면에서 외인 보유율·업종 라벨 실표기 1회 확인 (QA 비고 1)
   - AI 종합분석 모델 sonnet-4-6 → claude-sonnet-5 업데이트 (별도 브랜치 진행 중)
+
+### 2026-07-02 — chore(ai): AI 종합분석 모델 claude-sonnet-5 업데이트 (env 템플릿) (#202)
+
+- **slug**: `chore/ai-model-sonnet5` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/202
+- **요약**: chore(ai): AI 종합분석 모델 claude-sonnet-5 업데이트 (env 템플릿)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > AI 종합분석 분석가 그룹 모델을 Sonnet 4.6 → **claude-sonnet-5** 로 업데이트. 실 값은 `.env.local`(미커밋)에서 교체했고, 이 PR 은 템플릿 권장값·주석 갱신분.
+  > 
+  > ## 확인 사항
+  > 
+  > - `claude --model claude-sonnet-5` CLI 스모크 정상 응답 (분석 파이프라인 동일 경로)
+  > - effort 게이트: `intradayEffort` 의 sonnet-4-5 가드에 sonnet-5 미매칭 → effort 자동 적용 (기존 테스트가 sonnet-4-6=low 케이스로 고정)
+  > - 비용 대시보드: sonnet 패밀리 매핑(`m.includes("sonnet")`)·단가 $3/$15 스티커 동일 → 무수정. 단 2026-08-31까지 인트로 단가($2/$10) 기간엔 대시보드 추정이 실청구 대비 최대 33% 과대 (스티커 기준 유지 — 카피에 '공개 단가' 명시돼 있음)
+  > - 코드 하드 참조 없음(테스트 픽스처의 불투명 문자열만 — 유지), TRADER/PM=opus-4-8·INTRADAY=haiku 불변
+  > 
+  > ## 다음 작업
+  > 
+  > - 다음 종목 분석 1회 실행 시 /analyze 토큰 대시보드에서 분석가 모델이 sonnet-5 로 캡처되는지 확인
+  > - (선택) 인트로 단가 기간 비용 과대계상이 거슬리면 modelBreakdown 단가 한시 조정
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 다음 종목 분석 1회 실행 시 /analyze 토큰 대시보드에서 분석가 모델이 sonnet-5 로 캡처되는지 확인
+  - (선택) 인트로 단가 기간 비용 과대계상이 거슬리면 modelBreakdown 단가 한시 조정
