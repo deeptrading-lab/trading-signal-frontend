@@ -30,7 +30,7 @@ function makeRow(overrides: Partial<ScorecardRow> = {}): ScorecardRow {
     AlphaResidualPct: null,
     Regime: null,
   };
-  const horizon = (h: "d1" | "w1" | "m1") => ({
+  const horizon = (h: "d1" | "w1" | "w2" | "m1") => ({
     [`${h}Status`]: "pending" as const,
     [`${h}Close`]: null,
     [`${h}ReturnPct`]: null,
@@ -59,6 +59,7 @@ function makeRow(overrides: Partial<ScorecardRow> = {}): ScorecardRow {
     benchKey: null,
     ...horizon("d1"),
     ...horizon("w1"),
+    ...horizon("w2"),
     ...horizon("m1"),
     createdAt: "2026-06-01T07:00:00.000Z",
     ...overrides,

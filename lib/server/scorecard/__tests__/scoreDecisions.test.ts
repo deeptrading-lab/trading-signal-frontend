@@ -55,6 +55,15 @@ function makeRow(overrides: Partial<ScorecardRow> = {}): ScorecardRow {
     w1Beta: null,
     w1AlphaResidualPct: null,
     w1Regime: null,
+    w2Status: "pending",
+    w2Close: null,
+    w2ReturnPct: null,
+    w2ScoredAt: null,
+    w2BenchReturnPct: null,
+    w2ExcessReturnPct: null,
+    w2Beta: null,
+    w2AlphaResidualPct: null,
+    w2Regime: null,
     m1Status: "pending",
     m1Close: null,
     m1ReturnPct: null,
@@ -87,7 +96,10 @@ function buildDeps(opts: {
     getPendingRows: async () =>
       [...rowMap.values()].filter(
         (r) =>
-          r.d1Status === "pending" || r.w1Status === "pending" || r.m1Status === "pending",
+          r.d1Status === "pending" ||
+          r.w1Status === "pending" ||
+          r.w2Status === "pending" ||
+          r.m1Status === "pending",
       ),
     fetchDaily: async (ticker: string) => {
       if (opts.throwTickers?.has(ticker)) throw new Error("KIS 조회 실패(mock)");
@@ -111,6 +123,11 @@ function buildDeps(opts: {
           row.w1Close = update.close;
           row.w1ReturnPct = update.returnPct;
           row.w1ScoredAt = update.scoredAt;
+        } else if (horizon === "w2") {
+          row.w2Status = update.status;
+          row.w2Close = update.close;
+          row.w2ReturnPct = update.returnPct;
+          row.w2ScoredAt = update.scoredAt;
         } else {
           row.m1Status = update.status;
           row.m1Close = update.close;

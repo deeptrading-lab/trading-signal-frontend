@@ -52,7 +52,7 @@ const DIMENSIONS: ScorecardDimension[] = [
 /** 차원 → 라벨(기존 DIMENSION_LABEL + regime 보강). */
 const dimensionLabel = (d: ScorecardDimension): string =>
   d === "regime" ? DIMENSION_LABEL_REGIME : DIMENSION_LABEL[d];
-const HORIZON_FILTERS: HorizonFilter[] = ["all", "d1", "w1", "m1"];
+const HORIZON_FILTERS: HorizonFilter[] = ["all", "d1", "w1", "w2", "m1"];
 
 export function ScorecardContainer() {
   const { data, isLoading, isError, isFetching, refetch } = useQueryScorecardSummary();

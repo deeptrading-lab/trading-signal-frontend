@@ -83,7 +83,13 @@ function parseDate(ymdDash: string): Date {
 
 /** 행의 한 horizon 현재 status 읽기. */
 function statusOf(row: ScorecardRow, h: ScorecardHorizon): HorizonStatus {
-  return h === "d1" ? row.d1Status : h === "w1" ? row.w1Status : row.m1Status;
+  return h === "d1"
+    ? row.d1Status
+    : h === "w1"
+      ? row.w1Status
+      : h === "w2"
+        ? row.w2Status
+        : row.m1Status;
 }
 
 /**

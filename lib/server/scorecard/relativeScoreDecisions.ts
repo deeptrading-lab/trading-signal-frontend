@@ -93,7 +93,13 @@ function parseDate(ymdDash: string): Date {
 }
 
 function statusOf(row: ScorecardRow, h: ScorecardHorizon): HorizonStatus {
-  return h === "d1" ? row.d1Status : h === "w1" ? row.w1Status : row.m1Status;
+  return h === "d1"
+    ? row.d1Status
+    : h === "w1"
+      ? row.w1Status
+      : h === "w2"
+        ? row.w2Status
+        : row.m1Status;
 }
 
 /** 해당 horizon 의 벤치 수익률이 이미 행에 기록돼 있는지(backfill 필요 판별). */
@@ -102,7 +108,9 @@ function benchReturnOf(row: ScorecardRow, h: ScorecardHorizon): number | null {
     ? row.d1BenchReturnPct
     : h === "w1"
       ? row.w1BenchReturnPct
-      : row.m1BenchReturnPct;
+      : h === "w2"
+        ? row.w2BenchReturnPct
+        : row.m1BenchReturnPct;
 }
 
 /**
