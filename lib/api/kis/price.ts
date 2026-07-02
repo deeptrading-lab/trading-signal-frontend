@@ -34,6 +34,7 @@ import type {
   StockPriceWithShares,
 } from "./types";
 import { withTossFallback } from "@/lib/api/marketdata/source";
+import { createKisMetaLoader } from "./tossEnrich";
 import {
   fetchStockPriceToss,
   fetchStockPriceWithSharesToss,
@@ -63,15 +64,37 @@ async function buildAuthHeaders(trId: string): Promise<AuthHeaders> {
 }
 
 /**
+ * 토스 모드 현재가 보강 — 업종(sector)·외국인 지분율(foreignRatio)은 토스 미제공이라
+ * KIS `inquire-price` 값을 best-effort 합성한다(`tossEnrich.ts` 설계 제약 참조).
+ * 외인비율은 일 단위 데이터라 10분 캐시로 충분.
+ */
+const loadKisPriceMeta = createKisMetaLoader({
+  ttlMs: 10 * 60_000,
+  failureTtlMs: 60_000,
+  budgetMs: 1_200,
+  fetcher: async (ticker: string) => {
+    const kis = await fetchStockPriceKis(ticker);
+    return { sector: kis.sector, foreignRatio: kis.foreignRatio };
+  },
+});
+
+async function enrichTossPrice(price: StockPrice): Promise<StockPrice> {
+  const meta = await loadKisPriceMeta(price.ticker);
+  if (!meta) return price;
+  return { ...price, sector: meta.sector, foreignRatio: meta.foreignRatio };
+}
+
+/**
  * 현재가 조회. KIS rt_cd != "0" 은 비즈니스 에러 (한글 msg1 통과).
  *
  * `MARKET_DATA_SOURCE=toss`(+키 존재) 시 토스 어댑터로 위임 — 실패하면 KIS 폴백
  * (PRD `toss-market-data-adapter` §3-2·3-3. 이하 fetch* 동일 패턴).
+ * 토스 성공 시에도 업종·외인비율은 KIS 메타로 보강(위 enrichTossPrice).
  */
 export async function fetchStockPrice(ticker: string): Promise<StockPrice> {
   return withTossFallback(
     "현재가",
-    () => fetchStockPriceToss(ticker),
+    () => fetchStockPriceToss(ticker).then(enrichTossPrice),
     () => fetchStockPriceKis(ticker),
   );
 }
@@ -131,7 +154,10 @@ export async function fetchStockPriceWithShares(
 ): Promise<StockPriceWithShares> {
   return withTossFallback(
     "현재가+상장주수",
-    () => fetchStockPriceWithSharesToss(ticker),
+    async () => {
+      const result = await fetchStockPriceWithSharesToss(ticker);
+      return { ...result, price: await enrichTossPrice(result.price) };
+    },
     () => fetchStockPriceWithSharesKis(ticker),
   );
 }
