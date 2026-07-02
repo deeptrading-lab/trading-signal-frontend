@@ -9,6 +9,7 @@ import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSes
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils/cn";
+import { formatKrwInput } from "@/lib/utils/formatMoney";
 import {
   PAPER_TRADING_CREATE_BUTTON,
   PAPER_TRADING_CREATE_TITLE,
@@ -57,7 +58,7 @@ export function PaperTradingListContainer() {
   const [selectedStocks, setSelectedStocks] = useState<PaperTradingSelectedStock[]>([
     { ticker: "005930", name: "삼성전자", market: "KOSPI" },
   ]);
-  const [initialCash, setInitialCash] = useState("10000000");
+  const [initialCash, setInitialCash] = useState(formatKrwInput("10000000"));
   const [targetReturnPct, setTargetReturnPct] = useState("5");
   const [riskMode, setRiskMode] = useState<PaperTradingRiskMode>("balanced");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export function PaperTradingListContainer() {
         name,
         tickers: selectedStocks.map((stock) => stock.ticker),
         stocks: selectedStocks,
-        initialCash: Number(initialCash),
+        initialCash: Number(initialCash.replace(/[^0-9]/g, "")),
         targetReturnPct: Number(targetReturnPct),
         riskMode,
         decisionProvider: "mock",
@@ -159,10 +160,10 @@ export function PaperTradingListContainer() {
             <label className="flex flex-col gap-xs text-body-sm text-text-muted">
               <span>{PAPER_TRADING_FIELD_CASH}</span>
               <input
-                className="h-input-h rounded-md border border-border-line bg-surface-base px-md text-text-strong"
-                inputMode="decimal"
+                className="h-input-h rounded-md border border-border-line bg-surface-base px-md text-text-strong tabular-nums"
+                inputMode="numeric"
                 value={initialCash}
-                onChange={(event) => setInitialCash(event.target.value)}
+                onChange={(event) => setInitialCash(formatKrwInput(event.target.value))}
               />
             </label>
             <label className="flex flex-col gap-xs text-body-sm text-text-muted">

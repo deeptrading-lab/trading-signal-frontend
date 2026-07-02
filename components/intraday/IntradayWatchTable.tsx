@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronDown, History, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { formatMoney } from "@/lib/utils/formatMoney";
+import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
 import { isApiError } from "@/lib/api/errors";
 import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { useMutationIntradayRead } from "@/hooks/stock/useMutationIntradayRead";
@@ -157,7 +157,7 @@ function WatchRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [cash, setCash] = useState("10000000");
+  const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
   const [startError, setStartError] = useState<string | null>(null);
 
@@ -256,7 +256,7 @@ function WatchRow({
               value={cash}
               aria-label={P.cashLabel}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setCash(e.target.value)}
+              onChange={(e) => setCash(formatKrwInput(e.target.value))}
             />
           )}
         </td>

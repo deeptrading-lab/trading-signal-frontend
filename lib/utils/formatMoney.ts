@@ -32,3 +32,13 @@ export function formatNumber(
     maximumFractionDigits: digits,
   }).format(value);
 }
+
+/**
+ * 원화 금액 input 마스킹 — 입력 문자열에서 숫자만 남기고 세 자리 콤마를 다시 찍는다.
+ * "10000" → "10,000", 숫자 없음 → "". 파싱측은 `replace(/[^0-9]/g, "")` 로 콤마를 걷어낸다.
+ */
+export function formatKrwInput(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("ko-KR");
+}
