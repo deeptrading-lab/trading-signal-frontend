@@ -5429,3 +5429,31 @@
   - prod 반영 결정 시: Vercel env(TOSS_*, MARKET_DATA_SOURCE) + 스코어카드 채점 캔들 소스 일관성 처리(§9 q1 후속)
   - WTS 에서 dev/prod client 분리 발급 가능 여부 확인 (§9 q3)
   - NXT 애프터마켓 분봉 활용 여부 검토 (§9 q4)
+
+### 2026-07-02 — feat(marketdata): X-Data-Source 실서빙 소스 노출 + 소스 판정 로그 (관측성) (#200)
+
+- **slug**: `marketdata-observability` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/200
+- **요약**: feat(marketdata): X-Data-Source 실서빙 소스 노출 + 소스 판정 로그 (관측성)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > PR #199 후속(경량 플로우, PRD 없음) — 토스 모드에서 데이터 출처를 값 지문 없이 확인할 수 있게 한다.
+  > 
+  > - `X-Data-Source` 헤더가 **실제 서빙 소스**를 표기: `toss` / `kis`(토글 off 또는 폴백) / `toss,kis`(다콜 일부 폴백). AsyncLocalStorage 요청 단위 추적이라 동시 요청·폴백에도 정확.
+  > - 최초 시세 호출 시 `[marketdata] 시세 소스: …` 1회 로그. `MARKET_DATA_SOURCE=toss`인데 키가 없으면 게이트 사유 warn(동료 로컬 디버깅).
+  > - 적용: 종목 4개 라우트(price·daily·chart·chart-minute). mock 분기·에러 매핑 무수정.
+  > 
+  > ## 검증
+  > 
+  > - 단위 +7케이스(혼합 표기·추적 밖 호출·1회 로그), 전체 666 passed·typecheck·lint 클린
+  > - 라이브(:3000, 토글 on): 4/4 라우트 `X-Data-Source: toss` 실측 — `docs/qa/marketdata-observability.md`
+  > 
+  > ## 다음 작업
+  > 
+  > - snapshot·ai-analysis 등 다중 소스 합성 라우트에 동일 추적 확장(필요 시)
+  > - 폴백 데드라인 전파·관심종목 토스 전환 등 #199 잔여 후속 유지
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - snapshot·ai-analysis 등 다중 소스 합성 라우트에 동일 추적 확장(필요 시)
+  - 폴백 데드라인 전파·관심종목 토스 전환 등 #199 잔여 후속 유지
