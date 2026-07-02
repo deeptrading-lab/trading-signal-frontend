@@ -5391,3 +5391,41 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - [ ] 차트 오버레이 드롭다운 키보드 접근성(Escape·화살표 네비) — `ChartRangeDropdown`/`ChartOptionsDropdown` 일괄
   - [ ] 매물대(Volume Profile) 시각 리디자인 — 별도 작업
+
+### 2026-07-02 — feat(marketdata): 토스증권 시세·캔들·종목정보 어댑터 (MARKET_DATA_SOURCE 토글, KIS 하이브리드) (#199)
+
+- **slug**: `toss-market-data-adapter` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/199
+- **요약**: feat(marketdata): 토스증권 시세·캔들·종목정보 어댑터 (MARKET_DATA_SOURCE 토글, KIS 하이브리드)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > 토스증권 Open API 를 시세 레이어 대체 소스로 도입한다 — `MARKET_DATA_SOURCE=toss` 옵트인 토글 + 키 없으면 무조건 KIS(동료 로컬 무영향) + 호출 실패 시 KIS 폴백. 지수·수급·관심종목 일괄시세는 KIS 유지(하이브리드). PRD: `docs/prd/toss-market-data-adapter.md`
+  > 
+  > ## 구현
+  > 
+  > - `lib/api/toss/` — client(429 Retry-After·401 단일활성토큰 재시도·{result} 언래핑) / token(2단 캐시+분산락, KIS store 재사용) / candles(1d 커서 페이징 + W/M 리샘플) / minute(1m 페이징 + 정규장 필터 + 15:31 종가 동시호가 리라벨) / price(/prices+일봉 컨텍스트 등락 합성) / stock-master(24h 캐시)
+  > - `lib/api/marketdata/source.ts` — 토글 판정 + `withTossFallback` 단일 지점
+  > - 기존 KIS 함수 8개는 시그니처 유지, 본문 최상단 위임만 추가 → 시그널 엔진·스코어카드·BFF·프론트 수정 0
+  > - 스모크 테스트 `npm run toss:smoke` (문서 미기재 5개 미지수 실측 스크립트)
+  > 
+  > ## 검증
+  > 
+  > - 단위: kst 변환·W/M 리샘플·토글 게이트 20케이스 + 기존 656 테스트 무수정 통과, typecheck/lint 클린
+  > - E2E(로컬 dev 4개 env 조합 부팅): `docs/qa/toss-market-data-adapter.md` — 분봉 78봉 KIS 동수·폴백 발화·키없음 무영향 확인
+  > - ★실측 발견: **토스 일봉 = KRX+NXT 통합 시세**(확정봉 OHLC 상이·거래량 +70%) — 버그 아닌 정의 차이, PRD §9 q1 RESOLVED. prod 채점 cron 은 토글 미설정(kis)이라 영향 0
+  > 
+  > ## 다음 작업
+  > 
+  > - 장중 실측 1회: kis/toss 현재가 나란히 대조(AC-3 비고 2) + 장전 당일봉 없음 경로 확인
+  > - 관심종목(fetchIntstockMultprice) 토스 전환 — 전일종가 일단위 KV 캐시 워밍 설계 (PRD §9 q2)
+  > - prod 반영 결정 시: Vercel env(TOSS_*, MARKET_DATA_SOURCE) + 스코어카드 채점 캔들 소스 일관성 처리(§9 q1 후속)
+  > - WTS 에서 dev/prod client 분리 발급 가능 여부 확인 (§9 q3)
+  > - NXT 애프터마켓 분봉 활용 여부 검토 (§9 q4)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 장중 실측 1회: kis/toss 현재가 나란히 대조(AC-3 비고 2) + 장전 당일봉 없음 경로 확인
+  - 관심종목(fetchIntstockMultprice) 토스 전환 — 전일종가 일단위 KV 캐시 워밍 설계 (PRD §9 q2)
+  - prod 반영 결정 시: Vercel env(TOSS_*, MARKET_DATA_SOURCE) + 스코어카드 채점 캔들 소스 일관성 처리(§9 q1 후속)
+  - WTS 에서 dev/prod client 분리 발급 가능 여부 확인 (§9 q3)
+  - NXT 애프터마켓 분봉 활용 여부 검토 (§9 q4)
