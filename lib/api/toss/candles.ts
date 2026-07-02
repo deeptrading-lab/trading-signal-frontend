@@ -123,7 +123,7 @@ function mondayOf(date: string): string {
  * 일봉 → 주(W)/월(M)봉 리샘플 (오름차순 입력·출력).
  *
  * 집계 규칙(AC-8): open=버킷 첫 봉 시가, high/low=극값, close=마지막 봉 종가, volume=합산.
- * 봉 라벨 `date` = 버킷 **마지막 거래일**(차트 x축 관례 — 진행 중 주/월은 현재까지의 마지막 날).
+ * 봉 라벨 `date` = 버킷 **첫 거래일** — KIS 주봉 라벨(주 시작일, E2E 실측) 파리티.
  */
 export function resampleDailyCandles(
   daily: StockDailyCandle[],
@@ -136,14 +136,13 @@ export function resampleDailyCandles(
     const key = period === "W" ? mondayOf(c.date) : c.date.slice(0, 7);
     const existing = buckets.get(key);
     if (!existing) {
-      buckets.set(key, { ...c });
+      buckets.set(key, { ...c }); // 라벨 = 버킷 첫 거래일(date 유지)
       order.push(key);
     } else {
       existing.high = Math.max(existing.high, c.high);
       existing.low = Math.min(existing.low, c.low);
       existing.close = c.close;
       existing.volume += c.volume;
-      existing.date = c.date; // 라벨 = 버킷 마지막 거래일
     }
   }
 

@@ -34,6 +34,12 @@ const DATE_MAX_PAGES = 6;
 
 const SESSION_START_MIN = 9 * 60; // 09:00
 const SESSION_END_MIN = 15 * 60 + 30; // 15:30 (동시호가 종가봉 포함)
+/**
+ * ⚠️ 토스는 KRX 종가 동시호가 체결을 **15:31 봉**에 기록한다(E2E 실측 — 15:21~15:30 은
+ * 0거래량 채움봉, 15:31 에 대량 체결). KIS 는 같은 체결이 15:30 봉이므로, 15:31 봉을
+ * 세션에 포함시킨 뒤 15:30 으로 리라벨해 파리티를 맞춘다.
+ */
+const CLOSING_AUCTION_MIN = 15 * 60 + 31; // 15:31
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -62,16 +68,25 @@ function mapTossMinuteCandle(candle: TossCandle): StockMinuteCandle | null {
   };
 }
 
-/** 국내 심볼 정규장 필터 — KIS 세션 파리티(모듈 주석). 미국 티커는 통과. */
+/**
+ * 국내 심볼 정규장 필터 — KIS 세션 파리티(모듈 주석). 미국 티커는 통과.
+ * 15:31 종가 동시호가 봉은 포함 후 15:30 으로 리라벨(`CLOSING_AUCTION_MIN` 주석).
+ */
 function filterRegularSession(
   symbol: string,
   candles: StockMinuteCandle[],
 ): StockMinuteCandle[] {
   if (!isKoreanTicker(symbol)) return candles;
-  return candles.filter((c) => {
+  const kept: StockMinuteCandle[] = [];
+  for (const c of candles) {
     const min = minutesOfDay(c.date);
-    return min >= SESSION_START_MIN && min <= SESSION_END_MIN;
-  });
+    if (min >= SESSION_START_MIN && min <= SESSION_END_MIN) {
+      kept.push(c);
+    } else if (min === CLOSING_AUCTION_MIN) {
+      kept.push({ ...c, date: `${c.date.slice(0, 10)}T15:30` });
+    }
+  }
+  return kept;
 }
 
 function finalize(
@@ -79,8 +94,10 @@ function finalize(
   oneMin: StockMinuteCandle[],
   timeframe: number,
 ): StockMinuteCandle[] {
+  // dropFillerBars 를 dedupe 앞에 둔다 — 리라벨된 15:30 동시호가 봉(volume>0)과 원래 15:30
+  // 채움봉(volume 0)이 겹칠 때 채움봉을 먼저 제거해 dedupe 가 체결봉을 유지하게.
   return resampleMinuteCandles(
-    dropFillerBars(dedupeSortMinuteCandles(filterRegularSession(symbol, oneMin))),
+    dedupeSortMinuteCandles(dropFillerBars(filterRegularSession(symbol, oneMin))),
     timeframe,
   );
 }
@@ -88,6 +105,9 @@ function finalize(
 /**
  * 특정 세션 날짜("YYYY-MM-DD")의 1분봉을 `before` 커서로 역방향 수집.
  * 해당 날짜보다 오래된 봉을 만나면 종료(세션 시작 도달).
+ *
+ * ⚠️ `maxBars` 는 **정규장 필터를 통과한 봉**만 센다 — 토스 1m 스트림은 NXT 프리/애프터 봉이
+ * 섞여 있어, 필터 전 개수로 캡을 걸면 저녁 봉이 캡을 소진해 정규장 봉이 잘린다(E2E 실측 회귀).
  */
 async function collectSessionMinutes(
   symbol: string,
@@ -107,10 +127,15 @@ async function collectSessionMinutes(
     if (mapped.length === 0) break;
 
     let crossedSessionStart = false;
-    for (const c of mapped) {
+    for (const c of filterRegularSession(symbol, mapped)) {
       const date = c.date.slice(0, 10);
       if (date === sessionDate) acc.push(c);
-      else if (date < sessionDate) crossedSessionStart = true;
+    }
+    for (const c of mapped) {
+      if (c.date.slice(0, 10) < sessionDate) {
+        crossedSessionStart = true;
+        break;
+      }
     }
     if (crossedSessionStart) break;
     if (!nextBefore || nextBefore === before) break;
@@ -140,7 +165,10 @@ export async function fetchTodayMinuteCandlesToss(
     .reduce((max, c) => (c.date > max ? c.date : max), mapped[0].date)
     .slice(0, 10);
 
-  const acc = mapped.filter((c) => c.date.slice(0, 10) === sessionDate);
+  // maxBars 는 정규장 통과 봉만 센다 (collectSessionMinutes 주석의 NXT 캡 소진 회귀 참조).
+  const acc = filterRegularSession(ticker, mapped).filter(
+    (c) => c.date.slice(0, 10) === sessionDate,
+  );
   const crossed = mapped.some((c) => c.date.slice(0, 10) < sessionDate);
 
   if (!crossed && first.nextBefore && acc.length < maxBars) {

@@ -35,7 +35,7 @@ describe("resampleDailyCandles — W(주봉)", () => {
     expect(weekly).toHaveLength(2);
 
     expect(weekly[0]).toEqual({
-      date: "2026-07-01", // 버킷 마지막 거래일
+      date: "2026-06-29", // 버킷 첫 거래일 (KIS 주봉 라벨 파리티)
       open: 100, // 첫 봉 시가
       high: 120, // 극값
       low: 90,
@@ -68,7 +68,7 @@ describe("resampleDailyCandles — M(월봉)", () => {
     const monthly = resampleDailyCandles(daily, "M");
     expect(monthly).toHaveLength(2);
     expect(monthly[0]).toEqual({
-      date: "2026-06-30",
+      date: "2026-06-29", // 버킷 첫 거래일
       open: 100,
       high: 120,
       low: 95,
