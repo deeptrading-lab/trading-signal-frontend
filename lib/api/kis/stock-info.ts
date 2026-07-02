@@ -27,6 +27,8 @@ import type {
   KisSearchStockInfoOutput,
   StockInfo,
 } from "./types";
+import { withTossFallback } from "@/lib/api/marketdata/source";
+import { fetchStockInfoToss } from "@/lib/api/toss/stock-master";
 
 type AuthHeaders = {
   authorization: string;
@@ -53,6 +55,14 @@ async function buildAuthHeaders(trId: string): Promise<AuthHeaders> {
  * @param ticker 6자리 종목코드 — `PDNO` 로 그대로 사용 (응답 pdno 는 12자리 패딩이지만 입력값 유지).
  */
 export async function fetchStockInfo(ticker: string): Promise<StockInfo> {
+  return withTossFallback(
+    "종목정보",
+    () => fetchStockInfoToss(ticker),
+    () => fetchStockInfoKis(ticker),
+  );
+}
+
+async function fetchStockInfoKis(ticker: string): Promise<StockInfo> {
   const client = getKisClient();
   const headers = await buildAuthHeaders("CTPF1002R");
 
