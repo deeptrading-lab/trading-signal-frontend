@@ -7,8 +7,10 @@
  * 사용처: app/api/stock/chart/route.ts
  */
 
-import { fetchStockDailyChart } from "@/lib/api/kis";
+import { fetchStockDailyChartKis } from "@/lib/api/kis/price";
 import type { StockDailyCandle } from "@/lib/api/kis/types";
+import { withTossFallback } from "@/lib/api/marketdata/source";
+import { fetchDailyRangeToss } from "@/lib/api/toss/candles";
 
 /** 단일 호출 커버 가능 캘린더일 (100 영업봉 ≒ 140일, 여유 10일). */
 const CHUNK_DAYS = 130;
@@ -44,6 +46,21 @@ export async function fetchDailyChunked(
   fromDate: string,
   toDate: string,
 ): Promise<StockDailyCandle[]> {
+  // 토스는 커서 페이징(콜당 200봉)이라 130일 청크 분할이 불필요·유해(3000일=24청크 중복 페치로
+  // 12s 라우트 예산 초과). 토글 시 범위 페치 1회로 위임하고, 실패 시에만 KIS 청크 경로.
+  // 폴백 본문은 wrapper(fetchStockDailyChart)가 아닌 *Kis 를 직접 써서 청크당 토스 재시도를 차단.
+  return withTossFallback(
+    "일봉 범위(청크)",
+    () => fetchDailyRangeToss(ticker, fromDate, toDate),
+    () => fetchDailyChunkedKis(ticker, fromDate, toDate),
+  );
+}
+
+async function fetchDailyChunkedKis(
+  ticker: string,
+  fromDate: string,
+  toDate: string,
+): Promise<StockDailyCandle[]> {
   const from = new Date(`${fromDate.slice(0, 4)}-${fromDate.slice(4, 6)}-${fromDate.slice(6, 8)}`);
   const to = new Date(`${toDate.slice(0, 4)}-${toDate.slice(4, 6)}-${toDate.slice(6, 8)}`);
 
@@ -59,7 +76,7 @@ export async function fetchDailyChunked(
   const all: StockDailyCandle[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const { from: cf, to: ct } = chunks[i];
-    const candles = await fetchStockDailyChart(ticker, cf, ct, "D");
+    const candles = await fetchStockDailyChartKis(ticker, cf, ct, "D");
     all.push(...candles);
     if (i < chunks.length - 1) await delay(CHUNK_DELAY_MS);
   }

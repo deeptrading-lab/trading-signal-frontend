@@ -16,17 +16,11 @@
 import { pickTossArray, tossGet } from "./client";
 import { fetchRecentDailyContext } from "./candles";
 import { makeTossTransportError } from "./errors";
-import { getTossStockMaster } from "./stock-master";
+import { getTossStockMaster } from "./stockMaster";
 import type { TossPriceRow, TossStockRow } from "./types";
+import { toNumber } from "@/lib/api/kis/mappers";
 import { getSymbolName } from "@/lib/api/kis/search";
-import type { StockPrice } from "@/lib/api/kis/types";
-import type { StockPriceWithShares } from "@/lib/api/kis/price";
-
-function num(value: string | undefined): number {
-  if (!value) return 0;
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+import type { StockPrice, StockPriceWithShares } from "@/lib/api/kis/types";
 
 async function fetchPriceRow(symbol: string): Promise<TossPriceRow | null> {
   const result = await tossGet<unknown>("/api/v1/prices", { symbols: symbol });
@@ -44,7 +38,7 @@ async function fetchPriceParts(ticker: string): Promise<PriceParts> {
     getTossStockMaster(ticker).catch(() => null),
   ]);
 
-  const last = num(row?.lastPrice);
+  const last = toNumber(row?.lastPrice);
   const price = last > 0 ? last : context.today?.close ?? 0;
   if (price <= 0) {
     throw makeTossTransportError({
@@ -87,6 +81,6 @@ export async function fetchStockPriceWithSharesToss(
   ticker: string,
 ): Promise<StockPriceWithShares> {
   const { price, master } = await fetchPriceParts(ticker);
-  const listed = num(master?.sharesOutstanding);
+  const listed = toNumber(master?.sharesOutstanding);
   return { price, listedShares: listed > 0 ? listed : null };
 }

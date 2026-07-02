@@ -25,7 +25,9 @@ import {
   minutesOfDay,
   resampleMinuteCandles,
 } from "@/lib/api/kis/minuteResample";
+import { toNumber } from "@/lib/api/kis/mappers";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
+import { delay } from "@/lib/server/bffUtils";
 
 const PAGE_DELAY_MS = 250;
 /** 당일(NXT 포함 최대 ~720분) 페이지 상한 — 200봉/콜. */
@@ -37,19 +39,10 @@ const SESSION_END_MIN = 15 * 60 + 30; // 15:30 (동시호가 종가봉 포함)
 /**
  * ⚠️ 토스는 KRX 종가 동시호가 체결을 **15:31 봉**에 기록한다(E2E 실측 — 15:21~15:30 은
  * 0거래량 채움봉, 15:31 에 대량 체결). KIS 는 같은 체결이 15:30 봉이므로, 15:31 봉을
- * 세션에 포함시킨 뒤 15:30 으로 리라벨해 파리티를 맞춘다.
+ * 세션에 포함시켰다가 정렬 후 15:30 으로 병합/리라벨해 파리티를 맞춘다
+ * (`mergeClosingAuctionBars`). 과거일 커서도 이 봉이 잘리지 않게 15:32 를 anchor 로 쓴다.
  */
 const CLOSING_AUCTION_MIN = 15 * 60 + 31; // 15:31
-
-function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function num(value: string | undefined): number {
-  if (!value) return 0;
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 function isKoreanTicker(symbol: string): boolean {
   return /^\d{6}$/.test(symbol);
@@ -60,33 +53,60 @@ function mapTossMinuteCandle(candle: TossCandle): StockMinuteCandle | null {
   if (!stamp) return null;
   return {
     date: stamp,
-    open: num(candle.openPrice),
-    high: num(candle.highPrice),
-    low: num(candle.lowPrice),
-    close: num(candle.closePrice),
-    volume: num(candle.volume),
+    open: toNumber(candle.openPrice),
+    high: toNumber(candle.highPrice),
+    low: toNumber(candle.lowPrice),
+    close: toNumber(candle.closePrice),
+    volume: toNumber(candle.volume),
   };
 }
 
 /**
  * 국내 심볼 정규장 필터 — KIS 세션 파리티(모듈 주석). 미국 티커는 통과.
- * 15:31 종가 동시호가 봉은 포함 후 15:30 으로 리라벨(`CLOSING_AUCTION_MIN` 주석).
+ * 15:31 종가 동시호가 봉은 **원본 스탬프 그대로** 통과시킨다 — 여기서 리라벨하면 실체결
+ * 15:30 봉과 키가 충돌해 dedupe 가 한쪽 거래량을 비결정적으로 버린다. 병합/리라벨은
+ * 정렬 뒤 `mergeClosingAuctionBars` 가 결정론적으로 수행.
  */
 function filterRegularSession(
   symbol: string,
   candles: StockMinuteCandle[],
 ): StockMinuteCandle[] {
   if (!isKoreanTicker(symbol)) return candles;
-  const kept: StockMinuteCandle[] = [];
-  for (const c of candles) {
+  return candles.filter((c) => {
     const min = minutesOfDay(c.date);
-    if (min >= SESSION_START_MIN && min <= SESSION_END_MIN) {
-      kept.push(c);
-    } else if (min === CLOSING_AUCTION_MIN) {
-      kept.push({ ...c, date: `${c.date.slice(0, 10)}T15:30` });
+    return (
+      (min >= SESSION_START_MIN && min <= SESSION_END_MIN) ||
+      min === CLOSING_AUCTION_MIN
+    );
+  });
+}
+
+/**
+ * 정렬 완료 배열에서 15:31 동시호가 봉을 15:30 으로 정규화(결정론적).
+ * 직전 원소가 같은 날 15:30 실체결 봉이면 병합(극값·거래량 합산, close=동시호가 체결가),
+ * 아니면 15:30 으로 리라벨만 한다.
+ */
+export function mergeClosingAuctionBars(
+  sorted: StockMinuteCandle[],
+): StockMinuteCandle[] {
+  const out: StockMinuteCandle[] = [];
+  for (const c of sorted) {
+    if (minutesOfDay(c.date) !== CLOSING_AUCTION_MIN) {
+      out.push(c);
+      continue;
+    }
+    const relabeled = `${c.date.slice(0, 10)}T15:30`;
+    const prev = out[out.length - 1];
+    if (prev && prev.date === relabeled) {
+      prev.high = Math.max(prev.high, c.high);
+      prev.low = Math.min(prev.low, c.low);
+      prev.close = c.close; // 동시호가 체결가 = 그날의 공식 종가
+      prev.volume += c.volume;
+    } else {
+      out.push({ ...c, date: relabeled });
     }
   }
-  return kept;
+  return out;
 }
 
 function finalize(
@@ -94,10 +114,10 @@ function finalize(
   oneMin: StockMinuteCandle[],
   timeframe: number,
 ): StockMinuteCandle[] {
-  // dropFillerBars 를 dedupe 앞에 둔다 — 리라벨된 15:30 동시호가 봉(volume>0)과 원래 15:30
-  // 채움봉(volume 0)이 겹칠 때 채움봉을 먼저 제거해 dedupe 가 체결봉을 유지하게.
   return resampleMinuteCandles(
-    dedupeSortMinuteCandles(dropFillerBars(filterRegularSession(symbol, oneMin))),
+    mergeClosingAuctionBars(
+      dedupeSortMinuteCandles(dropFillerBars(filterRegularSession(symbol, oneMin))),
+    ),
     timeframe,
   );
 }
@@ -183,12 +203,30 @@ export async function fetchTodayMinuteCandlesToss(
     acc.push(...rest);
   }
 
-  return finalize(ticker, acc, timeframe);
+  const result = finalize(ticker, acc, timeframe);
+  if (result.length > 0) return result;
+
+  // 장전(NXT 프리마켓만 존재) 케이스: 최신 세션이 오늘로 잡혔지만 정규장 봉이 아직 없다.
+  // KIS(FID_PW_DATA_INCU_YN=Y)는 이때 직전 세션 봉을 돌려주므로, 첫 페이지에서 관측된
+  // 직전 거래일로 재수집해 파리티를 맞춘다.
+  const prevSessionDate = mapped
+    .map((c) => c.date.slice(0, 10))
+    .filter((d) => d < sessionDate)
+    .sort()
+    .pop();
+  if (!prevSessionDate) return result;
+  return fetchMinuteCandlesForDateToss(
+    ticker,
+    prevSessionDate.replace(/-/g, ""),
+    timeframe,
+  );
 }
 
 /**
  * `fetchMinuteCandlesForDate(ticker, dateYyyymmdd, timeframe)` 의 토스 구현.
- * anchor = 해당일 15:31 KST — 15:30 종가봉까지 포함, NXT 애프터봉(15:31~)은 커서에서 제외.
+ * anchor = 해당일 15:32 KST — `before` 는 **exclusive** 라서 15:31 로 잡으면 정작
+ * 15:31 종가 동시호가 봉(그날 최대 거래량)이 잘린다. 15:32 로 그 봉까지 포함하고
+ * NXT 애프터봉(15:32~)은 커서에서 제외.
  */
 export async function fetchMinuteCandlesForDateToss(
   ticker: string,
@@ -196,7 +234,7 @@ export async function fetchMinuteCandlesForDateToss(
   timeframe: number,
 ): Promise<StockMinuteCandle[]> {
   const dash = ymdToDash(dateYyyymmdd);
-  const before = `${dash}T15:31:00+09:00`;
+  const before = `${dash}T15:32:00+09:00`;
   const oneMin = await collectSessionMinutes(ticker, dash, before, DATE_MAX_PAGES);
   return finalize(ticker, oneMin, timeframe);
 }

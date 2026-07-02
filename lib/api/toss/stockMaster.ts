@@ -16,19 +16,31 @@ const MASTER_TTL_MS = 24 * 60 * 60 * 1_000;
 type CacheEntry = { row: TossStockRow; cachedAt: number };
 
 const cache = new Map<string, CacheEntry>();
+/** 요청 내 동시 조회 dedupe — 스냅샷 라우트가 price 경로와 stockInfo 를 병렬로 쏘면
+ * 콜드 캐시에서 같은 심볼 /stocks 를 2번 부르게 되므로 pending promise 를 공유한다. */
+const inflight = new Map<string, Promise<TossStockRow | null>>();
 
 /**
- * 종목 마스터 1건 — 캐시 우선. 응답에 심볼이 없으면 null (미상장 등).
+ * 종목 마스터 1건 — 캐시 우선 + 인스턴스 내 single-flight. 응답에 심볼이 없으면 null (미상장 등).
  */
 export async function getTossStockMaster(symbol: string): Promise<TossStockRow | null> {
   const hit = cache.get(symbol);
   if (hit && Date.now() - hit.cachedAt < MASTER_TTL_MS) return hit.row;
 
-  const result = await tossGet<unknown>("/api/v1/stocks", { symbols: symbol });
-  const rows = pickTossArray<TossStockRow>(result, "stocks");
-  const row = rows.find((r) => r.symbol === symbol) ?? rows[0] ?? null;
-  if (row) cache.set(symbol, { row, cachedAt: Date.now() });
-  return row;
+  const pending = inflight.get(symbol);
+  if (pending) return pending;
+
+  const promise = (async () => {
+    const result = await tossGet<unknown>("/api/v1/stocks", { symbols: symbol });
+    const rows = pickTossArray<TossStockRow>(result, "stocks");
+    const row = rows.find((r) => r.symbol === symbol) ?? rows[0] ?? null;
+    if (row) cache.set(symbol, { row, cachedAt: Date.now() });
+    return row;
+  })().finally(() => {
+    inflight.delete(symbol);
+  });
+  inflight.set(symbol, promise);
+  return promise;
 }
 
 /** 토스 market 문자열 → 앱 `StockMarket` 배지. 미국(NASDAQ/NYSE 등)·미지 값은 "기타". */

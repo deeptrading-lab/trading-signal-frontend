@@ -20,6 +20,7 @@
 import axios from "axios";
 import { getKisStore, hashAppKey } from "@/lib/api/kis/store";
 import { makeTossTokenError } from "./errors";
+import { delay } from "@/lib/server/bffUtils";
 
 const TOKEN_URL = "https://openapi.tossinvest.com/oauth2/token";
 const TOKEN_TIMEOUT_MS = 5_000;
@@ -27,9 +28,13 @@ const TOKEN_TIMEOUT_MS = 5_000;
 const GRACE_PERIOD_MS = 60_000;
 /** 분산 락 TTL — 데드락 방지. */
 const LOCK_TTL_MS = 10_000;
-/** 락 미획득 시 store 폴링 — 단일 활성 토큰이라 KIS 보다 대기를 길게 갖는다. */
-const POLL_INTERVAL_MS = 100;
-const POLL_MAX_TOTAL_MS = 2_000;
+/**
+ * 락 미획득 시 store 폴링 — 단일 활성 토큰이라 KIS 보다 대기를 길게 갖는다
+ * (성급한 직접 발급 = 락 보유자의 방금 발급한 토큰을 401 무효화하는 핑퐁).
+ * 간격을 벌려 KV 왕복을 줄이고, 예산은 발급 소요(토큰 엔드포인트 ~1s)를 넉넉히 덮게.
+ */
+const POLL_INTERVAL_MS = 250;
+const POLL_MAX_TOTAL_MS = 4_000;
 
 type CacheEntry = {
   token: string;
@@ -39,10 +44,6 @@ type CacheEntry = {
 
 let l1: CacheEntry | null = null;
 let inflight: Promise<string> | null = null;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 function readCreds(): { id: string; secret: string } | null {
   const id = process.env.TOSS_CLIENT_ID?.trim();

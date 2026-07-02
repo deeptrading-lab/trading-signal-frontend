@@ -29,6 +29,24 @@
 4. **장전/휴장(당일 봉 없음)** — 코드 경로상 prevClose=최신 확정봉·volume 0·open/high/low undefined 로 디그레이드. 21시 실행이라 라이브 미관측 — **내일 장전(08:xx) 1회 확인 권장**.
 5. **미국 티커** — 어댑터 레벨 동작(스모크 AAPL: 일봉 1990~·분봉·마스터 확인). 분봉 세션 필터는 국내 전용이라 미국 분봉은 KST 날짜 그룹핑 한계 문서화(현 소비처 없음).
 
+## 리뷰(8각도 병렬 파인더) 반영 — 2026-07-02
+
+구현 후 적대 리뷰에서 확정 3건 + 개선 10건 수정, 라이브 재검증 완료:
+
+**확정 버그(수정 + 라이브 검증)**
+1. 과거일 분봉 커서가 `before=15:31`(exclusive)이라 정작 15:31 종가 동시호가 봉이 잘림 → 15:32 anchor. 검증: 07-01 분봉 78봉·마지막 봉 vol=2,727,566(종가 체결) 확인.
+2. 15:30 실체결 봉과 15:31 동시호가 봉 공존 시 dedupe 가 페이지 순서에 따라 한쪽 거래량을 비결정적으로 소실 → 정렬 후 결정론적 **병합**(`mergeClosingAuctionBars`, 거래량 합산·close=동시호가가) + 단위 테스트 3케이스.
+3. 장전(NXT 프리마켓만 존재) 당일 분봉이 빈 배열 → KIS `includePast` 파리티로 직전 세션 재수집 폴백.
+4. `fetchDailyChunked` 가 토스 모드에서 130일×24청크 중복 페치(3000일 시 12s 예산 초과) → 토스 커서 범위 페치 1회로 위임, 폴백 본문은 KIS 직행 경로(`fetchStockDailyChartKis`)로 청크당 토스 재시도 차단. 검증: 13개월 265봉 정상.
+
+**개선(수정)**: tossGet 5xx/네트워크 transient 1회 재시도(KIS `withPageRetry` 관례) · 현재가 일봉 컨텍스트 30s 캐시(CHART 5/s 쿼터 보호) · 종목 마스터 single-flight(스냅샷 병렬 중복 콜 제거) · `MAX_RANGE_PAGES` 40→15(타임아웃 후 낭비 콜 차단) · chart W/M 첫 버킷 45일 패딩(부분 집계 왜곡 제거) · 토큰 폴링 250ms/4s(KV 왕복↓·발급 핑퐁↓) · `pickTossArray` 투기적 "첫 배열" 폴백 제거 · 중복 헬퍼 통합(`toNumber`·`delay` 기존 모듈 재사용) · `stock-master.ts`→`stockMaster.ts`(파일명 컨벤션) · `StockPriceWithShares` 를 types.ts 로 이동(kis↔toss 타입 순환 제거).
+
+**수용(문서화, 코드 무변경)**
+- 토스 행(hang) 장애 시 KIS 폴백 시작 전에 라우트 withTimeout 이 먼저 발화할 수 있음(폴백 총 지연 = 두 소스 합) — 토스 장애 시간대 한정 강등이며 데드라인 전파는 후속 과제.
+- `X-Data-Source` 헤더는 토스 서빙 시에도 "kis"(라우트가 소스 미인지) — PRD §4 비범위 명시, 관측은 서버 `[marketdata]` warn 로그.
+- `sector`/`foreignRatio`/`industryName` undefined·`isAdminItem` false 디그레이드(관리종목 배지 미표시 포함) — PRD §3-3·§8 명시. prod 채점·배지 신뢰가 필요한 시점 전에 재검토.
+- `/api/stock/daily` 정렬: KIS 원 응답(내림차순)과 달리 토스는 오름차순 — 활성 클라이언트 소비자 없음(잠복) + mock 이 이미 오름차순이라 토스가 mock 계약과 정합. 소비자 생길 때 라우트 레벨 정렬 명시 권장.
+
 ## 비고
 
 1. **KIS `inquire-price` 야간 500**: 21:4x KST에 순정 KIS 경로(토글 미설정 부팅)에서 3/3 연속 `Request failed with status code 500`. daily·chart·minute 등 다른 KIS TR 은 동시간 정상 → 본 브랜치 밖의 KIS측/시간대 이슈로 판정(간헐 5xx 전력 참조). 낮 시간 재확인 권장.

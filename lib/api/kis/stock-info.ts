@@ -28,7 +28,7 @@ import type {
   StockInfo,
 } from "./types";
 import { withTossFallback } from "@/lib/api/marketdata/source";
-import { fetchStockInfoToss } from "@/lib/api/toss/stock-master";
+import { fetchStockInfoToss } from "@/lib/api/toss/stockMaster";
 
 type AuthHeaders = {
   authorization: string;

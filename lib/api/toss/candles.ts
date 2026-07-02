@@ -17,22 +17,18 @@
 import { tossGet } from "./client";
 import { addDaysToDash, isoToKstDate, todayKstDate, ymdToDash } from "./kst";
 import type { TossCandle, TossCandlePage } from "./types";
+import { toNumber } from "@/lib/api/kis/mappers";
 import type { StockDailyCandle } from "@/lib/api/kis/types";
+import { delay } from "@/lib/server/bffUtils";
 
 const PAGE_COUNT = 200;
 const PAGE_DELAY_MS = 250;
-/** 범위 페치 페이지 상한 — chart 라우트 MAX_DAYS(3000일≈2,050봉=11페이지)의 넉넉한 배수. */
-const MAX_RANGE_PAGES = 40;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function num(value: string | undefined): number {
-  if (!value) return 0;
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+/**
+ * 범위 페치 페이지 상한 — chart 라우트 MAX_DAYS(3000일≈2,050봉)=11페이지 + 여유.
+ * 상한을 크게 잡으면 라우트 타임아웃(12s) 발화 후에도 서버가 낭비 콜을 계속 돌리므로
+ * 예산에 맞춰 타이트하게 둔다.
+ */
+const MAX_RANGE_PAGES = 15;
 
 /** 캔들 1페이지 — `minute.ts`(분봉 어댑터)도 재사용. */
 export async function fetchCandlesPage(
@@ -56,11 +52,11 @@ function mapTossDailyCandle(candle: TossCandle): StockDailyCandle | null {
   if (!date) return null;
   return {
     date,
-    open: num(candle.openPrice),
-    high: num(candle.highPrice),
-    low: num(candle.lowPrice),
-    close: num(candle.closePrice),
-    volume: num(candle.volume),
+    open: toNumber(candle.openPrice),
+    high: toNumber(candle.highPrice),
+    low: toNumber(candle.lowPrice),
+    close: toNumber(candle.closePrice),
+    volume: toNumber(candle.volume),
   };
 }
 
@@ -190,6 +186,9 @@ export async function fetchStockDailyToss(
 /**
  * `fetchStockDailyChart(ticker, from, to, period)` 의 토스 구현 — 오름차순.
  * (소비측인 chart 라우트·`fetchDailyChunked` 는 자체 정렬/dedup 하므로 순서 계약도 안전.)
+ *
+ * W/M 은 fromDate 가 주/월 중간이면 첫 버킷이 부분 집계(시가·거래량 왜곡)되므로,
+ * 45일 패딩해 페치한 뒤 fromDate 가 속한 버킷부터 완전한 봉으로 돌려준다(KIS 파리티).
  */
 export async function fetchStockDailyChartToss(
   ticker: string,
@@ -197,20 +196,45 @@ export async function fetchStockDailyChartToss(
   toDate: string,
   period: "D" | "W" | "M" = "D",
 ): Promise<StockDailyCandle[]> {
-  const daily = await fetchDailyRangeToss(ticker, fromDate, toDate);
-  if (period === "D") return daily;
-  return resampleDailyCandles(daily, period);
+  if (period === "D") {
+    return fetchDailyRangeToss(ticker, fromDate, toDate);
+  }
+
+  const fromDash = ymdToDash(fromDate);
+  const paddedFrom = addDaysToDash(fromDash, -45);
+  const daily = await fetchDailyRangeToss(ticker, paddedFrom, toDate);
+  const resampled = resampleDailyCandles(daily, period);
+  const cutoff = period === "W" ? mondayOf(fromDash) : fromDash.slice(0, 7);
+  return resampled.filter((c) =>
+    period === "W" ? mondayOf(c.date) >= cutoff : c.date.slice(0, 7) >= cutoff,
+  );
 }
+
+type DailyContext = {
+  prevClose: number | null;
+  today: StockDailyCandle | null;
+};
+
+/** 현재가 컨텍스트 30s 캐시 — 현재가 폴링이 CHART 그룹(5/s) 쿼터를 소진하지 않게. */
+const CONTEXT_TTL_MS = 30_000;
+const contextCache = new Map<string, { value: DailyContext; cachedAt: number }>();
 
 /**
  * 현재가 합성용 최근 일봉 컨텍스트 — 최신 봉이 오늘(KST)이면 `today`, 직전 봉 종가가 `prevClose`.
  *
  * `/prices` 가 등락률·거래량을 주지 않으므로(PRD §1) 이 컨텍스트와 합성한다.
+ * 캔들 호출은 차트 페이징과 같은 MARKET_DATA_CHART(5/s) 그룹이라 30s 캐시로 흡수한다
+ * (당일 봉 volume/고저가 최대 30s 지연 — 현재가 폴링 주기 대비 허용 오차).
  */
-export async function fetchRecentDailyContext(symbol: string): Promise<{
-  prevClose: number | null;
-  today: StockDailyCandle | null;
-}> {
+export async function fetchRecentDailyContext(symbol: string): Promise<DailyContext> {
+  const hit = contextCache.get(symbol);
+  if (hit && Date.now() - hit.cachedAt < CONTEXT_TTL_MS) return hit.value;
+  const value = await fetchRecentDailyContextUncached(symbol);
+  contextCache.set(symbol, { value, cachedAt: Date.now() });
+  return value;
+}
+
+async function fetchRecentDailyContextUncached(symbol: string): Promise<DailyContext> {
   const { candles } = await fetchCandlesPage(symbol, "1d", { count: 3 });
   const mapped = dedupeSortDaily(
     (candles ?? []).map(mapTossDailyCandle).filter((c): c is StockDailyCandle => c !== null),
