@@ -24,6 +24,7 @@ import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
+  INTRADAY_READ_COPY as C,
   INTRADAY_WATCH_COPY as W,
 } from "@/lib/copy/stock/intradayRead";
 import type { InvestorFlowRow } from "@/lib/types/flow/top10";
@@ -137,21 +138,24 @@ export function IntradayWatchWorkspace() {
         </section>
       ) : null}
 
-      {/* 워치 표 */}
+      {/* 워치 표 — 공통 안내는 종목마다 반복하지 않고 표 위 한 곳에(피드백). */}
       {watch.length === 0 ? (
         <div className="card-info text-body">{W.empty}</div>
       ) : (
-        <IntradayWatchTable
-          items={watch}
-          quotes={quotes}
-          sessionByTicker={sessionByTicker}
-          isCreating={isCreating}
-          onStart={start}
-          onRemove={remove}
-        />
+        <>
+          <p className="text-caption text-text-muted">
+            {P.startHint} {C.disclaimer} {P.disclaimer}
+          </p>
+          <IntradayWatchTable
+            items={watch}
+            quotes={quotes}
+            sessionByTicker={sessionByTicker}
+            isCreating={isCreating}
+            onStart={start}
+            onRemove={remove}
+          />
+        </>
       )}
-
-      <p className="text-caption text-text-muted">{W.disclaimer}</p>
     </div>
   );
 }

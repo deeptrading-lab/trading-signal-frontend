@@ -83,7 +83,7 @@ export const INTRADAY_PAPER_COPY = {
   cashInvalid: "모의 투자금은 0보다 큰 숫자여야 해요.",
   creating: "세션 생성 중…",
   startHint:
-    "장중(평일 09:00~15:30) 이 화면이 열려 있는 동안 5분마다 AI가 판단해 가상 체결해요. 체결가에 수수료·제세금·슬리피지를 반영해요.",
+    "장중(평일 09:00~15:30) 이 화면이 열려 있는 동안 설정한 판단 주기(기본 5분)마다 AI가 판단해 가상 체결해요. 체결가에 수수료·제세금·슬리피지를 반영해요.",
   autoTicking: "자동 판단 동작 중",
   metricReturn: "수익률",
   metricValue: "평가",
@@ -108,13 +108,16 @@ export const INTRADAY_PAPER_COPY = {
     colPosition: "포지션",
     colLast: "최근 판단",
     colCash: "모의 투자금(원)",
+    colActions: "실행",
     none: "—",
-    readRun: "판단",
-    readRunning: "판단 중",
+    readRun: "AI 진단",
+    readRunning: "진단 중",
+    readTitle: "매매 없이 지금 시점의 단타 판단만 받아봐요",
     startRun: "모의 시작",
     ordersButton: "체결 내역",
     removeAria: "워치에서 제거",
     expandAria: "상세 접기/펼치기",
+    expandEmpty: "AI 진단을 누르면 판단 결과가, 모의 시작 후엔 체결 내역 진입이 여기에 표시돼요.",
   },
 
   /* 상세 시트 — 카드 클릭 시 체결 내역·거래별 손익. */

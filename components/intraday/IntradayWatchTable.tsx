@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, Pause, Play, X } from "lucide-react";
+import { ChevronDown, History, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatMoney } from "@/lib/utils/formatMoney";
 import { isApiError } from "@/lib/api/errors";
@@ -39,8 +39,11 @@ import type {
 
 const T = P.table;
 
-/** 컴팩트 버튼(utilities 가 components 레이어를 덮는다) / 아이콘 버튼. */
-const BTN_COMPACT = "px-sm py-xs text-caption whitespace-nowrap";
+/**
+ * 컴팩트 버튼 — button-primary 의 고정 높이 토큰(h-button-primary-h=40px)을 utilities 레이어의
+ * h-8 로 덮어 아이콘 버튼·input(h-8)과 같은 32px 로 통일(디자인 일관성 피드백).
+ */
+const BTN_COMPACT = "inline-flex h-8 items-center px-sm py-0 text-caption whitespace-nowrap";
 const ICON_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
 
@@ -81,7 +84,7 @@ export function IntradayWatchTable({
               <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
               <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
-              <th className="py-sm pr-lg" aria-label="액션" />
+              <th className="py-sm pr-lg text-right font-normal">{T.colActions}</th>
             </tr>
           </thead>
           <tbody>
@@ -252,6 +255,7 @@ function WatchRow({
               type="button"
               className={cn("button-secondary", BTN_COMPACT)}
               disabled={!provider || read.isPending}
+              title={T.readTitle}
               onClick={(e) => {
                 e.stopPropagation();
                 runRead();
@@ -260,18 +264,33 @@ function WatchRow({
               {read.isPending ? T.readRunning : T.readRun}
             </button>
             {current ? (
-              <button
-                type="button"
-                className={ICON_BTN}
-                disabled={isPatching}
-                aria-label={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void setStatus(running ? "paused" : "running");
-                }}
-              >
-                {running ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={ICON_BTN}
+                  aria-label={T.ordersButton}
+                  title={T.ordersButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSheetOpen(true);
+                  }}
+                >
+                  <History className="size-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={ICON_BTN}
+                  disabled={isPatching}
+                  aria-label={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
+                  title={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void setStatus(running ? "paused" : "running");
+                  }}
+                >
+                  {running ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -335,6 +354,9 @@ function WatchRow({
                 <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
               ) : null}
               {read.data ? <IntradayReadCard data={read.data} /> : null}
+              {!startError && !read.isPending && !read.isError && !read.data && !current ? (
+                <p className="text-caption text-text-muted">{T.expandEmpty}</p>
+              ) : null}
 
               {current ? (
                 <div className="flex flex-wrap items-center gap-xs">
@@ -352,13 +374,7 @@ function WatchRow({
                     {P.detailLink}
                   </Link>
                 </div>
-              ) : (
-                <p className="text-caption text-text-muted">{P.startHint}</p>
-              )}
-
-              <p className="text-caption text-text-muted">
-                {C.disclaimer} {P.disclaimer}
-              </p>
+              ) : null}
             </div>
           </td>
         </tr>
