@@ -147,6 +147,17 @@ export type StockPrice = {
   foreignRatio?: number;
 };
 
+/**
+ * 현재가 + 상장주수(시총 산출용) — `fetchStockPriceWithShares` 반환형.
+ * price.ts 가 아닌 여기 두는 이유: 토스 어댑터(lib/api/toss/price.ts)도 같은 계약을
+ * 구현하는데, price.ts 에서 import 하면 kis/price ↔ toss/price 모듈 순환이 된다.
+ */
+export type StockPriceWithShares = {
+  price: StockPrice;
+  /** 상장 주수(주). 시총 = price.price × listedShares. 없으면 null. */
+  listedShares: number | null;
+};
+
 export type StockDailyCandle = {
   /** YYYY-MM-DD (ISO 8601 일자). */
   date: string;

@@ -27,7 +27,21 @@ import type {
   KisInquireTimeItemChartItem,
 } from "./types";
 import { mapDailyCandle, mapMinuteCandle, mapStockPrice, toNumber } from "./mappers";
-import type { StockDailyCandle, StockMinuteCandle, StockPrice } from "./types";
+import type {
+  StockDailyCandle,
+  StockMinuteCandle,
+  StockPrice,
+  StockPriceWithShares,
+} from "./types";
+import { withTossFallback } from "@/lib/api/marketdata/source";
+import {
+  fetchStockPriceToss,
+  fetchStockPriceWithSharesToss,
+} from "@/lib/api/toss/price";
+import {
+  fetchStockDailyChartToss,
+  fetchStockDailyToss,
+} from "@/lib/api/toss/candles";
 
 type AuthHeaders = {
   authorization: string;
@@ -50,8 +64,19 @@ async function buildAuthHeaders(trId: string): Promise<AuthHeaders> {
 
 /**
  * 현재가 조회. KIS rt_cd != "0" 은 비즈니스 에러 (한글 msg1 통과).
+ *
+ * `MARKET_DATA_SOURCE=toss`(+키 존재) 시 토스 어댑터로 위임 — 실패하면 KIS 폴백
+ * (PRD `toss-market-data-adapter` §3-2·3-3. 이하 fetch* 동일 패턴).
  */
 export async function fetchStockPrice(ticker: string): Promise<StockPrice> {
+  return withTossFallback(
+    "현재가",
+    () => fetchStockPriceToss(ticker),
+    () => fetchStockPriceKis(ticker),
+  );
+}
+
+async function fetchStockPriceKis(ticker: string): Promise<StockPrice> {
   const client = getKisClient();
   const headers = await buildAuthHeaders("FHKST01010100");
 
@@ -90,12 +115,8 @@ export async function fetchStockPrice(ticker: string): Promise<StockPrice> {
   return mapStockPrice(data.output, ticker);
 }
 
-/** 현재가 + 상장주수(시총 산출용) — `fetchStockPrice` 의 스냅샷 변형. */
-export type StockPriceWithShares = {
-  price: StockPrice;
-  /** 상장 주수(주) — `lstn_stcn`. 시총 = price.price × listedShares. 없으면 null. */
-  listedShares: number | null;
-};
+/** 현재가 + 상장주수 반환형 — 정의는 types.ts (kis↔toss 순환 방지). 기존 import 경로 호환 re-export. */
+export type { StockPriceWithShares };
 
 /**
  * 현재가 조회 + 상장주수 동시 반환.
@@ -106,6 +127,16 @@ export type StockPriceWithShares = {
  * `fetchStockPrice` 와 동일.
  */
 export async function fetchStockPriceWithShares(
+  ticker: string,
+): Promise<StockPriceWithShares> {
+  return withTossFallback(
+    "현재가+상장주수",
+    () => fetchStockPriceWithSharesToss(ticker),
+    () => fetchStockPriceWithSharesKis(ticker),
+  );
+}
+
+async function fetchStockPriceWithSharesKis(
   ticker: string,
 ): Promise<StockPriceWithShares> {
   const client = getKisClient();
@@ -154,6 +185,17 @@ export async function fetchStockPriceWithShares(
  * 일자별 시세 조회. period = "D" / "W" / "M".
  */
 export async function fetchStockDaily(
+  ticker: string,
+  period: "D" | "W" | "M" = "D",
+): Promise<StockDailyCandle[]> {
+  return withTossFallback(
+    "일자별 시세",
+    () => fetchStockDailyToss(ticker, period),
+    () => fetchStockDailyKis(ticker, period),
+  );
+}
+
+async function fetchStockDailyKis(
   ticker: string,
   period: "D" | "W" | "M" = "D",
 ): Promise<StockDailyCandle[]> {
@@ -208,6 +250,20 @@ export async function fetchStockDaily(
  * @param toDate   조회 종료일자 YYYYMMDD.
  */
 export async function fetchStockDailyChart(
+  ticker: string,
+  fromDate: string,
+  toDate: string,
+  period: "D" | "W" | "M" = "D",
+): Promise<StockDailyCandle[]> {
+  return withTossFallback(
+    "기간 차트",
+    () => fetchStockDailyChartToss(ticker, fromDate, toDate, period),
+    () => fetchStockDailyChartKis(ticker, fromDate, toDate, period),
+  );
+}
+
+/** KIS 직행 경로 — `chartChunked.ts` 폴백 본문이 청크당 토스 재시도를 피하려고 직접 사용. */
+export async function fetchStockDailyChartKis(
   ticker: string,
   fromDate: string,
   toDate: string,
