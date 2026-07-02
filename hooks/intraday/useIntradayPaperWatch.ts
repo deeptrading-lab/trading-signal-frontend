@@ -65,10 +65,20 @@ export function useIntradayPaperWatch(watchTickers: string[]) {
     [cliSessions, watchTickers],
   );
 
-  // 자동 틱 대상 — 워치 등재 여부와 무관하게 running 전부(세션 수명은 일시정지/완료로만 관리).
+  // 자동 틱 대상 — **워치에 올라온 종목의 running 세션만**. persistence 가 과거 세션을 running
+  // 그대로 복원하므로 전부 돌리면 재시작 직후 백그라운드 매매·LLM 콜이 폭주하고 순차 사이클이
+  // 새 세션의 짧은 주기(1~2분)를 밀어낸다(리뷰 #5). 복원 세션은 '진행 중 모의 단타' 칩으로
+  // 워치에 다시 올려야 자동 판단이 이어진다.
   const runningSessionIds = useMemo(
-    () => cliSessions.filter((session) => session.status === "running").map((session) => session.id),
-    [cliSessions],
+    () =>
+      cliSessions
+        .filter(
+          (session) =>
+            session.status === "running" &&
+            watchTickers.includes(intradaySessionStock(session).ticker),
+        )
+        .map((session) => session.id),
+    [cliSessions, watchTickers],
   );
 
   const start = (

@@ -30,11 +30,19 @@ type StoredSession = {
   session: PaperTradingSession;
   positions: PaperTradingPosition[];
   ticks: PaperTradingTick[];
+  /**
+   * 세션 단위 틱 직렬화 체인(미영속) — 창 dedup 이 check-then-act(검사→LLM 수십 초→append)라
+   * 동시 호출(탭 폴링·crontab·수동)이 같은 창을 중복 실행하던 레이스를 막는다(리뷰 #2).
+   * 뒤 호출은 앞 틱 완료 후 실행되므로 dedup 검사가 항상 최신 ticks 를 본다.
+   */
+  tickChain?: Promise<unknown>;
 };
 
 type PaperTradingStore = {
   sessions: Map<string, StoredSession>;
-  /** Supabase 저장본 1회 hydrate(single-flight) — 프로세스 첫 접근에서 시작. */
+  /** hydrate 성공(ok|disabled) 여부 — 실패는 미설정으로 남겨 다음 접근에서 재시도(리뷰 #4). */
+  hydrated?: boolean;
+  /** 진행 중 hydrate(single-flight). 완료 후 해제. */
   hydration?: Promise<void>;
 };
 
@@ -53,25 +61,36 @@ function getStore(): PaperTradingStore {
 }
 
 /**
- * Supabase 저장본을 메모리로 1회 복원(멱등) — dev 재시작 후에도 세션·틱 이력이 이어진다.
- * 메모리에 이미 있는 id 는 건드리지 않는다(메모리가 더 최신). 미설정/실패는 조용히 skip.
+ * Supabase 저장본을 메모리로 복원(성공 시 1회) — dev 재시작 후에도 세션·틱 이력이 이어진다.
+ * 메모리에 이미 있는 id 는 건드리지 않는다(메모리가 더 최신).
+ * - 미설정(disabled)·성공(ok) → hydrated 확정(재시도 불필요).
+ * - 실패(error) → hydrated 미설정으로 남겨 **다음 접근에서 재시도**(첫 시도 일시 장애가
+ *   프로세스 수명 동안 복원을 막던 문제 — 리뷰 #4). 개별 fetch 는 4초 타임아웃.
  */
 async function ensureHydrated(): Promise<void> {
   const store = getStore();
+  if (store.hydrated) return;
   if (!store.hydration) {
     store.hydration = (async () => {
-      const persisted = await loadPersistedPaperTrading();
-      if (!persisted) return;
-      for (const entry of persisted) {
-        if (!store.sessions.has(entry.session.id)) {
-          store.sessions.set(entry.session.id, {
-            session: entry.session,
-            positions: entry.positions,
-            ticks: entry.ticks,
-          });
+      const loaded = await loadPersistedPaperTrading();
+      if (loaded.status === "error") return; // hydrated 미설정 → 재시도 여지.
+      if (loaded.status === "ok") {
+        for (const entry of loaded.sessions) {
+          if (!store.sessions.has(entry.session.id)) {
+            store.sessions.set(entry.session.id, {
+              session: entry.session,
+              positions: entry.positions,
+              ticks: entry.ticks,
+            });
+          }
         }
       }
-    })().catch(() => undefined);
+      store.hydrated = true;
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        store.hydration = undefined;
+      });
   }
   return store.hydration;
 }
@@ -110,6 +129,20 @@ export async function createPaperTradingSession(
     request.decisionProvider === "cli-agent" || request.decisionProvider === "existing-ai"
       ? request.decisionProvider
       : "mock";
+
+  // 생성 멱등 가드(리뷰 #6) — 생성 응답은 첫 틱(CLI 콜) 완료 후라 클라 타임아웃 재클릭이
+  // 가능하다. 같은 종목의 running 단타 세션이 이미 있으면 새로 만들지 않고 그 세션을 돌려준다.
+  if (decisionProvider === "cli-agent") {
+    const ticker = stocks[0]?.ticker;
+    const existing = Array.from(getStore().sessions.values()).find(
+      (entry) =>
+        entry.session.decisionProvider === "cli-agent" &&
+        entry.session.status === "running" &&
+        (entry.session.stocks[0]?.ticker ?? entry.session.tickers[0]) === ticker,
+    );
+    if (existing) return toDetail(existing);
+  }
+
   const tickIntervalMinutes =
     decisionProvider === "cli-agent"
       ? (request.tickIntervalMinutes ?? PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES)
@@ -195,8 +228,27 @@ export async function runPaperTradingSessionTick(
   await ensureHydrated();
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
+
+  // 세션 단위 직렬화 — 앞 틱이 끝난 뒤에야 다음 호출이 창을 판정한다(중복 창 실행 차단).
+  const task = (entry.tickChain ?? Promise.resolve()).then(() => runTickOnce(entry, options));
+  entry.tickChain = task.then(
+    () => undefined,
+    () => undefined,
+  );
+  return task;
+}
+
+async function runTickOnce(
+  entry: StoredSession,
+  options: {
+    triggeredBy?: PaperTradingTriggeredBy;
+    tickWindowStart?: string;
+    priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
+  },
+): Promise<PaperTradingSessionDetail> {
   if (entry.session.status !== "running") return toDetail(entry);
 
+  // 창 판정은 자기 차례가 온 시점(직렬화 획득 후)에 한다 — 대기 중 창이 넘어갔으면 새 창으로.
   const tickWindowStart =
     options.tickWindowStart ?? resolveNextTickWindow(entry.session, new Date());
 
@@ -225,8 +277,9 @@ export async function runPaperTradingSessionTick(
 export function resetPaperTradingStoreForTest(): void {
   const store = getStore();
   store.sessions.clear();
-  // 테스트 격리 — hydration single-flight 도 초기화(테스트 env 는 Supabase 미설정이라 즉시 no-op).
+  // 테스트 격리 — hydration 상태도 초기화(테스트 env 는 Supabase 미설정이라 즉시 disabled).
   store.hydration = undefined;
+  store.hydrated = undefined;
 }
 
 /**

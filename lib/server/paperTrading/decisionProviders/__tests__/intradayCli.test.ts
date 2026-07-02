@@ -206,9 +206,10 @@ describe("toPaperTradingDecision (AI 분할 매수·분할 매도)", () => {
     expect(d.targetAllocationPct).toBe(50);
   });
 
-  it("BUY — 기존 비중보다 낮춰 잡지 않는다(매도 역전 방지)", () => {
+  it("BUY — 기존 비중보다 낮춰 잡지 않고, 여력이 없으면 주문도 내지 않는다(매도 역전 방지)", () => {
     const d = toPaperTradingDecision(intraday({ entryPositionPct: 20 }), { ...base, position });
     expect(d.targetAllocationPct).toBe(40);
+    expect(d.targetAllocations).toHaveLength(0); // 목표=현 비중 → floor 드리프트 매도 차단.
   });
 
   it("SELL — 분할 청산 50% → REDUCE, 목표 비중 = 현 비중의 절반", () => {
@@ -229,9 +230,10 @@ describe("toPaperTradingDecision (AI 분할 매수·분할 매도)", () => {
     expect(d.targetAllocationPct).toBe(0);
   });
 
-  it("HOLD — 현재 비중 유지(리밸런싱 주문 방지)", () => {
+  it("HOLD — 현재 비중 유지 + 주문 없음(stale 비중 되먹임 매도 누수 방지)", () => {
     const d = toPaperTradingDecision(intraday({ action: "HOLD" }), { ...base, position });
     expect(d.action).toBe("HOLD");
     expect(d.targetAllocationPct).toBe(40);
+    expect(d.targetAllocations).toHaveLength(0);
   });
 });

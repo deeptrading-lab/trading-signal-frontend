@@ -239,6 +239,56 @@ describe("executeVirtualTrade forced-exit (단타 청산)", () => {
   });
 });
 
+describe("executeVirtualTrade 빈 targetAllocations 계약 (리뷰 #1 — HOLD 매도 누수 방지)", () => {
+  const held: PaperTradingPosition = {
+    ticker: "005930",
+    name: "삼성전자",
+    quantity: 10,
+    avgEntryPrice: 100_000,
+    lastPrice: 100_000,
+    marketValue: 1_000_000,
+    unrealizedPnl: 0,
+    unrealizedPnlPct: 0,
+    allocationPct: 50,
+    updatedAt: price.asOf,
+  };
+
+  it("allocations 비면(EXIT 제외) 가격이 올라도 주문을 내지 않는다", () => {
+    const result = executeVirtualTrade({
+      cash: 1_000_000,
+      positions: [held],
+      decision: {
+        ...buyDecision,
+        action: "HOLD",
+        targetAllocationPct: 50, // stale 비중이 남아 있어도
+        targetAllocations: [],   // 빈 allocations = 리밸런싱 금지.
+      },
+      priceSnapshot: [{ ...price, price: 100_300 }], // +0.3% 상승 — floor 드리프트 조건.
+      maxPositionPct: 50,
+      cashBufferPct: 10,
+    });
+    expect(result.orders).toHaveLength(0);
+    expect(result.positions[0]?.quantity).toBe(10);
+  });
+
+  it("빈 allocations 여도 forcedExit(손절)는 그대로 발동한다", () => {
+    const result = executeVirtualTrade({
+      cash: 1_000_000,
+      positions: [held],
+      decision: {
+        ...buyDecision,
+        action: "HOLD",
+        targetAllocationPct: 50,
+        targetAllocations: [],
+      },
+      priceSnapshot: [{ ...price, price: 96_000 }],
+      forcedExit: { stopPrice: 97_000, targetPrice: 110_000, flattenAll: false },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).toContain("손절선");
+  });
+});
+
 describe("executeVirtualTrade 거래 비용 모델 (단타 cli-agent)", () => {
   // 검산 쉬운 값: 수수료 10bp/편도, 매도 제세금 20bp, 슬리피지 10bp/편도.
   const costs = { feeBpPerSide: 10, sellTaxBp: 20, slippageBp: 10 };

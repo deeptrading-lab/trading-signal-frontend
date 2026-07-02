@@ -71,7 +71,7 @@ export const INTRADAY_WATCH_COPY = {
   searchPlaceholder: "종목명·코드로 검색해 워치에 추가",
   /* 진행 중 모의 세션 복원 칩 — 새로고침으로 워치가 비어도 세션은 서버에 살아있다. */
   runningTitle: "진행 중 모의 단타",
-  runningHint: "눌러서 워치에 다시 추가하면 현황이 보여요.",
+  runningHint: "눌러서 워치에 추가해야 자동 판단이 이어져요.",
 } as const;
 
 /** 워치 카드 하단 "AI 모의 단타" 시작/현황 카피 — intraday-paper-watch. */

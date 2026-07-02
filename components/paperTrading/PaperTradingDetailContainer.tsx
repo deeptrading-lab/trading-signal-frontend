@@ -119,7 +119,10 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
   const { session, positions, ticks, equityCurve } = detail;
   const canRun = session.status === "running";
   const isIntraday = session.decisionProvider === "cli-agent";
-  const title = session.stocks[0]?.name ?? session.name ?? PAPER_TRADING_DETAIL_TITLE;
+  // 단타(단일 종목)는 종목명이 곧 정체성, mock 다종목 세션은 사용자가 지은 세션명 유지(리뷰 #10).
+  const title = isIntraday
+    ? (session.stocks[0]?.name ?? session.name ?? PAPER_TRADING_DETAIL_TITLE)
+    : (session.name || PAPER_TRADING_DETAIL_TITLE);
 
   // 체결 평탄화(최신 위) + 실현손익·비용 누계 — "모의 매매한 걸 다 본다"의 핵심 파생값.
   const orders: OrderRow[] = ticks

@@ -250,6 +250,13 @@ function normalizeTargets(
   items: Array<{ ticker: string; targetAllocationPct: number; rationale: string }>;
   adjustedForMax: boolean;
 } {
+  // 빈 targetAllocations = "리밸런싱 주문 없음" 계약(EXIT 제외 — 청산은 항상 실행).
+  // 단타(cli-agent) HOLD·여력 없는 BUY 가 여기로 온다: 목표 비중 %→floor(주수) 재계산이
+  // 가격 미세 상승마다 1주 매도를 만들어내는 드리프트를 원천 차단(리뷰 #1).
+  // mock·forced-exit 은 항상 명시 allocations 를 넣으므로 무영향.
+  if (decision.targetAllocations.length === 0 && decision.action !== "EXIT") {
+    return { items: [], adjustedForMax: false };
+  }
   const source =
     decision.targetAllocations.length > 0
       ? decision.targetAllocations

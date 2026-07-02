@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createPaperTradingSession,
+  listPaperTradingSessions,
   resetPaperTradingStoreForTest,
   resolveNextTickWindow,
   runPaperTradingSessionTick,
@@ -136,6 +137,23 @@ describe("cli-agent 세션 생성 (intraday-paper-watch)", () => {
     // 테스트 환경 = KIS 미설정 → 분봉 없음 → 사전 게이트가 LLM 을 스킵하고 결정론 폴백(HOLD).
     expect(detail.latestDecision?.action).toBe("HOLD");
     expect(detail.ticks[0]?.rationale).toContain("결정론 폴백");
+  });
+
+  it("같은 종목 running 단타 세션이 있으면 새로 만들지 않고 그 세션을 반환한다(타임아웃 재클릭 멱등)", async () => {
+    resetPaperTradingStoreForTest();
+    const request = {
+      name: "단타 모의 · 삼성전자",
+      tickers: ["005930"],
+      stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+      initialCash: 1_000_000,
+      targetReturnPct: 5,
+      riskMode: "balanced" as const,
+      decisionProvider: "cli-agent" as const,
+    };
+    const first = await createPaperTradingSession(request, { priceSnapshotProvider: testPriceProvider });
+    const second = await createPaperTradingSession(request, { priceSnapshotProvider: testPriceProvider });
+    expect(second.session.id).toBe(first.session.id);
+    expect((await listPaperTradingSessions()).length).toBe(1);
   });
 
   it("요청 주기(2분)가 있으면 세션에 그대로 반영된다", async () => {

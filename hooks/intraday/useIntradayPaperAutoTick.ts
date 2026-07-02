@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { runPaperTradingTick } from "@/lib/api/paperTrading/sessions";
 import { queryKeys } from "@/hooks/query/queryKeys";
-import { isKstMarketHours } from "@/lib/utils/kstMarketHours";
+import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -33,7 +33,8 @@ export function useIntradayPaperAutoTick(sessionIds: string[]): { isTicking: boo
     if (ids.length === 0) return;
 
     const fire = async (): Promise<void> => {
-      if (busy.current || !isKstMarketHours()) return;
+      // 마감 유예(~15:40) 포함 — 15:20 전량 청산 창(15:30)이 busy 스킵으로 유실되지 않게.
+      if (busy.current || !isKstMarketHoursWithCloseGrace()) return;
       busy.current = true;
       setIsTicking(true);
       try {

@@ -375,11 +375,16 @@ export function toPaperTradingDecision(
 
   let targetPct: number;
   let ptAction: PaperTradingDecision["action"];
+  /** false = 리밸런싱 주문 금지(targetAllocations 비움 — virtualExecution 계약, 리뷰 #1). */
+  let trade = true;
 
   if (action === "BUY") {
     const desired = intraday.entryPositionPct ?? riskTargetPct(input.riskMode);
     targetPct = Math.max(currentPct, Math.min(input.maxPositionPct, desired));
     ptAction = "BUY";
+    // 캡에 걸려 현 비중 이하가 되면 살 여력이 없음 — %→floor(주수) 재계산 드리프트로
+    // BUY 액션이 1주 매도를 만드는 역전을 막기 위해 주문을 내지 않는다.
+    trade = targetPct > currentPct;
   } else if (action === "SELL") {
     const ratio = intraday.sellRatioPct ?? 100;
     if (input.position && ratio < 100) {
@@ -390,21 +395,26 @@ export function toPaperTradingDecision(
       ptAction = input.position ? "EXIT" : "SELL";
     }
   } else {
+    // HOLD = 현 포지션 그대로 — stale allocationPct 를 목표로 되먹이면 가격 미세 변동마다
+    // floor 재계산 매도가 새므로(리뷰 #1) 주문 자체를 내지 않는다(익절/손절은 forcedExit 담당).
     targetPct = input.position && input.position.quantity > 0 ? currentPct : 0;
     ptAction = "HOLD";
+    trade = false;
   }
 
   return {
     action: ptAction,
     targetAllocationPct: targetPct,
-    targetAllocations: [
-      {
-        ticker: input.ticker,
-        name: input.name,
-        targetAllocationPct: targetPct,
-        rationale: intraday.rationale,
-      },
-    ],
+    targetAllocations: trade
+      ? [
+          {
+            ticker: input.ticker,
+            name: input.name,
+            targetAllocationPct: targetPct,
+            rationale: intraday.rationale,
+          },
+        ]
+      : [],
     confidence: intraday.confidence,
     rationale: intraday.rationale,
     riskNotes: intraday.riskNotes,

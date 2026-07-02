@@ -18,7 +18,7 @@ import type { VolumeRankResponse } from "@/lib/types/market/volumeRank";
 import {
   withTimeout,
   jsonWithDataSource,
-  fetchWithTransientRetry,
+  fetchWithTransientRetryOrThrow,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
@@ -50,8 +50,10 @@ export async function GET() {
   }
 
   try {
+    // throw 전파 변형 사용(리뷰 #8) — 빈 배열 폴백은 KIS 비즈니스 오류(토큰 만료·레이트리밋)를
+    // 삼켜 아래 isApiError 분기를 죽은 코드로 만들고 원인 없는 generic 502 만 남긴다.
     const fetched = await withTimeout(
-      fetchWithTransientRetry(() => fetchVolumeRank(), [], RETRY_BACKOFF_MS),
+      fetchWithTransientRetryOrThrow(() => fetchVolumeRank(), RETRY_BACKOFF_MS),
       BFF_TIMEOUT_MS,
     );
     const rows = fetched.filter(isRegularStock);
