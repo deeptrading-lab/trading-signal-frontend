@@ -20,7 +20,7 @@ import {
   PAPER_TRADING_CLOSE_FLATTEN_HHMM,
   PAPER_TRADING_DAILY_LOSS_KILL_PCT,
   PAPER_TRADING_INTRADAY_PRIOR_DAYS,
-  PAPER_TRADING_INTRADAY_TIMEFRAME,
+  deriveIntradayTimeframe,
 } from "@/lib/server/paperTrading/constants";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type {
@@ -155,7 +155,8 @@ export async function resolveIntradayTickDecision(
 ): Promise<IntradayTickResult> {
   const { session } = args;
   const stock = session.stocks[0] ?? { ticker: session.tickers[0] ?? "", name: session.tickers[0] ?? "" };
-  const timeframe = PAPER_TRADING_INTRADAY_TIMEFRAME;
+  // 분봉 단위는 세션 판단 주기에서 파생(주기마다 최소 1봉 마감) — env 는 실험용 오버라이드.
+  const timeframe = deriveIntradayTimeframe(session.tickIntervalMinutes);
   const nowHhmm = kstHhmm(args.tickWindowStart);
   const flattenAll = nowHhmm >= PAPER_TRADING_CLOSE_FLATTEN_HHMM;
   const dailyLossKill = session.returnPct <= PAPER_TRADING_DAILY_LOSS_KILL_PCT;

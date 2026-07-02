@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateCreateSessionRequest } from "@/lib/server/paperTrading/validateCreateSession";
+import { deriveIntradayTimeframe } from "@/lib/server/paperTrading/constants";
 import type { CreatePaperTradingSessionRequest } from "@/lib/types/paperTrading/paperTrading";
 
 const base: Partial<CreatePaperTradingSessionRequest> = {
@@ -45,5 +46,34 @@ describe("validateCreateSessionRequest", () => {
     expect(
       validateCreateSessionRequest({ ...base, decisionProvider: "cli-agent", tickIntervalMinutes: 7 }),
     ).toContain("판단 주기");
+  });
+});
+
+describe("deriveIntradayTimeframe (주기 → 분봉 파생)", () => {
+  it("주기별 매핑 — 분봉 ≤ 주기, 주기마다 최소 1봉 마감", () => {
+    const prev = process.env.INTRADAY_TIMEFRAME;
+    delete process.env.INTRADAY_TIMEFRAME;
+    try {
+      expect(deriveIntradayTimeframe(1)).toBe(1);
+      expect(deriveIntradayTimeframe(2)).toBe(1);
+      expect(deriveIntradayTimeframe(3)).toBe(3);
+      expect(deriveIntradayTimeframe(5)).toBe(5);
+      expect(deriveIntradayTimeframe(10)).toBe(5);
+      expect(deriveIntradayTimeframe(15)).toBe(15);
+      expect(deriveIntradayTimeframe(999)).toBe(5); // 미지정 주기 폴백.
+    } finally {
+      if (prev !== undefined) process.env.INTRADAY_TIMEFRAME = prev;
+    }
+  });
+
+  it("INTRADAY_TIMEFRAME env 는 실험용 강제 오버라이드", () => {
+    const prev = process.env.INTRADAY_TIMEFRAME;
+    process.env.INTRADAY_TIMEFRAME = "3";
+    try {
+      expect(deriveIntradayTimeframe(15)).toBe(3);
+    } finally {
+      if (prev !== undefined) process.env.INTRADAY_TIMEFRAME = prev;
+      else delete process.env.INTRADAY_TIMEFRAME;
+    }
   });
 });

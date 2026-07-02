@@ -170,6 +170,20 @@ export type PaperTradingSessionDetail = {
 /** 단타(cli-agent) 판단 주기 선택지(분) — UI 드랍다운·서버 검증 공용. 15분 초과는 단타 아님. */
 export const PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS = [1, 2, 3, 5, 10, 15] as const;
 
+/**
+ * 판단 주기 → 분봉 단위 자동 파생(UI 라벨·서버 공용).
+ * 원칙: 분봉 ≤ 주기(주기마다 최소 1봉이 마감돼 "이전 봉 꼬리" 판단이 성립), 초단타로 갈수록 세분.
+ * 2·10분은 표준 분봉이 아니라 한 단계 아래 프로파일(1·5분봉)을 쓴다(주기당 2봉 마감).
+ */
+export const INTRADAY_TIMEFRAME_BY_INTERVAL: Record<number, number> = {
+  1: 1,
+  2: 1,
+  3: 3,
+  5: 5,
+  10: 5,
+  15: 15,
+};
+
 export type CreatePaperTradingSessionRequest = {
   name: string;
   tickers: string[];

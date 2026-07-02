@@ -19,7 +19,7 @@ import {
   PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
   PAPER_TRADING_INTRADAY_PRIOR_DAYS,
   PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES,
-  PAPER_TRADING_INTRADAY_TIMEFRAME,
+  deriveIntradayTimeframe,
 } from "@/lib/server/paperTrading/constants";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 import type { IntradayReadResponse } from "@/lib/types/intraday/intradayDecision";
@@ -38,7 +38,8 @@ export async function readIntraday(
   ticker: string,
   opts: ReadIntradayOptions,
 ): Promise<IntradayReadResponse> {
-  const timeframe = opts.timeframe ?? PAPER_TRADING_INTRADAY_TIMEFRAME;
+  // on-demand 진단도 기본 주기에서 분봉을 파생(세션 없음 — env 기본 주기의 시야로 판단).
+  const timeframe = opts.timeframe ?? deriveIntradayTimeframe(PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES);
   const profile = resolveIntradayProfile(timeframe);
 
   // 분봉 — 당일 + 전일 warmup(priorDays). 콜이 많아 latency 큼(on-demand 허용).

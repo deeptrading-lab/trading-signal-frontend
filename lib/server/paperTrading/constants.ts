@@ -1,4 +1,7 @@
-import type { PaperTradingCostModel } from "@/lib/types/paperTrading/paperTrading";
+import {
+  INTRADAY_TIMEFRAME_BY_INTERVAL,
+  type PaperTradingCostModel,
+} from "@/lib/types/paperTrading/paperTrading";
 
 export const PAPER_TRADING_DEFAULT_INITIAL_CASH = 10_000_000;
 export const PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES = 30;
@@ -29,14 +32,15 @@ export const PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES = envInt(
   30,
 );
 /**
- * 분봉 단위(분) — `INTRADAY_TIMEFRAME` 로 조절. 1/3/5/15 지원, 기본 5.
- * ⚠️ 1분봉은 페치 볼륨이 크다(KIS 30봉/콜 vs 토스 200봉/콜) — 1분 운용은
- * `MARKET_DATA_SOURCE=toss` 병행을 권장.
+ * 판단 주기(분) → 분봉 단위(분) 파생 — 매핑은 `INTRADAY_TIMEFRAME_BY_INTERVAL`(주기·봉 마감 정렬).
+ * `INTRADAY_TIMEFRAME` env 는 실험용 강제 오버라이드(1/3/5/15)로만 동작하며 평시엔 비워둔다.
+ * ⚠️ 1분봉은 페치 볼륨이 크다(KIS 30봉/콜 vs 토스 200봉/콜) — `MARKET_DATA_SOURCE=toss` 병행 권장.
  */
-export const PAPER_TRADING_INTRADAY_TIMEFRAME = ((): number => {
-  const v = envInt("INTRADAY_TIMEFRAME", 5, 1, 15);
-  return [1, 3, 5, 15].includes(v) ? v : 5;
-})();
+export function deriveIntradayTimeframe(intervalMinutes: number): number {
+  const override = Number.parseInt(process.env.INTRADAY_TIMEFRAME ?? "", 10);
+  if ([1, 3, 5, 15].includes(override)) return override;
+  return INTRADAY_TIMEFRAME_BY_INTERVAL[intervalMinutes] ?? 5;
+}
 /** 단타 익절 목표 캡(%) — 과욕 차단(사후 게이트). */
 export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = 5;
 /** 세션 일일 손실 kill(%) — 도달 시 신규 진입 차단(관리/청산만). */

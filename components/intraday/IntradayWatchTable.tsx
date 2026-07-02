@@ -32,6 +32,7 @@ import {
 } from "@/lib/copy/paperTrading/labels";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
 import {
+  INTRADAY_TIMEFRAME_BY_INTERVAL,
   PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS,
   type PaperTradingSelectedStock,
   type PaperTradingSession,
@@ -275,7 +276,7 @@ function WatchRow({
             >
               {PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.map((min) => (
                 <option key={min} value={min}>
-                  {min}분
+                  {min}분 · {INTRADAY_TIMEFRAME_BY_INTERVAL[min]}분봉
                 </option>
               ))}
             </select>
