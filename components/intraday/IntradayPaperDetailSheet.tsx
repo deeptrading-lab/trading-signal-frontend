@@ -9,6 +9,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -83,7 +84,8 @@ export function IntradayPaperDetailSheet({
     };
   }, [onClose]);
 
-  return (
+  // 포털 — 워치 표(tbody) 안에서 열려도 DOM 중첩 위반 없이 body 에 띄운다(열림 시에만 렌더 = 클라 전용).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex sm:items-center sm:justify-center sm:p-lg"
       role="dialog"
@@ -287,7 +289,8 @@ export function IntradayPaperDetailSheet({
           </section>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
