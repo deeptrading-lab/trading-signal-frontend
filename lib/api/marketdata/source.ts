@@ -12,6 +12,7 @@
  * 토스 모드에서도 KIS 키는 여전히 필요하다(§4).
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { isKisConfigured } from "@/lib/api/kis/client";
 import { isTossConfigured } from "@/lib/api/toss/client";
 
@@ -21,6 +22,58 @@ export function resolveMarketDataSource(): MarketDataSource {
   const value = process.env.MARKET_DATA_SOURCE?.trim().toLowerCase();
   if (value === "toss" && isTossConfigured()) return "toss";
   return "kis";
+}
+
+/**
+ * 요청 단위 "실제 서빙 소스" 추적 — X-Data-Source 관측성(PR#199 다음 작업).
+ *
+ * 라우트가 `trackMarketDataSource()` 로 감싸면, 그 async 컨텍스트 안에서 `withTossFallback`
+ * 이 성공적으로 사용한 소스가 기록된다. 헤더는 토글 상태가 아니라 **응답 데이터의 실제 출처**:
+ * 토스 성공 = "toss", 토글 off·전량 폴백 = "kis", 다콜 중 일부만 폴백 = "toss,kis".
+ */
+type SourceTracking = { used: Set<MarketDataSource> };
+
+const trackingStore = new AsyncLocalStorage<SourceTracking>();
+
+function recordServedSource(source: MarketDataSource): void {
+  trackingStore.getStore()?.used.add(source);
+}
+
+export async function trackMarketDataSource<T>(
+  fn: () => Promise<T>,
+): Promise<{ result: T; servedSource: string | null }> {
+  const tracking: SourceTracking = { used: new Set() };
+  const result = await trackingStore.run(tracking, fn);
+  const list = Array.from(tracking.used).sort().reverse(); // toss 를 앞에 — "toss,kis"
+  return { result, servedSource: list.length > 0 ? list.join(",") : null };
+}
+
+/**
+ * 프로세스당 1회, 최초 시세 호출 시 소스 판정을 로그로 남긴다 — dev 콘솔에서 토글 상태를
+ * 값 지문 없이 즉시 확인. 특히 "toss 지정했는데 키가 없어 kis 로 게이트된" 케이스(동료 로컬)를
+ * 명시해 디버깅 미스터리를 없앤다.
+ */
+let sourceLoggedOnce = false;
+
+function logResolvedSourceOnce(): void {
+  if (sourceLoggedOnce) return;
+  sourceLoggedOnce = true;
+  const raw = process.env.MARKET_DATA_SOURCE?.trim().toLowerCase() ?? "";
+  const resolved = resolveMarketDataSource();
+  if (raw === "toss" && resolved !== "toss") {
+    console.warn(
+      "[marketdata] MARKET_DATA_SOURCE=toss 지정됐지만 TOSS_CLIENT_ID/SECRET 미설정 — kis 로 동작합니다(무영향 게이트).",
+    );
+    return;
+  }
+  console.info(
+    `[marketdata] 시세 소스: ${resolved}${resolved === "toss" ? " (호출 실패 시 해당 호출만 KIS 폴백)" : ""}`,
+  );
+}
+
+/** 테스트 전용 — 1회 로그 플래그 초기화. */
+export function resetSourceLogForTest(): void {
+  sourceLoggedOnce = false;
 }
 
 /**
@@ -36,16 +89,26 @@ export async function withTossFallback<T>(
   tossFn: () => Promise<T>,
   kisFn: () => Promise<T>,
 ): Promise<T> {
-  if (resolveMarketDataSource() !== "toss") return kisFn();
+  logResolvedSourceOnce();
+
+  if (resolveMarketDataSource() !== "toss") {
+    const result = await kisFn();
+    recordServedSource("kis");
+    return result;
+  }
 
   try {
-    return await tossFn();
+    const result = await tossFn();
+    recordServedSource("toss");
+    return result;
   } catch (error) {
     if (!isKisConfigured()) throw error;
     console.warn(
       `[marketdata] toss ${label} 실패 — KIS 폴백:`,
       error instanceof Error ? error.message : error,
     );
-    return kisFn();
+    const result = await kisFn();
+    recordServedSource("kis");
+    return result;
   }
 }

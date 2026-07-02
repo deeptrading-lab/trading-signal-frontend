@@ -27,6 +27,7 @@ import {
   jsonWithDataSource,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
+import { trackMarketDataSource } from "@/lib/api/marketdata/source";
 
 const FALLBACK_TIMEOUT_MESSAGE =
   "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
@@ -47,8 +48,11 @@ export async function GET(request: NextRequest) {
 
   try {
     // route handler 자체 timeout 가드 (BFF 5s) — Promise.race.
-    const data = await withTimeout(fetchStockPrice(ticker), 5_000);
-    return jsonWithDataSource(withSeedName(data, ticker), "kis", {
+    // X-Data-Source 는 실제 서빙 소스(toss/kis — 폴백 반영, trackMarketDataSource 주석).
+    const { result: data, servedSource } = await trackMarketDataSource(() =>
+      withTimeout(fetchStockPrice(ticker), 5_000),
+    );
+    return jsonWithDataSource(withSeedName(data, ticker), servedSource ?? "kis", {
       "X-KIS-Env": resolveKisEnv(),
     });
   } catch (error) {

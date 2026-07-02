@@ -18,6 +18,7 @@ import { fetchTodayMinuteCandles } from "@/lib/api/kis/minuteChartChunked";
 import { isApiError } from "@/lib/api/errors";
 import { getMockStockMinuteChart } from "@/lib/mock/stock/minute";
 import { withTimeout, BFF_TIMEOUT_SENTINEL } from "@/lib/server/bffUtils";
+import { trackMarketDataSource } from "@/lib/api/marketdata/source";
 
 /** 분봉 페이징은 콜이 많아 타임아웃을 넉넉히. */
 const BFF_TIMEOUT_MS = 20_000;
@@ -45,12 +46,14 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1분봉 페이징 → 리샘플 → 최신 bars개만.
-    const all = await withTimeout(
-      fetchTodayMinuteCandles(ticker, timeframe, bars * timeframe + timeframe),
-      BFF_TIMEOUT_MS,
+    const { result: all, servedSource } = await trackMarketDataSource(() =>
+      withTimeout(
+        fetchTodayMinuteCandles(ticker, timeframe, bars * timeframe + timeframe),
+        BFF_TIMEOUT_MS,
+      ),
     );
     const candles = all.slice(-bars);
-    return jsonOk(candles, "kis", { "X-KIS-Env": resolveKisEnv() });
+    return jsonOk(candles, servedSource ?? "kis", { "X-KIS-Env": resolveKisEnv() });
   } catch (error) {
     return mapErrorToResponse(error, ticker, timeframe, bars);
   }
@@ -58,7 +61,7 @@ export async function GET(request: NextRequest) {
 
 function jsonOk(
   data: unknown,
-  source: "kis" | "mock" | "mock-timeout",
+  source: string,
   extra?: Record<string, string>,
 ): NextResponse {
   return NextResponse.json(data, {
