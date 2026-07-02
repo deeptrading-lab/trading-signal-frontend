@@ -27,7 +27,7 @@ create table if not exists public.signal_scorecard (
   decided_at timestamptz not null,      -- 판정 생성 timestamp(불변 기록)
   run_id text,                          -- 토큰 usage 연계(nullable)
 
-  -- horizon 평가 상태(d1=+1d / w1=+1w / m1=+1m) ──────────────────────────────
+  -- horizon 평가 상태(d1=+1d / w1=+1w / w2=+2w / m1=+1m) ─────────────────────
   d1_status text not null default 'pending' check (d1_status in ('pending','hit','miss','flat','skipped')),
   d1_close numeric,
   d1_return_pct numeric,
@@ -37,6 +37,11 @@ create table if not exists public.signal_scorecard (
   w1_close numeric,
   w1_return_pct numeric,
   w1_scored_at timestamptz,
+
+  w2_status text not null default 'pending' check (w2_status in ('pending','hit','miss','flat','skipped')),
+  w2_close numeric,
+  w2_return_pct numeric,
+  w2_scored_at timestamptz,
 
   m1_status text not null default 'pending' check (m1_status in ('pending','hit','miss','flat','skipped')),
   m1_close numeric,
@@ -58,10 +63,20 @@ alter table public.signal_scorecard add column if not exists signal_action text;
 alter table public.signal_scorecard add column if not exists target_pct numeric;
 alter table public.signal_scorecard add column if not exists stop_loss_pct numeric;
 
+-- horizon w2(+2주=10영업일) 신규 추가(scorecard-w2-horizon) — 이미 배포된 DB용 멱등 base 컬럼.
+-- NOT NULL + default 'pending' 이라 기존 행은 자동으로 pending 채워짐(소급 채점은 앞으로만).
+alter table public.signal_scorecard add column if not exists w2_status text not null default 'pending'
+  check (w2_status in ('pending','hit','miss','flat','skipped'));
+alter table public.signal_scorecard add column if not exists w2_close numeric;
+alter table public.signal_scorecard add column if not exists w2_return_pct numeric;
+alter table public.signal_scorecard add column if not exists w2_scored_at timestamptz;
+
 -- cron 조회 인덱스 — horizon 중 하나라도 pending 인 행을 빠르게 찾기 위함.
+-- w2 추가로 WHERE 절이 바뀌었으므로 기존 인덱스를 drop 후 재생성(if not exists 는 no-op이라 갱신 안 됨).
+drop index if exists public.signal_scorecard_pending_idx;
 create index if not exists signal_scorecard_pending_idx
   on public.signal_scorecard (entry_date)
-  where d1_status = 'pending' or w1_status = 'pending' or m1_status = 'pending';
+  where d1_status = 'pending' or w1_status = 'pending' or w2_status = 'pending' or m1_status = 'pending';
 
 -- 집계/표 조회용 보조 인덱스.
 create index if not exists signal_scorecard_ticker_idx on public.signal_scorecard (ticker);
@@ -77,6 +92,8 @@ comment on column public.signal_scorecard.d1_status is
   'horizon +1d(1영업일) 평가 상태: pending|hit|miss|flat|skipped';
 comment on column public.signal_scorecard.w1_status is
   'horizon +1w(5영업일) 평가 상태';
+comment on column public.signal_scorecard.w2_status is
+  'horizon +2w(10영업일) 평가 상태';
 comment on column public.signal_scorecard.m1_status is
   'horizon +1m(21영업일) 평가 상태';
 
@@ -108,6 +125,14 @@ alter table public.signal_scorecard add column if not exists w1_alpha_residual_p
 alter table public.signal_scorecard add column if not exists w1_regime text
   check (w1_regime is null or w1_regime in ('up','down','flat'));
 
+-- horizon별 상대 측정값 — w2(+2주=10영업일, scorecard-w2-horizon).
+alter table public.signal_scorecard add column if not exists w2_bench_return_pct numeric;
+alter table public.signal_scorecard add column if not exists w2_excess_return_pct numeric;
+alter table public.signal_scorecard add column if not exists w2_beta numeric;
+alter table public.signal_scorecard add column if not exists w2_alpha_residual_pct numeric;
+alter table public.signal_scorecard add column if not exists w2_regime text
+  check (w2_regime is null or w2_regime in ('up','down','flat'));
+
 -- horizon별 상대 측정값 — m1.
 alter table public.signal_scorecard add column if not exists m1_bench_return_pct numeric;
 alter table public.signal_scorecard add column if not exists m1_excess_return_pct numeric;
@@ -117,10 +142,13 @@ alter table public.signal_scorecard add column if not exists m1_regime text
   check (m1_regime is null or m1_regime in ('up','down','flat'));
 
 -- backfill 대상(채점됐으나 상대값 비어있는 horizon) 빠른 탐색용 부분 인덱스.
+-- w2 추가로 WHERE 절이 바뀌었으므로 drop 후 재생성.
+drop index if exists public.signal_scorecard_rel_backfill_idx;
 create index if not exists signal_scorecard_rel_backfill_idx
   on public.signal_scorecard (entry_date)
   where (d1_status in ('hit','miss','flat') and d1_bench_return_pct is null)
      or (w1_status in ('hit','miss','flat') and w1_bench_return_pct is null)
+     or (w2_status in ('hit','miss','flat') and w2_bench_return_pct is null)
      or (m1_status in ('hit','miss','flat') and m1_bench_return_pct is null);
 
 comment on column public.signal_scorecard.bench_key is

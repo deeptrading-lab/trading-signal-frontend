@@ -51,15 +51,33 @@ function addAbs(counts: Counts, verdict: ScorecardRow["verdict"], returnPct: num
 }
 
 function horizonStatus(row: ScorecardRow, h: ScorecardHorizon): HorizonStatus {
-  return h === "d1" ? row.d1Status : h === "w1" ? row.w1Status : row.m1Status;
+  return h === "d1"
+    ? row.d1Status
+    : h === "w1"
+      ? row.w1Status
+      : h === "w2"
+        ? row.w2Status
+        : row.m1Status;
 }
 
 function horizonReturnPct(row: ScorecardRow, h: ScorecardHorizon): number | null {
-  return h === "d1" ? row.d1ReturnPct : h === "w1" ? row.w1ReturnPct : row.m1ReturnPct;
+  return h === "d1"
+    ? row.d1ReturnPct
+    : h === "w1"
+      ? row.w1ReturnPct
+      : h === "w2"
+        ? row.w2ReturnPct
+        : row.m1ReturnPct;
 }
 
 function horizonRegime(row: ScorecardRow, h: ScorecardHorizon): ScorecardRegime | null {
-  return h === "d1" ? row.d1Regime : h === "w1" ? row.w1Regime : row.m1Regime;
+  return h === "d1"
+    ? row.d1Regime
+    : h === "w1"
+      ? row.w1Regime
+      : h === "w2"
+        ? row.w2Regime
+        : row.m1Regime;
 }
 
 /** signalScore 구간 라벨(보조 차원). */

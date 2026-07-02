@@ -36,6 +36,7 @@ const SELECT_COLS =
   "target_pct,stop_loss_pct,entry_close,entry_date,live_price,decided_at,run_id,bench_key," +
   `d1_status,d1_close,d1_return_pct,d1_scored_at,${REL_COLS("d1")},` +
   `w1_status,w1_close,w1_return_pct,w1_scored_at,${REL_COLS("w1")},` +
+  `w2_status,w2_close,w2_return_pct,w2_scored_at,${REL_COLS("w2")},` +
   `m1_status,m1_close,m1_return_pct,m1_scored_at,${REL_COLS("m1")},created_at`;
 
 type SupabaseScorecardRow = {
@@ -72,6 +73,15 @@ type SupabaseScorecardRow = {
   w1_beta: number | string | null;
   w1_alpha_residual_pct: number | string | null;
   w1_regime: ScorecardRegime | null;
+  w2_status: HorizonStatus;
+  w2_close: number | string | null;
+  w2_return_pct: number | string | null;
+  w2_scored_at: string | null;
+  w2_bench_return_pct: number | string | null;
+  w2_excess_return_pct: number | string | null;
+  w2_beta: number | string | null;
+  w2_alpha_residual_pct: number | string | null;
+  w2_regime: ScorecardRegime | null;
   m1_status: HorizonStatus;
   m1_close: number | string | null;
   m1_return_pct: number | string | null;
@@ -141,6 +151,15 @@ function toRow(r: SupabaseScorecardRow): ScorecardRow {
     w1Beta: num(r.w1_beta),
     w1AlphaResidualPct: num(r.w1_alpha_residual_pct),
     w1Regime: r.w1_regime,
+    w2Status: r.w2_status,
+    w2Close: num(r.w2_close),
+    w2ReturnPct: num(r.w2_return_pct),
+    w2ScoredAt: r.w2_scored_at,
+    w2BenchReturnPct: num(r.w2_bench_return_pct),
+    w2ExcessReturnPct: num(r.w2_excess_return_pct),
+    w2Beta: num(r.w2_beta),
+    w2AlphaResidualPct: num(r.w2_alpha_residual_pct),
+    w2Regime: r.w2_regime,
     m1Status: r.m1_status,
     m1Close: num(r.m1_close),
     m1ReturnPct: num(r.m1_return_pct),
@@ -218,7 +237,7 @@ export async function getPendingScorecardRows(limit: number): Promise<ScorecardR
   url.searchParams.set("select", SELECT_COLS);
   url.searchParams.set(
     "or",
-    "(d1_status.eq.pending,w1_status.eq.pending,m1_status.eq.pending)",
+    "(d1_status.eq.pending,w1_status.eq.pending,w2_status.eq.pending,m1_status.eq.pending)",
   );
   url.searchParams.set("order", "entry_date.asc");
   url.searchParams.set("limit", String(limit));
@@ -258,8 +277,8 @@ export async function getRowsNeedingRelativeScoring(limit: number): Promise<Scor
   const scoredNoBench = (h: string): string =>
     `and(${h}_status.in.(hit,miss,flat),${h}_bench_return_pct.is.null)`;
   const orClause =
-    "(d1_status.eq.pending,w1_status.eq.pending,m1_status.eq.pending," +
-    `${scoredNoBench("d1")},${scoredNoBench("w1")},${scoredNoBench("m1")})`;
+    "(d1_status.eq.pending,w1_status.eq.pending,w2_status.eq.pending,m1_status.eq.pending," +
+    `${scoredNoBench("d1")},${scoredNoBench("w1")},${scoredNoBench("w2")},${scoredNoBench("m1")})`;
 
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
   url.searchParams.set("select", SELECT_COLS);
@@ -360,6 +379,7 @@ export async function getAllScorecardRows(limit = 2000): Promise<ScorecardRow[]>
 const HORIZON_COL: Record<ScorecardHorizon, string> = {
   d1: "d1",
   w1: "w1",
+  w2: "w2",
   m1: "m1",
 };
 

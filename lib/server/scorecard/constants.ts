@@ -15,6 +15,7 @@ import type {
  * horizon 별 평가 경과 영업일 임계.
  * - d1 = 결정 후 1영업일
  * - w1 = 5영업일(약 1주)
+ * - w2 = 10영업일(약 2주)
  * - m1 = 21영업일(한국시장 약 1달)
  *
  * `businessDaysBetween(entry, today) >= 임계` 이면 평가 대상(도래).
@@ -22,11 +23,12 @@ import type {
 export const HORIZON_BUSINESS_DAYS: Record<ScorecardHorizon, number> = {
   d1: 1,
   w1: 5,
+  w2: 10,
   m1: 21,
 };
 
 /** 평가 순서(고정) — cron·집계·표 컬럼 순서 단일 원천. */
-export const HORIZONS: ScorecardHorizon[] = ["d1", "w1", "m1"];
+export const HORIZONS: ScorecardHorizon[] = ["d1", "w1", "w2", "m1"];
 
 /**
  * 적중 임계 T(%). 결정시점 대비 horizon 수익률 `r%` 의 절대 폭 밴드.

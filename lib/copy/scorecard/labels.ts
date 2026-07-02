@@ -22,6 +22,7 @@ export const DIMENSION_LABEL = {
 export const HORIZON_LABEL = {
   d1: "+1일",
   w1: "+1주",
+  w2: "+2주",
   m1: "+1달",
   all: "전체",
 } as const;

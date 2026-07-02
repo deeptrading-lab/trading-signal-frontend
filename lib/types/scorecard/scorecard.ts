@@ -12,8 +12,8 @@
 import type { FinalVerdict, AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 import type { SignalAction } from "@/lib/types/signal";
 
-/** 평가 시점(horizon) — +1d / +1w / +1m. 경과 영업일 임계는 `constants.HORIZON_BUSINESS_DAYS`. */
-export type ScorecardHorizon = "d1" | "w1" | "m1";
+/** 평가 시점(horizon) — +1d / +1w / +2w / +1m. 경과 영업일 임계는 `constants.HORIZON_BUSINESS_DAYS`. */
+export type ScorecardHorizon = "d1" | "w1" | "w2" | "m1";
 
 /**
  * horizon 평가 상태.
@@ -98,6 +98,21 @@ export interface ScorecardRow {
   w1AlphaResidualPct: number | null;
   /** 해당 horizon 구간 시장 국면(벤치마크 기준). 측정 불가면 null. */
   w1Regime: ScorecardRegime | null;
+
+  w2Status: HorizonStatus;
+  w2Close: number | null;
+  w2ReturnPct: number | null;
+  w2ScoredAt: string | null;
+  /** 같은 horizon 벤치마크 지수 수익률(%). 측정 불가면 null. */
+  w2BenchReturnPct: number | null;
+  /** 초과수익 = abs − bench(%p). */
+  w2ExcessReturnPct: number | null;
+  /** entry 직전 윈도우로 추정한 베타. 추정 불가면 null. */
+  w2Beta: number | null;
+  /** 베타보정 잔차 = abs − β·bench(%p). */
+  w2AlphaResidualPct: number | null;
+  /** 해당 horizon 구간 시장 국면(벤치마크 기준). 측정 불가면 null. */
+  w2Regime: ScorecardRegime | null;
 
   m1Status: HorizonStatus;
   m1Close: number | null;
