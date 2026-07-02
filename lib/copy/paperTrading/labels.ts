@@ -73,6 +73,29 @@ export const STATUS_LABEL: Record<PaperTradingSessionStatus, string> = {
   failed: "실패",
 };
 
+/* 세션 상세(전체 화면) 재디자인 — intraday-paper-watch. */
+export const PAPER_TRADING_BACK_TO_WATCH = "단타 워치로";
+export const PAPER_TRADING_METRIC_REALIZED = "실현손익 합";
+export const PAPER_TRADING_METRIC_COSTS = "비용 누계";
+export const PAPER_TRADING_ORDERS_TITLE = "체결 내역";
+export const PAPER_TRADING_ORDERS_EMPTY = "아직 체결이 없어요.";
+export const PAPER_TRADING_ORDER_BUY = "매수";
+export const PAPER_TRADING_ORDER_SELL = "매도";
+export const PAPER_TRADING_ORDER_COLS = {
+  time: "시각",
+  side: "구분",
+  qty: "수량",
+  price: "체결가",
+  notional: "금액",
+  cost: "비용",
+  pnl: "실현손익",
+  note: "판단 메모",
+} as const;
+export const PAPER_TRADING_ANALYST_PREFIX = "흐름 진단";
+export const PAPER_TRADING_GATE_PREFIX = "룰 조정";
+/** cli-agent 세션 — 수동 재판단 대신 자동 주기 안내. */
+export const PAPER_TRADING_AUTO_TICK_NOTE = "단타 워치 화면이 열려 있는 동안 자동으로 판단해요.";
+
 export const PAPER_TRADING_TABLE_TICKER = "종목";
 export const PAPER_TRADING_TABLE_QUANTITY = "수량";
 export const PAPER_TRADING_TABLE_AVG = "평균가";
