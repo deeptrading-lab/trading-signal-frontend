@@ -40,10 +40,14 @@ import type {
 const T = P.table;
 
 /**
- * 컴팩트 버튼 — button-primary 의 고정 높이 토큰(h-button-primary-h=40px)을 utilities 레이어의
- * h-8 로 덮어 아이콘 버튼·input(h-8)과 같은 32px 로 통일(디자인 일관성 피드백).
+ * 컴팩트 버튼 — button-primary/secondary 합성 클래스는 높이·패딩 토큰이 달라 크기가 어긋나므로
+ * (40px 고정 높이 등) 여기선 쓰지 않고 동일 스펙(h-8·px-sm·rounded-md·text-caption)으로 직접
+ * 정의한다. 색만 다르고 크기는 픽셀 단위로 같다(디자인 일관성 피드백).
  */
-const BTN_COMPACT = "inline-flex h-8 items-center px-sm py-0 text-caption whitespace-nowrap";
+const BTN_BASE =
+  "inline-flex h-8 items-center justify-center rounded-md px-sm text-caption font-medium whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default";
+const BTN_PRIMARY = `${BTN_BASE} border-0 bg-accent-vivid text-surface hover:bg-accent-vivid/90`;
+const BTN_NEUTRAL = `${BTN_BASE} border border-border-line bg-surface-base text-text-strong hover:bg-surface-muted`;
 const ICON_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
 
@@ -84,7 +88,9 @@ export function IntradayWatchTable({
               <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
               <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
               <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
-              <th className="py-sm pr-lg text-right font-normal">{T.colActions}</th>
+              <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
+              <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
+              <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
             </tr>
           </thead>
           <tbody>
@@ -248,62 +254,70 @@ function WatchRow({
           )}
         </td>
 
-        {/* 액션 — 판단 · 모의 시작/일시정지 · 제거 · 펼침 */}
-        <td className="py-sm pr-lg">
-          <div className="flex items-center justify-end gap-xs">
-            <button
-              type="button"
-              className={cn("button-secondary", BTN_COMPACT)}
-              disabled={!provider || read.isPending}
-              title={T.readTitle}
-              onClick={(e) => {
-                e.stopPropagation();
-                runRead();
-              }}
-            >
-              {read.isPending ? T.readRunning : T.readRun}
-            </button>
-            {current ? (
-              <>
-                <button
-                  type="button"
-                  className={ICON_BTN}
-                  aria-label={T.ordersButton}
-                  title={T.ordersButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSheetOpen(true);
-                  }}
-                >
-                  <History className="size-4" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={ICON_BTN}
-                  disabled={isPatching}
-                  aria-label={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
-                  title={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void setStatus(running ? "paused" : "running");
-                  }}
-                >
-                  {running ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
-                </button>
-              </>
-            ) : (
+        {/* AI 진단 — 매매 없이 지금 시점 판단만(결과는 펼침에) */}
+        <td className="py-sm pr-md text-center">
+          <button
+            type="button"
+            className={BTN_NEUTRAL}
+            disabled={!provider || read.isPending}
+            title={T.readTitle}
+            onClick={(e) => {
+              e.stopPropagation();
+              runRead();
+            }}
+          >
+            {read.isPending ? T.readRunning : T.readRun}
+          </button>
+        </td>
+
+        {/* 모의 매매 — 시작 또는 진행 중 컨트롤(체결 내역·일시정지) */}
+        <td className="py-sm pr-md text-center">
+          {current ? (
+            <div className="inline-flex items-center gap-xs">
               <button
                 type="button"
-                className={cn("button-primary", BTN_COMPACT)}
-                disabled={isCreating}
+                className={ICON_BTN}
+                aria-label={T.ordersButton}
+                title={T.ordersButton}
                 onClick={(e) => {
                   e.stopPropagation();
-                  void handleStart();
+                  setSheetOpen(true);
                 }}
               >
-                {isCreating ? P.creating : T.startRun}
+                <History className="size-4" aria-hidden />
               </button>
-            )}
+              <button
+                type="button"
+                className={ICON_BTN}
+                disabled={isPatching}
+                aria-label={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
+                title={running ? PAPER_TRADING_PAUSE : PAPER_TRADING_RESUME}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void setStatus(running ? "paused" : "running");
+                }}
+              >
+                {running ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={BTN_PRIMARY}
+              disabled={isCreating}
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleStart();
+              }}
+            >
+              {isCreating ? P.creating : T.startRun}
+            </button>
+          )}
+        </td>
+
+        {/* 관리 — 제거 · 펼침 */}
+        <td className="py-sm pr-lg">
+          <div className="flex items-center justify-end gap-xs">
             <button
               type="button"
               className={ICON_BTN}
@@ -337,7 +351,7 @@ function WatchRow({
       {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
       {expanded ? (
         <tr className="border-t border-border-line">
-          <td colSpan={9} className="bg-surface-muted px-lg py-md">
+          <td colSpan={11} className="bg-surface-muted px-lg py-md">
             <div className="flex flex-col gap-sm">
               {startError ? (
                 <p className="text-caption text-signal-down" role="alert">
@@ -360,17 +374,10 @@ function WatchRow({
 
               {current ? (
                 <div className="flex flex-wrap items-center gap-xs">
-                  <button
-                    type="button"
-                    className={cn("button-secondary", BTN_COMPACT)}
-                    onClick={() => setSheetOpen(true)}
-                  >
+                  <button type="button" className={BTN_NEUTRAL} onClick={() => setSheetOpen(true)}>
                     {T.ordersButton}
                   </button>
-                  <Link
-                    href={`/dashboard/paper-trading/${current.id}`}
-                    className={cn("button-secondary", BTN_COMPACT)}
-                  >
+                  <Link href={`/dashboard/paper-trading/${current.id}`} className={BTN_NEUTRAL}>
                     {P.detailLink}
                   </Link>
                 </div>
