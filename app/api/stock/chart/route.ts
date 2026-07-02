@@ -18,6 +18,7 @@ import { fetchStockDailyChart, isKisConfigured, resolveKisEnv } from "@/lib/api/
 import { isApiError } from "@/lib/api/errors";
 import { getMockStockChart } from "@/lib/mock/stock/daily";
 import { withTimeout, BFF_TIMEOUT_SENTINEL } from "@/lib/server/bffUtils";
+import { trackMarketDataSource } from "@/lib/api/marketdata/source";
 import { fetchDailyChunked, CHUNK_DAYS as DAILY_CHUNK_DAYS, toYyyymmdd, addDays } from "@/lib/api/kis/chartChunked";
 
 /** 일봉 1년 = ~3콜, 타임아웃을 넉넉히. */
@@ -54,15 +55,16 @@ export async function GET(request: NextRequest) {
   const fromDate = toYyyymmdd(addDays(new Date(), -days));
 
   try {
-    const fetch =
-      period === "D" && days > DAILY_CHUNK_DAYS
-        ? fetchDailyChunked(ticker, fromDate, toDate)
-        : fetchStockDailyChart(ticker, fromDate, toDate, period).then((c) =>
-            c.slice().sort((a, b) => a.date.localeCompare(b.date)),
-          );
-
-    const candles = await withTimeout(fetch, BFF_TIMEOUT_MS);
-    return jsonOk(candles, "kis", { "X-KIS-Env": resolveKisEnv() });
+    const { result: candles, servedSource } = await trackMarketDataSource(() => {
+      const fetch =
+        period === "D" && days > DAILY_CHUNK_DAYS
+          ? fetchDailyChunked(ticker, fromDate, toDate)
+          : fetchStockDailyChart(ticker, fromDate, toDate, period).then((c) =>
+              c.slice().sort((a, b) => a.date.localeCompare(b.date)),
+            );
+      return withTimeout(fetch, BFF_TIMEOUT_MS);
+    });
+    return jsonOk(candles, servedSource ?? "kis", { "X-KIS-Env": resolveKisEnv() });
   } catch (error) {
     return mapErrorToResponse(error, ticker);
   }
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
 
 function jsonOk(
   data: unknown,
-  source: "kis" | "mock" | "mock-timeout",
+  source: string,
   extra?: Record<string, string>,
 ): NextResponse {
   return NextResponse.json(data, {
