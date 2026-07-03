@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  closeOutRunningSessionsAtClose,
   runScheduledIntradayTicks,
   runWithLimit,
   selectSchedulableSessions,
@@ -74,5 +75,30 @@ describe("runScheduledIntradayTicks (장중 게이트)", () => {
   it("장중이지만 스케줄 대상 세션이 없으면 0", async () => {
     resetPaperTradingStoreForTest();
     expect(await runScheduledIntradayTicks(new Date("2026-07-03T01:00:00.000Z"))).toBe(0); // 금 10:00 KST
+  });
+
+  it("마감 후 시각이어도 틱 경로는 항상 -1(종료는 별도 함수 소관)", async () => {
+    resetPaperTradingStoreForTest();
+    // 금 21:00 KST — 틱은 안 돌고(-1), 종료 스윕이 별도로 처리한다.
+    expect(await runScheduledIntradayTicks(new Date("2026-07-03T12:00:00.000Z"))).toBe(-1);
+  });
+});
+
+describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", () => {
+  it("장중·프리마켓·주말이면 실행하지 않는다(-1)", async () => {
+    resetPaperTradingStoreForTest();
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T01:00:00.000Z"))).toBe(-1); // 금 10:00 KST 장중
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-02T23:00:00.000Z"))).toBe(-1); // 금 08:00 KST 프리마켓
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-04T06:41:00.000Z"))).toBe(-1); // 토 15:41 KST 주말
+  });
+
+  it("마감 유예 경계(15:40)는 아직 종료하지 않는다(-1) — 마지막 틱과 겹침 방지", async () => {
+    resetPaperTradingStoreForTest();
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:40:00.000Z"))).toBe(-1); // 금 15:40 KST
+  });
+
+  it("마감 후(15:41+)이고 대상 세션이 없으면 0", async () => {
+    resetPaperTradingStoreForTest();
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:41:00.000Z"))).toBe(0); // 금 15:41 KST
   });
 });

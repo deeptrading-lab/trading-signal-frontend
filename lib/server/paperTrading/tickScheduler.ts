@@ -14,9 +14,10 @@
 
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
-import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 import {
   listPaperTradingSessions,
+  patchPaperTradingSessionStatus,
   runPaperTradingSessionTick,
 } from "@/lib/server/paperTrading/sessionStore";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
@@ -86,6 +87,40 @@ export async function runScheduledIntradayTicks(now: Date = new Date()): Promise
   }
 }
 
+/** 마감 종료 스윕 중첩 방지. */
+let closeOutRunning = false;
+
+/**
+ * 장 마감(평일 15:40 초과) 후 남은 running 단타 세션을 **완료로 자동 종료**한다.
+ *
+ * 단타 = 하루 1세션 — 자동 종료가 없으면 세션이 계속 running 으로 남아 (a) 다음 거래일 스케줄러가
+ * 다시 틱해 크로스데이로 누적되고 (b) 워치 표에 어제 세션이 계속 자동 상주한다. 종료로 그날 결과를
+ * 확정하고 표에서 내려(✕ 제거 가능) 다음 날 새 세션으로 시작하게 한다. 15:20 전량 청산이 이미
+ * 지나 종료 시 열린 포지션은 없다. 완료 후 사이클은 대상 0 → no-op(로그·부하 없음).
+ *
+ * 테스트를 위해 export(now 주입). 반환: 완료한 세션 수(-1 = 장중·프리마켓·주말·중첩으로 미실행).
+ */
+export async function closeOutRunningSessionsAtClose(now: Date = new Date()): Promise<number> {
+  if (closeOutRunning || !isKstAfterMarketClose(now)) return -1;
+  closeOutRunning = true;
+  try {
+    const running = selectSchedulableSessions(await listPaperTradingSessions());
+    if (running.length === 0) return 0;
+    for (const session of running) {
+      try {
+        await patchPaperTradingSessionStatus(session.id, "completed");
+      } catch (error) {
+        // 개별 실패(영속 오류 등)는 다음 사이클 재시도 — 다른 세션 종료를 막지 않는다.
+        log.warn(`마감 자동 완료 실패 session=${session.id.slice(0, 8)}`, error);
+      }
+    }
+    log(`장 마감 — running 단타 세션 ${running.length}건 완료 처리`);
+    return running.length;
+  } finally {
+    closeOutRunning = false;
+  }
+}
+
 /** 서버 부팅 시 1회 기동(멱등). Vercel no-op. */
 export function startIntradayTickScheduler(): void {
   const g = globalThis as GlobalWithFlag;
@@ -93,8 +128,13 @@ export function startIntradayTickScheduler(): void {
   if (isVercelEnv()) return; // 서버리스: 타이머 미유지 + CLI 부재.
   g[STARTED_KEY] = true;
   log(
-    `단타 자동 틱 스케줄러 시작 — 60초 체크 · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예)`,
+    `단타 자동 틱 스케줄러 시작 — 60초 체크 · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료`,
   );
-  setInterval(() => void runScheduledIntradayTicks(), POLL_MS);
-  void runScheduledIntradayTicks();
+  // 매 사이클: 장중이면 틱, 마감 후면 종료 스윕(시간대가 겹치지 않아 둘 중 하나만 실행된다).
+  const cycle = () => {
+    void runScheduledIntradayTicks();
+    void closeOutRunningSessionsAtClose();
+  };
+  setInterval(cycle, POLL_MS);
+  cycle();
 }

@@ -39,3 +39,16 @@ export function isKstMarketHoursWithCloseGrace(now: Date = new Date()): boolean 
   const mins = kstMinutesOfWeekday(now);
   return mins != null && mins >= 9 * 60 && mins <= 15 * 60 + 40;
 }
+
+/**
+ * 평일 마감 유예(15:40)를 지난 시각이면 true — 단타 세션 **마감 자동 완료** 게이트.
+ * 장중·프리마켓(09:00 이전)·주말은 false. 15:20 전량 청산이 이미 지나 종료 시 열린 포지션은 없다.
+ *
+ * `isKstMarketHoursWithCloseGrace`(≤15:40)와 겹치지 않게 **초과(>15:40)** 로 판정한다 —
+ * 15:40 까지는 틱, 15:41 부터 종료 스윕이라 마지막 틱과 종료가 서로 밟지 않는다.
+ * 프리마켓을 제외하는 이유: 09:00 직전에 미리 만들어 둔 세션을 개장 전에 완료시키지 않기 위함.
+ */
+export function isKstAfterMarketClose(now: Date = new Date()): boolean {
+  const mins = kstMinutesOfWeekday(now);
+  return mins != null && mins > 15 * 60 + 40;
+}
