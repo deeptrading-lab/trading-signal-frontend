@@ -30,6 +30,7 @@ import {
   YAxis,
 } from "recharts";
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
+import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { cn } from "@/lib/utils/cn";
 import { fmtCost, fmtTokensApprox } from "@/components/analyze/format";
@@ -97,6 +98,14 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
     setStatus,
     refetch,
   } = usePaperTradingSession(sessionId);
+
+  // 장중 자동 갱신 — 서버 스케줄러가 주기마다 틱을 만드니 running 단타 세션이면 이 화면도
+  // 30초 폴링으로 따라온다(새로고침 불필요). mock·정지 세션은 폴링 없음.
+  useIntradayPaperRefresh(
+    detail && detail.session.decisionProvider === "cli-agent" && detail.session.status === "running"
+      ? [detail.session.id]
+      : [],
+  );
 
   if (isLoading) {
     return (
