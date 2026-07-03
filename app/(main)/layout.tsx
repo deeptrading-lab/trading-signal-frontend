@@ -24,18 +24,28 @@
 
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { WorkbenchSessionProvider } from "@/hooks/workbench/useWorkbenchSession";
 import { AIAnalysisProvider } from "@/hooks/stock/aiAnalysisProvider";
 import { GlobalAIAnalysis } from "@/components/stock/GlobalAIAnalysis";
+import { cn } from "@/lib/utils/cn";
+
+/** 카드리스 화이트 포워드 리스킨을 적용한 라우트(home-reskin). 점진 롤아웃 — 이 목록의 라우트만
+ * main 배경을 흰색(surface)으로 덮는다. 나머지는 기존 회색(surface-muted)+카드 유지.
+ * 전역 `main-area`/`surface-muted` 토큰은 무변경(홈 한정 override). */
+const WHITE_SURFACE_ROUTES = new Set<string>(["/"]);
 
 export default function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  // usePathname 은 SSR/클라 초기 렌더 동일값 → hydration mismatch 0.
+  const isWhiteSurface = WHITE_SURFACE_ROUTES.has(pathname);
   return (
     <WorkbenchSessionProvider>
       <AIAnalysisProvider>
@@ -51,7 +61,13 @@ export default function MainLayout({
            *  홈 인디케이터만큼 더 커지므로 spacer 도 `+ env(safe-area-inset-bottom)`.
            *  추가로 `+ spacing.lg`(14px) — 마지막 카드와 BottomNav 사이 숨 쉴 여백(카드 간 gap-lg 와 동일 리듬).
            *  md+ 에서는 BottomNav 미렌더 → `md:pb-0`. */}
-          <main className="flex-1 overflow-y-auto pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom)+theme(spacing.lg))] md:pb-0 main-area scrollbar-hide-mobile">
+          <main
+            className={cn(
+              "flex-1 overflow-y-auto pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom)+theme(spacing.lg))] md:pb-0 main-area scrollbar-hide-mobile",
+              // 홈 한정 — main-area 의 surface-muted(회색) 대신 surface(흰색)로 덮는다(카드리스 화이트).
+              isWhiteSurface && "bg-surface",
+            )}
+          >
             {children}
           </main>
         </div>

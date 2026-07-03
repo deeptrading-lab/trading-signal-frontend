@@ -1,19 +1,15 @@
 /**
- * IndicesCard — `/market` 주요 지수 카드.
+ * IndicesCard — 주요 지수 표시(2 variant).
  *
- * PR8 (finsight-redesign) 신규.
+ * - `variant="card"`(기본): `/market` 2-col grid 카드(기존 그대로 — 회귀 0).
+ * - `variant="strip"`(home-reskin): 카드리스 가로 스트립. 노스스타 `#homeScreen .idx` 정합 —
+ *   **박스 없는** 보더리스 타일 [지수명(caption)] / [값(h2, tnum)] / [등락률(부호색)],
+ *   타일 사이 세로 헤어라인 + 스트립 하단 헤어라인으로만 구분. 모바일 가로 스크롤.
  *
- * 시안 `MarketTrends.tsx` L42~L67 정합 — 카드 헤더 (TrendingUp 아이콘 + 타이틀) + 6 지수 2-col grid.
- * 각 항목: 2줄 — 1줄 지수명 (text-body-sm text-strong) / 2줄 값 (text-h2 tabular-nums, 좌) + 변동률 (한국식 + TrendingUp/Down 아이콘, 우, 밑선 정렬).
+ * ⚠️ 스트립 스파크라인 미포함 — `MarketIndexQuote` 는 단일 스냅샷(값/등락/방향)만 담고 시계열이
+ *   없다. 시세 계층 무변경 리스킨 범위에서 가짜 시리즈를 그리지 않는다(금융 데이터 정직성).
  *
- * v8 토큰:
- *   - 카드 셸 = `card` 합성 토큰 (rounded.lg + card padding).
- *   - 헤더 좌측 아이콘 = `text-accent-vivid` (시안의 `text-emerald-500` 정합 v8 토큰 cascade).
- *   - 지수 박스 = `bg-surface-muted rounded-md p-md` (시안 `bg-slate-50` 정합).
- *   - 변동률 = `signal-up-text` / `signal-down-text` (한국식 — 상승 빨강 / 하락 파랑).
- *   - 변동률 아이콘 = `TrendingUp` (상승) / `TrendingDown` (하락). 색은 signal-up/-down 텍스트 cascade 자연 흡수.
- *
- * 정적 server-safe 컴포넌트 — useState 0.
+ * 정적 server-safe 컴포넌트 — useState 0. 색은 부호(한국식 상승 빨강/하락 파랑).
  */
 
 import { TrendingDown, TrendingUp } from "lucide-react";
@@ -21,18 +17,31 @@ import { cn } from "@/lib/utils/cn";
 import type { MarketIndex } from "@/lib/types/market/indices";
 import { MARKET_INDICES_TITLE } from "@/lib/copy/market/labels";
 
+export type IndicesCardVariant = "card" | "strip";
+
 export interface IndicesCardProps {
   indices: MarketIndex[];
+  variant?: IndicesCardVariant;
 }
 
-export function IndicesCard({ indices }: IndicesCardProps) {
+export function IndicesCard({ indices, variant = "card" }: IndicesCardProps) {
+  if (variant === "strip") {
+    return (
+      <ul
+        className="flex overflow-x-auto border-b border-border-line pb-lg scrollbar-hide-mobile"
+        aria-label={MARKET_INDICES_TITLE}
+      >
+        {indices.map((index, i) => (
+          <IndexTile key={index.name} index={index} first={i === 0} />
+        ))}
+      </ul>
+    );
+  }
+
   return (
     <section className="card" aria-label={MARKET_INDICES_TITLE}>
       <header className="mb-lg flex items-center gap-sm">
-        <TrendingUp
-          className="h-xl w-xl text-accent-vivid"
-          aria-hidden="true"
-        />
+        <TrendingUp className="h-xl w-xl text-accent-vivid" aria-hidden="true" />
         <h2 className="text-h2 text-text-strong">{MARKET_INDICES_TITLE}</h2>
       </header>
       <ul className="grid grid-cols-2 gap-md">
@@ -44,6 +53,28 @@ export function IndicesCard({ indices }: IndicesCardProps) {
   );
 }
 
+/** 스트립 타일 — 보더리스 세로 스택(home-reskin). */
+function IndexTile({ index, first }: { index: MarketIndex; first: boolean }) {
+  const signalClass = index.isUp ? "signal-up-text" : "signal-down-text";
+  return (
+    <li
+      className={cn(
+        "flex w-32 shrink-0 flex-col gap-xs border-r border-border-line px-lg last:border-r-0",
+        first && "pl-0",
+      )}
+    >
+      <span className="truncate text-caption text-text-muted">{index.name}</span>
+      <span className="text-h2 tabular-nums text-text-strong">
+        {index.value}
+      </span>
+      <span className={cn("text-caption", signalClass)}>
+        {index.changeDisplay}
+      </span>
+    </li>
+  );
+}
+
+/** 카드 셀 — 기존 `/market` 2-col grid(회귀 0). */
 function IndexCell({ index }: { index: MarketIndex }) {
   const signalClass = index.isUp ? "signal-up-text" : "signal-down-text";
   const Icon = index.isUp ? TrendingUp : TrendingDown;
