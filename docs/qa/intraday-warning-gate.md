@@ -29,6 +29,15 @@
   병렬 세션(`feature/intraday-paused-remove`)의 워크트리라 **건드리지 않음**(공유 워크트리 reset 사고
   방지). 본 PR 코드와 무관 — 스코프 실행 시 전부 통과. (후속: exclude 를 `**/node_modules/**` 로.)
 
+## 적대 리뷰 반영 (2026-07-03, reviewer — 정확성 버그 0건)
+
+- 자동 체결 3경로(pre-gate 스킵·LLM 성공·LLM 실패 폴백) 모두 정리매매·투자위험 BUY 차단 확인,
+  누수 0. forceAgents(on-demand)도 warnings 조회 후 게이트 적용.
+- **PLAUSIBLE 반영(주석 보강)**: 스킵 경로는 warnings 미조회라, `evaluatePreGate` 가 향후 BUY 신호에서도
+  스킵하도록 바뀌면 폴백 BUY 가 게이트를 우회할 수 있다(현재는 스킵⟹HOLD 신호라 안전). 스킵 조건에
+  tripwire 주석을 달아 미래 편집자가 그 지점에서 인지하도록 함.
+- PLAUSIBLE(미노출): on-demand read 의 abort-전-조회 갭 — 자동 체결 없음 + abort 시 응답 폐기라 무노출.
+
 ## 커버리지 노트
 
 - 실제 단타 세션 자동틱 실행(로컬 CLI)은 유닛으로 갈음 — 두 게이트가 순수 함수라 CLI 없이 완결 검증.

@@ -214,6 +214,9 @@ export function evaluatePreGate(ctx: IntradayContext, dailyLossKill: boolean): P
   // 무포지션 + 분봉 HOLD + 직전도 HOLD → 변화 없음, LLM 호출 생략(비용 절감).
   // 단, 구조 이벤트(전고 돌파 등)가 잡히면 신규 진입 가능 상태에 한해 AI 에 묻는다 —
   // 4축 점수가 아직 HOLD 여도 돌파 셋업은 다음 주기까지 기다리면 늦는다.
+  // ⚠️ 스킵 조건에 `signal.action === "HOLD"` 를 유지하라 — 스킵 경로는 ctx.warnings 를 조회하지
+  //    않으므로(비용 절감), deriveFromSignal 이 여기서 BUY 를 낼 수 있게 바뀌면 시장경보 게이트가
+  //    우회된다(정리매매 종목 자동 진입). BUY 신호에서 스킵하려면 먼저 warnings 를 채워야 한다.
   if (flat && ctx.signal.action === "HOLD" && (ctx.previousDecision?.action ?? "HOLD") === "HOLD") {
     if (ctx.structureEvent && !noNewEntry) {
       return { callLlm: true, noNewEntry };
