@@ -187,22 +187,24 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
         </div>
       </div>
 
-      {/* 성과 지표 — 수익률·평가·현금·시작금 + 실현손익·비용(단타 성과 평가의 실질값) */}
-      <section className="grid grid-cols-2 gap-md sm:grid-cols-3 lg:grid-cols-6" aria-label="모의투자 요약">
-        <MetricCard
-          label={PAPER_TRADING_METRIC_RETURN}
-          value={formatPct(session.returnPct)}
-          tone={session.returnPct >= 0 ? "up" : "down"}
-        />
-        <MetricCard label={PAPER_TRADING_METRIC_VALUE} value={formatNumber(session.portfolioValue)} />
-        <MetricCard label={PAPER_TRADING_METRIC_CASH} value={formatNumber(session.cash)} />
-        <MetricCard label={PAPER_TRADING_METRIC_INITIAL} value={formatNumber(session.initialCash)} />
-        <MetricCard
-          label={PAPER_TRADING_METRIC_REALIZED}
-          value={`${realizedSum >= 0 ? "+" : ""}${formatNumber(realizedSum)}`}
-          tone={realizedSum > 0 ? "up" : realizedSum < 0 ? "down" : undefined}
-        />
-        <MetricCard label={PAPER_TRADING_METRIC_COSTS} value={formatNumber(costSum)} />
+      {/* 성과 지표 — 한 카드 안 컴팩트 스탯 행(개별 카드 6개는 과대하던 피드백 반영) */}
+      <section className="card" aria-label="모의투자 요약">
+        <dl className="grid grid-cols-2 gap-x-lg gap-y-md sm:grid-cols-3 lg:grid-cols-6">
+          <Stat
+            label={PAPER_TRADING_METRIC_RETURN}
+            value={formatPct(session.returnPct)}
+            tone={session.returnPct >= 0 ? "up" : "down"}
+          />
+          <Stat label={PAPER_TRADING_METRIC_VALUE} value={formatNumber(session.portfolioValue)} />
+          <Stat label={PAPER_TRADING_METRIC_CASH} value={formatNumber(session.cash)} />
+          <Stat label={PAPER_TRADING_METRIC_INITIAL} value={formatNumber(session.initialCash)} />
+          <Stat
+            label={PAPER_TRADING_METRIC_REALIZED}
+            value={`${realizedSum >= 0 ? "+" : ""}${formatNumber(realizedSum)}`}
+            tone={realizedSum > 0 ? "up" : realizedSum < 0 ? "down" : undefined}
+          />
+          <Stat label={PAPER_TRADING_METRIC_COSTS} value={formatNumber(costSum)} />
+        </dl>
       </section>
 
       {/* 자산 곡선 + 포지션 현황 */}
@@ -356,56 +358,76 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
         )}
       </section>
 
-      {/* 판단 타임라인 — 최신순, 판단 근거·흐름 진단·룰 조정까지(사후 분석용) */}
+      {/* 판단 타임라인 — 최신순 컴팩트 표(카드 스택은 과대하던 피드백). 흐름 진단 전문은 근거 hover. */}
       <section className="card">
         <h2 className="text-h2 text-text-strong">{PAPER_TRADING_TIMELINE_TITLE}</h2>
-        <div className="mt-md flex flex-col gap-sm">
-          {latestTicks.map((tick) => {
-            const adjustments = [
-              ...(tick.decision.gateAdjustments ?? []),
-              ...tick.guardAdjustments,
-            ];
-            return (
-              <article key={tick.id} className="rounded-md border border-border-line bg-surface-base p-md">
-                <div className="flex flex-wrap items-center justify-between gap-sm">
-                  <div className="flex items-baseline gap-sm">
-                    <p className="text-body-strong text-text-strong">
-                      {ACTION_LABEL[tick.decision.action]}
-                    </p>
-                    <p className="text-caption text-text-muted tabular-nums">
+        <div className="mt-md overflow-x-auto">
+          <table className="w-full min-w-[640px] text-body-sm">
+            <thead>
+              <tr className="text-left text-caption text-text-muted">
+                <th className="py-xs pr-md font-normal">{PAPER_TRADING_ORDER_COLS.time}</th>
+                <th className="py-xs pr-md font-normal">판단</th>
+                <th className="py-xs pr-md text-right font-normal">수익률</th>
+                <th className="py-xs font-normal">근거</th>
+              </tr>
+            </thead>
+            <tbody>
+              {latestTicks.map((tick) => {
+                const adjustments = [
+                  ...(tick.decision.gateAdjustments ?? []),
+                  ...tick.guardAdjustments,
+                ];
+                return (
+                  <tr key={tick.id} className="border-t border-border-line align-top">
+                    <td className="whitespace-nowrap py-xs pr-md text-caption text-text-muted tabular-nums">
                       #{tick.tickIndex + 1} · {formatDate(tick.tickWindowStart)}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "text-body-strong tabular-nums",
-                      tick.returnPctAfter >= 0 ? "text-signal-up" : "text-signal-down",
-                    )}
-                  >
-                    {formatPct(tick.returnPctAfter)}
-                  </span>
-                </div>
-                <p className="mt-sm text-body-sm text-text-muted">{tick.rationale}</p>
-                {tick.decision.analystNote ? (
-                  <p className="mt-xs text-caption text-text-muted line-clamp-2">
-                    {PAPER_TRADING_ANALYST_PREFIX}: {tick.decision.analystNote}
-                  </p>
-                ) : null}
-                {adjustments.length > 0 ? (
-                  <p className="mt-xs text-caption text-text-muted">
-                    {PAPER_TRADING_GATE_PREFIX}: {adjustments.join(" · ")}
-                  </p>
-                ) : null}
-              </article>
-            );
-          })}
+                    </td>
+                    <td
+                      className={cn(
+                        "whitespace-nowrap py-xs pr-md font-medium",
+                        actionTone(tick.decision.action),
+                      )}
+                    >
+                      {ACTION_LABEL[tick.decision.action]}
+                    </td>
+                    <td
+                      className={cn(
+                        "whitespace-nowrap py-xs pr-md text-right tabular-nums",
+                        tick.returnPctAfter >= 0 ? "text-signal-up" : "text-signal-down",
+                      )}
+                    >
+                      {formatPct(tick.returnPctAfter)}
+                    </td>
+                    <td className="py-xs">
+                      <p
+                        className="text-caption text-text-strong"
+                        title={
+                          tick.decision.analystNote
+                            ? `${PAPER_TRADING_ANALYST_PREFIX}: ${tick.decision.analystNote}`
+                            : undefined
+                        }
+                      >
+                        {tick.rationale}
+                      </p>
+                      {adjustments.length > 0 ? (
+                        <p className="mt-[2px] text-caption text-text-muted">
+                          {PAPER_TRADING_GATE_PREFIX}: {adjustments.join(" · ")}
+                        </p>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
   );
 }
 
-function MetricCard({
+/** 컴팩트 스탯 — 한 카드 안에서 라벨(캡션)+값(본문 강조)으로 6지표를 얇게. */
+function Stat({
   label,
   value,
   tone,
@@ -415,19 +437,26 @@ function MetricCard({
   tone?: "up" | "down";
 }) {
   return (
-    <div className="card">
-      <p className="text-caption text-text-muted">{label}</p>
-      <p
+    <div className="flex flex-col gap-[2px]">
+      <dt className="text-caption text-text-muted">{label}</dt>
+      <dd
         className={cn(
-          "mt-xs text-h2 tabular-nums text-text-strong",
+          "text-body-strong tabular-nums text-text-strong",
           tone === "up" && "text-signal-up",
           tone === "down" && "text-signal-down",
         )}
       >
         {value}
-      </p>
+      </dd>
     </div>
   );
+}
+
+/** 타임라인 판단 색 — 매수 계열 빨강 / 매도 계열 파랑 / 유지 중립(한국식). */
+function actionTone(action: string): string {
+  if (action === "BUY" || action === "INCREASE") return "text-signal-up";
+  if (action === "SELL" || action === "REDUCE" || action === "EXIT") return "text-signal-down";
+  return "text-text-muted";
 }
 
 /** 원화 축 라벨 — 300만·1.2억처럼 축약(자릿수 잘림 방지). */
