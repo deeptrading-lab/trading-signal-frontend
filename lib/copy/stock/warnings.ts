@@ -42,6 +42,16 @@ export function warningSeverity(warningType: string): StockWarningSeverity {
   return WARNING_SEVERITIES[warningType] ?? "info";
 }
 
+/**
+ * 신규 진입을 룰로 차단해야 하는 경보 판정 — critical 심각도(정리매매·투자위험).
+ * 단타 결정론 게이트(PRD intraday-warning-gate)가 사용한다. 심각도 분류를 재사용하므로
+ * UI 빨간 배지(critical)와 트레이딩 진입 차단이 구조적으로 일치한다(단일 진실 원천).
+ * 단기과열·투자경고·VI(warn/info)는 차단 대상이 아니다 — 프롬프트 참고로만(#205).
+ */
+export function isEntryBlockingWarning(warningType: string): boolean {
+  return warningSeverity(warningType) === "critical";
+}
+
 const SEVERITY_ORDER: Record<StockWarningSeverity, number> = {
   critical: 0,
   warn: 1,

@@ -18,6 +18,12 @@ import type {
   IntradayLevels,
 } from "@/lib/types/intraday/intradayDecision";
 import type { DecisionSignal } from "@/lib/types/stock/aiAnalysis";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
+
+/** 활성 경보 1건 빌더(날짜는 실측처럼 null). */
+function warn(warningType: string): StockWarningItem {
+  return { warningType, exchange: null, startDate: null, endDate: null };
+}
 
 function signal(over: Partial<DecisionSignal> = {}): DecisionSignal {
   return {
@@ -157,6 +163,27 @@ describe("applyPostGate", () => {
     const r = applyPostGate(buyLlm({ action: "SELL" }), ctx(), true);
     expect(r.decision.action).toBe("SELL");
   });
+
+  // ── 거래소 시장경보 게이트 (PRD intraday-warning-gate) ──
+  it("정리매매 활성이면 BUY → HOLD 하드 강등 (AC-1)", () => {
+    const r = applyPostGate(buyLlm(), ctx({ warnings: [warn("LIQUIDATION_TRADING")] }), false);
+    expect(r.decision.action).toBe("HOLD");
+    expect(r.adjustments.join()).toContain("시장경보");
+  });
+  it("투자위험 활성이면 BUY → HOLD 강등 (AC-2)", () => {
+    const r = applyPostGate(buyLlm(), ctx({ warnings: [warn("INVESTMENT_RISK")] }), false);
+    expect(r.decision.action).toBe("HOLD");
+  });
+  it("단기과열·투자경고·VI(warn/info)는 차단하지 않는다 (AC-4)", () => {
+    for (const t of ["OVERHEATED", "INVESTMENT_WARNING", "VI_STATIC"]) {
+      const r = applyPostGate(buyLlm(), ctx({ warnings: [warn(t)] }), false);
+      expect(r.decision.action, `${t} 는 유지`).toBe("BUY");
+    }
+  });
+  it("경보 활성 + SELL 은 영향 없음 (AC-6)", () => {
+    const r = applyPostGate(buyLlm({ action: "SELL" }), ctx({ warnings: [warn("INVESTMENT_RISK")] }), false);
+    expect(r.decision.action).toBe("SELL");
+  });
 });
 
 describe("intradayEffort (effort 미지원 모델 가드)", () => {
@@ -189,6 +216,12 @@ describe("deriveFromSignal (폴백)", () => {
       position: { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: -2, heldMinutes: 30, allocationPct: 50 },
     });
     expect(deriveFromSignal(c, false).action).toBe("SELL");
+  });
+  it("정리매매 활성이면 폴백도 BUY 차단 → HOLD (AC-3 — applyPostGate 우회 방지)", () => {
+    expect(deriveFromSignal(ctx({ warnings: [warn("LIQUIDATION_TRADING")] }), false).action).toBe("HOLD");
+  });
+  it("단기과열만이면 폴백 BUY 유지 (AC-4)", () => {
+    expect(deriveFromSignal(ctx({ warnings: [warn("OVERHEATED")] }), false).action).toBe("BUY");
   });
 });
 

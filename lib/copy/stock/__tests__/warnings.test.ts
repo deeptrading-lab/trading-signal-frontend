@@ -10,6 +10,7 @@ import {
   warningLabel,
   warningSeverity,
   toWarningChips,
+  isEntryBlockingWarning,
   WARNING_FALLBACK_LABEL,
 } from "../warnings";
 
@@ -30,6 +31,18 @@ describe("warningLabel / warningSeverity", () => {
   it("unknown warningType 은 폴백 라벨 + info — throw 없음 (AC-5)", () => {
     expect(warningLabel("FUTURE_NEW_CODE")).toBe(WARNING_FALLBACK_LABEL);
     expect(warningSeverity("FUTURE_NEW_CODE")).toBe("info");
+  });
+});
+
+describe("isEntryBlockingWarning (단타 결정론 게이트)", () => {
+  it("정리매매·투자위험(critical)만 진입 차단 대상", () => {
+    expect(isEntryBlockingWarning("LIQUIDATION_TRADING")).toBe(true);
+    expect(isEntryBlockingWarning("INVESTMENT_RISK")).toBe(true);
+  });
+  it("단기과열·투자경고·VI·unknown(warn/info)은 차단 대상 아님", () => {
+    for (const t of ["OVERHEATED", "INVESTMENT_WARNING", "VI_STATIC", "STOCK_WARRANTS", "NEW_CODE"]) {
+      expect(isEntryBlockingWarning(t), t).toBe(false);
+    }
   });
 });
 
