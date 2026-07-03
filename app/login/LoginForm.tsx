@@ -1,12 +1,15 @@
 /**
- * 로그인 폼 — `/login` 의 인터랙티브 셸.
+ * 로그인 폼 — `/login`(앱 비밀번호 게이트)의 인터랙티브 셸.
  *
  * PRD `app-password-gate` §3.4 / AC-16~18:
  *   - 컴포넌트는 도메인 훅 `hooks/auth/useLogin` 만 import(TanStack 훅 직접 import 0).
  *   - 한글 카피는 `lib/copy/auth/login` 참조(평문 산재 0).
- *   - 기존 v8 합성 클래스(`card`/`input`/`input-error`/`input-label`/`button-primary`/
- *     `input-helper-error`)만 사용 — 신규 디자인 토큰 0.
  *   - `next` 쿼리는 도메인 훅이 same-origin 검증(open-redirect 차단)한다.
+ *
+ * polish-login-404 리스킨(프레젠테이션만 — 인증 로직/제출 배선 무변경):
+ *   - 카드리스·화이트포워드 중앙 정렬. 셸 밖 화면이라 자체 클린 표면(`bg-surface`, 다크 세이프)을 깐다.
+ *   - 브랜드 로크업(`BrandLockup`)이 헤더/사이드바와 동일한 3색 맥박 배지 + 워드마크를 focal 로 노출.
+ *   - 제출 버튼은 `components/ui/Button` 원자, 필드 에러는 `input-error`/`input-helper-error` 합성 토큰.
  */
 
 "use client";
@@ -15,8 +18,9 @@ import { useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLogin } from "@/hooks/auth/useLogin";
 import { cn } from "@/lib/utils/cn";
+import { Button } from "@/components/ui/Button";
+import { BrandLockup } from "@/components/layout/BrandLockup";
 import {
-  LOGIN_BRAND,
   LOGIN_PASSWORD_LABEL,
   LOGIN_PASSWORD_PLACEHOLDER,
   LOGIN_SUBMIT,
@@ -37,21 +41,22 @@ export function LoginForm() {
   };
 
   const hasError = error !== null;
+  const isDisabled = isPending || password.length === 0;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface-muted p-lg">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-xl bg-surface px-lg py-2xl">
+      <header className="flex flex-col items-center gap-md text-center">
+        <BrandLockup wordmarkAs="h1" wordmarkId="login-brand" />
+        <p id="login-subtitle" className="text-body-sm text-text-muted">
+          {LOGIN_SUBTITLE}
+        </p>
+      </header>
+
       <form
         onSubmit={handleSubmit}
-        className="card flex w-full max-w-[360px] flex-col gap-lg"
-        aria-labelledby="login-brand"
+        className="flex w-full max-w-[360px] flex-col gap-lg"
+        aria-labelledby="login-brand login-subtitle"
       >
-        <div className="flex flex-col gap-xs text-center">
-          <h1 id="login-brand" className="text-h1 text-text-strong">
-            {LOGIN_BRAND}
-          </h1>
-          <p className="text-body-sm text-text-muted">{LOGIN_SUBTITLE}</p>
-        </div>
-
         <div className="flex flex-col gap-xs">
           <label htmlFor="login-password" className="input-label">
             {LOGIN_PASSWORD_LABEL}
@@ -79,14 +84,15 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <button
+        <Button
           type="submit"
-          className="button-primary w-full"
-          disabled={isPending || password.length === 0}
-          aria-disabled={isPending || password.length === 0}
+          className="w-full"
+          disabled={isDisabled}
+          aria-disabled={isDisabled}
+          aria-busy={isPending}
         >
           {isPending ? LOGIN_SUBMIT_PENDING : LOGIN_SUBMIT}
-        </button>
+        </Button>
       </form>
     </main>
   );

@@ -27,7 +27,7 @@ export const HEADER_MARKET_TICKER_ARIA = "글로벌 마켓 시세";
 export const HEADER_THEME_TO_DARK_ARIA = "다크 모드로 전환";
 export const HEADER_THEME_TO_LIGHT_ARIA = "라이트 모드로 전환";
 
-export const NOT_FOUND_TITLE = "준비 중인 화면입니다";
+export const NOT_FOUND_TITLE = "페이지를 찾을 수 없어요";
 export const NOT_FOUND_DESCRIPTION =
-  "곧 만나보실 수 있어요. 홈으로 돌아가 다른 메뉴를 둘러보세요.";
-export const NOT_FOUND_HOME_CTA = "홈으로 돌아가기";
+  "주소가 바뀌었거나 삭제된 페이지일 수 있어요. 홈에서 다시 시작해 보세요.";
+export const NOT_FOUND_HOME_CTA = "홈으로";
