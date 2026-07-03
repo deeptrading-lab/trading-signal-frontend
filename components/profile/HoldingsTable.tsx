@@ -1,16 +1,18 @@
 /**
- * HoldingsTable — `/profile` "내 자산" 보유종목 전체 테이블.
+ * HoldingsTable — `/profile` "내 자산" 보유종목 플랫 표 (client component).
  *
- * home-market-redesign PR1 — `/dashboard` 의 HoldingsTop3(요약) → **전체 테이블**(PRD AC-2).
- *   - 4열: 종목명 / 평가액 / 수익률 / 비중. 헤더 클릭 정렬(↕, `aria-sort`).
- *   - 수익률 컬럼만 등락색(signal-up/down). 평가액·비중은 text-strong.
+ * home-market-redesign PR1 → **profile-reskin**(카드리스 플랫 표 — 홈 랭킹/관심종목 표 정합).
+ *   - 카드 셸(`card`)·회색 헤더 스트립·`holdings-table-*` 합성 토큰 폐기 → 흰 바탕 위 헤어라인 표
+ *     (홈 `ModelCostBreakdown` 표 언어: thead 하단 헤어라인 + text-muted 라벨, tbody 행 헤어라인 + hover).
+ *   - 4열: 종목명 / 평가액 / 수익률 / 비중. 헤더 클릭 정렬(↕, `aria-sort`) — 정렬 상태·동작 무변경.
+ *   - **종목명만**(코드 미표시). 로고닷은 자산 종류(주식=asset-stock / 코인=asset-coin) soft 페어로
+ *     라이트/다크 AA 대비 확보(홈 rankLogoDot 톤 — soft bg + strong text). `text-surface` 직대비 제거.
+ *   - 수익률만 등락색(한국식 signal-up 빨강 / signal-down 파랑). 평가액·비중은 text-strong.
  *   - 비중은 평가액 / 총평가액 으로 산출(자산 분류축 — 등락색 미사용).
  *   - 거래성 컬럼(예수금/주문가능/실현손익/입출금) 0 — 조회·분석 전용 스코프(AC-9).
  *
  * 정렬 상태(useState)가 필요해 client component.
- * 모바일 폴백(R6): 좁은 화면에서 가로 스크롤 허용(`overflow-x-auto`) — 정렬 가능 테이블 의미 유지.
- *
- * 토큰: `card` 셸 + `holdings-table-*` 합성 토큰(app/components.css). hex/px 직타 0.
+ * 모바일 폴백: 좁은 화면에서 가로 스크롤 허용(`overflow-x-auto`) — 정렬 가능 표 의미 유지. hex/px 직타 0.
  */
 
 "use client";
@@ -20,6 +22,7 @@ import { ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
+import { rankLogoInitial } from "@/lib/utils/rankLogoDot";
 import type { Holding } from "@/lib/types/profile/holdings";
 import {
   HOLDINGS_TABLE_TITLE,
@@ -88,16 +91,20 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
   }
 
   return (
-    <section className="card" aria-label={HOLDINGS_TABLE_TITLE}>
-      <h2 className="mb-lg text-h2 text-text-strong">{HOLDINGS_TABLE_TITLE}</h2>
+    <section className="flex flex-col gap-md" aria-label={HOLDINGS_TABLE_TITLE}>
+      {/* "내 자산"(h2) 하위 — 위계상 h3. text-body-md font-bold = body-strong(16px/700) 조합
+       * (`text-body-strong` 은 유틸 미생성 no-op — tailwind.config adaptFontSize 참조). */}
+      <h3 className="text-body-md font-bold text-text-strong">
+        {HOLDINGS_TABLE_TITLE}
+      </h3>
 
       {rows.length === 0 ? (
-        <p className="text-body-sm text-text-muted">{HOLDINGS_EMPTY}</p>
+        <p className="py-md text-body-sm text-text-muted">{HOLDINGS_EMPTY}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="holdings-table-header border-b border-border-line">
+              <tr className="border-b border-border-line">
                 <HeaderCell
                   label={HOLDINGS_COL_NAME}
                   active={sortKey === "name"}
@@ -161,18 +168,25 @@ function HeaderCell({
 }) {
   const SortIcon = !active ? ChevronsUpDown : dir === "asc" ? ArrowUp : ArrowDown;
   return (
-    <th scope="col" aria-sort={ariaSort} className="holdings-table-header">
+    <th
+      scope="col"
+      aria-sort={ariaSort}
+      className={align === "left" ? "pr-md" : "pl-md"}
+    >
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          "inline-flex w-full items-center gap-xs py-md text-label-sm text-text-muted hover:text-text-strong",
+          "inline-flex w-full items-center gap-xs py-md text-label-sm text-text-muted transition-colors hover:text-text-strong",
           align === "right" ? "justify-end" : "justify-start",
         )}
       >
         <span>{label}</span>
         <SortIcon
-          className={cn("h-4 w-4", active ? "text-text-strong" : "text-text-muted")}
+          className={cn(
+            "h-4 w-4",
+            active ? "text-text-strong" : "text-text-muted",
+          )}
           aria-hidden="true"
         />
       </button>
@@ -182,43 +196,43 @@ function HeaderCell({
 
 function Row({ row }: { row: HoldingRow }) {
   const isStock = row.assetType === "stock";
-  const iconBgClass = isStock ? "bg-asset-stock" : "bg-asset-coin";
+  // 자산 종류 soft 페어(라이트/다크 AA) — text-surface 직대비 대신 홈 로고닷 톤.
+  const dotClass = isStock
+    ? "bg-asset-stock-soft text-asset-stock"
+    : "bg-asset-coin-soft text-asset-coin";
   const signalClass = row.isUp ? "signal-up-text" : "signal-down-text";
 
   return (
-    <tr className="holdings-table-row holdings-table-row-hover border-b border-border-line">
-      {/* 종목명 */}
-      <td className="holdings-table-cell">
+    <tr className="border-b border-border-line transition-colors last:border-b-0 hover:bg-surface-muted">
+      {/* 종목명(코드 미표시) */}
+      <td className="py-md pr-md">
         <div className="flex items-center gap-md">
           <span
             className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill text-body-sm-strong text-surface",
-              iconBgClass,
+              "inline-grid h-8 w-8 shrink-0 place-items-center rounded-sm text-caption font-bold",
+              dotClass,
             )}
             aria-hidden="true"
           >
-            {row.name.charAt(0)}
+            {rankLogoInitial(row.name)}
           </span>
-          <span className="flex flex-col">
-            <span className="text-body-sm-strong text-text-strong">
-              {row.name}
-            </span>
-            <span className="text-caption text-text-muted">{row.symbol}</span>
+          <span className="truncate text-body-sm-strong text-text-strong">
+            {row.name}
           </span>
         </div>
       </td>
       {/* 평가액 */}
-      <td className="holdings-table-cell-numeric text-right text-text-strong">
+      <td className="py-md pl-md text-right text-body-sm-strong tabular-nums text-text-strong whitespace-nowrap">
         ₩ {formatNumber(row.amountKrw)}
       </td>
       {/* 수익률 (등락색) */}
-      <td className="holdings-table-cell text-right">
-        <span className={signalClass}>
+      <td className="py-md pl-md text-right whitespace-nowrap">
+        <span className={cn("text-body-sm-strong", signalClass)}>
           {formatPct(row.changePct, { digits: 1, sign: true })}
         </span>
       </td>
       {/* 비중 */}
-      <td className="holdings-table-cell-numeric text-right text-text-strong">
+      <td className="py-md pl-md text-right text-body-sm-strong tabular-nums text-text-strong whitespace-nowrap">
         {formatNumber(row.weightPct, { digits: 1 })}%
       </td>
     </tr>

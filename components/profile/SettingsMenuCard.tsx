@@ -1,22 +1,31 @@
 /**
- * SettingsMenuCard — `/profile` 설정 메뉴 카드 (server component).
+ * SettingsMenuCard — `/profile` 설정 메뉴 (server component).
  *
- * PR9 (finsight-redesign) 신규.
+ * PR9 (finsight-redesign) → **profile-reskin**(카드리스 플랫 섹션).
  *
- * 시안 `Profile.tsx` L59~L78 정합 — 4 설정 (알림 / 보안 / 결제 / 다크모드) + separator + 로그아웃.
+ * 시안 `Profile.tsx` L59~L78 정합 — 설정 항목 + 로그아웃.
  *
- * v8 토큰:
- *   - 카드 셸 = `card` 합성 토큰 (rounded.lg + border + card padding).
- *   - 메뉴 버튼 = `flex items-center gap-md p-md w-full rounded-md text-left hover:bg-surface-muted`.
- *   - 아이콘 = `text-text-muted` (default) / `text-critical` (LOGOUT variant).
- *   - 라벨 = `text-body-strong text-text-strong` (default) / `text-critical` (LOGOUT).
- *   - separator = `h-px bg-border-line` (시안의 `bg-slate-100` cascade).
+ * profile-reskin — 카드 셸(`card`)·항목별 rounded 박스 폐기 → `Section`(플랫 "설정" 제목) +
+ *   `ul.divide-y`(행 사이 헤어라인, 양 끝 선 없음) + `.profile-menu-row` 플랫 행. 홈 랭킹 톤 정합.
+ *   - 이동/설정 행 = 아이콘 + 라벨 + 우측 `ChevronRight`(도달성 어포던스). full-width hover.
+ *   - THEME = client 3-state 세그먼트(ThemeMenuButton). LogoutMenuButton = danger 행(critical).
+ *   - 행 스타일 단일 진실 원천 = `.profile-menu-row(-danger)`(app/components.css) — 3 컴포넌트 공유.
  *
  * lucide-react 아이콘 매핑은 menuItems mock 의 `iconName` 키에서 도출 — 컴포넌트 단 record.
  */
 
 import Link from "next/link";
-import { Bell, Bot, CreditCard, LogOut, Moon, Shield, Target } from "lucide-react";
+import {
+  Bell,
+  Bot,
+  ChevronRight,
+  CreditCard,
+  LogOut,
+  Moon,
+  Shield,
+  Target,
+} from "lucide-react";
+import { Section } from "@/components/ui/Section";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import { ThemeMenuButton } from "@/components/theme/ThemeMenuButton";
 import type {
@@ -24,6 +33,7 @@ import type {
   ProfileMenuKey,
 } from "@/lib/types/profile/menuItems";
 import {
+  SETTINGS_SECTION_TITLE,
   MENU_NOTIFICATIONS,
   MENU_SECURITY,
   MENU_BILLING,
@@ -57,20 +67,16 @@ const ICON_MAP = {
   LogOut,
 } as const;
 
-// default 메뉴 행 공통 클래스 — 버튼(설정)과 링크(이동) 항목이 같은 시각을 공유.
-const MENU_ROW_CLASS =
-  "w-full flex items-center gap-md p-md rounded-md text-left transition-colors hover:bg-surface-muted";
-
 export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
   const danger = items.find((item) => item.variant === "danger");
   const defaults = items.filter((item) => item.variant !== "danger");
 
   return (
-    <section className="card" aria-label="설정 메뉴">
-      <ul className="flex flex-col gap-xs">
+    <Section title={SETTINGS_SECTION_TITLE}>
+      <ul role="list" className="divide-y divide-border-line">
         {defaults.map((item) => (
           <li key={item.key}>
-            {/* THEME 항목만 client 로 분리(3-state 토글 동작) — 나머지는 server MenuButton 유지. */}
+            {/* THEME 항목만 client 로 분리(3-state 토글 동작) — 나머지는 server MenuButton/Link. */}
             {item.key === "THEME" ? (
               <ThemeMenuButton />
             ) : item.href ? (
@@ -81,30 +87,27 @@ export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
           </li>
         ))}
         {danger ? (
-          <>
-            <li aria-hidden="true">
-              <div className="my-sm h-px bg-border-line" />
-            </li>
-            <li>
-              {/* danger = 로그아웃 — 동작이 필요해 client 컴포넌트로 분리(onClick → 쿠키삭제 → /login). */}
-              <LogoutMenuButton />
-            </li>
-          </>
+          <li>
+            {/* danger = 로그아웃 — 동작이 필요해 client 컴포넌트로 분리(onClick → 쿠키삭제 → /login). */}
+            <LogoutMenuButton />
+          </li>
         ) : null}
       </ul>
-    </section>
+    </Section>
   );
 }
 
-// default(비위험) 설정 항목 전용 — danger(로그아웃)는 LogoutMenuButton 이 담당.
+// default(비위험) 설정 항목 — 아이콘 + 라벨 + 우측 chevron. danger(로그아웃)는 LogoutMenuButton 담당.
 function MenuButton({ item }: { item: ProfileMenuItem }) {
   const Icon = ICON_MAP[item.iconName];
   return (
-    <button type="button" className={MENU_ROW_CLASS}>
-      <Icon className="h-5 w-5 text-text-muted" aria-hidden="true" />
-      <span className="text-body-strong text-text-strong">
-        {MENU_LABEL[item.key]}
-      </span>
+    <button type="button" className="profile-menu-row">
+      <Icon className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
+      <span className="flex-1 truncate">{MENU_LABEL[item.key]}</span>
+      <ChevronRight
+        className="h-4 w-4 shrink-0 text-text-muted"
+        aria-hidden="true"
+      />
     </button>
   );
 }
@@ -113,11 +116,13 @@ function MenuButton({ item }: { item: ProfileMenuItem }) {
 function MenuLink({ item }: { item: ProfileMenuItem }) {
   const Icon = ICON_MAP[item.iconName];
   return (
-    <Link href={item.href ?? "#"} className={MENU_ROW_CLASS}>
-      <Icon className="h-5 w-5 text-text-muted" aria-hidden="true" />
-      <span className="text-body-strong text-text-strong">
-        {MENU_LABEL[item.key]}
-      </span>
+    <Link href={item.href ?? "#"} className="profile-menu-row no-underline">
+      <Icon className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
+      <span className="flex-1 truncate">{MENU_LABEL[item.key]}</span>
+      <ChevronRight
+        className="h-4 w-4 shrink-0 text-text-muted"
+        aria-hidden="true"
+      />
     </Link>
   );
 }

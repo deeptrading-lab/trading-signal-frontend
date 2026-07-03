@@ -44,15 +44,18 @@ import { cn } from "@/lib/utils/cn";
  *   - `/stock*`      종목 상세·검색(`/stock`, `/stock/[ticker]`) — stock-detail-reskin
  *   - `/watchlist`   관심종목(watchlist-reskin) — 카드리스 플랫 표(home 랭킹 정합)
  *   - `/analyze`     AI 분석(analyze-reskin) — 카드리스 플랫 결과 목록 + 플랫 토큰 대시보드
+ *   - `/profile`     마이페이지(profile-reskin) — 카드리스 플랫(자산 히어로만 라이트 카드)
  * `startsWith("/stock")` 는 `/stockfoo` 같은 유령 경로가 없어(라우트 트리상 `/stock` 세그먼트뿐) 새지 않고,
- * `/watchlist`·`/analyze` 는 하위 라우트가 없어 exact match 로 좁힌다. 나머지 도메인(`/market`·`/profile`·
- * `/dashboard`·`/intraday`)은 기존 회색+카드 유지. */
+ * `/watchlist`·`/analyze`·`/profile` 은 하위 라우트가 없어 exact match 로 좁힌다. `/dashboard` 는
+ * `/profile` 로 영구 redirect 되므로(pathname 이 `/profile` 로 귀결) 별도 guard 불필요. 나머지 도메인
+ * (`/market`·`/intraday`)은 기존 회색+카드 유지. */
 function isWhiteSurfaceRoute(pathname: string): boolean {
   return (
     pathname === "/" ||
     pathname.startsWith("/stock") ||
     pathname === "/watchlist" ||
-    pathname === "/analyze"
+    pathname === "/analyze" ||
+    pathname === "/profile"
   );
 }
 
