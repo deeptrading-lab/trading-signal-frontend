@@ -88,13 +88,28 @@ export function IntradayWatchWorkspace() {
   useIntradayPaperRefresh(runningSessionIds);
   const autoActive = runningSessionIds.length > 0;
 
+  // 활성 세션 종목을 워치 목록에 편입 — 행 순서를 "추가/처음 본 순서"로 고정한다
+  // (세션 updatedAt 순으로 붙이면 틱마다 순서가 출렁임).
+  useEffect(() => {
+    if (!storageReady) return;
+    setWatch((prev) => {
+      const missing = activeStocks.filter(
+        (stock) => !prev.some((item) => item.ticker === stock.ticker),
+      );
+      if (missing.length === 0) return prev;
+      return [...prev, ...missing.map((s) => ({ ticker: s.ticker, name: s.name }))];
+    });
+  }, [activeStocks, storageReady]);
+
   // 표 행 = 로컬 워치 ∪ 활성 세션 종목(자동 상주 — 페이지를 벗어나도 표가 유지된다, 피드백).
+  // 워치 편입 effect 가 반영되기 전 첫 렌더에서도 보이도록 미편입분은 이름순으로 뒤에 붙인다.
   const rows = useMemo(() => {
     const map = new Map<string, Watch>();
     for (const item of watch) map.set(item.ticker, item);
-    for (const stock of activeStocks) {
-      if (!map.has(stock.ticker)) map.set(stock.ticker, { ticker: stock.ticker, name: stock.name });
-    }
+    const appended = activeStocks
+      .filter((stock) => !map.has(stock.ticker))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    for (const stock of appended) map.set(stock.ticker, { ticker: stock.ticker, name: stock.name });
     return [...map.values()];
   }, [watch, activeStocks]);
 
