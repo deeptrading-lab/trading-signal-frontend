@@ -77,6 +77,9 @@ export const STATUS_LABEL: Record<PaperTradingSessionStatus, string> = {
 export const PAPER_TRADING_BACK_TO_WATCH = "단타 워치로";
 export const PAPER_TRADING_METRIC_REALIZED = "실현손익 합";
 export const PAPER_TRADING_METRIC_COSTS = "비용 누계";
+/** CLI 토큰 사용 — 구독 기반이라 실제 과금 아님(API 환산 추정). */
+export const PAPER_TRADING_METRIC_TOKENS = "토큰 사용";
+export const PAPER_TRADING_METRIC_TOKEN_COST = "환산 비용($)";
 export const PAPER_TRADING_ORDERS_TITLE = "체결 내역";
 export const PAPER_TRADING_ORDERS_EMPTY = "아직 체결이 없어요.";
 export const PAPER_TRADING_ORDER_BUY = "매수";

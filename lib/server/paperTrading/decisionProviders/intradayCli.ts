@@ -22,7 +22,7 @@ import {
 } from "@/lib/prompts/intraday/agents";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type { RuleDirection, SignalResult } from "@/lib/types/signal";
-import type { AIAnalysisProvider, DecisionSignal } from "@/lib/types/stock/aiAnalysis";
+import type { AgentUsage, AIAnalysisProvider, DecisionSignal } from "@/lib/types/stock/aiAnalysis";
 import type {
   PaperTradingDecision,
   PaperTradingRiskMode,
@@ -475,15 +475,23 @@ export async function decideIntradayWithCli(
   // 미설정 시 INTRADAY_MODEL, 그래도 없으면 invokeAgentCliStream 이 CLAUDE_CLI_MODEL 로 폴백.
   const analystModel = process.env.INTRADAY_ANALYST_MODEL ?? process.env.INTRADAY_MODEL;
   const judgeModel = process.env.INTRADAY_JUDGE_MODEL ?? process.env.INTRADAY_MODEL;
-  // 판단을 내린 모델을 틱에 기록 — 모델별 판단 품질 비교(A/B)의 원장 근거.
+  // 판단을 내린 모델·토큰 사용량을 틱에 기록 — 모델 A/B·세션 누적 비용 집계의 원장 근거.
   const effectiveModel = (model?: string) =>
     model ?? process.env.CLAUDE_CLI_MODEL ?? "cli-default";
+  let analystUsage: AgentUsage | undefined;
+  let judgeUsage: AgentUsage | undefined;
   const withModels = (
     result: IntradayProviderResult,
     used: { analyst: boolean; judge: boolean },
   ): IntradayProviderResult => {
-    if (used.analyst) result.decision.analystModel = effectiveModel(analystModel);
-    if (used.judge) result.decision.judgeModel = effectiveModel(judgeModel);
+    if (used.analyst) {
+      result.decision.analystModel = effectiveModel(analystModel);
+      result.decision.analystUsage = analystUsage;
+    }
+    if (used.judge) {
+      result.decision.judgeModel = effectiveModel(judgeModel);
+      result.decision.judgeUsage = judgeUsage;
+    }
     return result;
   };
 
@@ -504,6 +512,7 @@ export async function decideIntradayWithCli(
       () => {},
     );
     analystNote = r1.text.trim();
+    analystUsage = r1.usage;
   } catch {
     analystNote = "";
   }
@@ -526,6 +535,7 @@ export async function decideIntradayWithCli(
         () => {},
       );
       llm = normalizeLlm(parseLooseJson(r2.text));
+      judgeUsage = r2.usage;
     } catch {
       llm = null;
     }

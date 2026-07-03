@@ -48,6 +48,12 @@ export type PaperTradingDecision = {
   /** 이 판단을 내린 모델 — 모델별 판단 품질 비교(A/B)용. 결정론 폴백이면 미기록. */
   analystModel?: string;
   judgeModel?: string;
+  /**
+   * 이 판단의 CLI 토큰 사용량(에이전트별) — 세션 누적 토큰·환산 비용 집계용.
+   * 구독(CLI) 기반이라 실제 과금이 아닌 API 환산 추정치. 결정론 폴백/미호출이면 미기록.
+   */
+  analystUsage?: import("@/lib/types/stock/aiAnalysis").AgentUsage;
+  judgeUsage?: import("@/lib/types/stock/aiAnalysis").AgentUsage;
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**

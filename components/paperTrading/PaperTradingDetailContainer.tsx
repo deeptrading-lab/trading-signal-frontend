@@ -32,6 +32,7 @@ import {
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { cn } from "@/lib/utils/cn";
+import { fmtCost, fmtTokensApprox } from "@/components/analyze/format";
 import {
   ACTION_LABEL,
   PAPER_TRADING_ANALYST_PREFIX,
@@ -47,6 +48,8 @@ import {
   PAPER_TRADING_METRIC_INITIAL,
   PAPER_TRADING_METRIC_REALIZED,
   PAPER_TRADING_METRIC_RETURN,
+  PAPER_TRADING_METRIC_TOKEN_COST,
+  PAPER_TRADING_METRIC_TOKENS,
   PAPER_TRADING_METRIC_VALUE,
   PAPER_TRADING_NO_POSITION,
   PAPER_TRADING_ORDER_BUY,
@@ -132,6 +135,20 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
   const costSum = orders.reduce((sum, order) => sum + (order.costKrw ?? 0), 0);
   const latestTicks = [...ticks].reverse();
 
+  // 세션 누적 CLI 토큰·환산 비용 — 틱에 내장된 에이전트별 usage 합산(구독 기반, 실제 과금 아님).
+  const usageTotals = ticks.reduce(
+    (acc, tick) => {
+      for (const usage of [tick.decision.analystUsage, tick.decision.judgeUsage]) {
+        if (!usage) continue;
+        acc.tokens += (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+        acc.cost += usage.costUsd ?? 0;
+        acc.calls += 1;
+      }
+      return acc;
+    },
+    { tokens: 0, cost: 0, calls: 0 },
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
       {/* 헤더 — 뒤로가기(단타 워치)·종목명·상태·주기·컨트롤 */}
@@ -189,7 +206,7 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
 
       {/* 성과 지표 — 한 카드 안 컴팩트 스탯 행(개별 카드 6개는 과대하던 피드백 반영) */}
       <section className="card" aria-label="모의투자 요약">
-        <dl className="grid grid-cols-2 gap-x-lg gap-y-md sm:grid-cols-3 lg:grid-cols-6">
+        <dl className="grid grid-cols-2 gap-x-lg gap-y-md sm:grid-cols-4 lg:grid-cols-8">
           <Stat
             label={PAPER_TRADING_METRIC_RETURN}
             value={formatPct(session.returnPct)}
@@ -204,12 +221,21 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
             tone={realizedSum > 0 ? "up" : realizedSum < 0 ? "down" : undefined}
           />
           <Stat label={PAPER_TRADING_METRIC_COSTS} value={formatNumber(costSum)} />
+          <Stat
+            label={PAPER_TRADING_METRIC_TOKENS}
+            value={usageTotals.calls > 0 ? `${fmtTokensApprox(usageTotals.tokens)} 토큰` : "—"}
+          />
+          <Stat
+            label={PAPER_TRADING_METRIC_TOKEN_COST}
+            value={usageTotals.calls > 0 ? fmtCost(usageTotals.cost) : "—"}
+          />
         </dl>
       </section>
 
       {/* 자산 곡선 + 포지션 현황 */}
       <div className="grid gap-md lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
-        <section className="card min-h-[320px]">
+        {/* min-w-0 — 그리드 셀 최소폭 자동값이 차트 측정 실패(width -1 경고)를 유발하지 않게. */}
+        <section className="card min-h-[320px] min-w-0">
           <div className="mb-md flex items-center justify-between gap-md">
             <h2 className="text-h2 text-text-strong">{PAPER_TRADING_EQUITY_TITLE}</h2>
             {isIntraday ? (
@@ -502,8 +528,9 @@ function EquityCurveChart({
   };
 
   return (
-    <div className="h-[260px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-[260px] w-full min-w-0">
+      {/* initialDimension — 첫 렌더에서 컨테이너 측정 전(-1) recharts 경고 방지(레이아웃 확정 후 실측으로 대체). */}
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 260 }}>
         <AreaChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
