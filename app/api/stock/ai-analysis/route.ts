@@ -26,6 +26,9 @@ import { AXIS_LABEL } from "@/lib/copy/signal/labels";
 import type { AxisScore, SignalResult } from "@/lib/types/signal";
 import type { StockPrice, StockDailyCandle } from "@/lib/api/kis/types";
 import type { StockInvestorTrend } from "@/lib/types/stock/investors";
+import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
+import { warningLabel } from "@/lib/copy/stock/warnings";
 import type {
   AgentKey,
   AgentFailReason,
@@ -331,6 +334,7 @@ function formatPriceContextForPrompt(
   signal: SignalResult,
   price: StockPrice | null,
   investor: StockInvestorTrend | null,
+  warnings: StockWarningItem[],
 ): string {
   const n = candles.length;
   if (n === 0) return "";
@@ -351,6 +355,15 @@ function formatPriceContextForPrompt(
   if (price?.sector) meta.push(`업종: ${price.sector}`);
   if (price?.foreignRatio != null) meta.push(`외국인 지분율: ${price.foreignRatio.toFixed(1)}%`);
   if (meta.length) lines.push(meta.join(" | "));
+
+  // 매수 유의(거래소 시장경보·VI, PRD stock-warnings §3-2) — 활성 항목이 있을 때만 1줄.
+  //   빈 배열이면 줄 자체가 없어 기존 프롬프트와 동일(무회귀). 라벨 중복(VI 계열)은 Set 제거.
+  if (warnings.length > 0) {
+    const labels = [...new Set(warnings.map((w) => warningLabel(w.warningType)))];
+    lines.push(
+      `⚠️ 매수 유의(거래소 시장경보): ${labels.join(", ")} — 현재 지정/발동 중입니다. 결론(verdict)과 리스크 평가에 반드시 반영하세요.`,
+    );
+  }
 
   lines.push("");
 
@@ -766,14 +779,20 @@ export async function POST(req: NextRequest): Promise<Response> {
           aiLog.warn(`데이터 제한 분석 — ${ticker} ${signalResult.bars}봉(limitedData)`);
         }
 
-        // 2. 가격·수급 컨텍스트 — 병렬 페치 (실패해도 분석 계속) ──────────────
-        const [priceSettled, investorSettled] = await Promise.allSettled([
+        // 2. 가격·수급·시장경보 컨텍스트 — 병렬 페치 (실패해도 분석 계속) ──────────────
+        //    warnings 는 토스 전용(키 없으면 빈 배열, never-throw) — PRD stock-warnings §3-2.
+        const [priceSettled, investorSettled, warningsSettled] = await Promise.allSettled([
           fetchStockPrice(ticker),
           fetchInvestorTrend(ticker),
+          fetchActiveWarnings(ticker),
         ]);
         const priceData = priceSettled.status === "fulfilled" ? priceSettled.value : null;
         const investorData = investorSettled.status === "fulfilled" ? investorSettled.value : null;
-        state.priceContext = formatPriceContextForPrompt(sorted, signalResult, priceData, investorData);
+        const warningsData = warningsSettled.status === "fulfilled" ? warningsSettled.value : [];
+        state.priceContext = formatPriceContextForPrompt(sorted, signalResult, priceData, investorData, warningsData);
+        if (warningsData.length > 0) {
+          aiLog(`시장경보 컨텍스트 주입 — ${warningsData.map((w) => w.warningType).join(",")}`);
+        }
 
         // 분석 시점 종목명(decision-stock-name) — KIS 현재가 응답명 → 시드(symbols.json) 폴백 순.
         //   ⚠️ KIS inquire-price 의 hts_kor_isnm 은 prod 에서도 자주 비어 mapStockPrice 가 ticker 로 폴백한다
