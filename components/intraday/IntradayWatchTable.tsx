@@ -32,11 +32,13 @@ import {
 } from "@/lib/copy/paperTrading/labels";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
 import {
+  INTRADAY_TIMEFRAME_BY_INTERVAL,
   PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS,
   type PaperTradingSelectedStock,
   type PaperTradingSession,
   type PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
+import { IntradayMiniChart } from "@/components/intraday/IntradayMiniChart";
 
 /** 주기 드랍다운 기본값(분) — 초단타 기본. */
 const DEFAULT_INTERVAL_MIN = 2;
@@ -347,6 +349,8 @@ function WatchRow({
   const [startError, setStartError] = useState<string | null>(null);
   // 생성 진행 표시는 "내가 누른 행"에만 — isCreating(전역)은 중복 클릭 방지용 disabled 로만 쓴다.
   const [starting, setStarting] = useState(false);
+  // 펼침 탭 — 차트(당일 분봉+체결 마커) 기본, 체결 내역(미니 로그) 전환.
+  const [tab, setTab] = useState<"chart" | "orders">("chart");
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
   const { detail, isPatching, setStatus } = usePaperTradingSession(session?.id ?? "");
@@ -358,11 +362,14 @@ function WatchRow({
   const position = detail?.positions.find((p) => p.quantity >= 1) ?? null;
   const lastTick = detail?.ticks.at(-1) ?? null;
   const running = current?.status === "running";
-  // 펼침 미니 체결 로그 — 최근 5건(최신 위). 전체 내역·손익 합계는 시트(행 🕘 아이콘).
-  const recentOrders = (detail?.ticks ?? [])
-    .flatMap((tick) => tick.orders.map((order) => ({ ...order, at: tick.tickWindowStart })))
-    .slice(-5)
-    .reverse();
+  // 체결 전체(시간순) — 차트 탭 마커용. 미니 로그는 최근 5건(최신 위), 전체·손익 합계는 시트.
+  const allOrders = (detail?.ticks ?? []).flatMap((tick) =>
+    tick.orders.map((order) => ({ ...order, at: tick.tickWindowStart })),
+  );
+  const recentOrders = allOrders.slice(-5).reverse();
+  // 차트 분봉 단위 — 세션 주기에서 파생(세션 없으면 드랍다운 선택값 기준).
+  const chartTimeframe =
+    INTRADAY_TIMEFRAME_BY_INTERVAL[current?.tickIntervalMinutes ?? intervalMin] ?? 1;
 
   const runRead = () => {
     if (!provider || read.isPending) return;
@@ -600,20 +607,53 @@ function WatchRow({
                 <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
               ) : null}
               {read.data ? <IntradayReadCard data={read.data} /> : null}
-              {!startError && !read.isPending && !read.isError && !read.data && !current ? (
-                <p className="text-caption text-text-muted">{T.expandEmpty}</p>
+
+              {/* 왜 이런 판단 — 최근 판단 근거 메모(탭 공통 상단) */}
+              {current && lastTick ? (
+                <p className="text-caption text-text-muted">
+                  {P.lastDecision}: {lastTick.rationale}
+                </p>
               ) : null}
 
-              {current ? (
+              {/* 펼침 탭 — 차트 | 체결 내역 */}
+              <div className="flex items-center gap-md border-b border-border-line" role="tablist">
+                {(["chart", "orders"] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    className={cn(
+                      "-mb-px cursor-pointer border-b-2 pb-xs text-body-sm transition-colors",
+                      tab === key
+                        ? "border-accent-vivid font-medium text-text-strong"
+                        : "border-transparent text-text-muted hover:text-text-strong",
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTab(key);
+                    }}
+                  >
+                    {key === "chart" ? T.tabChart : T.tabOrders}
+                  </button>
+                ))}
+              </div>
+
+              {tab === "chart" ? (
+                <IntradayMiniChart
+                  ticker={item.ticker}
+                  timeframe={chartTimeframe}
+                  orders={allOrders.map((order) => ({
+                    at: order.at,
+                    price: order.price,
+                    side: order.side,
+                  }))}
+                />
+              ) : !current ? (
+                <p className="text-caption text-text-muted">{T.ordersNoSession}</p>
+              ) : (
                 <div className="flex flex-col gap-xs">
-                  {/* 왜 이런 판단 — 최근 판단 근거 메모 */}
-                  {lastTick ? (
-                    <p className="text-caption text-text-muted">
-                      {P.lastDecision}: {lastTick.rationale}
-                    </p>
-                  ) : null}
-                  {/* 미니 체결 로그 — 펼치자마자 보이게(전체·손익 합계는 행의 체결 내역 아이콘) */}
-                  <span className="text-caption text-text-muted">{P.sheet.ordersTitle}</span>
+                  {/* 미니 체결 로그 — 최근 5건(전체·손익 합계는 행의 체결 내역 아이콘) */}
                   {recentOrders.length === 0 ? (
                     <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
                   ) : (
@@ -647,7 +687,7 @@ function WatchRow({
                     </ul>
                   )}
                 </div>
-              ) : null}
+              )}
             </div>
           </td>
         </tr>

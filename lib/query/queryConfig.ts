@@ -35,6 +35,11 @@ export const queryConfig = {
       staleTime: 1 * DAY,
       gcTime: 7 * DAY,
     },
+    /** 당일 분봉(단타워치 차트 탭) — 장중 1분 주기 갱신은 훅의 refetchInterval 이 담당. */
+    minuteChart: {
+      staleTime: 45 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
     /** 종목 검색 — 키워드 변동 적음. */
     search: {
       staleTime: 5 * MINUTE,

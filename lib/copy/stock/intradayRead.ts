@@ -125,8 +125,14 @@ export const INTRADAY_PAPER_COPY = {
     ordersButton: "체결 내역",
     removeAria: "워치에서 제거",
     expandAria: "상세 접기/펼치기",
-    expandEmpty: "AI 진단을 누르면 판단 결과가, 모의 시작 후엔 최근 체결 로그가 여기에 표시돼요.",
     cashPresetAria: "금액 빠른 선택",
+    /* 펼침 탭 — 차트(당일 분봉+체결 마커) / 체결 내역(미니 로그). */
+    tabChart: "차트",
+    tabOrders: "체결 내역",
+    chartLoading: "당일 분봉을 불러오는 중…",
+    chartEmpty: "당일 분봉이 아직 없어요.",
+    chartError: "분봉을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+    ordersNoSession: "모의 세션이 없어요 — 모의 시작을 누르면 여기에 체결이 기록돼요.",
   },
 
   /* 상세 시트 — 카드 클릭 시 체결 내역·거래별 손익. */
