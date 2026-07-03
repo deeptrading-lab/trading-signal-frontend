@@ -42,7 +42,7 @@ export function CollapsibleCard({
 
   if (variant === "flat") {
     return (
-      <div className="border-b border-border-line">
+      <section aria-label={title} className="border-b border-border-line">
         <button
           type="button"
           // -mx-xs/px-xs — hover 배경만 좌우 4px 번져 숨 쉬는 여백(텍스트는 콘텐츠 폭 정렬).
@@ -64,7 +64,7 @@ export function CollapsibleCard({
           />
         </button>
         {open && <div className="pb-lg">{children}</div>}
-      </div>
+      </section>
     );
   }
 

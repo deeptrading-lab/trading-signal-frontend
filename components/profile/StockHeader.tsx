@@ -30,6 +30,7 @@ import { pickStockName } from "@/lib/utils/resolveStockName";
 import { rankLogoDotClass, rankLogoInitial } from "@/lib/utils/rankLogoDot";
 import {
   STOCK_DETAIL_LOADING,
+  STOCK_DETAIL_LOAD_ERROR,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
@@ -41,7 +42,7 @@ export interface StockHeaderProps {
 }
 
 export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
-  const { data, isLoading, isError, error } = useQueryStockPrice(ticker);
+  const { data, isLoading, isError } = useQueryStockPrice(ticker);
   // 매수 유의 경고칩 — BFF fail-soft(실패도 200+빈 배열)라 data 만 보고 없으면 미표시.
   const { data: warningsData } = useQueryStockWarnings(ticker);
   const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
@@ -59,9 +60,7 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   if (isError) {
     return (
       <div className="card-critical" role="alert">
-        <p className="text-body-strong">
-          {error?.message ?? STOCK_DETAIL_NOT_FOUND}
-        </p>
+        <p className="text-body-strong">{STOCK_DETAIL_LOAD_ERROR}</p>
       </div>
     );
   }

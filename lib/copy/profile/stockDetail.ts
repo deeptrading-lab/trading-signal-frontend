@@ -25,6 +25,8 @@ export const STOCK_DETAIL_DESCRIPTION_SOURCE_PREFIX = "출처";
 export const STOCK_DETAIL_LOADING = "불러오는 중…";
 export const STOCK_DETAIL_NOT_FOUND =
   "해당 종목을 찾을 수 없습니다. 종목코드를 다시 확인해주세요.";
+export const STOCK_DETAIL_LOAD_ERROR =
+  "시세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
 export const STOCK_DETAIL_MOCK_FALLBACK_NOTICE =
   "실시간 데이터 일시 연결 안 됨 — 샘플 데이터로 보고 있습니다.";
 
