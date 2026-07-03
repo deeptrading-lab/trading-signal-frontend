@@ -475,6 +475,17 @@ export async function decideIntradayWithCli(
   // 미설정 시 INTRADAY_MODEL, 그래도 없으면 invokeAgentCliStream 이 CLAUDE_CLI_MODEL 로 폴백.
   const analystModel = process.env.INTRADAY_ANALYST_MODEL ?? process.env.INTRADAY_MODEL;
   const judgeModel = process.env.INTRADAY_JUDGE_MODEL ?? process.env.INTRADAY_MODEL;
+  // 판단을 내린 모델을 틱에 기록 — 모델별 판단 품질 비교(A/B)의 원장 근거.
+  const effectiveModel = (model?: string) =>
+    model ?? process.env.CLAUDE_CLI_MODEL ?? "cli-default";
+  const withModels = (
+    result: IntradayProviderResult,
+    used: { analyst: boolean; judge: boolean },
+  ): IntradayProviderResult => {
+    if (used.analyst) result.decision.analystModel = effectiveModel(analystModel);
+    if (used.judge) result.decision.judgeModel = effectiveModel(judgeModel);
+    return result;
+  };
 
   // ① 흐름·세력 분석가 — 실패해도 진단 없이 ②로 진행(분석가는 보조).
   let analystNote = "";
@@ -521,11 +532,17 @@ export async function decideIntradayWithCli(
   }
 
   if (!llm) {
-    return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
-      "판단가 응답 실패 — 결정론 폴백",
-    ]);
+    return withModels(
+      finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
+        "판단가 응답 실패 — 결정론 폴백",
+      ]),
+      { analyst: analystNote !== "", judge: false },
+    );
   }
 
   const gated = applyPostGate(llm, ctx, pre.noNewEntry);
-  return finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments);
+  return withModels(
+    finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments),
+    { analyst: analystNote !== "", judge: true },
+  );
 }

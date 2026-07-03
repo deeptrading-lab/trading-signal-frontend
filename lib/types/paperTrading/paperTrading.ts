@@ -45,6 +45,9 @@ export type PaperTradingDecision = {
   analystNote?: string;
   /** 사후 룰 게이트가 LLM 결정을 조정한 내역(과욕 캡·레짐 veto 등) — 단타 cli-agent 만. */
   gateAdjustments?: string[];
+  /** 이 판단을 내린 모델 — 모델별 판단 품질 비교(A/B)용. 결정론 폴백이면 미기록. */
+  analystModel?: string;
+  judgeModel?: string;
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**
