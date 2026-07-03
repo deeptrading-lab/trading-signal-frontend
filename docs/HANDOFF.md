@@ -5718,3 +5718,46 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (사용자 확인) 001210 등 지정 종목을 관심종목에 담아 "투자경고" 칩 시각 확인.
   - 남은 매수유의 후속: ③ 밸류트랩 스냅샷(소비자=봇 레포), ⑦ 스코어카드 지정 이벤트 스탬프(경보 이력 없어 결정시점 스탬프 필요). 둘 다 소비자 준비 시.
+
+### 2026-07-03 — feat(intraday): 틱 판단 정량 스냅샷 영속 — 미스 분석·모델 A/B 근거 (#209)
+
+- **slug**: `intraday-tick-snapshot` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/209
+- **요약**: feat(intraday): 틱 판단 정량 스냅샷 영속 — 미스 분석·모델 A/B 근거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 단타 cli-agent 틱 판단에 **정량 스냅샷**(시그널·구조 레벨·기준가)을 실어 Supabase payload(jsonb)에 함께 영속한다. 진입 게이트 캘리브레이션(후속 A/B/C)의 before/after를 **숫자로** 측정하기 위한 계측 인프라.
+  > 
+  > ## 배경
+  > 
+  > 오늘 장중 `무포지션 지속` 원인을 분석하려 했더니, 저장된 틱엔 근거 텍스트(rationale)만 남고 손익비·"저항까지 여유%"·레짐 같은 숫자가 빠져 있었다 → 7세션 586틱을 근거 텍스트 **키워드 grep** 으로만 분류해야 했다. 스냅샷을 남기면 미스 원인 정량 집계와 모델(Haiku vs Sonnet) 판단 품질 A/B가 가능해진다.
+  > 
+  > ## 변경 (4파일, 순수 계측 — 거래 동작 무변경)
+  > 
+  > - `lib/types/intraday/intradayDecision.ts` — `IntradaySnapshot` 타입: `basePrice`·`signal`(4축 score·action·regime·confidence)·`levels`(박스 상·하단·구조 TP/SL·손익비·목표 거리%)·`structureEvent`.
+  > - `lib/types/paperTrading/paperTrading.ts` — `PaperTradingDecision.intradaySnapshot?`(옵셔널, inline import). mock/existing-ai 미설정.
+  > - `lib/server/paperTrading/decisionProviders/intradayCli.ts` — `finalize()` choke point 에서 스냅샷 생성 → `toPaperTradingDecision`(옵셔널 3번째 인자)로 전달. **LLM·결정론 폴백 모든 틱**에 기록.
+  > - 테스트 2건 추가(전달 시 보존 / 미전달 시 undefined).
+  > 
+  > ## 지속성
+  > 
+  > `persistence.ts` 가 tick 을 `payload: tick` 통째 jsonb 로 저장·하이드레이트 → **마이그레이션·지속성 코드 변경 없이** 자동 round-trip. 세션 상세 API도 tick 을 wholesale 반환하므로 스냅샷이 그대로 노출된다.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit`·eslint 클린, vitest **752 통과**(신규 2).
+  > - 라이브 확인(머지 후 dev 재시작 필요 — 스케줄러 부팅 고정): 새 틱의 `decision.intradaySnapshot` 에 signal·levels·rrr 채워지는지 API로 확인.
+  > 
+  > ## 다음 작업
+  > 
+  > - **A. 돌파 시 목표를 측정된 폭/다음 상위 구조로** — 신고가 추세에서 저항 천장이 가격을 추격해 손익비가 영원히 안 나오는 문제(이번 분석의 #1 원인, 218/586). 거래 동작 변경이라 별도 PRD 권장. 이 스냅샷으로 진입율·가상손익 before/after 측정.
+  > - B. 거래량 동의 baseline 재캘리브(20봉 평균이 완만한 추세를 과소평가, #2 원인 181/586).
+  > - C. 확정 상승 레짐에선 RSI 과매수를 진입 veto 에서 제외.
+  > - (선택) 세션 상세 타임라인에 스냅샷 숫자 컬럼(손익비·저항 여유%·regime) 노출.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **A. 돌파 시 목표를 측정된 폭/다음 상위 구조로** — 신고가 추세에서 저항 천장이 가격을 추격해 손익비가 영원히 안 나오는 문제(이번 분석의 #1 원인, 218/586). 거래 동작 변경이라 별도 PRD 권장. 이 스냅샷으로 진입율·가상손익 before/after 측정.
+  - B. 거래량 동의 baseline 재캘리브(20봉 평균이 완만한 추세를 과소평가, #2 원인 181/586).
+  - C. 확정 상승 레짐에선 RSI 과매수를 진입 veto 에서 제외.
+  - (선택) 세션 상세 타임라인에 스냅샷 숫자 컬럼(손익비·저항 여유%·regime) 노출.
