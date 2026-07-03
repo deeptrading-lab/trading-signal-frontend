@@ -5,8 +5,6 @@
 
 /** 페이지 헤더 — 결과 카드 + 토큰 대시보드를 아우르는 상위 제목. */
 export const ANALYZE_PAGE_TITLE = "AI 분석";
-export const ANALYZE_PAGE_SUBTITLE =
-  "지금까지 분석한 종목의 결론과 토큰 사용량을 모아 봅니다.";
 
 /** 상위 탭 — 분석 결과 카드 / 토큰 사용량 대시보드 전환. */
 export const TAB_RESULTS = "분석 결과";

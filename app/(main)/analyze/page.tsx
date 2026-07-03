@@ -19,14 +19,15 @@
 
 import { Suspense } from "react";
 import { AnalyzeTabsContainer } from "@/components/analyze/AnalyzeTabsContainer";
-import { ANALYZE_PAGE_SUBTITLE, ANALYZE_PAGE_TITLE } from "@/lib/copy/analyze/labels";
+import { ANALYZE_PAGE_TITLE } from "@/lib/copy/analyze/labels";
 
 export default function AnalyzePage() {
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
-      <header className="flex flex-col gap-xs">
+      {/* 페이지 타이틀 — 모바일은 하단 탭이 현재 화면을 알려주므로 시각 숨김(문서 아웃라인용 h1 유지),
+       *  데스크탑(md+)에서만 노출. */}
+      <header className="sr-only md:not-sr-only">
         <h1 className="text-h1 text-text-strong">{ANALYZE_PAGE_TITLE}</h1>
-        <p className="text-body-sm text-text-muted">{ANALYZE_PAGE_SUBTITLE}</p>
       </header>
       {/* useSearchParams(탭 상태) 가 Suspense 경계를 요구 — login 패턴과 동일. */}
       <Suspense fallback={null}>
