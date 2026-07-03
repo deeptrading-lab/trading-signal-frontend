@@ -5556,3 +5556,35 @@
   - 레거시 정리: `/dashboard/paper-trading` 목록 페이지·마이페이지 "AI 모의투자" 메뉴를 `/intraday` 로 통합 여부 결정
   - 거래량 순위 장중 실측(야간 등락률 이상값 확인) 및 체결강도·호가잔량 후보 확장 검토
   - 여러 날 누적 성적 대시보드(Supabase 원장 기반 판단 품질 분석 — miss 사후분석 학습루프와 연결)
+
+### 2026-07-03 — feat(stock): 매수 유의사항(시장경보·VI) — AI 분석 그라운딩 주입 + 종목 헤더 경고 칩 (#204)
+
+- **slug**: `stock-warnings` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/204
+- **요약**: feat(stock): 매수 유의사항(시장경보·VI) — AI 분석 그라운딩 주입 + 종목 헤더 경고 칩
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 토스 `GET /stocks/{symbol}/warnings`(매수 유의사항)를 도입해 두 지면에 배선한다 — PRD `docs/prd/stock-warnings.md`.
+  > 
+  > - **공용 로더** `lib/api/toss/warnings.ts` — never-throw(키 없음·404·5xx 전부 빈 배열), 60s 캐시 + 실패 캐시 + single-flight, unknown warningType 허용(스펙 의무). **첫 "토스 전용" 데이터(KIS 폴백 없음)** — `MARKET_DATA_SOURCE` 토글과 무관하게 `isTossConfigured()` 만 게이트.
+  > - **① AI 종합분석**: 그라운딩(`priceContext`)에 `⚠️ 매수 유의(거래소 시장경보): 투자경고 — 현재 지정/발동 중` 1줄. 활성 항목 없으면 무주입(프롬프트 무변경 = 무회귀).
+  > - **② 종목 상세 헤더**: 종목명 옆 경고 칩 — 정리매매·투자위험 `badge-critical` / 투자경고·단기과열 `badge-warn` / VI `badge-info`. 장중 60s 자동 갱신(VI 추적), 실패·빈 배열·키 없음 = 미표시.
+  > - 실측 함정 반영: 지정 중에도 `startDate/endDate` 가 null 로 옴(111710 실측) → 기간 필드 의존 금지, "지정 중" 상태만 표시.
+  > 
+  > ## 검증 (docs/qa/stock-warnings.md)
+  > 
+  > - AC 8건 전부 ✅ — 장중 실샘플: 거래량 상위 프로브로 **금호전기(001210)·금호건설(002990) 투자경고 검출**, BFF 실응답·400·X-Data-Source 확인.
+  > - vitest 726 passed(신규 15 포함) · tsc · eslint · next build 클린.
+  > - 토스 키 없는 동료 로컬 = AC-1(유닛)로 보장: 토스 무호출 + 빈 배열 + 화면 무변화.
+  > 
+  > ## 다음 작업
+  > 
+  > - 단타워치/모의투자 후속 PR: 틱 판단 컨텍스트(`formatIntradayContext`)에 경보 1줄 주입 + volume-rank 후보표 경고 칩 — 본 PR 의 `fetchActiveWarnings`·`toWarningChips` 재사용.
+  > - 밸류트랩 스냅샷(`/api/stock/snapshot`) warnings 포함, 시그널 룰 엔진 게이트(정리매매·투자위험 하드 제외), 관심종목 행 배지(보류 주석 해제), 스코어카드 지정 이벤트 스탬프.
+  > - prod 활성화는 Vercel 에 TOSS 키 등록만으로 가능(시세 소스 전환과 독립) — 단일 활성 토큰은 기존 KV 공유로 해결됨.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 단타워치/모의투자 후속 PR: 틱 판단 컨텍스트(`formatIntradayContext`)에 경보 1줄 주입 + volume-rank 후보표 경고 칩 — 본 PR 의 `fetchActiveWarnings`·`toWarningChips` 재사용.
+  - 밸류트랩 스냅샷(`/api/stock/snapshot`) warnings 포함, 시그널 룰 엔진 게이트(정리매매·투자위험 하드 제외), 관심종목 행 배지(보류 주석 해제), 스코어카드 지정 이벤트 스탬프.
+  - prod 활성화는 Vercel 에 TOSS 키 등록만으로 가능(시세 소스 전환과 독립) — 단일 활성 토큰은 기존 KV 공유로 해결됨.
