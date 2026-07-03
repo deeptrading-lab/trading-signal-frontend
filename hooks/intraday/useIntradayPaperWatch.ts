@@ -2,9 +2,8 @@
  * useIntradayPaperWatch — 단타워치 ↔ AI 모의투자(cli-agent) 세션 연결 훅. intraday-paper-watch.
  *
  * 워치의 각 종목에 대응하는 cli-agent 세션을 매핑하고(종목당 1세션, running·최신 우선),
- * "모의 단타 시작"(세션 생성)과 자동 틱 대상(running 세션 id 목록)을 제공한다.
- * 세션 저장은 서버 in-memory(dev 재시작 시 소멸) — 워치 로컬 상태와 무관하게 세션이 살아있을 수
- * 있으므로, 워치에 없는 running 세션은 `runningOrphans` 로 노출해 칩으로 복원한다.
+ * "모의 단타 시작"(세션 생성)·활성 세션 종목(`activeStocks` — 표 자동 상주용)·화면 갱신
+ * 폴링 대상(running 세션 id)을 제공한다. 틱 발화는 서버 스케줄러(tickScheduler) 전담.
  */
 
 "use client";
@@ -35,7 +34,7 @@ function pickBetter(a: PaperTradingSession, b: PaperTradingSession): PaperTradin
   return a.updatedAt >= b.updatedAt ? a : b;
 }
 
-export function useIntradayPaperWatch(watchTickers: string[]) {
+export function useIntradayPaperWatch() {
   const { sessions, isCreating, create } = usePaperTradingSessions();
 
   const cliSessions = useMemo(
@@ -54,30 +53,22 @@ export function useIntradayPaperWatch(watchTickers: string[]) {
     return map;
   }, [cliSessions]);
 
-  // 진행 중인데 워치에 없는 세션 — 새로고침으로 워치가 비어도 칩으로 복원.
-  const runningOrphans = useMemo(
-    () =>
-      cliSessions.filter(
-        (session) =>
-          session.status === "running" &&
-          !watchTickers.includes(intradaySessionStock(session).ticker),
-      ),
-    [cliSessions, watchTickers],
-  );
-
-  // 화면 갱신 폴링 대상 — 워치에 올라온 종목의 running 세션(보이는 행의 상세만 무효화).
-  // 틱 발화는 서버 스케줄러가 running 세션 전부를 전담하므로(화면 무관) 안전 필터가 아니라
-  // 조회 범위 최적화다. 원치 않는 세션은 일시정지/완료로 멈춘다.
-  const runningSessionIds = useMemo(
+  // 활성(미완료) 세션 종목 — 워치 로컬 상태와 무관하게 **표에 자동 상주**시킨다(피드백:
+  // 페이지 이동 후에도 표 유지). 완료 세션은 표에서 내려간다(기록은 세션 상세에 남음).
+  const activeStocks = useMemo(
     () =>
       cliSessions
-        .filter(
-          (session) =>
-            session.status === "running" &&
-            watchTickers.includes(intradaySessionStock(session).ticker),
-        )
-        .map((session) => session.id),
-    [cliSessions, watchTickers],
+        .filter((session) => session.status === "running" || session.status === "paused")
+        .map(intradaySessionStock)
+        .filter((stock) => stock.ticker),
+    [cliSessions],
+  );
+
+  // 화면 갱신 폴링 대상 — running 세션 전부(활성 세션은 항상 표에 있으므로 곧 보이는 행).
+  // 틱 발화는 서버 스케줄러 전담. 세션 수명은 일시정지/완료로 관리.
+  const runningSessionIds = useMemo(
+    () => cliSessions.filter((session) => session.status === "running").map((session) => session.id),
+    [cliSessions],
   );
 
   const start = (
@@ -96,5 +87,5 @@ export function useIntradayPaperWatch(watchTickers: string[]) {
       tickIntervalMinutes,
     });
 
-  return { sessionByTicker, runningOrphans, runningSessionIds, isCreating, start };
+  return { sessionByTicker, activeStocks, runningSessionIds, isCreating, start };
 }

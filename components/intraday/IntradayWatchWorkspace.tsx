@@ -9,16 +9,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
-import {
-  intradaySessionStock,
-  useIntradayPaperWatch,
-} from "@/hooks/intraday/useIntradayPaperWatch";
+import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
@@ -47,22 +44,66 @@ function dedupCandidates(rows: InvestorFlowRow[]): InvestorFlowRow[] {
   return out;
 }
 
+/** 워치 로컬 목록 localStorage 키 — 페이지 이동/새로고침에도 직접 추가한 종목 유지. */
+const WATCH_STORAGE_KEY = "finsight:intraday-watch";
+
+function loadStoredWatch(): Watch[] {
+  try {
+    const raw = window.localStorage.getItem(WATCH_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (x): x is Watch =>
+          !!x && typeof (x as Watch).ticker === "string" && typeof (x as Watch).name === "string",
+      )
+      .slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
 export function IntradayWatchWorkspace() {
   const [watch, setWatch] = useState<Watch[]>([]);
+  // SSR 불일치 방지 — 마운트 후 localStorage 복원, 복원 전에는 저장하지 않는다.
+  const [storageReady, setStorageReady] = useState(false);
+  useEffect(() => {
+    setWatch(loadStoredWatch());
+    setStorageReady(true);
+  }, []);
+  useEffect(() => {
+    if (!storageReady) return;
+    try {
+      window.localStorage.setItem(WATCH_STORAGE_KEY, JSON.stringify(watch));
+    } catch {
+      /* 저장 실패는 무시(용량 등) */
+    }
+  }, [watch, storageReady]);
+
   const { data: flow, isLoading: flowLoading } = useQueryFlowTop10("today");
   const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
-
-  const watchTickers = watch.map((item) => item.ticker);
-  const { data: quotes = [] } = useQueryWatchlist(watchTickers);
-  const { sessionByTicker, runningOrphans, runningSessionIds, isCreating, start } =
-    useIntradayPaperWatch(watchTickers);
+  const { sessionByTicker, activeStocks, runningSessionIds, isCreating, start } =
+    useIntradayPaperWatch();
   // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
   useIntradayPaperRefresh(runningSessionIds);
   const autoActive = runningSessionIds.length > 0;
 
+  // 표 행 = 로컬 워치 ∪ 활성 세션 종목(자동 상주 — 페이지를 벗어나도 표가 유지된다, 피드백).
+  const rows = useMemo(() => {
+    const map = new Map<string, Watch>();
+    for (const item of watch) map.set(item.ticker, item);
+    for (const stock of activeStocks) {
+      if (!map.has(stock.ticker)) map.set(stock.ticker, { ticker: stock.ticker, name: stock.name });
+    }
+    return [...map.values()];
+  }, [watch, activeStocks]);
+
+  const rowTickers = rows.map((item) => item.ticker);
+  const { data: quotes = [] } = useQueryWatchlist(rowTickers);
+
   const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
-  const watching = new Set(watchTickers);
+  const watching = new Set(rowTickers);
 
   const add = (item: Watch) =>
     setWatch((prev) => (prev.some((x) => x.ticker === item.ticker) ? prev : [...prev, item]));
@@ -105,42 +146,8 @@ export function IntradayWatchWorkspace() {
         />
       </section>
 
-      {/* 진행 중 모의 세션 복원 칩 — 새로고침으로 워치가 비어도 세션은 살아있다 */}
-      {runningOrphans.length > 0 ? (
-        <section className="card flex flex-col gap-xs" aria-label={W.runningTitle}>
-          <div className="flex items-baseline gap-sm">
-            <h2 className="text-h2 text-text-strong">{W.runningTitle}</h2>
-            <span className="text-caption text-text-muted">{W.runningHint}</span>
-          </div>
-          <div className="flex flex-wrap gap-xs">
-            {runningOrphans.map((session) => {
-              const sessionStock = intradaySessionStock(session);
-              return (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => add({ ticker: sessionStock.ticker, name: sessionStock.name })}
-                  className="text-caption px-sm py-xs rounded-pill border border-border-line transition-colors cursor-pointer hover:bg-surface-muted"
-                >
-                  <span className="text-text-strong">{sessionStock.name}</span>{" "}
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      session.returnPct >= 0 ? "text-signal-up" : "text-signal-down",
-                    )}
-                  >
-                    {session.returnPct >= 0 ? "+" : ""}
-                    {session.returnPct.toFixed(2)}%
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {/* 워치 표 — 공통 안내는 종목마다 반복하지 않고 표 위 한 곳에(피드백). */}
-      {watch.length === 0 ? (
+      {/* 워치 표 — 활성 세션 종목은 자동 상주(로컬 워치 초기화와 무관). 공통 안내는 표 위 한 곳에. */}
+      {rows.length === 0 ? (
         <div className="card-info text-body">{W.empty}</div>
       ) : (
         <>
@@ -150,7 +157,7 @@ export function IntradayWatchWorkspace() {
             ))}
           </div>
           <IntradayWatchTable
-            items={watch}
+            items={rows}
             quotes={quotes}
             sessionByTicker={sessionByTicker}
             isCreating={isCreating}

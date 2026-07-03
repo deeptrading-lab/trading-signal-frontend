@@ -69,9 +69,6 @@ export const INTRADAY_WATCH_COPY = {
   empty: "검색하거나 추천 후보를 눌러 종목을 추가하면 장중 단타 판단을 받아볼 수 있어요.",
   /* 종목 검색 — 후보 밖 종목도 워치에 추가. */
   searchPlaceholder: "종목명·코드로 검색해 워치에 추가",
-  /* 진행 중 모의 세션 복원 칩 — 새로고침으로 워치가 비어도 세션은 서버에 살아있다. */
-  runningTitle: "진행 중 모의 단타",
-  runningHint: "눌러서 워치에 추가하면 현황이 보여요 — 자동 판단은 서버가 계속해요.",
 } as const;
 
 /** 워치 카드 하단 "AI 모의 단타" 시작/현황 카피 — intraday-paper-watch. */

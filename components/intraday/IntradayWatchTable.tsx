@@ -528,17 +528,20 @@ function WatchRow({
                 <ExternalLink className="size-4" aria-hidden />
               </Link>
             ) : null}
-            <button
-              type="button"
-              className={ICON_BTN}
-              aria-label={T.removeAria}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
-            >
-              <X className="size-4" aria-hidden />
-            </button>
+            {/* 활성 세션 행은 표에 자동 상주(제거해도 재등장) — ✕ 대신 일시정지/완료로 관리. */}
+            {!current || current.status === "completed" ? (
+              <button
+                type="button"
+                className={ICON_BTN}
+                aria-label={T.removeAria}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
             <button
               type="button"
               className={ICON_BTN}
