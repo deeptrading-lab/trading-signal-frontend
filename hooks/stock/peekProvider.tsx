@@ -4,9 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import type { StockDirection } from "@/lib/store/stockMetaStore";
 
 /**
@@ -19,8 +22,10 @@ import type { StockDirection } from "@/lib/store/stockMetaStore";
  * ## 단일 활성 Peek(rate-limit 안전 설계)
  * 활성 Peek 은 항상 **하나(한 종목)** 다. 여러 행을 지나가도 표시 중인 Peek 은 하나뿐이라,
  * 화면에 뜬 그 종목의 **가격 1쿼리 + 차트 1쿼리**만 발생한다(행마다 선반입하는 burst 아님).
- * `MiniStockChart`(→ `useQueryStockChart`)는 1일 staleTime + 상세 차트와 쿼리키 공유라 재hover·
- * 상세 진입 시 캐시 히트. 이 설계가 KIS 레이트리밋을 압박하지 않는 핵심이다.
+ * `MiniStockChart`(→ `useQueryStockChart`)는 **1일 staleTime** 이라 같은 종목 재hover 는 캐시 히트
+ * (쿼리키=ticker·period·days). 선반입이 데운 `stock.price` 캐시는 peek 이 그대로 히트하고, 차트는
+ * 상세가 **같은 구간**을 볼 때만 공유·히트한다(구간이 다르면 재요청). 이 캐시 + 단일 활성 설계가
+ * KIS 레이트리밋을 압박하지 않는 핵심이다.
  *
  * ## 컨텍스트 분리(리렌더 격리)
  * - **actions**: `showPopover`/`openSheet`/`hidePopover`/`close` — 식별자 안정. 종목 행(다수)이 구독.
@@ -76,6 +81,16 @@ export function useStockPeekState(): PeekTarget | null {
 
 export function StockPeekProvider({ children }: { children: React.ReactNode }) {
   const [peek, setPeek] = useState<PeekTarget | null>(null);
+
+  // 라우트 이동 시 즉시 해제(팝오버·시트 모두) — hover→클릭/Enter 내비게이션 후 pointer-events-none
+  //   팝오버가 목적지 화면에 떠 있는 채로 남는 것을 방지(aiAnalysisProvider 의 collapse 와 동형).
+  const pathname = usePathname();
+  const prevPath = useRef(pathname);
+  useEffect(() => {
+    if (prevPath.current === pathname) return;
+    prevPath.current = pathname;
+    setPeek(null);
+  }, [pathname]);
 
   const showPopover = useCallback((req: PeekRequest) => {
     setPeek({ ...req, mode: "popover" });

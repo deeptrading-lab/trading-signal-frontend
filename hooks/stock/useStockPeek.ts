@@ -27,7 +27,13 @@ import {
  * ## 정상 행 동작 무회귀
  * 클릭→상세 이동·선반입·키보드(Enter/Space)는 행이 그대로 소유한다. 본 훅은 hover/focus/touch
  * 만 얹는다. 롱프레스로 시트를 연 뒤 이어지는 유령 클릭(내비게이션)은 touchend preventDefault +
- * onClickCapture 로 이중 차단한다.
+ * onClickCapture 로 이중 차단한다. ♥/제거 등 인터랙티브 자식에서 시작한 touch 는 롱프레스 대상에서
+ * 제외해(closest 가드) 버튼 고유 탭을 지킨다.
+ *
+ * ## 팝오버 잔류 방지
+ * 팝오버는 pointer-events-none 라 클릭이 통과해도 스스로 닫히지 않는다. 라우트 이동 해제
+ * (StockPeekProvider) 가 hover→클릭/Enter 내비게이션을 잡고, 여기 언마운트 정리가 검색결과 교체처럼
+ * 내비게이션 없이 hover 중인 행이 사라지는 경우를 잡는다(이 행이 띄운 팝오버만 정확히 닫음).
  */
 
 /** 노스스타·선반입과 동일 hover 의도 지연. */
@@ -80,6 +86,8 @@ export function useStockPeek({
   const touchActiveAt = useRef(0);
   /** 롱프레스로 시트를 열었음 — 이어지는 클릭(내비게이션)을 삼킨다. */
   const suppressClick = useRef(false);
+  /** 이 행이 지금 팝오버를 띄운 상태인지 — leave/언마운트 시 자기 팝오버만 정확히 닫기 위해. */
+  const shownPopover = useRef(false);
 
   const clearPeekTimer = useCallback(() => {
     if (peekTimer.current !== null) {
@@ -100,11 +108,21 @@ export function useStockPeek({
       if (!actions) return;
       clearPeekTimer();
       peekTimer.current = setTimeout(() => {
+        shownPopover.current = true;
         actions.showPopover({ ticker, name, anchor, seed });
       }, PEEK_INTENT_MS);
     },
     [actions, ticker, name, seed, clearPeekTimer],
   );
+
+  /** 이 행이 띄운 팝오버만 닫는다 — 대기 타이머 취소 + shown 이면 hide(교차 행 오작동 방지). */
+  const hideOwnPopover = useCallback(() => {
+    clearPeekTimer();
+    if (shownPopover.current) {
+      shownPopover.current = false;
+      actions?.hidePopover();
+    }
+  }, [clearPeekTimer, actions]);
 
   const onMouseEnter = useCallback(
     (e: React.MouseEvent) => {
@@ -118,9 +136,8 @@ export function useStockPeek({
 
   const onMouseLeave = useCallback(() => {
     cancelIntent();
-    clearPeekTimer();
-    actions?.hidePopover();
-  }, [cancelIntent, clearPeekTimer, actions]);
+    hideOwnPopover();
+  }, [cancelIntent, hideOwnPopover]);
 
   const onFocus = useCallback(
     (e: React.FocusEvent) => {
@@ -138,17 +155,23 @@ export function useStockPeek({
 
   const onBlur = useCallback(() => {
     cancelIntent();
-    clearPeekTimer();
-    actions?.hidePopover();
-  }, [cancelIntent, clearPeekTimer, actions]);
+    hideOwnPopover();
+  }, [cancelIntent, hideOwnPopover]);
 
   const onTouchStart = useCallback(
     (e: React.TouchEvent) => {
       touchActiveAt.current = Date.now();
-      suppressClick.current = false;
+      suppressClick.current = false; // 새 touch — 이전 억제 상태 해제(자식 버튼 탭도 포함).
+      clearLongPress(); // 이전 대기 타이머 취소.
+      // ♥/제거 등 "자식" 인터랙티브 요소에서 시작한 touch 는 롱프레스 제외(버튼 고유 탭 유지).
+      //   단, 행 자체가 버튼인 검색결과(currentTarget===button)는 제외 대상이 아니다 → 롱프레스 허용.
+      const interactive = (e.target as HTMLElement | null)?.closest?.("button, a");
+      if (interactive && interactive !== e.currentTarget) {
+        touchStart.current = null;
+        return;
+      }
       const t = e.touches[0];
       touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
-      clearLongPress();
       if (!actions) return;
       longPressTimer.current = setTimeout(() => {
         suppressClick.current = true;
@@ -199,13 +222,16 @@ export function useStockPeek({
     }
   }, []);
 
-  // 언마운트 — 대기 타이머 정리.
+  // 언마운트 — 대기 타이머 정리 + 이 행이 띄운 팝오버가 남아 있으면 닫는다.
+  //   React 는 언마운트 시 onMouseLeave/onBlur 를 쏘지 않는다. 검색결과 교체처럼 hover 중인 행이
+  //   내비게이션 없이 사라지는 경우(라우트 해제가 못 잡음) 팝오버가 떠 있는 채로 남는 것을 방지.
   useEffect(() => {
     return () => {
       clearPeekTimer();
       clearLongPress();
+      if (shownPopover.current) actions?.hidePopover();
     };
-  }, [clearPeekTimer, clearLongPress]);
+  }, [clearPeekTimer, clearLongPress, actions]);
 
   return {
     peekProps: {
