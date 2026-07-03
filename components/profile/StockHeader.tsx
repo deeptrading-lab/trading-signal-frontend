@@ -40,10 +40,7 @@ import {
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import {
-  toWarningChips,
-  type StockWarningSeverity,
-} from "@/lib/copy/stock/warnings";
+import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 
 export interface StockHeaderProps {
   ticker: string;
@@ -96,7 +93,6 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const nameForAdd = displayName === ticker ? undefined : displayName;
   const toggleWatch = () =>
     added ? removeTicker(ticker) : addTicker(ticker, nameForAdd);
-  const warningChips = toWarningChips(warningsData?.warnings ?? []);
   const direction = data.direction;
   const isUp = direction === "up";
   const isFlat = direction === "flat";
@@ -120,11 +116,7 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
             {displayName}
           </h1>
           <WatchlistStarButton added={added} onToggle={toggleWatch} />
-          {warningChips.map((chip) => (
-            <span key={chip.label} className={BADGE_BY_SEVERITY[chip.severity]}>
-              {chip.label}
-            </span>
-          ))}
+          <StockWarningBadges warnings={warningsData?.warnings} />
         </div>
         {onAIAnalysis && (
           <button
@@ -161,10 +153,3 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
     </div>
   );
 }
-
-/** 심각도 → 디자인 시스템 배지 클래스 (`app/components.css` @layer components). */
-const BADGE_BY_SEVERITY: Record<StockWarningSeverity, string> = {
-  critical: "badge-critical",
-  warn: "badge-warn",
-  info: "badge-info",
-};
