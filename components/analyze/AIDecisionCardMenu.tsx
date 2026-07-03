@@ -81,6 +81,9 @@ export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={toggleMenu}
+        // ★ a11y — 행(ListRow)이 클릭 가능한 div 이므로 케밥 키보드 조작(Enter/Space)이 행의
+        //   onKeyDown(상세 열기)으로 버블링되지 않게 차단(home-reskin 동일 패턴). onClick 은 toggleMenu 가 차단.
+        onKeyDown={(e) => e.stopPropagation()}
         className={cn(
           "relative z-20 inline-flex h-7 w-7 items-center justify-center rounded-full cursor-pointer",
           "text-text-muted transition-colors hover:bg-surface-muted hover:text-text-strong",

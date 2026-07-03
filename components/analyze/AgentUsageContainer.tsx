@@ -18,15 +18,16 @@ import { CacheCostCards } from "./CacheCostCards";
 import { ModelCostBreakdown } from "./ModelCostBreakdown";
 import { AgentUsageTable } from "./AgentUsageTable";
 import { SamsungAbExperimentCard } from "./SamsungAbExperimentCard";
+import { SegmentedTabs } from "./SegmentedTabs";
 
 // recharts 차트 3종은 recharts(≈109kB gzip)를 끌어오므로 next/dynamic 으로 지연 로드 —
-// Usage 탭에 데이터가 있을 때만(아래 조건부 렌더) 청크 로드(perf WS-4). 차트 래퍼(section.card)와
-// 높이를 맞춘 스켈레톤으로 레이아웃 시프트 최소화.
+// Usage 탭에 데이터가 있을 때만(아래 조건부 렌더) 청크 로드(perf WS-4). 카드리스 플랫 섹션과
+// 높이를 맞춘 스켈레톤으로 레이아웃 시프트 최소화(박스 없이 제목 스켈레톤 + 차트 높이 블록).
 function ChartSkeleton({ heightClass }: { heightClass: string }) {
   return (
-    <section className="card" aria-hidden="true">
-      <div className="mb-md h-4 w-40 animate-pulse rounded bg-surface-muted" />
-      <div className={cn("w-full animate-pulse rounded-lg bg-surface-muted", heightClass)} />
+    <section className="flex flex-col gap-md" aria-hidden="true">
+      <div className="h-4 w-40 animate-pulse rounded-sm bg-surface-muted" />
+      <div className={cn("w-full animate-pulse rounded-md bg-surface-muted", heightClass)} />
     </section>
   );
 }
@@ -57,7 +58,7 @@ import {
   usageRunCount,
 } from "@/lib/copy/analyze/labels";
 
-const TABS: { key: AIAnalysisProvider; label: string }[] = [
+const TABS: ReadonlyArray<{ key: AIAnalysisProvider; label: string }> = [
   { key: "claude", label: PROVIDER_TAB_CLAUDE },
   { key: "codex", label: PROVIDER_TAB_CODEX },
 ];
@@ -69,19 +70,18 @@ export function AgentUsageContainer() {
 
   if (isLoading) {
     return (
-      <div className="card skeleton min-h-[160px]" aria-busy="true">
+      <div aria-busy="true" aria-label={USAGE_LOADING}>
         <span className="sr-only">{USAGE_LOADING}</span>
-        <div className="skeleton-line skeleton-line-medium" />
-        <div className="skeleton-line skeleton-line-narrow" />
-        <div className="skeleton-line skeleton-line-medium" />
+        <div className="h-40 w-full animate-pulse rounded-md bg-surface-muted" aria-hidden="true" />
       </div>
     );
   }
 
   if (isError || !data) {
+    // 카드리스 플랫 알림 — 박스 없이 여백만(결과 목록 에러 정합).
     return (
-      <div className="card-critical" role="alert">
-        <p className="text-body-strong mb-md">{USAGE_ERROR}</p>
+      <div className="flex flex-col items-start gap-md py-md" role="alert">
+        <p className="text-body-sm text-text-muted">{USAGE_ERROR}</p>
         <button type="button" className="button-secondary" onClick={() => refetch()}>
           {USAGE_RETRY}
         </button>
@@ -90,12 +90,7 @@ export function AgentUsageContainer() {
   }
 
   if (!data.configured) {
-    return (
-      <div className="card" role="status">
-        <h2 className="text-h3 text-text-strong mb-sm">{USAGE_NOT_CONFIGURED_TITLE}</h2>
-        <p className="text-body-sm text-text-muted">{USAGE_NOT_CONFIGURED_BODY}</p>
-      </div>
-    );
+    return <UsageStatusBlock title={USAGE_NOT_CONFIGURED_TITLE} body={USAGE_NOT_CONFIGURED_BODY} />;
   }
 
   const provider = picked ?? data.latestProvider ?? "claude";
@@ -104,30 +99,17 @@ export function AgentUsageContainer() {
   const runSeries = data.runSeriesByProvider?.[provider] ?? [];
 
   return (
-    <div className="flex flex-col gap-md">
+    <div className="flex flex-col gap-xl">
       <SamsungAbExperimentCard />
 
-      {/* provider 탭 + run 수 + 새로고침 */}
+      {/* provider 탭(세그먼트 컨트롤) + run 수 + 새로고침 */}
       <div className="flex items-center justify-between gap-md flex-wrap">
-        <div className="flex items-center gap-sm" role="tablist" aria-label="AI 공급자">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={provider === t.key}
-              onClick={() => setPicked(t.key)}
-              className={cn(
-                "cursor-pointer rounded-pill border px-md py-xs text-body-sm-strong transition-colors",
-                provider === t.key
-                  ? "border-accent-vivid bg-accent-vivid-soft text-accent-vivid"
-                  : "border-border-line bg-surface text-text-muted hover:text-text-strong",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          options={TABS}
+          value={provider}
+          onChange={setPicked}
+          ariaLabel="AI 공급자"
+        />
         <div className="flex items-center gap-md">
           <span className="text-caption text-text-muted">{usageRunCount(data.runCount)}</span>
           <button
@@ -143,14 +125,14 @@ export function AgentUsageContainer() {
       </div>
 
       {provider === "codex" ? (
-        <p className="card text-body-sm text-text-muted">{CODEX_UNMEASURED_NOTICE}</p>
+        // 카드 → 얇은 안내 스트립(surface-muted). 박스 테두리 없이 subtle 하게.
+        <p className="rounded-md bg-surface-muted px-md py-sm text-body-sm text-text-muted">
+          {CODEX_UNMEASURED_NOTICE}
+        </p>
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="card" role="status">
-          <h2 className="text-h3 text-text-strong mb-sm">{USAGE_EMPTY_TITLE}</h2>
-          <p className="text-body-sm text-text-muted">{USAGE_EMPTY_BODY}</p>
-        </div>
+        <UsageStatusBlock title={USAGE_EMPTY_TITLE} body={USAGE_EMPTY_BODY} />
       ) : (
         <>
           <CacheCostCards rows={rows} wallClockMs={wallClockMs} />
@@ -161,6 +143,16 @@ export function AgentUsageContainer() {
           <AgentUsageTable rows={rows} />
         </>
       )}
+    </div>
+  );
+}
+
+/** 미설정·빈 — 카드 박스 없이 흰 바탕 + 여백만(결과 목록 StatusBlock 정합). */
+function UsageStatusBlock({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center gap-xs py-2xl text-center" role="status">
+      <p className="text-body-strong text-text-strong">{title}</p>
+      <p className="text-body-sm text-text-muted">{body}</p>
     </div>
   );
 }

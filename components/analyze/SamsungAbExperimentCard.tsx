@@ -109,7 +109,7 @@ function ConfigRow({
   return (
     <tr className="border-t border-border-line">
       <td className="py-sm pr-md">
-        <div className="flex flex-col gap-2xs">
+        <div className="flex flex-col gap-xs">
           <span className="text-body-sm-strong text-text-strong">
             {isBaseline ? AB_BASELINE : AB_VARIANT}
           </span>
@@ -175,9 +175,9 @@ function DeltaCard({
     : toneValue;
   const tone = numeric == null ? "text-text-strong" : deltaTone(numeric, lowerIsBetter);
   return (
-    <div className="rounded-lg border border-border-line bg-surface px-md py-sm">
+    <div className="flex flex-col gap-xs">
       <p className="text-caption text-text-muted">{label}</p>
-      <p className={cn("mt-2xs text-h3 tabular-nums", tone)}>{value}</p>
+      <p className={cn("text-h2 tabular-nums", tone)}>{value}</p>
     </div>
   );
 }
@@ -201,11 +201,11 @@ export function SamsungAbExperimentCard() {
   const deltaByConfig = new Map(deltas.map((d) => [d.configId, d]));
 
   return (
-    <section className="card flex flex-col gap-md">
+    <section className="flex flex-col gap-md">
       <header className="flex flex-col gap-xs">
         <div className="flex items-start justify-between gap-md">
           <div>
-            <h2 className="text-h3 text-text-strong">{AB_SAMSUNG_TITLE}</h2>
+            <h2 className="text-h2 text-text-strong">{AB_SAMSUNG_TITLE}</h2>
             <p className="mt-xs text-body-sm text-text-muted">{AB_SAMSUNG_SUBTITLE}</p>
           </div>
           <button
@@ -235,7 +235,7 @@ export function SamsungAbExperimentCard() {
           <p className="text-caption text-text-muted">{AB_SINGLE_TICKER_NOTICE}</p>
         </div>
 
-        <div className="rounded-lg border border-border-line bg-surface-muted px-md py-sm">
+        <div className="rounded-md bg-surface-muted px-md py-sm">
           <p className="text-caption font-semibold text-text-strong">{AB_SAMSUNG_COMMAND_TITLE}</p>
           <code className="mt-xs block whitespace-pre-wrap break-all rounded-md bg-surface px-sm py-xs text-caption text-text-strong">
             {AB_SAMSUNG_COMMAND}
@@ -245,29 +245,26 @@ export function SamsungAbExperimentCard() {
       </div>
 
       {isLoading ? (
-        <div className="skeleton min-h-[120px]" aria-busy="true">
+        <div className="h-28 w-full animate-pulse rounded-md bg-surface-muted" aria-busy="true">
           <span className="sr-only">{AB_REPORT_LOADING}</span>
-          <div className="skeleton-line skeleton-line-medium" />
-          <div className="skeleton-line skeleton-line-narrow" />
-          <div className="skeleton-line skeleton-line-medium" />
         </div>
       ) : isError || !data ? (
-        <div className="card-critical" role="alert">
-          <p className="text-body-sm-strong">{AB_REPORT_ERROR}</p>
+        <div className="rounded-md bg-critical-soft px-md py-sm" role="alert">
+          <p className="text-body-sm-strong text-critical">{AB_REPORT_ERROR}</p>
         </div>
       ) : !data.configured ? (
-        <div className="rounded-lg border border-border-line bg-surface px-md py-sm" role="status">
+        <div className="rounded-md bg-surface-muted px-md py-sm" role="status">
           <p className="text-body-sm-strong text-text-strong">{AB_REPORT_NOT_CONFIGURED_TITLE}</p>
           <p className="mt-xs text-body-sm text-text-muted">{AB_REPORT_NOT_CONFIGURED_BODY}</p>
         </div>
       ) : data.configs.length === 0 || !baseline ? (
-        <div className="rounded-lg border border-border-line bg-surface px-md py-sm" role="status">
+        <div className="rounded-md bg-surface-muted px-md py-sm" role="status">
           <p className="text-body-sm-strong text-text-strong">{AB_REPORT_EMPTY_TITLE}</p>
           <p className="mt-xs text-body-sm text-text-muted">{AB_REPORT_EMPTY_BODY}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-md">
-          <div className="grid gap-sm md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-lg rounded-lg bg-surface-muted p-md md:grid-cols-3 md:p-lg xl:grid-cols-6">
             <DeltaCard label={AB_DELTA_INPUT} value={fmtDeltaPct(primaryDelta?.inputDeltaPct ?? null)} />
             <DeltaCard label={AB_DELTA_TIME} value={fmtDeltaPct(primaryDelta?.wallClockDeltaPct ?? null)} />
             <DeltaCard label={AB_DELTA_WORST_TIME} value={fmtDeltaPct(worstWallClockDelta)} />
@@ -319,7 +316,7 @@ export function SamsungAbExperimentCard() {
           </div>
 
           {primaryDelta?.reasons.length ? (
-            <div className="rounded-lg border border-border-line bg-surface-muted px-md py-sm">
+            <div className="rounded-md bg-surface-muted px-md py-sm">
               <p className="text-caption font-semibold text-text-strong">{statusLabel(primaryDelta.status)}</p>
               <p className="mt-xs text-caption text-text-muted">{primaryDelta.reasons.join(" · ")}</p>
             </div>

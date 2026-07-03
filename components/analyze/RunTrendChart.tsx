@@ -78,10 +78,10 @@ export function RunTrendChart({ series }: { series: RunSeriesPoint[] }) {
   const deltaUp = deltaPct != null && deltaPct > 0;
 
   return (
-    <section className="card" aria-label={TREND_TITLE}>
-      <header className="mb-md flex flex-wrap items-start justify-between gap-md">
+    <section className="flex flex-col gap-md" aria-label={TREND_TITLE}>
+      <header className="flex flex-wrap items-start justify-between gap-md">
         <div>
-          <h2 className="flex items-center gap-xs text-h3 text-text-strong">
+          <h2 className="flex items-center gap-xs text-h2 text-text-strong">
             {TREND_TITLE}
             <InfoTooltip label={TREND_HINT} />
           </h2>
@@ -114,9 +114,9 @@ export function RunTrendChart({ series }: { series: RunSeriesPoint[] }) {
       </header>
 
       {/* 최신 분석 헤드라인 */}
-      <div className="mb-md flex items-baseline gap-sm">
+      <div className="flex items-baseline gap-sm">
         <span className="text-caption text-text-muted">{TREND_LATEST}</span>
-        <strong className="text-h3 text-text-strong tabular-nums">
+        <strong className="text-h2 text-text-strong tabular-nums">
           {fmtMetric(t.latest, metric)}
         </strong>
         {deltaPct != null ? (

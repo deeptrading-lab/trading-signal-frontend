@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { Section } from "@/components/ui/Section";
 import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
 import { agentLabel, fmtCost, fmtDuration, fmtModel, fmtRate, fmtTokens } from "./format";
 import {
@@ -110,8 +111,7 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
   ];
 
   return (
-    <section className="card" aria-label={TABLE_TITLE}>
-      <h2 className="mb-lg text-h3 text-text-strong">{TABLE_TITLE}</h2>
+    <Section aria-label={TABLE_TITLE} title={TABLE_TITLE}>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
@@ -133,7 +133,7 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
             {display.map((r) => (
               <tr
                 key={r.agentKey}
-                className="border-b border-border-line hover:bg-surface-hover"
+                className="border-b border-border-line hover:bg-surface-muted"
               >
                 <td className="py-md pr-md text-body-sm-strong text-text-strong whitespace-nowrap">
                   {agentLabel(r.agentKey)}
@@ -167,7 +167,7 @@ export function AgentUsageTable({ rows }: { rows: AgentUsageRow[] }) {
           </tbody>
         </table>
       </div>
-    </section>
+    </Section>
   );
 }
 
@@ -176,7 +176,7 @@ function Num({ value, strong }: { value: string; strong?: boolean }) {
     <td
       className={cn(
         "py-md pl-md text-right tabular-nums whitespace-nowrap",
-        strong ? "text-body-sm-strong text-text-strong" : "text-body-sm text-text-default",
+        strong ? "text-body-sm-strong text-text-strong" : "text-body-sm text-text-strong",
       )}
     >
       {value}
