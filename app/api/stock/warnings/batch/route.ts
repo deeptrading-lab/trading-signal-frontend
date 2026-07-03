@@ -18,8 +18,14 @@ import { isTossConfigured } from "@/lib/api/toss/client";
 import type { StockWarningsBatchResponse } from "@/lib/types/stock/warnings";
 import { withTimeout, jsonWithDataSource } from "@/lib/server/bffUtils";
 
-/** 한 번에 조회할 티커 상한 — 토스 STOCK 5/s 대비 fan-out 폭 제한. */
-const MAX_TICKERS = 30;
+/**
+ * 한 번에 조회할 티커 상한 — 단타 워치 화면의 최대 가시 union 을 덮는다:
+ * 저장 워치(≤20) + 수급 후보(≤14) + 거래량 후보(≤14) = 최대 ~48. 이보다 낮으면 union 초과 시
+ * **뒤쪽(거래량 후보)이 먼저 잘려** 경보가 밀집한 그룹의 배지가 조용히 사라진다(리뷰 F-2). 50 으로
+ * 상향해 정상 사용 범위를 전부 덮되, 초과분은 여전히 로그 후 절단(무음 절단 금지).
+ * 콜드 캐시 첫 로드는 동시성 5 로 나눠 fan-out(60s 캐시가 이후 흡수, fail-soft·백그라운드).
+ */
+const MAX_TICKERS = 50;
 const BFF_TIMEOUT_MS = 6_000;
 
 export async function GET(request: NextRequest) {

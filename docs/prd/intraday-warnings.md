@@ -28,8 +28,8 @@
 
 - `fetchActiveWarningsBatch(symbols, concurrency=5)` — `fetchActiveWarnings` 를 동시성 제한
   fan-out(토스 `STOCK` 5/s 준수), 기존 60s 캐시 재사용. 반환 `Record<ticker, StockWarningItem[]>`.
-- BFF `GET /api/stock/warnings/batch?tickers=a,b,c` — 최대 30개 캡(초과분 로그 후 절단),
-  `X-Data-Source: toss|none`. 키 없으면 빈 맵.
+- BFF `GET /api/stock/warnings/batch?tickers=a,b,c` — 최대 50개 캡(가시 union 저장워치 20 + 후보
+  14+14 을 덮음, 초과분 로그 후 절단), `X-Data-Source: toss|none`. 키 없으면 빈 맵.
 - 클라이언트 `getStockWarningsBatch` + `useQueryStockWarningsBatch(tickers)` (staleTime 60s).
 
 ### 3-2. ⑥a 틱 판단 컨텍스트 주입
@@ -61,7 +61,7 @@
 | AC-2 | 활성 경보 없는 종목 | 컨텍스트에 유의 줄 없음, 칩 없음 |
 | AC-3 | 지정 종목(단기과열/투자경고) | 컨텍스트 `[매수 유의]` 1줄 + 표/후보 칩 |
 | AC-4 | 변화없음 스킵 틱 | 경보 페치 안 함(LLM 미호출 경로 — 낭비 방지) |
-| AC-5 | 배치 캡 | tickers>30 이면 30개로 절단 + 로그(무음 절단 금지) |
+| AC-5 | 배치 캡 | tickers>50 이면 50개로 절단 + 로그(무음 절단 금지). 정상 가시 union 은 미절단 |
 | AC-6 | 배치 동시성 | 최대 5 동시(5/s 준수), 중복 티커는 캐시로 1콜 |
 | AC-7 | 페치 실패 | 빈 맵 fail-soft, 표/판단 진행 무영향 |
 
