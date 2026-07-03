@@ -19,7 +19,7 @@ import {
   intradaySessionStock,
   useIntradayPaperWatch,
 } from "@/hooks/intraday/useIntradayPaperWatch";
-import { useIntradayPaperAutoTick } from "@/hooks/intraday/useIntradayPaperAutoTick";
+import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
@@ -56,7 +56,9 @@ export function IntradayWatchWorkspace() {
   const { data: quotes = [] } = useQueryWatchlist(watchTickers);
   const { sessionByTicker, runningOrphans, runningSessionIds, isCreating, start } =
     useIntradayPaperWatch(watchTickers);
-  const { isTicking } = useIntradayPaperAutoTick(runningSessionIds);
+  // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
+  useIntradayPaperRefresh(runningSessionIds);
+  const autoActive = runningSessionIds.length > 0;
 
   const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
@@ -74,7 +76,7 @@ export function IntradayWatchWorkspace() {
           <h1 className="text-h1 text-text-strong">{W.title}</h1>
           <p className="text-caption text-text-muted">{W.subtitle}</p>
         </div>
-        {isTicking ? <span className="ml-auto badge-info">{P.autoTicking}</span> : null}
+        {autoActive ? <span className="ml-auto badge-info">{P.autoTicking}</span> : null}
       </header>
 
       {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}
