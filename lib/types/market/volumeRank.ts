@@ -6,6 +6,13 @@
 
 import type { FlowDirection } from "@/lib/types/flow/top10";
 
+/**
+ * 정렬 기준 — 거래량순(기본) / 거래대금순.
+ *   - `volume` → KIS `FID_BLNG_CLS_CODE=0`(평균거래량), 지표 = `acml_vol`.
+ *   - `value`  → KIS `FID_BLNG_CLS_CODE=3`(거래금액순), 지표 = `acml_tr_pbmn`.
+ */
+export type VolumeRankBy = "volume" | "value";
+
 /** 거래량 순위 1행. */
 export type VolumeRankRow = {
   /** 종목 코드(6자리). */
@@ -20,6 +27,11 @@ export type VolumeRankRow = {
   direction: FlowDirection;
   /** 누적 거래량(주). */
   volume: number;
+  /**
+   * 누적 거래대금 — KIS `acml_tr_pbmn` 원값 그대로(단위 환산은 프론트 포맷터 책임).
+   * 거래대금순(`by=value`) 응답에서 채워진다. 거래량순에서도 응답에 있으면 함께 매핑.
+   */
+  tradingValue?: number;
 };
 
 /** 거래량 순위 응답. */

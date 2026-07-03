@@ -17,6 +17,9 @@
  *   - tickers 배열은 readonly tuple 안정성을 위해 `.slice().sort()` 정규화 후 join → 순서 무관 캐시.
  */
 
+import type { FluctuationDirection } from "@/lib/types/market/fluctuation";
+import type { VolumeRankBy } from "@/lib/types/market/volumeRank";
+
 function normalizeTickers(tickers: readonly string[]): string {
   return tickers.slice().sort().join(",");
 }
@@ -76,8 +79,11 @@ export const queryKeys = {
     ticker: ["market", "ticker"] as const,
     /** CNN(미국) 공포·탐욕 지수 — 단일, 인자 없음. */
     fearGreed: ["market", "fear-greed"] as const,
-    /** 거래량 순위 상위(단타워치 후보 추천) — 인자 없음. */
-    volumeRank: ["market", "volume-rank"] as const,
+    /** 거래량/거래대금 순위 상위(단타워치 후보·실시간 랭킹) — 정렬 기준별 분리 캐시. */
+    volumeRank: (by: VolumeRankBy) => ["market", "volume-rank", by] as const,
+    /** 등락률 순위(급상승/급하락, 실시간 랭킹 탭) — 방향별 분리 캐시. */
+    fluctuation: (dir: FluctuationDirection) =>
+      ["market", "fluctuation", dir] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>
