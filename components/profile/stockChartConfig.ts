@@ -9,6 +9,14 @@
 import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 
 /**
+ * 메인 차트 봉 단위(UI 레벨) — 분봉(당일) + 일/주/월봉(`ChartPeriod`).
+ *
+ * `ChartPeriod`("D"|"W"|"M")은 일봉 라우트(`/stock/chart`) 전용이라 그대로 두고, 분봉("m")을
+ *   더한 UI 유니온을 셸/차트 경계에서 쓴다. 분봉은 별도 라우트(`/stock/chart-minute`)로 페치한다.
+ */
+export type MainInterval = "m" | ChartPeriod;
+
+/**
  * 우측 y축(가격·거래량·MACD·RSI) 공통 폭(px). 최신 종가 태그(LastPriceTag)가
  * 이 폭만큼의 축 영역에 우정렬되므로, 축과 태그가 같은 상수를 공유해야 정렬이 맞는다.
  */
@@ -42,13 +50,27 @@ export const CHART_OVERLAY_OPTIONS: {
 ];
 
 // ── 봉·기간 설정 ────────────────────────────────────────
-export type PeriodConfig = { label: string; period: ChartPeriod };
+export type IntervalConfig = { label: string; interval: MainInterval };
 export type RangeConfig = { label: string; days: number };
+export type TimeframeConfig = { label: string; timeframe: number };
 
-export const PERIODS: PeriodConfig[] = [
-  { label: "일봉", period: "D" },
-  { label: "주봉", period: "W" },
-  { label: "월봉", period: "M" },
+/** 봉 종류 토글 순서: 분봉(당일) → 일봉 → 주봉 → 월봉. */
+export const INTERVALS: IntervalConfig[] = [
+  { label: "분봉", interval: "m" },
+  { label: "일봉", interval: "D" },
+  { label: "주봉", interval: "W" },
+  { label: "월봉", interval: "M" },
+];
+
+/**
+ * 분봉 간격 선택지 — 분봉이 활성일 때 우측 기간 슬롯이 이 목록으로 바뀐다(당일 한 세션이라
+ *   1개월/3개월… 범위가 무의미). 값은 `useQueryMinuteChart` 의 `timeframe`(분). 기본 5분.
+ */
+export const MINUTE_TIMEFRAMES: TimeframeConfig[] = [
+  { label: "1분", timeframe: 1 },
+  { label: "3분", timeframe: 3 },
+  { label: "5분", timeframe: 5 },
+  { label: "15분", timeframe: 15 },
 ];
 
 export const RANGES: Record<ChartPeriod, RangeConfig[]> = {
@@ -72,20 +94,27 @@ export const RANGES: Record<ChartPeriod, RangeConfig[]> = {
 
 // ── 기본값 ──────────────────────────────────────────────
 export const DEFAULT_CHART_TYPE: ChartType = "candle";
-export const DEFAULT_PERIOD: ChartPeriod = "D";
+export const DEFAULT_INTERVAL: MainInterval = "D";
 /** 일봉 기준 두 번째 범위(3개월) — 기존 기본값 유지. */
 export const DEFAULT_DAYS = RANGES["D"][1].days;
+/** 분봉 기본 간격(분) — `MINUTE_TIMEFRAMES` 세 번째(5분)와 정합. */
+export const DEFAULT_TIMEFRAME = 5;
 
-/** 봉 종류 변경 시 기본으로 잡는 범위(각 봉의 첫 범위). */
-export function defaultDaysForPeriod(p: ChartPeriod): number {
-  return RANGES[p][0].days;
+/**
+ * 봉 종류 변경 시 기본으로 잡는 범위(각 봉의 첫 범위).
+ * 분봉("m")은 days 를 쓰지 않고 `timeframe` 으로 제어하므로 여기선 기본 days 만 돌려준다(타입 총족용).
+ */
+export function defaultDaysForPeriod(interval: MainInterval): number {
+  if (interval === "m") return DEFAULT_DAYS;
+  return RANGES[interval][0].days;
 }
 
 /**
  * 봉 단위 라벨 — 보조지표 "데이터 부족 (최소 N{단위})" 안내에서 단위를 봉 종류에 맞춰 표기.
- * 일봉→"일", 주봉→"주", 월봉→"월".
+ * 분봉→"분", 일봉→"일", 주봉→"주", 월봉→"월".
  */
-export const PERIOD_UNIT: Record<ChartPeriod, string> = {
+export const PERIOD_UNIT: Record<MainInterval, string> = {
+  m: "분",
   D: "일",
   W: "주",
   M: "월",

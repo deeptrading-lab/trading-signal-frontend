@@ -3,7 +3,7 @@
  *
  * 노스스타 `#detailScreen` 정합 — **단일 컬럼 카드리스**(데스크탑·모바일 공통). 카드 박스 대신
  * 헤어라인·여백으로 섹션을 구분(토스 톤). 정보 티어링(T4):
- *   - 항시(always): 시세 헤더 → 일봉 차트 → 컴팩트 시그널 요약. 화면에 늘 떠 있다.
+ *   - 항시(always): 시세 헤더 → 가격 차트(분/일/주/월봉) → 컴팩트 시그널 요약. 화면에 늘 떠 있다.
  *   - 온디맨드(잠깐): 회사개요·최근공시·투자자 수급 — **데스크탑·모바일 공통 기본 접힘**(CollapsibleCard
  *     `variant="flat"`). 접힘 상태에선 자식이 미마운트라 해당 API 도 펼치기 전까진 호출되지 않는다.
  *
@@ -17,7 +17,6 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { StockHeader } from "./StockHeader";
 import { StockChartSkeleton } from "./StockChartSkeleton";
 import { SignalSummary } from "./SignalSummary";
@@ -30,9 +29,11 @@ import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
 import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
-  DEFAULT_PERIOD,
+  DEFAULT_INTERVAL,
+  DEFAULT_TIMEFRAME,
   defaultDaysForPeriod,
   type ChartType,
+  type MainInterval,
 } from "./stockChartConfig";
 
 /**
@@ -50,26 +51,30 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   const { openFor } = useAIAnalysisContext();
   const openAIAnalysis = () => openFor(ticker);
 
-  // 차트 컨트롤 상태 — 부모가 소유해 StockDailyChart 를 controlled 로 두고 값(라인/캔들·봉·기간)을 보존.
-  const [period, setPeriod] = useState<ChartPeriod>(DEFAULT_PERIOD);
-  const [days, setDays] = useState<number>(DEFAULT_DAYS);
+  // 차트 컨트롤 상태 — 부모가 소유해 StockDailyChart 를 controlled 로 두고 값(라인/캔들·봉·기간/간격)을 보존.
+  const [interval, setChartInterval] = useState<MainInterval>(DEFAULT_INTERVAL);
+  const [days, setDays] = useState<number>(DEFAULT_DAYS); // 일/주/월봉 보기 범위
+  const [timeframe, setTimeframe] = useState<number>(DEFAULT_TIMEFRAME); // 분봉 간격(분)
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
   // 오버레이 옵션(매물대·볼린저밴드) — 기본 off, 드롭다운 체크박스로 토글. localStorage 지속.
   const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
 
-  function handlePeriodChange(p: ChartPeriod) {
-    setPeriod(p);
-    setDays(defaultDaysForPeriod(p)); // 봉 변경 시 해당 봉의 첫 범위로
+  function handleIntervalChange(next: MainInterval) {
+    setChartInterval(next);
+    // 분봉은 days 대신 timeframe(기본 5분)로 제어 — 범위 리셋 불필요. 일/주/월봉만 해당 봉 첫 범위로.
+    if (next !== "m") setDays(defaultDaysForPeriod(next));
   }
 
   const chartControls = {
-    period,
+    interval,
     days,
+    timeframe,
     chartType,
     showVolumeProfile: chartOptions.volumeProfile,
     showBollinger: chartOptions.bollinger,
-    onPeriodChange: handlePeriodChange,
+    onIntervalChange: handleIntervalChange,
     onDaysChange: setDays,
+    onTimeframeChange: setTimeframe,
     onChartTypeChange: setChartType,
     onToggleVolumeProfile: () => toggleChartOption("volumeProfile"),
     onToggleBollinger: () => toggleChartOption("bollinger"),
@@ -80,7 +85,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       {/* ── 항시(T4): 시세 헤더 ── */}
       <StockHeader ticker={ticker} onAIAnalysis={openAIAnalysis} />
 
-      {/* ── 항시: 일봉 차트(플랫) — 시맨틱 <section> 은 자식(ChartShell)이 소유, 래퍼는 헤어라인만 ── */}
+      {/* ── 항시: 가격 차트(플랫, 봉 단위 선택) — 시맨틱 <section> 은 자식(ChartShell)이 소유, 래퍼는 헤어라인만 ── */}
       <div className="mt-lg border-t border-border-line pt-lg">
         <StockDailyChart ticker={ticker} {...chartControls} />
       </div>

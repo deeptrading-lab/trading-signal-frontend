@@ -1,7 +1,9 @@
 /**
  * StockDailyChart — 종목 상세 가격 차트 + 보조지표 서브플롯.
  *
- * 데이터 소스: `inquire-daily-itemchartprice`(FHKST03010100, 최대 100봉) — `useChartData`(워밍업 포함).
+ * 데이터 소스(봉 단위별, `useChartData` 가 분기):
+ *   - 일/주/월봉: `inquire-daily-itemchartprice`(FHKST03010100) — 워밍업 포함 fetch 후 구간 슬라이스.
+ *   - 분봉(당일): `inquire-time-itemchartprice`(FHKST03010200) — 당일 한 세션 전체, x축 "HH:mm".
  *
  * 서브플롯 구성 (syncId="stock-chart" 로 호버 연동):
  *   1. 가격 (240px) — 캔들(기본) 또는 라인. 하단에 날짜축(일정 간격) 표시.
@@ -37,7 +39,6 @@ import {
   ResponsiveContainer,
   DefaultZIndexes,
 } from "recharts";
-import { type ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { useChartData } from "@/hooks/stock/useChartData";
 import {
   fmtYAxis,
@@ -51,7 +52,7 @@ import {
   STOCK_DETAIL_LOADING,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
-import { PERIOD_UNIT, CHART_AXIS_WIDTH, type ChartType } from "./stockChartConfig";
+import { PERIOD_UNIT, CHART_AXIS_WIDTH, type ChartType, type MainInterval } from "./stockChartConfig";
 import { useChartTheme, SYNC_ID } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
@@ -69,13 +70,15 @@ export interface StockDailyChartProps {
   onExpand?: () => void;
   onCollapse?: () => void;
   // 차트 컨트롤 — 상위(StockPageLayout)가 소유. 확대/축소 리마운트에도 값 보존.
-  period: ChartPeriod;
+  interval: MainInterval;
   days: number;
+  timeframe: number;
   chartType: ChartType;
   showVolumeProfile: boolean;
   showBollinger: boolean;
-  onPeriodChange: (p: ChartPeriod) => void;
+  onIntervalChange: (i: MainInterval) => void;
   onDaysChange: (d: number) => void;
+  onTimeframeChange: (t: number) => void;
   onChartTypeChange: (t: ChartType) => void;
   onToggleVolumeProfile: () => void;
   onToggleBollinger: () => void;
@@ -86,19 +89,21 @@ export function StockDailyChart({
   expanded,
   onExpand,
   onCollapse,
-  period,
+  interval,
   days,
+  timeframe,
   chartType,
   showVolumeProfile,
   showBollinger,
-  onPeriodChange,
+  onIntervalChange,
   onDaysChange,
+  onTimeframeChange,
   onChartTypeChange,
   onToggleVolumeProfile,
   onToggleBollinger,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } =
-    useChartData(ticker, period, days);
+    useChartData(ticker, interval, days, timeframe);
 
   // 런타임 테마 색 — light/dark 전환 시 새 객체 reference 로 recharts 리렌더.
   const theme = useChartTheme();
@@ -118,13 +123,13 @@ export function StockDailyChart({
     [candleSeries, volSeries],
   );
 
-  const shellProps = { expanded, onExpand, onCollapse, period, days, onPeriodChange, onDaysChange, chartType, onChartTypeChange, showVolumeProfile, onToggleVolumeProfile, showBollinger, onToggleBollinger };
+  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, onIntervalChange, onDaysChange, onTimeframeChange, chartType, onChartTypeChange, showVolumeProfile, onToggleVolumeProfile, showBollinger, onToggleBollinger };
 
   // 볼린저밴드 표시 여부 — 토글 on 이고 보기 구간에 유효한(룩백 20봉 충족) 값이 있을 때만 렌더.
   const showBB = showBollinger && candleSeries.some((c) => c.bbMid != null);
 
-  // 데이터 부족 안내의 봉 단위(일/주/월) — 선택된 봉 종류에 따라 표기 변경.
-  const periodUnit = PERIOD_UNIT[period];
+  // 데이터 부족 안내의 봉 단위(분/일/주/월) — 선택된 봉 종류에 따라 표기 변경.
+  const periodUnit = PERIOD_UNIT[interval];
 
   if (isLoading) {
     return (

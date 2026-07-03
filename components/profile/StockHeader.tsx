@@ -4,7 +4,7 @@
  * stock-detail-reskin — 노스스타 `.phead` 정합:
  *   ① 이름행: 로고닷 + 종목명(**코드 미표시**) + 관심 별 + 매수 유의 경고칩 · (우) AI 종합분석 버튼.
  *   ② 가격행: 큰 현재가(font-display) + 등락률/등락액(한국식 상승 빨강·하락 파랑).
- *   ③ 메타칩: 업종(price.sector 있을 때만). ⚠️ 거래소·시총은 현재가 페이로드에 없어 **미표시**(날조 금지).
+ *   ※ 업종 칩은 기업개황 '업종' 필드와 중복이라 제거(chart-minute-interval). 거래소·시총은 payload 부재로 미표시.
  *
  * 데이터: `useQueryStockPrice(ticker)` — KIS 현재가 + 등락 + 업종. 종목명은 watchlist store →
  *   최근 검색 → API → ticker 폴백 순. 경고칩은 `useQueryStockWarnings`(fail-soft: 없으면 미표시).
@@ -136,15 +136,6 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
           </span>
         </div>
       </div>
-
-      {/* ③ 메타칩 — 업종(있을 때만). 거래소·시총은 payload 부재로 미표시. */}
-      {data.sector && (
-        <div className="flex flex-wrap items-center gap-xs">
-          <span className="inline-flex items-center rounded-pill bg-surface-muted px-sm py-xs text-caption text-text-muted">
-            {data.sector}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
