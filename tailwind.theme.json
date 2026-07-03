@@ -16,6 +16,7 @@
         "warn-soft": "#fff3df",
         "info": "#1c4fd1",
         "info-soft": "#e7efff",
+        "link": "#1c4fd1",
         "critical": "#8e1717",
         "critical-soft": "#fde1e1",
         "signal-up": "#c81e1e",
@@ -278,6 +279,21 @@
         "md": "768px",
         "lg": "1024px",
         "xl": "1280px"
+      },
+      "boxShadow": {
+        "card": "var(--fs-shadow-card)",
+        "elevated": "var(--fs-shadow-elevated)",
+        "overlay": "var(--fs-shadow-overlay)",
+        "tooltip": "var(--fs-shadow-tooltip)"
+      },
+      "transitionDuration": {
+        "fast": "120ms",
+        "base": "200ms",
+        "slow": "320ms"
+      },
+      "transitionTimingFunction": {
+        "standard": "cubic-bezier(0.2, 0, 0, 1)",
+        "emphasized": "cubic-bezier(0.25, 0.1, 0.25, 1)"
       }
     }
   }

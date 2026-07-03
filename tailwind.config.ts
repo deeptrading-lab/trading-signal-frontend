@@ -151,6 +151,12 @@ function adaptDesignTokens(json: typeof themeJson) {
     // Tailwind 의 `theme.extend.screens` 는 기본 sm/md/lg/xl 위에 덮어쓰는 의미라서, 기본값과 동일하더라도
     // 명시적으로 흡수해 DESIGN.md 단일 진실 원천 규칙(PR #13)을 breakpoint 차원에도 일관 적용한다.
     screens: t.screens,
+    // design-elevation-foundation — 그림자/모션 토큰 (inject-shadows / inject-motion 산출).
+    // boxShadow 는 `var(--fs-shadow-*)` 참조라 `html.dark` 토글로 라이트/다크 자동 전환.
+    // 모션(duration/timing)은 테마 무관 정적 값. motion/react 측은 `lib/motion/tokens.ts` 사용.
+    boxShadow: t.boxShadow,
+    transitionDuration: t.transitionDuration,
+    transitionTimingFunction: t.transitionTimingFunction,
     // 컴포넌트 metric (input/button/badge height, shell padding) 은 spacing 토큰으로 합성 불가능한
     // 절대값이라 그대로 width/height 유틸리티에서 임의 값(`h-[42px]`)으로 쓰거나 컴포넌트 클래스에 흡수한다.
     // 차후 디자이너가 metric 토큰을 정식화하면 본 어댑터에서 흡수.

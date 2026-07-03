@@ -5719,6 +5719,48 @@
   - (사용자 확인) 001210 등 지정 종목을 관심종목에 담아 "투자경고" 칩 시각 확인.
   - 남은 매수유의 후속: ③ 밸류트랩 스냅샷(소비자=봇 레포), ⑦ 스코어카드 지정 이벤트 스탬프(경보 이력 없어 결정시점 스탬프 필요). 둘 다 소비자 준비 시.
 
+### 2026-07-03 — feat(design): 리디자인 파운데이션 — elevation/motion/link 토큰 + 공용 원자 + 포터블 차트 (#211)
+
+- **slug**: `design-elevation-foundation` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/211
+- **요약**: feat(design): 리디자인 파운데이션 — elevation/motion/link 토큰 + 공용 원자 + 포터블 차트
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 개요
+  > 
+  > UX/UI 전면 고도화(토스급) 이니셔티브의 **Phase 1 파운데이션**. 전부 **무회귀(시각 무변경)** 로 설계 — 토큰은 정의만(미소비), 원자는 additive 래퍼, MiniStockChart는 additive. 실제 시각 변경은 후속 리스킨 페이즈(노스스타 확정 후).
+  > 
+  > ## 변경
+  > 
+  > ### 1. 디자인 토큰 — `design:sync` 파이프라인 확장
+  > - **`link` 토큰**(colors/colors-dark, `info` 폴백값) — v8에서 미정의로 남겨둔 TODO 해소
+  > - **그림자(elevation) 스케일** `shadows`/`shadows-dark`(card·elevated·overlay·tooltip) — 현재 인라인 리터럴 값으로 시드(무회귀)
+  > - **모션 토큰** `motion`(duration 3·ease 2)
+  > - 신규 `scripts/inject-shadows.mjs`·`inject-motion.mjs` — 기존 `inject-color-themes` 패턴 계승, light/dark parity 강제
+  > - `tailwind.config.ts` 어댑터: `boxShadow`·`transitionDuration`·`transitionTimingFunction` 흡수
+  > - 산출물: `app/shadow-vars.css`(`--fs-shadow-*` 라이트/다크), `lib/motion/tokens.ts`(motion/react용 JS 값)
+  > 
+  > ### 2. 공용 컴포넌트 원자 (`components/ui/`)
+  > - **래핑 원자**(서버 호환, 합성 클래스와 시각 동일): `Button`·`Card`·`Badge`·`Skeleton`
+  > - **플랫 프리미티브**(T2 탈-카드): `Section`·`Divider`·`ListRow`
+  > 
+  > ### 3. 포터블 차트
+  > - `components/stock/MiniStockChart.tsx` — 어디서든 소환 가능한 일봉 미니 차트. `StockDailyChart`와 데이터/아톰 공유(쿼리키 동일 → 상세 진입 시 캐시 히트). Phase 2 peek 인에이블러.
+  > 
+  > ## 검증
+  > - `design:sync` **멱등**(2회 실행 무diff) · `tsc` · `next build` · `eslint` · `vitest`(750 passed) 전부 통과
+  > - 토큰 미소비 + 원자 additive → **라이트·다크 시각 무변경**
+  > 
+  > ## 다음 작업
+  > - **Phase 2 — 글로벌 Peek 차트**: `MiniStockChart`를 종목 행에서 소환(데스크탑 hover 팝오버 / 모바일 롱프레스 시트). `usePrefetchStockDetail` 인텐트 시드 재사용, KIS 초당 한도 대비 동시성 캡.
+  > - **Phase 3~7 — 화면 리스킨**: 셸 → 홈(토스 IA·**카드리스·화이트포워드**·컴팩트) → 종목상세(정보 티어링) → AI 패널 → 관심종목 등. **노스스타 시안(Artifact)에서 룩 확정 후** 진행.
+  > - **확정 대기(노스스타)**: 브랜드 색(블루 전면 기본) / 실시간 랭킹 범위(거래대금·급상승/급하락 KIS 순위 TR 신설) / peek 인터랙션 방식 / 컴팩트 밀도.
+  > - **그림자·모션 토큰 소비**(현 인라인 리터럴 → `shadow-*` 유틸 치환)는 밀도/브랜드 비주얼 패스와 함께(다크 그림자값 개선 포함).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **Phase 2 — 글로벌 Peek 차트**: `MiniStockChart`를 종목 행에서 소환(데스크탑 hover 팝오버 / 모바일 롱프레스 시트). `usePrefetchStockDetail` 인텐트 시드 재사용, KIS 초당 한도 대비 동시성 캡.
+  - **Phase 3~7 — 화면 리스킨**: 셸 → 홈(토스 IA·**카드리스·화이트포워드**·컴팩트) → 종목상세(정보 티어링) → AI 패널 → 관심종목 등. **노스스타 시안(Artifact)에서 룩 확정 후** 진행.
+  - **확정 대기(노스스타)**: 브랜드 색(블루 전면 기본) / 실시간 랭킹 범위(거래대금·급상승/급하락 KIS 순위 TR 신설) / peek 인터랙션 방식 / 컴팩트 밀도.
+  - **그림자·모션 토큰 소비**(현 인라인 리터럴 → `shadow-*` 유틸 치환)는 밀도/브랜드 비주얼 패스와 함께(다크 그림자값 개선 포함).
 ### 2026-07-03 — feat(intraday): 틱 판단 정량 스냅샷 영속 — 미스 분석·모델 A/B 근거 (#209)
 
 - **slug**: `intraday-tick-snapshot` · **author**: @HY0118
