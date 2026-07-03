@@ -1,17 +1,18 @@
 /**
- * IntradayMiniChart — 워치 펼침 차트 탭의 당일 분봉 미니 차트. intraday-paper-watch.
+ * IntradayMiniChart — 워치 펼침 차트 탭의 당일 분봉 캔들 차트. intraday-paper-watch.
  *
- * AI 가 보는 것과 같은 분봉(세션 주기에서 파생된 타임프레임)의 종가 흐름 + 가상 체결
+ * AI 가 보는 것과 같은 분봉(세션 주기에서 파생된 타임프레임)의 캔들(시고저종) + 가상 체결
  * 지점(매수 빨강/매도 파랑 점)을 겹쳐 보여준다. 장중엔 훅이 60초 간격으로 자동 갱신.
- * 색·축·툴팁은 차트 테마 SSOT(useChartTheme) 재사용.
+ * 캔들 shape·툴팁은 스톡 차트 아톰(CandleBar·CandleTooltip) 재사용 — 부하는 라인과 사실상
+ * 동일(동일 API·SVG 노드 수백 개 수준). 색·축은 차트 테마 SSOT(useChartTheme).
  */
 
 "use client";
 
 import {
-  Area,
-  AreaChart,
+  Bar,
   CartesianGrid,
+  ComposedChart,
   ReferenceDot,
   ResponsiveContainer,
   Tooltip,
@@ -20,6 +21,10 @@ import {
 } from "recharts";
 import { useQueryMinuteChart } from "@/hooks/stock/useQueryMinuteChart";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
+// 캔들 아톰 — 스톡 일봉 차트와 공용(도메인 무관 차트 조각, components/ui 승격 후보).
+import { ChartThemeProvider } from "@/components/profile/chart/ChartThemeContext";
+import { CandleBar } from "@/components/profile/chart/CandleBar";
+import { CandleTooltip } from "@/components/profile/chart/CandleTooltip";
 import { formatMoney } from "@/lib/utils/formatMoney";
 import { INTRADAY_PAPER_COPY as P } from "@/lib/copy/stock/intradayRead";
 
@@ -34,14 +39,12 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** 주문 시각(UTC) → 분봉 버킷 키("YYYY-MM-DDTHH:mm", KST·타임프레임 내림) — 캔들 x 와 매칭. */
+/** 주문 시각(UTC) → 분봉 버킷 "HH:mm"(KST·타임프레임 내림) — 캔들 x(당일 유일)와 매칭. */
 function orderBucket(atIso: string, timeframe: number): string {
   const kst = new Date(new Date(atIso).getTime() + 9 * 3_600_000);
   const mins = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   const floored = Math.floor(mins / Math.max(1, timeframe)) * Math.max(1, timeframe);
-  return `${kst.getUTCFullYear()}-${pad(kst.getUTCMonth() + 1)}-${pad(kst.getUTCDate())}T${pad(
-    Math.floor(floored / 60),
-  )}:${pad(floored % 60)}`;
+  return `${pad(Math.floor(floored / 60))}:${pad(floored % 60)}`;
 }
 
 export function IntradayMiniChart({
@@ -66,70 +69,57 @@ export function IntradayMiniChart({
     return <p className="text-caption text-text-muted">{P.table.chartEmpty}</p>;
   }
 
-  const dayOpen = candles[0].open;
-  const last = candles.at(-1)!.close;
-  const lineColor = last >= dayOpen ? theme.C.stroke : theme.C.down;
-  const candleKeys = new Set(candles.map((c) => c.date));
+  // CandleBar 계약: wickRange(range dataKey)=[low,high], payload 에 open/close/high/low/isUp.
+  // 당일 단일 세션이라 x 는 "HH:mm" 으로 유일 — 툴팁 라벨도 그대로 쓴다.
+  const series = candles.map((candle, index) => {
+    const prevClose = index > 0 ? candles[index - 1].close : null;
+    return {
+      ...candle,
+      date: candle.date.slice(-5),
+      wickRange: [candle.low, candle.high] as [number, number],
+      isUp: candle.close >= candle.open,
+      change: prevClose != null ? candle.close - prevClose : null,
+      changePct: prevClose ? ((candle.close - prevClose) / prevClose) * 100 : null,
+    };
+  });
+  const candleKeys = new Set(series.map((row) => row.date));
   const markers = orders
     .map((order) => ({ ...order, x: orderBucket(order.at, timeframe) }))
     .filter((order) => candleKeys.has(order.x));
-  const gradientId = `intradayFill-${ticker}`;
 
   return (
     <div className="h-[220px] w-full min-w-0">
-      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 220 }}>
-        <AreaChart data={candles} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={lineColor} stopOpacity={0.2} />
-              <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid vertical={false} stroke={theme.C.grid} strokeDasharray="3 3" />
-          <XAxis
-            dataKey="date"
-            {...theme.axisProps}
-            tickFormatter={(v: string) => v.slice(-5)}
-            minTickGap={40}
-            tickMargin={6}
-          />
-          <YAxis
-            {...theme.axisProps}
-            width={56}
-            tickFormatter={(v: number) => formatMoney(v)}
-            domain={[
-              (dataMin: number) => dataMin * 0.998,
-              (dataMax: number) => dataMax * 1.002,
-            ]}
-          />
-          <Tooltip
-            contentStyle={theme.tooltipStyle}
-            labelStyle={theme.labelStyle}
-            formatter={(value) => [`${formatMoney(Number(value))}원`, "종가"]}
-            labelFormatter={(label) => String(label ?? "").slice(-5)}
-          />
-          <Area
-            type="monotone"
-            dataKey="close"
-            stroke={lineColor}
-            strokeWidth={2}
-            fill={`url(#${gradientId})`}
-            dot={false}
-            activeDot={{ r: 3, strokeWidth: 0 }}
-          />
-          {markers.map((marker, index) => (
-            <ReferenceDot
-              key={`${marker.x}-${index}`}
-              x={marker.x}
-              y={marker.price}
-              r={4}
-              fill={marker.side === "BUY" ? theme.C.stroke : theme.C.down}
-              stroke={theme.C.surface}
-              strokeWidth={1.5}
+      <ChartThemeProvider value={theme}>
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          initialDimension={{ width: 600, height: 220 }}
+        >
+          <ComposedChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke={theme.C.grid} strokeDasharray="3 3" />
+            <XAxis dataKey="date" {...theme.axisProps} minTickGap={40} tickMargin={6} />
+            <YAxis
+              {...theme.axisProps}
+              width={56}
+              tickFormatter={(v: number) => formatMoney(v)}
+              domain={["auto", "auto"]}
             />
-          ))}
-        </AreaChart>
-      </ResponsiveContainer>
+            <Tooltip content={<CandleTooltip />} />
+            <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={8} isAnimationActive={false} />
+            {markers.map((marker, index) => (
+              <ReferenceDot
+                key={`${marker.x}-${index}`}
+                x={marker.x}
+                y={marker.price}
+                r={4}
+                fill={marker.side === "BUY" ? theme.C.stroke : theme.C.down}
+                stroke={theme.C.surface}
+                strokeWidth={1.5}
+              />
+            ))}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </ChartThemeProvider>
     </div>
   );
 }
