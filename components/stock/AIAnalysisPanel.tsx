@@ -7,6 +7,7 @@ import {
   AlertCircle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 import { AGENT_META } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
@@ -32,7 +33,7 @@ import type {
  * prod(Vercel) 판별 — 클라이언트. Vercel 이 `NEXT_PUBLIC_VERCEL_ENV` 를 빌드타임 인라인하므로
  * 서버/클라 값이 동일 → 하이드레이션 불일치 없음(navItems.ts 선례). prod 한정 큐 카드 분기에만 사용.
  */
-const IS_PROD = typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string";
+const IS_PROD = isVercelRuntime();
 
 interface AIAnalysisPanelProps extends AIAnalysisContextValue {
   ticker: string;

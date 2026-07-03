@@ -70,6 +70,8 @@ export function useChartData(
   days: number,
 ): UseChartDataResult {
   // 워밍업 포함 fetch — 보기 구간(days)보다 더 과거까지 받아 지표 계산용 데이터 확보.
+  //   ※ useSignalResult 의 `D`/200 요청과는 `days` 키가 달라 초기 1왕복 중복이 있으나, 기간 선택기가
+  //     `days` 를 가변으로 두므로 안전한 단일 키 공유가 어렵다(사유·보류 근거는 useSignalResult 헤더 참고).
   const fetchDays = Math.min(days + WARMUP_DAYS[period], MAX_FETCH_DAYS);
   const { data, isLoading, isError, error } = useQueryStockChart(ticker, {
     period,
