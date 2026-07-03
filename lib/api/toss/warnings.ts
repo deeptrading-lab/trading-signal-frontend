@@ -116,6 +116,46 @@ export async function fetchActiveWarnings(
   return pending;
 }
 
+/**
+ * 여러 심볼의 활성 유의사항을 동시성 제한 fan-out 으로 조회 — PRD `intraday-warnings` §3-1.
+ * 각 심볼은 `fetchActiveWarnings`(never-throw·60s 캐시·single-flight)를 지나므로 중복 심볼·
+ * 최근 조회분은 캐시로 흡수된다. 토스 `STOCK` 5/s 준수를 위해 동시 실행을 제한한다.
+ *
+ * @returns 심볼(정규화 대문자) → 유의사항 배열. 실패 심볼은 빈 배열(fail-soft).
+ */
+export async function fetchActiveWarningsBatch(
+  symbols: readonly string[],
+  concurrency = 5,
+): Promise<Record<string, StockWarningItem[]>> {
+  // 키 미설정이면 fan-out 자체를 생략(빈 맵) — 동료 로컬 무영향.
+  if (!isTossConfigured()) return {};
+
+  // 중복·형식 밖 제거 후 정규화(대문자) — 캐시 키 정합.
+  const unique = [
+    ...new Set(
+      symbols
+        .map((s) => s.trim().toUpperCase())
+        .filter((s) => isValidWarningsSymbol(s)),
+    ),
+  ];
+
+  const out: Record<string, StockWarningItem[]> = {};
+  const limit = Math.max(1, concurrency);
+  let cursor = 0;
+
+  async function worker(): Promise<void> {
+    while (cursor < unique.length) {
+      const symbol = unique[cursor++];
+      out[symbol] = await fetchActiveWarnings(symbol); // never-throw
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, unique.length) }, () => worker()),
+  );
+  return out;
+}
+
 export function resetWarningsForTest(): void {
   cache.clear();
   inflight.clear();

@@ -35,6 +35,9 @@ export const queryKeys = {
       ["stock", "minute-chart", ticker, timeframe] as const,
     /** 매수 유의사항(거래소 시장경보·VI) — 종목 헤더 경고 칩. */
     warnings: (ticker: string) => ["stock", "warnings", ticker] as const,
+    /** 매수 유의사항 배치(단타 워치/후보 칩) — 티커 집합, 순서 무관 정규화. */
+    warningsBatch: (tickers: readonly string[]) =>
+      ["stock", "warnings-batch", normalizeTickers(tickers)] as const,
     search: (keyword: string) => ["stock", "search", keyword] as const,
     /** 종목별 개인/외국인/기관 최근 N일 순매수 추이(투자자 도메인 표면 B). */
     investors: (ticker: string) => ["stock", "investors", ticker] as const,

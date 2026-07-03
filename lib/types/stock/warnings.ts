@@ -27,3 +27,8 @@ export type StockWarningItem = {
 export type StockWarningsResponse = {
   warnings: StockWarningItem[];
 };
+
+/** 배치 조회 응답 — 티커별 활성 유의사항 맵(단타 워치/후보 칩). 유의사항 없는 티커는 생략 가능. */
+export type StockWarningsBatchResponse = {
+  warnings: Record<string, StockWarningItem[]>;
+};
