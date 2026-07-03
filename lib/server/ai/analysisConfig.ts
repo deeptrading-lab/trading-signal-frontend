@@ -40,6 +40,11 @@ export interface AnalysisConfig {
   debateOrder: "bull-first" | "bear-first";
   /** 입력 누적 slice 상한들. */
   slices: AnalysisSliceConfig;
+  /**
+   * 1차 분석가 리포트(market/news/fundamentals/social)를 후단 프롬프트에 다시 주입할 때의
+   * 압축 상한. null = 기존처럼 전문 주입(무회귀).
+   */
+  downstreamReportCharLimit: number | null;
   /** 에이전트별 reasoning effort 오버라이드(미지정 = AGENT_PROMPTS 기본). */
   effortByAgent?: Partial<Record<AgentKey, AgentEffort>>;
   /** 에이전트별 모델 id 오버라이드(미지정 = AGENT_PROMPTS/env 기본). */
@@ -53,6 +58,7 @@ export interface AnalysisConfig {
 export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
   debateRounds: DEBATE_ROUNDS,
   debateOrder: "bull-first",
+  downstreamReportCharLimit: null,
   slices: {
     traderBull: 1500,
     traderBear: 1500,
@@ -69,6 +75,7 @@ export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
 export type AnalysisConfigOverride = {
   debateRounds?: number;
   debateOrder?: "bull-first" | "bear-first";
+  downstreamReportCharLimit?: number | null;
   slices?: Partial<AnalysisSliceConfig>;
   effortByAgent?: Partial<Record<AgentKey, AgentEffort>>;
   modelByAgent?: Partial<Record<AgentKey, string>>;
@@ -85,6 +92,7 @@ export function resolveAnalysisConfig(
   return {
     debateRounds: override.debateRounds ?? DEFAULT_ANALYSIS_CONFIG.debateRounds,
     debateOrder: override.debateOrder ?? DEFAULT_ANALYSIS_CONFIG.debateOrder,
+    downstreamReportCharLimit: override.downstreamReportCharLimit ?? DEFAULT_ANALYSIS_CONFIG.downstreamReportCharLimit,
     slices: { ...DEFAULT_ANALYSIS_CONFIG.slices, ...(override.slices ?? {}) },
     effortByAgent: override.effortByAgent,
     modelByAgent: override.modelByAgent,

@@ -8,37 +8,7 @@
  */
 
 import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
-
-export interface AgentWaste {
-  agentKey: string;
-  stage: "A" | "B" | "C";
-  model: string | null;
-  avgInputTokens: number | null;
-  avgCacheReadTokens: number | null;
-  avgCacheCreationTokens: number | null;
-  avgOutputTokens: number | null;
-  avgCostUsd: number | null;
-  avgDurationMs: number | null;
-  /** 출력 / (신규입력 + 캐시읽기). null = 입력 0. */
-  yieldRatio: number | null;
-  /** 캐시생성 / (신규입력 + 캐시읽기 + 캐시생성). */
-  cacheCreationShare: number | null;
-}
-
-export interface StageWaste {
-  stage: "A" | "B" | "C";
-  totalInput: number;
-  totalCacheCreation: number;
-  totalOutput: number;
-  totalCostUsd: number;
-}
-
-export interface WasteReport {
-  /** yield 오름차순(최악=많이 읽고 적게 씀 먼저). */
-  agents: AgentWaste[];
-  /** 단계(A 분석가 / B 토론 / C 매니저)별 토큰·비용 분포. */
-  byStage: StageWaste[];
-}
+import type { AgentWaste, StageWaste, WasteReport } from "@/lib/types/stock/abHarness";
 
 function safeRatio(numer: number | null, denom: number): number | null {
   if (denom <= 0) return null;

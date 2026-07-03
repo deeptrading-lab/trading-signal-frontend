@@ -5761,3 +5761,87 @@
   - **Phase 3~7 — 화면 리스킨**: 셸 → 홈(토스 IA·**카드리스·화이트포워드**·컴팩트) → 종목상세(정보 티어링) → AI 패널 → 관심종목 등. **노스스타 시안(Artifact)에서 룩 확정 후** 진행.
   - **확정 대기(노스스타)**: 브랜드 색(블루 전면 기본) / 실시간 랭킹 범위(거래대금·급상승/급하락 KIS 순위 TR 신설) / peek 인터랙션 방식 / 컴팩트 밀도.
   - **그림자·모션 토큰 소비**(현 인라인 리터럴 → `shadow-*` 유틸 치환)는 밀도/브랜드 비주얼 패스와 함께(다크 그림자값 개선 포함).
+### 2026-07-03 — feat(intraday): 틱 판단 정량 스냅샷 영속 — 미스 분석·모델 A/B 근거 (#209)
+
+- **slug**: `intraday-tick-snapshot` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/209
+- **요약**: feat(intraday): 틱 판단 정량 스냅샷 영속 — 미스 분석·모델 A/B 근거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 단타 cli-agent 틱 판단에 **정량 스냅샷**(시그널·구조 레벨·기준가)을 실어 Supabase payload(jsonb)에 함께 영속한다. 진입 게이트 캘리브레이션(후속 A/B/C)의 before/after를 **숫자로** 측정하기 위한 계측 인프라.
+  > 
+  > ## 배경
+  > 
+  > 오늘 장중 `무포지션 지속` 원인을 분석하려 했더니, 저장된 틱엔 근거 텍스트(rationale)만 남고 손익비·"저항까지 여유%"·레짐 같은 숫자가 빠져 있었다 → 7세션 586틱을 근거 텍스트 **키워드 grep** 으로만 분류해야 했다. 스냅샷을 남기면 미스 원인 정량 집계와 모델(Haiku vs Sonnet) 판단 품질 A/B가 가능해진다.
+  > 
+  > ## 변경 (4파일, 순수 계측 — 거래 동작 무변경)
+  > 
+  > - `lib/types/intraday/intradayDecision.ts` — `IntradaySnapshot` 타입: `basePrice`·`signal`(4축 score·action·regime·confidence)·`levels`(박스 상·하단·구조 TP/SL·손익비·목표 거리%)·`structureEvent`.
+  > - `lib/types/paperTrading/paperTrading.ts` — `PaperTradingDecision.intradaySnapshot?`(옵셔널, inline import). mock/existing-ai 미설정.
+  > - `lib/server/paperTrading/decisionProviders/intradayCli.ts` — `finalize()` choke point 에서 스냅샷 생성 → `toPaperTradingDecision`(옵셔널 3번째 인자)로 전달. **LLM·결정론 폴백 모든 틱**에 기록.
+  > - 테스트 2건 추가(전달 시 보존 / 미전달 시 undefined).
+  > 
+  > ## 지속성
+  > 
+  > `persistence.ts` 가 tick 을 `payload: tick` 통째 jsonb 로 저장·하이드레이트 → **마이그레이션·지속성 코드 변경 없이** 자동 round-trip. 세션 상세 API도 tick 을 wholesale 반환하므로 스냅샷이 그대로 노출된다.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit`·eslint 클린, vitest **752 통과**(신규 2).
+  > - 라이브 확인(머지 후 dev 재시작 필요 — 스케줄러 부팅 고정): 새 틱의 `decision.intradaySnapshot` 에 signal·levels·rrr 채워지는지 API로 확인.
+  > 
+  > ## 다음 작업
+  > 
+  > - **A. 돌파 시 목표를 측정된 폭/다음 상위 구조로** — 신고가 추세에서 저항 천장이 가격을 추격해 손익비가 영원히 안 나오는 문제(이번 분석의 #1 원인, 218/586). 거래 동작 변경이라 별도 PRD 권장. 이 스냅샷으로 진입율·가상손익 before/after 측정.
+  > - B. 거래량 동의 baseline 재캘리브(20봉 평균이 완만한 추세를 과소평가, #2 원인 181/586).
+  > - C. 확정 상승 레짐에선 RSI 과매수를 진입 veto 에서 제외.
+  > - (선택) 세션 상세 타임라인에 스냅샷 숫자 컬럼(손익비·저항 여유%·regime) 노출.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **A. 돌파 시 목표를 측정된 폭/다음 상위 구조로** — 신고가 추세에서 저항 천장이 가격을 추격해 손익비가 영원히 안 나오는 문제(이번 분석의 #1 원인, 218/586). 거래 동작 변경이라 별도 PRD 권장. 이 스냅샷으로 진입율·가상손익 before/after 측정.
+  - B. 거래량 동의 baseline 재캘리브(20봉 평균이 완만한 추세를 과소평가, #2 원인 181/586).
+  - C. 확정 상승 레짐에선 RSI 과매수를 진입 veto 에서 제외.
+  - (선택) 세션 상세 타임라인에 스냅샷 숫자 컬럼(손익비·저항 여유%·regime) 노출.
+
+### 2026-07-03 — feat(intraday): 장 마감(15:40) 후 running 단타 세션 자동 완료 (#210)
+
+- **slug**: `intraday-auto-close-session` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/210
+- **요약**: feat(intraday): 장 마감(15:40) 후 running 단타 세션 자동 완료
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 장 마감(평일 15:40) 후 실행 중인 단타 cli-agent 세션을 **완료로 자동 종료**한다. 단타 = 하루 1세션 모델을 강제해, 세션이 밤새 running 으로 남아 다음 거래일 다시 틱되거나(크로스데이 누적) 워치 표에 계속 자동 상주하던 문제를 없앤다.
+  > 
+  > ## 배경
+  > 
+  > 지금까지 스케줄러는 15:40 이후 틱 발화만 멈출 뿐 세션 상태는 계속 `running` 이었다. 그래서:
+  > - 다음 거래일 09:00 에 어제 세션을 다시 틱 → 하루짜리 단타 세션에 다음 날 판단이 누적
+  > - `running` 이라 워치 표에 어제 세션이 계속 자동 상주(#206 이후 running 만 자동 상주)
+  > 
+  > ## 변경 (5파일, 동작 추가 — 기존 틱/체결 로직 무변경)
+  > 
+  > - `lib/utils/kstMarketHours.ts` — `isKstAfterMarketClose(now)`: 평일 15:40 **초과**(15:41+). 마감 유예 게이트(`≤15:40`, 틱 허용)와 상호 배타라 마지막 틱과 종료가 겹치지 않음. 프리마켓(09:00 이전)·주말 제외 → 개장 전 미리 만든 세션을 완료시키지 않음.
+  > - `lib/server/paperTrading/tickScheduler.ts` — `closeOutRunningSessionsAtClose()`: running cli-agent 세션을 `patchPaperTradingSessionStatus(id, "completed")` 로 전환. 15:20 전량 청산이 지나 열린 포지션 없음. 완료 후 사이클은 대상 0 → no-op(로그·부하 없음). 스케줄러 인터벌이 매 사이클 **틱 + 종료 스윕**을 함께 호출(시간대 배타). Vercel no-op(스케줄러 dev 전용).
+  > - `lib/copy/stock/intradayRead.ts` — 안내 문구에 `15:40 세션 자동 완료(다음 날 새로 시작)` 추가.
+  > - 테스트: `lib/utils/__tests__/kstMarketHours.test.ts`(신설, 경계·프리마켓·주말) + tickScheduler 종료 게이트 케이스.
+  > 
+  > ## 동작 요약
+  > 
+  > | 시각(평일) | 틱 | 종료 스윕 |
+  > |---|---|---|
+  > | 09:00–15:40 | O | — (-1) |
+  > | 15:41+ (야간 포함) | — (-1) | running→completed |
+  > | 프리마켓(~09:00)·주말 | — | — (-1, 개장 전 세션 보호) |
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit`·eslint 클린, vitest **769 통과**(신규 18).
+  > - 라이브 확인(머지 + dev 재시작 필요 — 스케줄러 부팅 고정): 15:41 KST 에 running 세션이 자동 완료로 바뀌고 워치 표에서 내려가는지.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - A. 돌파 시 목표를 측정된 폭/다음 상위 구조로(진입 캘리브레이션 #1 원인) — PRD 권장, #209 스냅샷으로 before/after 측정.
+  - B. 거래량 동의 baseline 재캘리브. C. 확정 상승 레짐 RSI 과매수 veto 제외.
+  - (엣지) dev 서버가 마감 시점에 꺼져 있어 종료를 놓친 세션은 다음 거래일 장중 재틱 후 그날 15:40 에 완료됨 — 필요 시 startedAt 이 과거일이면 첫 틱 전 완료하는 가드 추가 검토.

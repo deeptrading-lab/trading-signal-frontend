@@ -51,6 +51,8 @@ export const queryKeys = {
     aiDecisions: ["stock", "ai-decisions"] as const,
     /** AI 분석 에이전트별 토큰 사용량 집계 — Supabase 이력 BFF. 종목 무관 단일 키. */
     agentUsage: ["stock", "ai-agent-usage"] as const,
+    /** A/B 토큰 최적화 리포트 — session 단위 비교. */
+    abHarnessReport: (session: string) => ["stock", "ab-harness-report", session] as const,
     /** 로컬 분석 워커 온라인/처리 상태 — prod 처리 중 뱃지(S7) 폴링. 종목 무관 단일 키. */
     workerStatus: ["stock", "ai-worker-status"] as const,
   },

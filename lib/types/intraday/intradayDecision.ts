@@ -136,6 +136,25 @@ export interface IntradayReadResponse {
   warning?: string;
 }
 
+/**
+ * 판단 시점 정량 스냅샷 — 사후 미스 분석·모델 A/B 의 **숫자** 근거. 저장 틱(PaperTradingDecision)에
+ * 실려 Supabase payload(jsonb)로 함께 영속된다(무마이그레이션). LLM·결정론 폴백 **모든 틱**에 기록.
+ *
+ * ⚠️ 배경: 기존 저장 틱엔 근거 텍스트(rationale)만 남고 시그널·손익비·박스 레벨 같은 숫자가 빠져,
+ *    "저항까지 몇 %·손익비 얼마·레짐 뭐였나"를 사후에 숫자로 볼 수 없었다(키워드 grep 으로만 분석 가능).
+ *    이 스냅샷으로 진입 게이트 캘리브레이션(A/B)·미스 원인 정량 집계가 가능해진다.
+ */
+export interface IntradaySnapshot {
+  /** 판단 기준가(마지막 분봉 종가). */
+  basePrice: number;
+  /** 분봉 결정론 시그널(4축 score·action·regime·confidence) — 왜 이 판단인지의 정량 근거. */
+  signal: DecisionSignal;
+  /** 구조 레벨(박스 상·하단·구조 TP/SL·손익비·목표 거리%). "저항까지 여유" 계산의 원천. */
+  levels: IntradayLevels;
+  /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") 발생 여부 — 없으면 null. 돌파 참여 분석용. */
+  structureEvent: string | null;
+}
+
 /** 최종 단타 결정 — LLM 부분 + 서버 메타. */
 export interface IntradayDecision extends IntradayDecisionLlm {
   /** 판단 시 기준가(마지막 분봉 종가). */

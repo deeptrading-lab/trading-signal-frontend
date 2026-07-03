@@ -17,6 +17,7 @@ import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 import { CacheCostCards } from "./CacheCostCards";
 import { ModelCostBreakdown } from "./ModelCostBreakdown";
 import { AgentUsageTable } from "./AgentUsageTable";
+import { SamsungAbExperimentCard } from "./SamsungAbExperimentCard";
 
 // recharts 차트 3종은 recharts(≈109kB gzip)를 끌어오므로 next/dynamic 으로 지연 로드 —
 // Usage 탭에 데이터가 있을 때만(아래 조건부 렌더) 청크 로드(perf WS-4). 차트 래퍼(section.card)와
@@ -104,6 +105,8 @@ export function AgentUsageContainer() {
 
   return (
     <div className="flex flex-col gap-md">
+      <SamsungAbExperimentCard />
+
       {/* provider 탭 + run 수 + 새로고침 */}
       <div className="flex items-center justify-between gap-md flex-wrap">
         <div className="flex items-center gap-sm" role="tablist" aria-label="AI 공급자">

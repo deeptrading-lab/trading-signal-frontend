@@ -603,3 +603,93 @@ A·F·B 모든 즉시 가능 트랙 종결. 다음 세션은 P2 누적 follow-up
 - 화면 전환 후속 PR 들에서 KIS 모의 환경 한계 (일부 종목명 빈 문자열) 가 실제로 화면 카피에 노출될 가능성. mappers 우선순위 조정 또는 DART corpName fallback 도입 필요 가능성.
 - 시장 지수 매퍼는 본 PR-C 에서 인터페이스만 정착, 실제 KIS 지수 응답 필드 (전일 대비 등) 가 종목과 다를 경우 후속 화면 전환 PR 이 별도 mapper 도입해야 할 수 있음.
 - Signals 화면 (`app/(main)/signals/page.tsx`) 미존재 — PRD AC-15 의 "/signals" 진입 항목이 본 저장소 main 에 부재. PRD `signal-algorithm` 진입 시 함께 신설 권고.
+
+---
+
+## 2026-07-03 — 삼성전자 A/B 토큰 최적화 실측 원인 분석
+
+**요약**: `/analyze?tab=usage` 에 삼성전자(`005930`) A/B 리포트 카드를 띄우고 `debateRounds=1` B안을 재실행했다. 결론은 **B안 채택 보류**. 출력 토큰은 줄었지만 입력 토큰 절감은 재현되지 않았고, wall-clock·verdict 유사도도 불리했다.
+
+### 처리한 일
+
+- **localhost 검증** — `http://localhost:3100/analyze?tab=usage` 에 `SamsungAbExperimentCard` 렌더 확인.
+- **하니스 보강** — `scripts/ab-harness/run-golden-set.mjs` 에 `PROVIDER` env 와 `CONFIG_IDS` env 추가.
+  - 예: `PROVIDER=codex CONFIG_IDS=B SESSION=samsung-005930-token-ab TICKERS=005930 REPEATS=1 ...`
+- **리포트 보강** — A/B delta 에 `inputDeltaPct` 추가. Codex 는 비용(USD) 미측정이라 카드 첫 지표를 비용 대신 입력 토큰 변화로 표시.
+- **실측 실행** — 로컬에 `claude` CLI 가 없어 `codex` provider 로 실행. `samsung-005930-token-ab` 세션 기준:
+  - A baseline: 1회, 총 입력 `264,466`, 출력 `16,055`, 평균 소요 `3분 46초`, verdict `REDUCE`.
+  - B `debateRounds=1`: 2회 평균, 총 입력 `265,798`, 출력 `13,651`, 평균 소요 `8분 51초`, verdict `UNDERWEIGHT` 2회.
+  - 변화율: 입력 `+0.5%`, 출력 `-15.0%`, 소요 `+134.7%`, exact verdict agreement `0.0%`.
+
+### 원인 분석
+
+1. **최적화 레버가 전체 비용 지배 구간을 건드리지 못함**
+   - B안은 토론 라운드만 `2 → 1`로 줄인다.
+   - 하지만 총 입력은 1차 웹/데이터 분석가(`news`, `fundamentals`, `social`)와 후단 PM/risk 체인이 크게 지배한다.
+   - 토론 1라운드 제거 효과가 Phase A 입력 변동·캐시 변동에 묻혀, 총 입력 기준 절감이 재현되지 않았다.
+
+2. **Codex 측정값은 비용이 아니라 토큰 총량 비교에 그침**
+   - 현재 로컬에서 사용 가능 provider 는 `codex` 뿐이고, Codex CLI는 비용(USD)을 제공하지 않는다.
+   - 리포트의 비용은 `$0.00`/미측정에 가깝다. 비용 최적화 판단은 Claude CLI 또는 비용 측정 가능한 provider 로 재검증 필요.
+   - 총 입력은 `fresh input + cache read` 합산이다. Codex run 간 `cacheReadTokens` 변동이 커서 실제 비용 절감과 총 입력 감소가 1:1로 대응하지 않을 수 있다.
+
+3. **B 첫 번째 실행의 timeout 이 평균 wall-clock 을 망침**
+   - 첫 B 실행에서 `risk_risky` 가 timeout 으로 약 11분 이상 지연된 뒤 PM 으로 넘어갔다.
+   - 두 번째 B 실행은 timeout 없이 약 `3.7분`으로 종료됐지만, B 2회 평균 wall-clock 은 `8분 51초`로 남았다.
+   - 즉 B 자체가 항상 느리다기보다, **장시간 tail-risk 를 흡수하지 못하는 실행 안정성 문제**가 드러났다.
+
+4. **현재 품질 지표가 단일 ticker/정확 일치라 너무 거칠다**
+   - A=`REDUCE`, B=`UNDERWEIGHT` 는 둘 다 약세/주의 계열의 인접 verdict 이지만 exact agreement 는 `0%`로 표시된다.
+   - common ticker 가 1개뿐이라 리포트도 `INSUFFICIENT` 처리한다.
+   - 다음 판단에는 verdict ordinal distance(예: `REDUCE↔UNDERWEIGHT` = 1단계 drift), target/stop drift, confidence 유지 여부를 함께 봐야 한다.
+
+5. **표본 설계가 불균형**
+   - 현재 A는 1회, B는 2회다. B 재실행만 했기 때문에 A variance 를 모른다.
+   - 다음 세션에서는 같은 session 또는 새 session 에서 A/B 모두 동일 repeats 로 맞춰야 한다.
+
+### 다음 세션 시작 포인트
+
+| 우선 | 항목 | 이유 | 권고 |
+|---|---|---|---|
+| P0 | 결과 해석 정정 | 현재 B안은 "입력 토큰 절감" 검증 실패 | B안 채택 금지. 출력 축소 효과만 참고 |
+| P1 | balanced rerun | A 1회 vs B 2회는 비교 불균형 | 새 session 으로 `005930` A/B 각각 2~3회 또는 A를 1회 추가 |
+| P1 | failure-aware 리포트 | timeout run 이 평균을 오염 | report 에 failed/timeout agent 수, median wall-clock, worst run 표시 |
+| P1 | 품질 지표 개선 | exact verdict agreement 가 인접 verdict 를 과벌점 | verdict ordinal distance + bearish/bullish direction agreement 추가 |
+| P2 | 더 큰 레버 실험 | debateRounds 만으로는 Phase A/PM 입력을 못 줄임 | `risk`/`PM` 입력 요약, analyst report truncation, Phase A summary compression config 추가 |
+| P2 | Claude CLI 환경 복구 | 비용 판단 불가 | `CLAUDE_CLI_PATH` 또는 로컬 `claude` 설치 확인 후 비용 포함 재실험 |
+
+### 추천 다음 실험안
+
+1. **C안: 후단 입력 요약**
+   - 토론/리스크/PM 에 원문 전체 대신 각 analyst report 를 600~900자 요약본으로 전달.
+   - 기대: 입력 토큰 직접 감소. 리스크: 판단 근거 손실.
+
+2. **D안: risk 3개 병렬 축소 또는 timeout fail-fast**
+   - `risk_risky/risk_neutral/risk_safe` 중 하나를 기준 리스크 요약으로 통합하거나, timeout 발생 시 PM 에 "해당 risk unavailable" 을 명시하고 빠르게 진행.
+   - 기대: wall-clock tail-risk 완화. 리스크: 리스크 관점 다양성 감소.
+
+3. **E안: PM 프롬프트 구조화 압축**
+   - PM 입력에서 이전 결론·분석가·토론·리스크를 섹션별 bullet JSON/표로 압축.
+   - 기대: 최종 단계 입력 감소 + verdict 안정성 개선.
+
+### 2026-07-03 후속 처리
+
+- **P1 failure-aware 리포트 구현** — A/B config별 `runHealth` 추가. completed/incomplete run 수, 미측정 agent 수, 10분 이상 장시간 agent 수, median/worst wall-clock 을 계산하고 `/analyze?tab=usage` 삼성전자 A/B 카드 표에 노출.
+- **P1 품질 지표 개선 구현** — exact verdict agreement 외에 `verdictOrdinalDistance`(6단계 평균 거리)와 bullish/neutral/bearish `directionAgreementRate` 를 추가. `REDUCE ↔ UNDERWEIGHT` 같은 인접 약세 verdict 를 0% exact agreement 만으로 과벌점하지 않도록 보조 지표화.
+- **검증** — 관련 `vitest` 13건 PASS, 전체 `vitest` 676건 PASS(3 skipped), `tsc --noEmit` PASS, 전체 `eslint .` PASS, `next build` PASS. `pnpm exec` 시도가 `node_modules` 일부를 `.ignored` 로 옮겨 직접 복구했고, 이후 번들 Node PATH 로 검증 완료.
+
+### 2026-07-03 C1 실험 진행
+
+- **C1 구현** — `downstreamReportCharLimit=900` config 추가. 기본 분석은 `null`로 원문 그대로(무회귀), C1에서만 후단 프롬프트가 1차 분석가 리포트(`market/news/fundamentals/social`)를 900자 압축 발췌로 받는다.
+- **하니스 보강** — `scripts/ab-harness/run-golden-set.mjs` 에 `C1` config 추가. 실행 명령: `PROVIDER=codex CONFIG_IDS=A,C1 SESSION=samsung-005930-token-ab-c1-r2 TICKERS=005930 REPEATS=1 BASE_URL=http://localhost:3000 node scripts/ab-harness/run-golden-set.mjs`.
+- **실측 결과** — `samsung-005930-token-ab-c1-r2`, 삼성전자 1회씩:
+  - A baseline: 입력 `291,778`(fresh 245,954 + cache 45,824), 출력 `16,199`, 소요 `235.9s`, verdict `UNDERWEIGHT`.
+  - C1: 입력 `262,765`(fresh 196,461 + cache 66,304), 출력 `16,513`, 소요 `231.9s`, verdict `REDUCE`.
+  - 변화율: 입력 `-9.9%`, 출력 `+1.9%`, 소요 `-1.7%`, verdict exact `0%`, ordinal distance `1`, 방향 일치 `100%`.
+- **해석** — C1은 B안과 달리 총 입력 토큰 절감은 관측됨. 다만 출력이 소폭 증가했고 verdict가 약세 방향 안에서 한 단계 이동했으므로, 단일 ticker 1회만으로 채택 금지. 다음은 A/C1 동일 repeats 2~3회 또는 3 ticker 이상으로 재검증.
+
+### 미결·블록
+
+- `claude` CLI 없음: `command -v claude` 실패. 현재 실험은 Codex 기반이라 비용 비교 불가.
+- `debateRounds=1` B안은 현재 데이터만으로는 채택하면 안 됨.
+- 이번 SESSION_NOTES append 는 진행 중 작업 브랜치/working tree 에 묻어 두는 성격. 단독 PR 만들지 말 것.

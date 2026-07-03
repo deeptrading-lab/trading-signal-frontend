@@ -36,6 +36,7 @@ import type {
   IntradayDecisionLlm,
   IntradayLevels,
   IntradayPositionView,
+  IntradaySnapshot,
 } from "@/lib/types/intraday/intradayDecision";
 
 const AGENT_TIMEOUT_MS = 25_000;
@@ -405,6 +406,8 @@ function riskTargetPct(riskMode: PaperTradingRiskMode): number {
 export function toPaperTradingDecision(
   intraday: IntradayDecision,
   input: Pick<IntradayCliInput, "ticker" | "name" | "position" | "riskMode" | "maxPositionPct">,
+  /** 판단 시점 정량 스냅샷 — 있으면 저장 틱에 실어 영속(사후 미스 분석·A/B). 없으면 미기록. */
+  snapshot?: IntradaySnapshot,
 ): PaperTradingDecision {
   const { action } = intraday;
   const currentPct = input.position?.allocationPct ?? 0;
@@ -461,6 +464,7 @@ export function toPaperTradingDecision(
     // 청산 트리거(virtualExecution forced-exit): 손절가 우선, 없으면 무효화가.
     invalidationPrice: intraday.stopPrice ?? intraday.invalidationPrice ?? null,
     targetPrice: intraday.targetPrice ?? null,
+    intradaySnapshot: snapshot,
     source: "cli-agent",
   };
 }
@@ -495,7 +499,14 @@ export async function decideIntradayWithCli(
       analystNote,
       gateAdjustments,
     };
-    return { decision: toPaperTradingDecision(intraday, input), intraday };
+    // 판단 근거 정량 스냅샷 — LLM·폴백 공통 choke point 라 모든 틱이 기록된다.
+    const snapshot: IntradaySnapshot = {
+      basePrice: lastClose,
+      signal: decisionSignal,
+      levels,
+      structureEvent: ctx.structureEvent ?? null,
+    };
+    return { decision: toPaperTradingDecision(intraday, input, snapshot), intraday };
   };
 
   // 사전 게이트. (forceAgents=on-demand 판단 카드는 변화없음 스킵을 무시하고 항상 에이전트 호출)
