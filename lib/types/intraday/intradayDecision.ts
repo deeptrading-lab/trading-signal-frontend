@@ -80,6 +80,8 @@ export interface IntradayContext {
    * 끼운다. 봉 부족 시 빈 문자열(무주입).
    */
   featuresText?: string;
+  /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") — 사전 게이트의 LLM 스킵을 뚫는 트리거. */
+  structureEvent?: string | null;
 }
 
 /** LLM(②진입·청산 판단가)이 생성하는 부분 — 서버가 메타로 보강. */

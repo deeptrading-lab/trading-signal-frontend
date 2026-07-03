@@ -103,6 +103,23 @@ describe("evaluatePreGate", () => {
     });
     expect(evaluatePreGate(c, false).callLlm).toBe(true);
   });
+  it("무포지션 + HOLD 지속이어도 구조 이벤트(전고 돌파)면 LLM 호출", () => {
+    const c = ctx({
+      signal: signal({ action: "HOLD" }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+      structureEvent: "전고 돌파 진행",
+    });
+    expect(evaluatePreGate(c, false).callLlm).toBe(true);
+  });
+  it("구조 이벤트여도 신규 진입 불가 시간(15:00+)이면 스킵 유지", () => {
+    const c = ctx({
+      nowHhmm: "15:05",
+      signal: signal({ action: "HOLD" }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+      structureEvent: "전고 돌파 진행",
+    });
+    expect(evaluatePreGate(c, false).callLlm).toBe(false);
+  });
 });
 
 describe("applyPostGate", () => {

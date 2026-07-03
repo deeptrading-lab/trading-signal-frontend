@@ -158,9 +158,17 @@ function buildContext(
 ): IntradayContext {
   // 캔들 미시구조(마감봉 꼬리·스윙·피보나치·박스) — 결정론 산출, 봉 부족 시 빈 문자열.
   const profile = resolveIntradayProfile(input.timeframe);
-  const featuresText = formatIntradayFeatures(
-    extractIntradayFeatures(input.minuteCandles, input.timeframe, profile.structureLookback),
+  const features = extractIntradayFeatures(
+    input.minuteCandles,
+    input.timeframe,
+    profile.structureLookback,
   );
+  const featuresText = formatIntradayFeatures(features);
+  // 매수 관심 구조 이벤트 — 결정론 시그널(4축)이 늦게 반응해도 전고 돌파 순간엔 AI 에 묻는다
+  // (쌍바닥→돌파를 사전 게이트가 걸러버리던 커버리지 갭, 사용자 관찰 사례). 약세 흐름이면
+  // 어차피 사후 게이트가 매수를 차단하므로 트리거로 치지 않는다.
+  const structureEvent =
+    features?.swing.highBroken && signal.regime !== -1 ? "전고 돌파 진행" : null;
   return {
     ticker: input.ticker,
     name: input.name,
@@ -175,6 +183,7 @@ function buildContext(
     previousDecision: input.previousDecision,
     nowHhmm: input.nowHhmm,
     featuresText,
+    structureEvent,
   };
 }
 
@@ -192,7 +201,12 @@ export function evaluatePreGate(ctx: IntradayContext, dailyLossKill: boolean): P
   const flat = !ctx.position;
 
   // 무포지션 + 분봉 HOLD + 직전도 HOLD → 변화 없음, LLM 호출 생략(비용 절감).
+  // 단, 구조 이벤트(전고 돌파 등)가 잡히면 신규 진입 가능 상태에 한해 AI 에 묻는다 —
+  // 4축 점수가 아직 HOLD 여도 돌파 셋업은 다음 주기까지 기다리면 늦는다.
   if (flat && ctx.signal.action === "HOLD" && (ctx.previousDecision?.action ?? "HOLD") === "HOLD") {
+    if (ctx.structureEvent && !noNewEntry) {
+      return { callLlm: true, noNewEntry };
+    }
     return { callLlm: false, noNewEntry, reason: "상황 변화 없음 — AI 호출 생략(포지션·신호 그대로)" };
   }
   return { callLlm: true, noNewEntry };
