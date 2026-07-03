@@ -64,7 +64,7 @@ function IndexTile({ index, first }: { index: MarketIndex; first: boolean }) {
       )}
     >
       <span className="truncate text-caption text-text-muted">{index.name}</span>
-      <span className="text-h2 tabular-nums text-text-strong">
+      <span className="text-h2 tabular-nums whitespace-nowrap text-text-strong">
         {index.value}
       </span>
       <span className={cn("text-caption", signalClass)}>

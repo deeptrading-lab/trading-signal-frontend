@@ -257,6 +257,7 @@ function RankRow({
         aria-label={favorited ? RANK_FAVORITE_REMOVE : RANK_FAVORITE_ADD}
         className="inline-grid h-6 w-6 place-items-center rounded-sm text-text-muted transition-colors hover:text-signal-up"
         onClick={toggleFavorite}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <Heart
           className={cn("h-4 w-4", favorited && "fill-current text-signal-up")}
