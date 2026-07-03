@@ -218,9 +218,10 @@ export function applyPostGate(
   };
 
   // 1. 15:00+/일일손실: 신규 BUY 차단.
-  if (noNewEntry) demoteToHold("장막판/일일손실: 신규 진입 차단 → HOLD");
+  if (noNewEntry) demoteToHold("장 막판(15:00 이후)이거나 일일 손실 한도 도달 — 신규 진입 차단 → 관망");
   // 2. 약세 일봉 레짐 veto.
-  if (ctx.signal.regime === -1) demoteToHold("약세 레짐 veto: BUY → HOLD");
+  if (ctx.signal.regime === -1)
+    demoteToHold("일봉 큰 흐름이 약세 — 하락 국면 역행 매수 차단 → 관망");
   // 3. 손익비(RRR)<1.5: 진입 보류.
   if (d.action === "BUY" && (lv.rrr == null || lv.rrr < MIN_RRR))
     demoteToHold("손익비 1.5 미만 — 먹을 공간 대비 손절 폭이 커서 진입 보류 → 관망");

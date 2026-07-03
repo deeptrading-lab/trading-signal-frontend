@@ -46,7 +46,7 @@ export const INTRADAY_READ_COPY = {
     entryZone: "진입 구간",
     holding: "예상 보유",
     signal: "분봉 시그널",
-    regime: "일봉 레짐",
+    regime: "일봉 큰 흐름",
   },
   regimeLabel: { 1: "강세", 0: "중립", "-1": "약세" } as Record<string, string>,
   none: "—",

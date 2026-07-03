@@ -38,7 +38,7 @@ export function formatIntradayContext(ctx: IntradayContext): string {
   return [
     `종목: ${ctx.ticker} ${ctx.name} | 시각: ${ctx.nowHhmm} KST | 현재가: ${won(ctx.price)} | ${ctx.timeframe}분봉 | 판단 주기 ${ctx.intervalMinutes}분(다음 점검은 약 ${ctx.intervalMinutes}분 후)`,
     "",
-    `[분봉 시그널] 종합 ${s.action} | 점수 ${s.score.toFixed(0)}/100 | 동의도 ${Math.round(s.confidence * 100)}% | 레짐 ${regimeLabel}`,
+    `[분봉 시그널] 종합 ${s.action} | 점수 ${s.score.toFixed(0)}/100 | 동의도 ${Math.round(s.confidence * 100)}% | 일봉 큰 흐름 ${regimeLabel}`,
     `  축별: ${axes}`,
     "",
     `[구조 레벨] 박스 ${won(lv.boxLow)} ~ ${won(lv.boxHigh)}`,
