@@ -31,6 +31,8 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { WorkbenchSessionProvider } from "@/hooks/workbench/useWorkbenchSession";
 import { AIAnalysisProvider } from "@/hooks/stock/aiAnalysisProvider";
 import { GlobalAIAnalysis } from "@/components/stock/GlobalAIAnalysis";
+import { StockPeekProvider } from "@/hooks/stock/peekProvider";
+import { GlobalStockPeek } from "@/components/stock/GlobalStockPeek";
 import { cn } from "@/lib/utils/cn";
 
 /** 카드리스 화이트 포워드 리스킨을 적용한 라우트(home-reskin → stock-detail-reskin → watchlist-reskin).
@@ -65,6 +67,7 @@ export default function MainLayout({
   return (
     <WorkbenchSessionProvider>
       <AIAnalysisProvider>
+      <StockPeekProvider>
       <div className="flex h-screen overflow-hidden bg-surface-muted">
         {/* 좌측 Sidebar — viewport 전체 높이 점유 (데스크탑 한정, `< lg` 에선 sidebar 합성
          *  토큰의 `hidden lg:flex` 가 미렌더). */}
@@ -90,7 +93,10 @@ export default function MainLayout({
         <BottomNav />
         {/* AI 분석 패널·재열기 탭 — 셸에 두어 페이지 이동에도 백그라운드 분석이 끊기지 않게 한다. */}
         <GlobalAIAnalysis />
+        {/* 글로벌 Peek(차트 미리보기) — 종목 참조 행 hover/롱프레스 시 단일 오버레이로 소환. */}
+        <GlobalStockPeek />
       </div>
+      </StockPeekProvider>
       </AIAnalysisProvider>
     </WorkbenchSessionProvider>
   );

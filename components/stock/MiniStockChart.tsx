@@ -3,7 +3,8 @@
  *
  * `StockDailyChart` 의 가격 서브플롯만 떼어 낸 경량 버전 — 10개 컨트롤 prop·`ChartShell`·
  * 보조지표(MACD/RSI/거래량) 없이 캔들만. 데이터/테마/아톰은 상세 차트와 **동일 소스** 재사용:
- *   - `useChartData(ticker, "D", days)` → `useQueryStockChart` (쿼리키 공유 → 상세 진입 시 캐시 히트)
+ *   - `useChartData(ticker, "D", days)` → `useQueryStockChart` (쿼리키=ticker·period·days —
+ *     상세가 같은 구간을 볼 때 캐시 히트, 구간이 다르면 재요청. 1일 staleTime 이라 재hover 는 히트)
  *   - `useChartTheme` + `ChartThemeProvider` + `CandleBar`/`CandleTooltip` 아톰
  * 관심종목·랭킹·검색 등 종목 참조 지면의 hover/롱프레스 peek(Phase 2)가 소비한다.
  * `IntradayMiniChart`(분봉) 의 일봉 대응 — 같은 아톰·같은 렌더 경로.

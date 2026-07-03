@@ -14,8 +14,8 @@
  *   미배선 탭은 비활성(dimmed, 클릭 불가) 자리표시자로 남긴다.
  *
  * 색은 부호로 결정(한국식): 상승=빨강(signal-up) / 하락=파랑(signal-down).
- * 행 클릭 → `/stock/[ticker]`. hover/focus 시 `usePrefetchStockDetail` 로 상세 선반입
- *   (차트 peek 는 후속 단계 — 여기선 prefetch intent·경로만 부착).
+ * 행 클릭 → `/stock/[ticker]`. hover/focus·롱프레스 시 `useStockPeek` 로 상세 선반입 + 차트 Peek
+ *   (미리보기). 시드(가격/등락/방향)를 넘겨 팝오버/시트 즉시 페인트.
  *
  * 컨벤션(`docs/rules/frontend.md` §1): useQuery 직접 import 금지 → 도메인 훅만 소비.
  */
@@ -29,7 +29,7 @@ import { Section } from "@/components/ui/Section";
 import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
-import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
+import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
@@ -214,7 +214,15 @@ function RankRow({
   onToggleFavorite: () => void;
 }) {
   const router = useRouter();
-  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
+  const { peekProps, prefetch } = useStockPeek({
+    ticker: row.ticker,
+    name: row.name,
+    seed: {
+      price: row.price,
+      changePercent: row.changePercent,
+      direction: row.direction,
+    },
+  });
 
   const go = () => {
     prefetch(row.ticker);
@@ -245,10 +253,7 @@ function RankRow({
           go();
         }
       }}
-      onMouseEnter={() => onIntent(row.ticker)}
-      onMouseLeave={cancelIntent}
-      onFocus={() => onIntent(row.ticker)}
-      onBlur={cancelIntent}
+      {...peekProps}
     >
       {/* ♥ 관심종목 토글 */}
       <button
