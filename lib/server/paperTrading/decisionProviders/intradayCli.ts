@@ -8,6 +8,7 @@
 
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
+import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
 import {
   extractIntradayFeatures,
@@ -484,6 +485,14 @@ export async function decideIntradayWithCli(
     return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", undefined, [
       pre.reason ?? "규칙 사전 점검으로 AI 호출 생략",
     ]);
+  }
+
+  // LLM 을 실제로 호출하는 경로에서만 매수 유의(경보·VI)를 fail-soft 로 조회해 컨텍스트에 얹는다
+  // (스킵 틱은 미조회 — 낭비 방지, PRD §3-2). 토스 키 없으면 빈 배열이라 프롬프트 무변경.
+  // 이미 중단된 틱이면 조회 자체를 생략(리뷰 F-1 — abort 경로 불필요 대기 제거). 조회 중 중단은
+  // fetchActiveWarnings 가 바운드(≤5s)·never-throw 라 판단을 깨지 않는다.
+  if (!input.abortSignal.aborted) {
+    ctx.warnings = await fetchActiveWarnings(input.ticker);
   }
 
   const provider: AIAnalysisProvider = input.provider ?? "claude";

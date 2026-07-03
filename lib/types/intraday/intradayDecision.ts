@@ -6,6 +6,7 @@
  */
 
 import type { DecisionSignal } from "@/lib/types/stock/aiAnalysis";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 export type IntradayAction = "BUY" | "HOLD" | "SELL";
 export type IntradayConfidence = "HIGH" | "MEDIUM" | "LOW";
@@ -82,6 +83,11 @@ export interface IntradayContext {
   featuresText?: string;
   /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") — 사전 게이트의 LLM 스킵을 뚫는 트리거. */
   structureEvent?: string | null;
+  /**
+   * 활성 매수 유의사항(거래소 시장경보·VI) — 토스 warnings(PRD intraday-warnings §3-2).
+   * LLM 호출 시에만 fail-soft 로 채운다(스킵 틱은 미조회). 없거나 키 미설정이면 빈 배열/미주입.
+   */
+  warnings?: StockWarningItem[];
 }
 
 /** LLM(②진입·청산 판단가)이 생성하는 부분 — 서버가 메타로 보강. */

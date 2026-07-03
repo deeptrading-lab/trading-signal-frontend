@@ -20,6 +20,7 @@ import { useMutationIntradayRead } from "@/hooks/stock/useMutationIntradayRead";
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
 import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
 import { IntradayPaperDetailSheet } from "@/components/intraday/IntradayPaperDetailSheet";
+import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import {
   INTRADAY_PAPER_COPY as P,
   INTRADAY_READ_COPY as C,
@@ -39,6 +40,7 @@ import {
   type PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
 import { IntradayMiniChart } from "@/components/intraday/IntradayMiniChart";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 /** 주기 드랍다운 기본값(분) — 초단타 기본. */
 const DEFAULT_INTERVAL_MIN = 2;
@@ -65,6 +67,8 @@ export interface IntradayWatchTableProps {
   /** 배치 시세(현재가·등락률) — 없으면 해당 셀 "—". */
   quotes: WatchlistQuote[];
   sessionByTicker: Map<string, PaperTradingSession>;
+  /** 티커별 활성 매수 유의(경보·VI) — 빈 맵/미제공이면 칩 미표시(fail-soft). */
+  warningsByTicker?: Record<string, StockWarningItem[]>;
   isCreating: boolean;
   onStart: (
     stock: PaperTradingSelectedStock,
@@ -78,6 +82,7 @@ export function IntradayWatchTable({
   items,
   quotes,
   sessionByTicker,
+  warningsByTicker,
   isCreating,
   onStart,
   onRemove,
@@ -112,6 +117,7 @@ export function IntradayWatchTable({
                 item={item}
                 quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
                 session={sessionByTicker.get(item.ticker) ?? null}
+                warnings={warningsByTicker?.[item.ticker]}
                 isCreating={isCreating}
                 onStart={onStart}
                 onRemove={() => onRemove(item.ticker)}
@@ -331,6 +337,7 @@ function WatchRow({
   item,
   quote,
   session,
+  warnings,
   isCreating,
   onStart,
   onRemove,
@@ -338,6 +345,7 @@ function WatchRow({
   item: WatchItem;
   quote: WatchlistQuote | null;
   session: PaperTradingSession | null;
+  warnings: StockWarningItem[] | undefined;
   isCreating: boolean;
   onStart: IntradayWatchTableProps["onStart"];
   onRemove: () => void;
@@ -402,10 +410,11 @@ function WatchRow({
         onClick={() => setExpanded((v) => !v)}
         className="cursor-pointer border-t border-border-line transition-colors hover:bg-surface-muted"
       >
-        {/* 종목 — 코드 없이 이름만 + 세션 상태 */}
+        {/* 종목 — 코드 없이 이름만 + 매수 유의 칩 + 세션 상태 */}
         <td className="py-sm pl-lg pr-md">
           <div className="flex items-center gap-xs whitespace-nowrap">
             <span className="text-body-sm-strong text-text-strong">{item.name}</span>
+            <StockWarningBadges warnings={warnings} max={1} size="sm" />
             {current ? (
               <span className="text-caption text-text-muted">{STATUS_LABEL[current.status]}</span>
             ) : null}
