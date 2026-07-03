@@ -1,22 +1,20 @@
 /**
  * ProfilePage — `/profile` 셸 컴포저 (server component).
  *
- * PR9 (finsight-redesign) 신규. home-market-redesign PR1 — "내 자산" 섹션 추가(계좌 위젯 이전).
+ * PR9 (finsight-redesign) → home-market-redesign PR1 → **profile-reskin**(카드리스 화이트 포워드).
  *
- * 책임:
- *   - 페이지 타이틀 "마이페이지" (max-w-main-max-w — 전 페이지 너비 통일, 사이드 메뉴 이동 시 가로 밀림 제거).
- *   - ProfileCard 전폭 hero.
- *   - "내 자산" 섹션(AssetHero + 보유종목 전체 테이블) — ProfileCard 바로 아래(PRD §3.1, AC-2).
- *   - 2-column 그리드 (ConnectedExchangesCard + SettingsMenuCard).
+ * profile-reskin — 노스스타 홈(`MarketOverviewPage`) 정합. 흰 바탕(`(main)/layout.tsx` 가 `/profile`
+ *   한정 surface 덮음) 위에 섹션을 여백(`gap-2xl`)으로만 구분한다. 페이지 타이틀은 `sr-only`
+ *   (아이덴티티 헤더가 시각 헤더 역할 — 홈이 검색바를 헤더로 두는 것과 동일 톤). 라이트 카드는
+ *   "내 자산" 히어로(`asset-hero`) **하나만** — 나머지(보유종목·연동 거래소·설정)는 전부 플랫.
  *
- * 구조 (위→아래, DESIGN.md v9 배치 순서):
- *   1. 페이지 타이틀 (`text-h1`).
- *   2. ProfileCard — hero 카드 전폭 (무변경).
- *   3. AssetSection — "내 자산"(총자산 히어로 + 자산비중 도넛 + 보유종목 전체 테이블).
- *   4. 2-column 그리드 (`md:grid-cols-2 gap-lg`):
- *      좌 = ConnectedExchangesCard, 우 = SettingsMenuCard.
+ * 구조 (위→아래):
+ *   1. sr-only 페이지 타이틀(문서 아웃라인용 h1).
+ *   2. ProfileCard — 아이덴티티 헤더(카드리스 평탄 밴드).
+ *   3. AssetSection — "내 자산"(총자산 히어로 라이트 카드 + 자산비중 도넛 + 보유종목 플랫 표).
+ *   4. 2-column 그리드 (`md:grid-cols-2 gap-2xl`): 좌 = 연동 거래소, 우 = 설정. 둘 다 플랫 섹션.
  *
- * 모바일 정보 밀도 — 카드 1-column stacking. 데스크탑 (md+) — 2-column.
+ * 모바일 — 1-column stacking. 데스크탑 (md+) — 2-column.
  *
  * 클라이언트/서버:
  *   - 본 컴포넌트 + ProfileCard/Exchanges/Settings/AssetHero 모두 server-safe (useState 0).
@@ -28,7 +26,6 @@
  * Sidebar / BottomNav 의 "마이페이지" 메뉴 활성 — `isNavItemActive("/profile", "/profile")` true.
  */
 
-import { User } from "lucide-react";
 import { ProfileCard } from "./ProfileCard";
 import { AssetSection } from "./AssetSection";
 import { ConnectedExchangesCard } from "./ConnectedExchangesCard";
@@ -56,14 +53,12 @@ export function ProfilePage({
   holdings,
 }: ProfilePageProps) {
   return (
-    <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
-      <header className="flex items-center gap-sm">
-        <User className="h-2xl w-2xl text-accent-vivid" aria-hidden="true" />
-        <h1 className="text-h1 text-text-strong">{PROFILE_PAGE_TITLE}</h1>
-      </header>
+    <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-2xl">
+      {/* 문서 아웃라인용 접근성 제목(시각 비노출 — 아이덴티티 헤더가 페이지 헤더 역할, 홈 정합). */}
+      <h1 className="sr-only">{PROFILE_PAGE_TITLE}</h1>
       <ProfileCard user={user} />
       <AssetSection portfolio={portfolio} holdings={holdings} />
-      <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2xl md:grid-cols-2">
         <ConnectedExchangesCard exchanges={exchanges} />
         <SettingsMenuCard items={menuItems} />
       </div>
