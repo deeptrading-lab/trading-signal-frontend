@@ -53,13 +53,15 @@ export function IndicesCard({ indices, variant = "card" }: IndicesCardProps) {
   );
 }
 
-/** 스트립 타일 — 보더리스 세로 스택(home-reskin). */
+/** 스트립 타일 — 보더리스 세로 스택(home-reskin).
+ *  고정폭(w-32) 제거 → 값 콘텐츠 폭에 맞춰 컴팩트하게(토스 톤 밀도), 내부 패딩도 축소(px-lg→px-sm).
+ *  값은 `whitespace-nowrap` 유지(375px 줄바꿈 방지), 타일 사이 세로 헤어라인 유지. */
 function IndexTile({ index, first }: { index: MarketIndex; first: boolean }) {
   const signalClass = index.isUp ? "signal-up-text" : "signal-down-text";
   return (
     <li
       className={cn(
-        "flex w-32 shrink-0 flex-col gap-xs border-r border-border-line px-lg last:border-r-0",
+        "flex shrink-0 flex-col gap-xs border-r border-border-line px-sm last:border-r-0",
         first && "pl-0",
       )}
     >

@@ -35,7 +35,9 @@ export interface MarketPageProps {
 export function MarketPage({ themes }: MarketPageProps) {
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
-      <h1 className="inline-flex items-center gap-sm text-h1 text-text-strong">
+      {/* 페이지 타이틀 — 모바일은 하단 탭이 현재 화면을 알려주므로 시각 숨김(문서 아웃라인용 h1 유지),
+       *  데스크탑(md+)에서만 노출. */}
+      <h1 className="sr-only md:not-sr-only inline-flex items-center gap-sm text-h1 text-text-strong">
         <Compass
           className="h-2xl w-2xl text-accent-vivid"
           aria-hidden="true"

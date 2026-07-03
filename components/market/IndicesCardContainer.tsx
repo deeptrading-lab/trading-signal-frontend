@@ -153,10 +153,10 @@ function IndicesStripSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="flex w-32 shrink-0 flex-col gap-xs border-r border-border-line px-lg first:pl-0 last:border-r-0"
+          className="flex shrink-0 flex-col gap-xs border-r border-border-line px-sm first:pl-0 last:border-r-0"
         >
           <Skeleton variant="line" className="mb-0 h-3 w-12" />
-          <Skeleton variant="line" className="mb-0 h-5 w-20" />
+          <Skeleton variant="line" className="mb-0 h-5 w-16" />
           <Skeleton variant="line" className="mb-0 h-3 w-14" />
         </div>
       ))}
