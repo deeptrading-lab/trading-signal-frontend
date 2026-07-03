@@ -56,41 +56,38 @@ export const AnalystCard = memo(function AnalystCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm min-h-[120px]"
+      // 탈-카드: 그림자·헤더 색띠·헤더 하단선 제거. 헤어라인 타일 + 상태 점(dot)만으로 진행을 표시.
+      className="bg-surface rounded-md border border-border-line overflow-hidden flex flex-col min-h-[120px]"
     >
-      <div className={cn(
-        "flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 flex-none",
-        isActive && "bg-blue-50/60 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30",
-        isDone && "bg-emerald-50/40 dark:bg-emerald-950/10",
-      )}>
+      <div className="flex items-center gap-sm px-md pt-md pb-1 flex-none">
         {/* 완료 시 점 → 체크 */}
         {isDone ? (
-          <Check size={13} className="text-emerald-500 flex-none" />
+          <Check size={13} className="text-accent-vivid flex-none" />
         ) : (
           <div className={cn(
             "w-1.5 h-1.5 rounded-full flex-none",
-            isActive && "bg-blue-500 animate-pulse",
-            isError && "bg-red-500",
+            isActive && "bg-accent-vivid animate-pulse",
+            isError && "bg-critical",
           )} />
         )}
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex-1 truncate">
+        <span className="text-caption font-bold text-text-strong flex-1 truncate">
           {meta.label}
         </span>
-        {isActive && <RefreshCw size={11} className="text-blue-500 animate-spin flex-none" />}
-        {isError && <AlertCircle size={12} className="text-red-500 flex-none" />}
+        {isActive && <RefreshCw size={11} className="text-accent-vivid animate-spin flex-none" />}
+        {isError && <AlertCircle size={12} className="text-critical flex-none" />}
         {/* 완료 시 — 원래 체크 자리에 전체보기 */}
         {isDone && displayText && (
           <button
             type="button"
             onClick={() => onExpand(meta.label, displayText, summary)}
-            className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium cursor-pointer flex items-center gap-0.5 flex-none"
+            className="text-caption text-accent-vivid hover:opacity-70 font-medium cursor-pointer flex items-center gap-0.5 flex-none"
           >
             {COPY.card.viewFull} <ChevronRight size={10} />
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-hidden px-3 py-2.5">
+      <div className="flex-1 overflow-hidden px-md pb-md">
         {/* SNS 분석가 카드 전용 감성 배지 — done + 파싱 성공 시에만(폴백 시 미표시). */}
         {isDone && sentiment && (
           <div className="mb-2">
@@ -98,26 +95,26 @@ export const AnalystCard = memo(function AnalystCard({
           </div>
         )}
         {isActive && (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+          <p className="text-caption text-text-muted leading-relaxed">
             <span className="line-clamp-3 whitespace-pre-wrap">
               {previewText || messages[msgIdx]}
             </span>
-            <span className="inline-block w-1 h-[14px] bg-blue-500 animate-pulse ml-0.5 align-middle" />
+            <span className="inline-block w-1 h-[14px] bg-accent-vivid animate-pulse ml-0.5 align-middle" />
           </p>
         )}
         {isDone && displayText && (
           <p className={cn(
-            "text-[11px] leading-relaxed line-clamp-3 whitespace-pre-wrap",
+            "text-caption leading-relaxed line-clamp-3 whitespace-pre-wrap",
             // summary 노출 시엔 '결론' 톤으로 약간 진하게, 일반 미리보기는 기존 톤.
             summary
-              ? "text-slate-700 dark:text-slate-200 font-medium"
-              : "text-slate-600 dark:text-slate-300",
+              ? "text-text-strong font-medium"
+              : "text-text-muted",
           )}>
             {donePreview}
           </p>
         )}
         {isError && (
-          <p className="text-[11px] text-red-500 mt-1">
+          <p className="text-caption text-critical mt-1">
             {failReason ? COPY.card.failReason[failReason] : COPY.card.error}
           </p>
         )}
@@ -125,11 +122,11 @@ export const AnalystCard = memo(function AnalystCard({
 
       {/* 오류 재시도 전용 푸터 (전체보기는 헤더로 이동) */}
       {isError && !globalRunning && onRetry && (
-        <div className="flex-none px-3 py-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex-none px-md py-sm border-t border-border-line">
           <button
             type="button"
             onClick={onRetry}
-            className="text-[10px] text-red-500 hover:text-red-600 font-medium cursor-pointer flex items-center gap-1"
+            className="text-caption text-critical hover:opacity-70 font-medium cursor-pointer flex items-center gap-1"
           >
             <RefreshCw size={10} /> {COPY.card.retry}
           </button>

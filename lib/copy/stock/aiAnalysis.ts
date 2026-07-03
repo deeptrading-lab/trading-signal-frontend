@@ -82,6 +82,12 @@ export const COPY = {
     reopen: (name: string) => `${name} AI 분석 패널 열기`,
     /** 재열기 탭 닫기(완료 슬롯 제거) aria. */
     dismissTab: (name: string) => `${name} 분석 닫기`,
+    /** 재열기 핀 브랜드 라벨(세 줄 스택). */
+    reopenBrand: ["AI", "종합", "분석"],
+    /** 재열기 핀 aria — 대기/진행 건수 주입. */
+    reopenPin: (count: number) => `AI 분석 ${count}건 열기`,
+    /** 트레이더 카드 위 '심층 추론' 배지. */
+    deepReasoning: "🧠 심층 추론",
   },
   /** 동시 분석 상한(최대 3개) 안내. */
   limit: {
@@ -129,6 +135,15 @@ export const COPY = {
   },
   verdict: {
     badge: "최종 결정",
+    /** 포트폴리오 매니저 진행/실패 상태(최종 결론). */
+    pmLoading: "최종 결론 도출 중…",
+    pmFailed: "최종 결론 도출 실패",
+    /** 헤더 우측 강조 박스 라벨(신호 강도 / 확신도). */
+    signalStrengthShort: "신호 강도",
+    confidenceShort: "확신도",
+    /** 확신도 값만(높음/보통/낮음) — 강조 박스 숫자 자리. */
+    confidenceValue: (level: "HIGH" | "MEDIUM" | "LOW") =>
+      level === "HIGH" ? "높음" : level === "MEDIUM" ? "보통" : "낮음",
     confidence: (level: "HIGH" | "MEDIUM" | "LOW") =>
       `확신도: ${level === "HIGH" ? "높음" : level === "MEDIUM" ? "보통" : "낮음"}`,
     /** 확신도 산출 근거 — 무엇 기준인지 보조 설명 */

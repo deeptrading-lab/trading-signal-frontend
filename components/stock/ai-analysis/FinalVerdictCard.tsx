@@ -37,9 +37,8 @@ function renderRun(text: string, keyBase: string): ReactNode[] {
           <span
             key={`${keyBase}-n${m.index}`}
             className={cn(
-              m[1][0] === "+"
-                ? "text-red-600 dark:text-red-400"
-                : "text-blue-600 dark:text-blue-400",
+              // KR 관례: +상승=signal-up(빨강) / −하락=signal-down(파랑). 토큰 자동 다크.
+              m[1][0] === "+" ? "text-signal-up" : "text-signal-down",
             )}
           >
             {m[1]}
@@ -52,7 +51,7 @@ function renderRun(text: string, keyBase: string): ReactNode[] {
       nodes.push(
         <span
           key={`${keyBase}-t${m.index}`}
-          className="mx-0.5 font-normal text-slate-400 dark:text-slate-500"
+          className="mx-0.5 font-normal text-text-muted"
         >
           {m[2]}
         </span>,
@@ -71,7 +70,7 @@ function InlineBold({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">
+          <strong key={i} className="font-bold text-text-strong">
             {renderRun(part, `b${i}`)}
           </strong>
         ) : (
@@ -112,12 +111,13 @@ export function FinalVerdictCard({
   const bearish = isBearishVerdict(data.verdict);
   const accentColor = bullish ? "red" : bearish ? "blue" : "slate";
 
+  // KR 가격 위치 모델(위=빨강 상승, 아래=파랑 하락): 목표(상방)=signal-up / 손절·재진입(하방)=signal-down / 손익비=muted.
   const statCx = (color: "emerald" | "red" | "slate" | "blue") => cn(
-    "flex items-center justify-between gap-1.5 rounded-xl px-3 py-2.5",
-    color === "emerald" && "bg-emerald-50 dark:bg-emerald-950/20",
-    color === "red"     && "bg-red-50 dark:bg-red-950/20",
-    color === "slate"   && "bg-slate-100 dark:bg-slate-800/60",
-    color === "blue"    && "bg-blue-50 dark:bg-blue-950/20",
+    "flex items-center justify-between gap-sm rounded-md px-md py-sm",
+    color === "emerald" && "bg-signal-up-soft",
+    color === "red"     && "bg-signal-down-soft",
+    color === "slate"   && "bg-surface-muted",
+    color === "blue"    && "bg-signal-down-soft",
   );
 
   // target_pct·stop_loss_pct(%) 기준가. legacy(이 필드 추가 이전) 결정은 없음 → % 만 표기.
@@ -128,64 +128,61 @@ export function FinalVerdictCard({
   const renderPctStat = (pct: number, colorClass: string) => {
     const pctStr = `${pct > 0 ? "+" : ""}${pct}%`;
     if (basePrice == null) {
-      return <span className={cn("text-lg font-extrabold tabular-nums", colorClass)}>{pctStr}</span>;
+      return <span className={cn("text-mono-numeric tabular-nums", colorClass)}>{pctStr}</span>;
     }
     const price = roundToKrxTick(basePrice * (1 + pct / 100));
     return (
       <span className="flex items-baseline gap-1 whitespace-nowrap">
-        <span className={cn("text-lg font-extrabold tabular-nums", colorClass)}>
+        <span className={cn("text-mono-numeric tabular-nums", colorClass)}>
           {price.toLocaleString("ko-KR")}
         </span>
-        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">({pctStr})</span>
+        <span className="text-caption font-medium text-text-muted">({pctStr})</span>
       </span>
     );
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className={cn(
-        "bg-white dark:bg-slate-900 rounded-2xl border-[2.5px] shadow-lg overflow-hidden relative",
-        bullish && "border-red-500",
-        bearish && "border-blue-500",
-        !bullish && !bearish && "border-slate-300 dark:border-slate-700",
-      )}>
+      {/* 탈-카드지만 결론은 payoff — 굵은 색 테두리·강한 그림자를 걷고 헤어라인 + 옅은 elevation 카드로 낮춘다.
+          방향 정체성은 아이콘·라벨·배지 색으로만 전달(좌측 강조바·2.5px 컬러보더 제거). */}
+      <div className="bg-surface rounded-xl border border-border-line shadow-card overflow-hidden relative">
         <div className={cn(
-          "absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl",
-          bullish && "bg-red-500",
-          bearish && "bg-blue-500",
-          !bullish && !bearish && "bg-slate-500",
+          "absolute top-0 right-0 text-surface text-caption font-bold px-md py-1 rounded-bl-lg",
+          bullish && "bg-signal-up",
+          bearish && "bg-signal-down",
+          !bullish && !bearish && "bg-text-muted",
         )}>
           {COPY.verdict.badge}
         </div>
 
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800">
-          <div className="mt-1.5 flex items-center gap-3">
+        <div className="p-lg border-b border-border-line">
+          <div className="mt-1.5 flex items-center gap-md">
             <div className={cn(
               "w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0",
-              bullish && "bg-red-100 dark:bg-red-900/30",
-              bearish && "bg-blue-100 dark:bg-blue-900/30",
-              !bullish && !bearish && "bg-slate-100 dark:bg-slate-800",
+              bullish && "bg-signal-up-soft",
+              bearish && "bg-signal-down-soft",
+              !bullish && !bearish && "bg-surface-muted",
             )}>
-              {bullish && <TrendingUp className="text-red-600 dark:text-red-400" size={22} />}
-              {bearish && <TrendingDown className="text-blue-600 dark:text-blue-400" size={22} />}
+              {bullish && <TrendingUp className="text-signal-up" size={22} />}
+              {bearish && <TrendingDown className="text-signal-down" size={22} />}
               {/* 중립 — 카드(AIDecisionCard)와 동일하게 Minus(평행선). 상승 화살표는 오해 소지. */}
-              {!bullish && !bearish && <Minus className="text-slate-500" size={22} />}
+              {!bullish && !bearish && <Minus className="text-text-muted" size={22} />}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">
+              <h3 className="text-h1 font-extrabold text-text-strong leading-tight">
                 {VERDICT_LABEL[data.verdict]}
               </h3>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              <div className="mt-1 flex flex-wrap items-center gap-x-sm gap-y-xs text-caption text-text-muted">
                 <span className="flex items-center gap-1">
                   <TrendingUp size={13} /> {COPY.verdict.horizon(data.time_horizon)}
                 </span>
                 {calibration && (
                   <span
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
+                      "inline-flex items-center gap-1 rounded-sm px-sm py-0.5 text-caption font-medium",
                       calibration.sufficient
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
-                        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                        ? "bg-accent-vivid-soft text-accent-vivid"
+                        : "bg-surface-muted text-text-muted",
                     )}
                     title={
                       calibration.sufficient
@@ -204,63 +201,63 @@ export function FinalVerdictCard({
             {/* 핵심 지표 — 신호 강도(또는 확신도)를 헤더 우측에 강조 박스로. 근거는 tooltip. */}
             <div
               className={cn(
-                "flex flex-col items-center justify-center rounded-xl px-3.5 py-1.5 flex-shrink-0 min-w-[64px]",
-                bullish && "bg-red-100 dark:bg-red-900/30",
-                bearish && "bg-blue-100 dark:bg-blue-900/30",
-                !bullish && !bearish && "bg-slate-100 dark:bg-slate-800",
+                "flex flex-col items-center justify-center rounded-md px-md py-xs flex-shrink-0 min-w-16",
+                bullish && "bg-signal-up-soft",
+                bearish && "bg-signal-down-soft",
+                !bullish && !bearish && "bg-surface-muted",
               )}
               title={signal ? COPY.verdict.signalStrengthBasis : COPY.verdict.confidenceBasis}
             >
               <span className={cn(
                 "font-extrabold leading-none tabular-nums",
-                signal ? "text-[26px]" : "text-lg",
-                bullish && "text-red-600 dark:text-red-400",
-                bearish && "text-blue-600 dark:text-blue-400",
-                !bullish && !bearish && "text-slate-700 dark:text-slate-200",
+                signal ? "text-display" : "text-h2",
+                bullish && "text-signal-up",
+                bearish && "text-signal-down",
+                !bullish && !bearish && "text-text-strong",
               )}>
                 {signal
                   ? Math.round(signal.score)
-                  : data.confidence === "HIGH" ? "높음" : data.confidence === "MEDIUM" ? "보통" : "낮음"}
+                  : COPY.verdict.confidenceValue(data.confidence)}
               </span>
-              <span className="mt-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                {signal ? "신호 강도" : "확신도"}
+              <span className="mt-0.5 text-caption font-medium text-text-muted whitespace-nowrap">
+                {signal ? COPY.verdict.signalStrengthShort : COPY.verdict.confidenceShort}
               </span>
             </div>
           </div>
           {data.limitedData && (
-            <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            <div className="mt-md flex items-start gap-1.5 rounded-md bg-warn-soft px-md py-sm text-caption font-medium text-warn">
               <AlertTriangle size={14} className="mt-px flex-shrink-0" />
               <span>{COPY.verdict.limitedData(data.bars)}</span>
             </div>
           )}
-          <p className="mt-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+          <p className="mt-lg text-body-sm text-text-strong leading-relaxed">
             <InlineBold text={data.reasoning} />
           </p>
         </div>
 
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 space-y-2.5">
+        <div className="px-lg py-md border-b border-border-line space-y-md">
           <h4 className={cn(
-            "text-[13px] font-bold flex items-center gap-1.5",
-            accentColor === "red"   && "text-red-600 dark:text-red-400",
-            accentColor === "blue"  && "text-blue-600 dark:text-blue-400",
-            accentColor === "slate" && "text-slate-600 dark:text-slate-400",
+            "text-label-sm flex items-center gap-1.5",
+            accentColor === "red"   && "text-signal-up",
+            accentColor === "blue"  && "text-signal-down",
+            accentColor === "slate" && "text-text-muted",
           )}>
             {COPY.verdict.executionGuide}
           </h4>
 
           {/* 신규 진입자 / 기존 보유자 가이드 분리 */}
           {data.new_entry_strategy && (
-            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2">
-              <p className="text-[13px] font-bold text-slate-700 dark:text-slate-200 mb-0.5">{COPY.verdict.newEntryLabel}</p>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            <div className="bg-surface-muted rounded-md px-md py-sm">
+              <p className="text-label-sm text-text-strong mb-0.5">{COPY.verdict.newEntryLabel}</p>
+              <p className="text-body-sm text-text-strong leading-relaxed">
                 <InlineBold text={data.new_entry_strategy} />
               </p>
             </div>
           )}
           {data.holder_strategy && (
-            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2">
-              <p className="text-[13px] font-bold text-slate-700 dark:text-slate-200 mb-0.5">{COPY.verdict.holderLabel}</p>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            <div className="bg-surface-muted rounded-md px-md py-sm">
+              <p className="text-label-sm text-text-strong mb-0.5">{COPY.verdict.holderLabel}</p>
+              <p className="text-body-sm text-text-strong leading-relaxed">
                 <InlineBold text={data.holder_strategy} />
               </p>
             </div>
@@ -269,37 +266,35 @@ export function FinalVerdictCard({
           {/* 손익비는 값이 있을 때만 노출 — 없으면(진입 없음 등) 칸을 빼고 2열로. */}
           <div
             className={cn(
-              "grid grid-cols-1 gap-2",
+              "grid grid-cols-1 gap-sm",
               data.risk_reward_ratio !== null
                 ? "sm:grid-cols-3"
                 : "sm:grid-cols-2",
             )}
           >
             <div className={statCx(data.target_pct !== null && data.target_pct < 0 ? "blue" : "emerald")}>
-              <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">
+              <span className="text-body-sm-strong text-text-strong whitespace-nowrap">
                 {data.target_pct !== null && data.target_pct < 0
                   ? COPY.verdict.reentryLabel
                   : COPY.verdict.targetLabel}
               </span>
               {!data.target_pct ? (
-                <span className="text-lg font-extrabold text-slate-400 tabular-nums">—</span>
+                <span className="text-mono-numeric text-text-muted tabular-nums">—</span>
               ) : (
                 renderPctStat(
                   data.target_pct,
-                  data.target_pct > 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-blue-600 dark:text-blue-400",
+                  data.target_pct > 0 ? "text-signal-up" : "text-signal-down",
                 )
               )}
             </div>
             <div className={statCx("red")}>
-              <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">{COPY.verdict.stopLossLabel}</span>
-              {renderPctStat(data.stop_loss_pct, "text-red-600 dark:text-red-400")}
+              <span className="text-body-sm-strong text-text-strong whitespace-nowrap">{COPY.verdict.stopLossLabel}</span>
+              {renderPctStat(data.stop_loss_pct, "text-signal-down")}
             </div>
             {data.risk_reward_ratio !== null && (
               <div className={statCx("slate")}>
-                <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold whitespace-nowrap">{COPY.verdict.rrLabel}</span>
-                <span className="text-lg font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">
+                <span className="text-body-sm-strong text-text-strong whitespace-nowrap">{COPY.verdict.rrLabel}</span>
+                <span className="text-mono-numeric text-text-strong tabular-nums">
                   {data.risk_reward_ratio} : 1
                 </span>
               </div>
@@ -308,50 +303,50 @@ export function FinalVerdictCard({
         </div>
 
         {(data.short_term_outlook || data.mid_term_outlook) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border-line border-b border-border-line">
             {data.short_term_outlook && (
-              <div className="px-4 py-3 space-y-1">
-                <p className="text-[12px] font-bold text-slate-700 dark:text-slate-200">{COPY.verdict.shortTermLabel}</p>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed"><InlineBold text={data.short_term_outlook} /></p>
+              <div className="px-md py-md space-y-1">
+                <p className="text-label-sm text-text-strong">{COPY.verdict.shortTermLabel}</p>
+                <p className="text-caption text-text-muted leading-relaxed"><InlineBold text={data.short_term_outlook} /></p>
               </div>
             )}
             {data.mid_term_outlook && (
-              <div className="px-4 py-3 space-y-1">
-                <p className="text-[12px] font-bold text-slate-700 dark:text-slate-200">{COPY.verdict.midTermLabel}</p>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed"><InlineBold text={data.mid_term_outlook} /></p>
+              <div className="px-md py-md space-y-1">
+                <p className="text-label-sm text-text-strong">{COPY.verdict.midTermLabel}</p>
+                <p className="text-caption text-text-muted leading-relaxed"><InlineBold text={data.mid_term_outlook} /></p>
               </div>
             )}
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border-line bg-surface-muted">
           {data.key_strengths.length > 0 && (
-            <div className="p-5">
-              <h4 className="text-[13px] font-bold text-red-600 dark:text-red-400 mb-2 flex items-center gap-1">
+            <div className="p-lg">
+              <h4 className="text-label-sm text-signal-up mb-sm flex items-center gap-1">
                 <TrendingUp size={14} /> {COPY.verdict.strengths}
               </h4>
-              <ul className="text-sm space-y-1.5 text-slate-600 dark:text-slate-300">
+              <ul className="text-body-sm space-y-sm text-text-strong">
                 {data.key_strengths.map((s, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-red-500 font-bold shrink-0">↑</span><span className="min-w-0 leading-relaxed"><InlineBold text={s} /></span></li>
+                  <li key={i} className="flex gap-sm"><span className="text-signal-up font-bold shrink-0">↑</span><span className="min-w-0 leading-relaxed"><InlineBold text={s} /></span></li>
                 ))}
               </ul>
             </div>
           )}
           {data.key_risks.length > 0 && (
-            <div className="p-5">
-              <h4 className="text-[13px] font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1">
+            <div className="p-lg">
+              <h4 className="text-label-sm text-signal-down mb-sm flex items-center gap-1">
                 <TrendingDown size={14} /> {COPY.verdict.risks}
               </h4>
-              <ul className="text-sm space-y-1.5 text-slate-600 dark:text-slate-300">
+              <ul className="text-body-sm space-y-sm text-text-strong">
                 {data.key_risks.map((r, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-blue-500 font-bold shrink-0">↓</span><span className="min-w-0 leading-relaxed"><InlineBold text={r} /></span></li>
+                  <li key={i} className="flex gap-sm"><span className="text-signal-down font-bold shrink-0">↓</span><span className="min-w-0 leading-relaxed"><InlineBold text={r} /></span></li>
                 ))}
               </ul>
             </div>
           )}
         </div>
 
-        <div className="px-5 py-3 bg-slate-100 dark:bg-slate-950 text-[10px] text-slate-400 flex items-start gap-1.5">
+        <div className="px-lg py-md bg-surface-muted text-caption text-text-muted flex items-start gap-1.5">
           <Info size={12} className="flex-shrink-0 mt-0.5" />
           <p>{COPY.verdict.disclaimer}</p>
         </div>

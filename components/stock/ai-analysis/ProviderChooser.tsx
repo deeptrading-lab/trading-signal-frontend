@@ -30,21 +30,22 @@ interface ProviderChooserProps {
   onSelect: (provider: AIAnalysisProvider) => void;
 }
 
+// 공급자 색 — 토큰(다크 자동): claude=warn(웜/신중) / codex=info(쿨/신속). hex·dark: 직타 0.
 const PROVIDER_STYLE: Record<
   AIAnalysisProvider,
   { icon: typeof Sparkles; accent: string; soft: string; ring: string }
 > = {
   claude: {
     icon: Sparkles,
-    accent: "text-amber-600 dark:text-amber-400",
-    soft: "bg-amber-50 dark:bg-amber-900/30",
-    ring: "border-amber-200 hover:border-amber-400 hover:bg-amber-50 dark:border-amber-900 dark:hover:border-amber-700 dark:hover:bg-amber-900/20",
+    accent: "text-warn",
+    soft: "bg-warn-soft",
+    ring: "border-border-line hover:border-warn hover:bg-warn-soft",
   },
   codex: {
     icon: Zap,
-    accent: "text-emerald-600 dark:text-emerald-400",
-    soft: "bg-emerald-50 dark:bg-emerald-900/30",
-    ring: "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 dark:border-emerald-900 dark:hover:border-emerald-700 dark:hover:bg-emerald-900/20",
+    accent: "text-info",
+    soft: "bg-info-soft",
+    ring: "border-border-line hover:border-info hover:bg-info-soft",
   },
 };
 
@@ -70,8 +71,8 @@ function ChooserShell({
 /** 회색 원형 + 아이콘 (안내/오류 상태 공용). */
 function InfoIcon() {
   return (
-    <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-      <AlertCircle className="text-slate-400 w-7 h-7" />
+    <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-surface-muted flex items-center justify-center">
+      <AlertCircle className="text-text-muted w-7 h-7" />
     </div>
   );
 }
@@ -90,7 +91,7 @@ function ProviderCard({
       type="button"
       onClick={() => onSelect(provider)}
       className={cn(
-        "flex flex-col items-center text-center gap-2 rounded-2xl border bg-white dark:bg-slate-900 px-4 py-5 transition-colors cursor-pointer active:scale-95",
+        "flex flex-col items-center text-center gap-2 rounded-md border bg-surface px-md py-lg transition-colors cursor-pointer active:scale-95",
         // PC: 아이콘 왼쪽 + 텍스트 오른쪽 가로 카드(설명 한 줄).
         "md:flex-row md:items-center md:text-left md:gap-4 md:px-6",
         style.ring,
@@ -98,10 +99,10 @@ function ProviderCard({
     >
       <Icon className={cn("w-7 h-7 shrink-0", style.accent)} />
       <span className="flex flex-col gap-0.5 min-w-0">
-        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+        <span className="text-body-sm-strong text-text-strong">
           {COPY.provider[provider]}
         </span>
-        <span className="text-xs text-slate-500 dark:text-slate-400 leading-snug break-keep md:whitespace-nowrap">
+        <span className="text-caption text-text-muted leading-snug break-keep md:whitespace-nowrap">
           {COPY.chooser.desc[provider]}
         </span>
       </span>
@@ -115,8 +116,8 @@ export function ProviderChooser({ onSelect }: ProviderChooserProps) {
   if (isLoading) {
     return (
       <ChooserShell live>
-        <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-slate-400" />
-        <p className="text-sm text-slate-400 break-keep">{COPY.chooser.loading}</p>
+        <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-text-muted" />
+        <p className="text-body-sm text-text-muted break-keep">{COPY.chooser.loading}</p>
       </ChooserShell>
     );
   }
@@ -125,14 +126,14 @@ export function ProviderChooser({ onSelect }: ProviderChooserProps) {
     return (
       <ChooserShell live>
         <InfoIcon />
-        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed break-keep">
+        <p className="text-body-sm text-text-muted leading-relaxed break-keep">
           {COPY.chooser.error}
         </p>
         <button
           type="button"
           onClick={() => refetch()}
           disabled={isFetching}
-          className="mx-auto mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-bold transition-colors cursor-pointer disabled:opacity-60"
+          className="mx-auto mt-4 inline-flex items-center gap-1.5 px-md py-2 bg-surface-muted hover:bg-border-line text-text-strong rounded-sm text-body-sm font-bold transition-colors cursor-pointer disabled:opacity-60"
         >
           <RefreshCw size={14} className={cn(isFetching && "animate-spin")} />
           {COPY.chooser.retry}
@@ -145,7 +146,7 @@ export function ProviderChooser({ onSelect }: ProviderChooserProps) {
     return (
       <ChooserShell live>
         <InfoIcon />
-        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed break-keep">
+        <p className="text-body-sm text-text-muted leading-relaxed break-keep">
           {COPY.chooser.vercel}
         </p>
       </ChooserShell>
@@ -158,7 +159,7 @@ export function ProviderChooser({ onSelect }: ProviderChooserProps) {
     return (
       <ChooserShell live>
         <InfoIcon />
-        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed break-keep">
+        <p className="text-body-sm text-text-muted leading-relaxed break-keep">
           {COPY.chooser.noneLocal}
         </p>
       </ChooserShell>
@@ -174,14 +175,14 @@ export function ProviderChooser({ onSelect }: ProviderChooserProps) {
         <div className={cn("mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center", style.soft)}>
           <Icon className={cn("w-7 h-7", style.accent)} />
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed break-keep">
+        <p className="text-body-sm text-text-muted leading-relaxed break-keep">
           <span className={cn("font-bold", style.accent)}>{COPY.provider[only]}</span>
           {COPY.chooser.singleSuffix}
         </p>
         <button
           type="button"
           onClick={() => onSelect(only)}
-          className="mx-auto mt-5 block px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+          className="mx-auto mt-5 block px-6 py-2.5 bg-accent-vivid hover:brightness-110 text-surface rounded-sm text-button shadow-md shadow-accent-vivid/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
         >
           {COPY.chooser.start}
         </button>
@@ -191,7 +192,7 @@ export function ProviderChooser({ onSelect }: ProviderChooserProps) {
 
   return (
     <ChooserShell>
-      <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-slate-100 break-keep">
+      <h3 className="mb-4 text-body-sm-strong text-text-strong break-keep">
         {COPY.chooser.title}
       </h3>
       <div className="grid grid-cols-2 gap-3">

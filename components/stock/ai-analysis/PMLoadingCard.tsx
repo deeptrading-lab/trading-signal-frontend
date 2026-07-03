@@ -16,17 +16,14 @@ export function PMLoadingCard({ streamingChunk }: { streamingChunk: string }) {
   const tailText = streamingChunk.length > 200 ? "…" + streamingChunk.slice(-200) : streamingChunk;
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-800 p-5">
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-          <RefreshCw size={18} className="text-blue-500 animate-spin" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">최종 결론 도출 중…</p>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {streamingChunk ? tailText : messages[msgIdx]}
-          </p>
-        </div>
+    // 탈-카드: 흰 박스 → 옅은 accent 타일 + 인라인 스피너(진행 표시). 최종 결론 payoff 직전 단계.
+    <div className="flex items-center gap-md rounded-md bg-accent-vivid-soft px-md py-md">
+      <RefreshCw size={16} className="text-accent-vivid animate-spin flex-shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-body-sm-strong text-text-strong">{COPY.verdict.pmLoading}</p>
+        <p className="text-caption text-text-muted mt-0.5">
+          {streamingChunk ? tailText : messages[msgIdx]}
+        </p>
       </div>
     </div>
   );

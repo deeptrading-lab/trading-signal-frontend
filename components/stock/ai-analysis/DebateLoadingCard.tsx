@@ -15,18 +15,16 @@ export function DebateLoadingCard({ side }: { side: "bull" | "bear" }) {
 
   return (
     <div className={cn(
-      "rounded-xl border px-3 py-3",
-      isBull
-        ? "border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/10"
-        : "border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/10",
+      "rounded-md px-md py-md",
+      isBull ? "bg-signal-up-soft" : "bg-signal-down-soft",
     )}>
       <p className={cn(
-        "text-[11px] flex items-center gap-1.5",
-        isBull ? "text-red-500" : "text-blue-500",
+        "text-caption flex items-center gap-sm",
+        isBull ? "text-signal-up" : "text-signal-down",
       )}>
         <span className="relative flex h-2 w-2 flex-none">
-          <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isBull ? "bg-red-400" : "bg-blue-400")} />
-          <span className={cn("relative inline-flex h-2 w-2 rounded-full", isBull ? "bg-red-500" : "bg-blue-500")} />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
         </span>
         {messages[msgIdx]}
       </p>
