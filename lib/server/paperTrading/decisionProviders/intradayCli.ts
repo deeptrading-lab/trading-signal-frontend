@@ -221,8 +221,9 @@ export function applyPostGate(
   if (noNewEntry) demoteToHold("장막판/일일손실: 신규 진입 차단 → HOLD");
   // 2. 약세 일봉 레짐 veto.
   if (ctx.signal.regime === -1) demoteToHold("약세 레짐 veto: BUY → HOLD");
-  // 3. RRR<1.5: 진입 보류.
-  if (d.action === "BUY" && (lv.rrr == null || lv.rrr < MIN_RRR)) demoteToHold("RRR<1.5: 진입 보류 → HOLD");
+  // 3. 손익비(RRR)<1.5: 진입 보류.
+  if (d.action === "BUY" && (lv.rrr == null || lv.rrr < MIN_RRR))
+    demoteToHold("손익비 1.5 미만 — 먹을 공간 대비 손절 폭이 커서 진입 보류 → 관망");
 
   // 4. TP/SL 을 구조 barrier 밖으로 못 넓힘 + 과욕(+5%) 캡.
   if (d.action === "BUY") {

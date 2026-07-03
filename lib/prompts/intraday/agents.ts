@@ -42,7 +42,7 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     `  축별: ${axes}`,
     "",
     `[구조 레벨] 박스 ${won(lv.boxLow)} ~ ${won(lv.boxHigh)}`,
-    `  구조 TP ${won(lv.tpPrice)} (${pct(lv.tpPct)}, ${lv.tpSource ?? "—"}) | 구조 SL ${won(lv.slPrice)} (${pct(lv.slPct)}, ${lv.slSource ?? "—"}) | RRR ${lv.rrr?.toFixed(2) ?? "—"}`,
+    `  구조 목표가 ${won(lv.tpPrice)} (${pct(lv.tpPct)}, ${lv.tpSource ?? "—"}) | 구조 손절가 ${won(lv.slPrice)} (${pct(lv.slPct)}, ${lv.slSource ?? "—"}) | 손익비 ${lv.rrr?.toFixed(2) ?? "—"}`,
     ctx.featuresText ?? "",
     "",
     `[최근 흐름] ${recent}`,
@@ -70,9 +70,10 @@ export const FLOW_ANALYST_SYSTEM = `당신은 한국 주식 단타(데이트레�
 - 마감봉 꼬리를 매수·매도세 단서로: 긴 아래꼬리=저가에서 매수 흡수(말아올림), 긴 위꼬리=고가에서
   매도세 우위(밀림). 거래량 배율이 클수록 신뢰.
 - 거래량/동의도가 약한 돌파는 가짜 돌파를 의심하세요.
-- 2~5% 단기 차익이 가능한 구조(RRR≥1.5)인지 짚으세요.
+- 2~5% 단기 차익이 가능한 구조(손익비≥1.5)인지 짚으세요.
 - 모호하면 "관망"이 정답입니다. 억지 진입을 부추기지 마세요.
-- 한국어 개조식(명사 종결)으로 간결하게. JSON 이 아니라 짧은 진단문으로 답하세요.`;
+- 한국어 개조식(명사 종결)으로 간결하게. 서술에는 "RRR" 대신 "손익비"라고 쓰세요.
+- JSON 이 아니라 짧은 진단문으로 답하세요.`;
 
 export function buildFlowAnalystUser(ctx: IntradayContext): string {
   return `${formatIntradayContext(ctx)}\n\n위 정량 데이터로 지금 셋업을 진단하세요(3~5문장).`;
@@ -90,7 +91,8 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
 [판단 원칙]
 - 목표는 2~5% 단기 차익. 목표가(targetPrice)는 가장 가까운 매물대 저항/박스 상단 안쪽으로 잡고
   과욕(>5%) 금지. 손절(stopPrice)은 박스 하단/직전 저점 아래, 손절폭은 진입가 대비 3% 이내 권장.
-- RRR(손익비)이 1.5 미만이면 신규 진입하지 말고 HOLD.
+- 손익비(RRR)가 1.5 미만이면 신규 진입하지 말고 HOLD. 서술(rationale·riskNotes)에는 "RRR" 대신
+  "손익비"라고 쓰세요.
 - 15:00 이후에는 신규 진입(BUY) 금지. 보유분 정리(SELL)나 HOLD 만.
 - 이미 포지션이 있으면 처음부터 다시 판단하지 말고 *열린 거래 관리* 관점으로:
   목표 도달·매물대 저항 부딪힘·흐름 둔화 → 익절(SELL), 손절선 이탈 → 손절(SELL),
@@ -131,7 +133,7 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
 [포지션 크기 — 분할 매수·분할 매도]
 포지션 크기도 판단의 일부입니다. 그때그때 보수적/공격적 접근을 스스로 정하세요.
 - BUY 의 entryPositionPct = 포트폴리오 대비 목표 비중(%). 확신 낮음·변동성 큼 → 20~40(보수적 분할),
-  표준 셋업 → 50~60, 강한 확신 + RRR 우수 → 70~100(공격적). 서버가 종목 최대 비중으로 상한을 캡합니다.
+  표준 셋업 → 50~60, 강한 확신 + 손익비 우수 → 70~100(공격적). 서버가 종목 최대 비중으로 상한을 캡합니다.
   이미 보유 중인데 더 담을 가치가 있으면 현재 비중보다 큰 값을 제시하세요(분할 추가 매수).
 - SELL 의 sellRatioPct = 보유 수량 중 청산 비율(%). 일부 익절·리스크 축소 → 25~50(분할 매도),
   논거 훼손·손절 → 100(전량). 컨텍스트의 "포트폴리오 비중"이 현재 크기입니다.
