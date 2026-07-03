@@ -125,18 +125,18 @@ motion:
 typography:
   display:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial
-    fontSize: 30px
+    fontSize: 27px
     fontWeight: 700
     lineHeight: 1.18
   font-display:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial
-    fontSize: 36px
+    fontSize: 32px
     fontWeight: 800
     lineHeight: 1.12
     letterSpacing: -0.02em
   h1:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial
-    fontSize: 22px
+    fontSize: 20px
     fontWeight: 700
     lineHeight: 1.2
   h2:
@@ -214,7 +214,7 @@ typography:
     lineHeight: 1.2
     fontFeature: "tnum"
   gauge-score:
-    fontSize: 40px
+    fontSize: 34px
     fontWeight: 800
     letterSpacing: -0.02em
   table-cell-numeric:
@@ -244,25 +244,25 @@ spacing:
   button-primary-h: 40px
   button-sm-h: 32px
   hit-area-min: 40px
-  card-px: 20px
-  card-py: 20px
-  card-px-mobile: 16px
-  card-py-mobile: 16px
-  hero-px: 24px
-  hero-py: 24px
+  card-px: 16px
+  card-py: 16px
+  card-px-mobile: 13px
+  card-py-mobile: 13px
+  hero-px: 18px
+  hero-py: 18px
   home-grid-gap: 16px
   gauge-w: 220px
   gauge-h: 120px
   gauge-track-w: 14px
   donut-size: 120px
   donut-thickness: 22px
-  table-row-h: 48px
+  table-row-h: 42px
   table-cell-px: 12px
   disclosure-row-py: 12px
 rounded:
   sm: 8px
   md: 12px
-  lg: 16px
+  lg: 13px
   xl: 24px
   pill: 999px
 breakpoints:
