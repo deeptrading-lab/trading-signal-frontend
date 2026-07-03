@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Rocket, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
-import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
+import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils/cn";
+import { formatKrwInput } from "@/lib/utils/formatMoney";
 import {
   PAPER_TRADING_CREATE_BUTTON,
   PAPER_TRADING_CREATE_TITLE,
@@ -35,7 +36,6 @@ import {
   PAPER_TRADING_RISK_CONSERVATIVE,
   PAPER_TRADING_REMOVE_STOCK,
   PAPER_TRADING_SELECTED_STOCKS,
-  PAPER_TRADING_STOCK_SEARCH_EMPTY,
   PAPER_TRADING_STOCK_SEARCH_PLACEHOLDER,
   STATUS_LABEL,
 } from "@/lib/copy/paperTrading/labels";
@@ -55,24 +55,13 @@ export function PaperTradingListContainer() {
   const { sessions, isLoading, isError, isCreating, create, refetch } =
     usePaperTradingSessions();
   const [name, setName] = useState("AI 모의투자");
-  const [stockKeyword, setStockKeyword] = useState("");
-  const [debouncedKeyword, setDebouncedKeyword] = useState("");
   const [selectedStocks, setSelectedStocks] = useState<PaperTradingSelectedStock[]>([
     { ticker: "005930", name: "삼성전자", market: "KOSPI" },
   ]);
-  const [initialCash, setInitialCash] = useState("10000000");
+  const [initialCash, setInitialCash] = useState(formatKrwInput("10000000"));
   const [targetReturnPct, setTargetReturnPct] = useState("5");
   const [riskMode, setRiskMode] = useState<PaperTradingRiskMode>("balanced");
   const [createError, setCreateError] = useState<string | null>(null);
-  const { data: stockResults = [], isPending: isSearching } = useQueryStockSearch(
-    debouncedKeyword,
-    { enabled: debouncedKeyword.length > 0 },
-  );
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedKeyword(stockKeyword.trim()), 180);
-    return () => window.clearTimeout(id);
-  }, [stockKeyword]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,7 +71,7 @@ export function PaperTradingListContainer() {
         name,
         tickers: selectedStocks.map((stock) => stock.ticker),
         stocks: selectedStocks,
-        initialCash: Number(initialCash),
+        initialCash: Number(initialCash.replace(/[^0-9]/g, "")),
         targetReturnPct: Number(targetReturnPct),
         riskMode,
         decisionProvider: "mock",
@@ -102,8 +91,6 @@ export function PaperTradingListContainer() {
       if (prev.some((item) => item.ticker === stock.ticker)) return prev;
       return [...prev, stock].slice(0, 5);
     });
-    setStockKeyword("");
-    setDebouncedKeyword("");
   }
 
   function removeStock(ticker: string) {
@@ -135,52 +122,16 @@ export function PaperTradingListContainer() {
           </label>
 
           <div className="flex flex-col gap-sm">
-            <label className="relative flex flex-col gap-xs text-body-sm text-text-muted">
+            <div className="flex flex-col gap-xs text-body-sm text-text-muted">
               <span>{PAPER_TRADING_FIELD_STOCK_SEARCH}</span>
-              <input
-                className="h-input-h rounded-md border border-border-line bg-surface-base px-md text-text-strong"
-                value={stockKeyword}
+              {/* 공용 종목 검색 피커(components/ui/StockSearchPicker) — 단타워치와 동일 UI. */}
+              <StockSearchPicker
                 placeholder={PAPER_TRADING_STOCK_SEARCH_PLACEHOLDER}
-                onChange={(event) => setStockKeyword(event.target.value)}
+                onSelect={(stock) =>
+                  addStock({ ticker: stock.ticker, name: stock.name, market: stock.market })
+                }
               />
-              {debouncedKeyword.length > 0 ? (
-                <div className="dropdown-panel absolute left-0 right-0 top-full z-20 mt-xs flex max-h-[260px] flex-col gap-[2px] overflow-y-auto">
-                  {isSearching && stockResults.length === 0 ? (
-                    <p className="px-md py-dropdown-item-py text-body-sm text-text-muted">
-                      검색 중이에요.
-                    </p>
-                  ) : stockResults.length === 0 ? (
-                    <p className="px-md py-dropdown-item-py text-body-sm text-text-muted">
-                      {PAPER_TRADING_STOCK_SEARCH_EMPTY}
-                    </p>
-                  ) : (
-                    stockResults.map((stock) => (
-                      <button
-                        key={stock.ticker}
-                        type="button"
-                        className="search-result-item w-full text-left"
-                        onClick={() =>
-                          addStock({
-                            ticker: stock.ticker,
-                            name: stock.name,
-                            market: stock.market,
-                          })
-                        }
-                      >
-                        <span className="flex min-w-0 flex-col">
-                          <span className="truncate text-body-sm-strong text-text-strong">
-                            {stock.name}
-                          </span>
-                          <span className="search-result-item-meta">
-                            {stock.ticker} · {stock.market}
-                          </span>
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              ) : null}
-            </label>
+            </div>
             <div className="rounded-md bg-surface-muted p-sm">
               <p className="text-caption text-text-muted">{PAPER_TRADING_SELECTED_STOCKS}</p>
               <div className="mt-xs flex flex-wrap gap-xs">
@@ -209,10 +160,10 @@ export function PaperTradingListContainer() {
             <label className="flex flex-col gap-xs text-body-sm text-text-muted">
               <span>{PAPER_TRADING_FIELD_CASH}</span>
               <input
-                className="h-input-h rounded-md border border-border-line bg-surface-base px-md text-text-strong"
-                inputMode="decimal"
+                className="h-input-h rounded-md border border-border-line bg-surface-base px-md text-text-strong tabular-nums"
+                inputMode="numeric"
                 value={initialCash}
-                onChange={(event) => setInitialCash(event.target.value)}
+                onChange={(event) => setInitialCash(formatKrwInput(event.target.value))}
               />
             </label>
             <label className="flex flex-col gap-xs text-body-sm text-text-muted">

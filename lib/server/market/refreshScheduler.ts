@@ -12,27 +12,9 @@
 
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
+import { isKstMarketHours } from "@/lib/utils/kstMarketHours";
 
 let started = false;
-
-/** 평일(월~금) 09:00~15:30 KST 면 true — 정규장 시간. */
-export function isKstMarketHours(now: Date = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  const weekday = get("weekday"); // Mon..Sun
-  if (weekday === "Sat" || weekday === "Sun") return false;
-  // hour12:false 는 자정을 "24"로 줄 수 있어 모듈러로 정규화.
-  const hour = Number(get("hour")) % 24;
-  const minute = Number(get("minute"));
-  const mins = hour * 60 + minute;
-  return mins >= 9 * 60 && mins <= 15 * 60 + 30;
-}
 
 /**
  * 시황 자동 갱신 타이머 기동(멱등 — 중복 호출 무시). 장중에만 `refreshMarketAnalysis` 를 호출한다.

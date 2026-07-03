@@ -41,6 +41,19 @@ export type PaperTradingDecision = {
   confidence: PaperTradingConfidence;
   rationale: string;
   riskNotes: string[];
+  /** ① 흐름·세력 분석가 진단 원문 — 단타 cli-agent 만. "왜 이런 판단"의 배경 메모. */
+  analystNote?: string;
+  /** 사후 룰 게이트가 LLM 결정을 조정한 내역(과욕 캡·레짐 veto 등) — 단타 cli-agent 만. */
+  gateAdjustments?: string[];
+  /** 이 판단을 내린 모델 — 모델별 판단 품질 비교(A/B)용. 결정론 폴백이면 미기록. */
+  analystModel?: string;
+  judgeModel?: string;
+  /**
+   * 이 판단의 CLI 토큰 사용량(에이전트별) — 세션 누적 토큰·환산 비용 집계용.
+   * 구독(CLI) 기반이라 실제 과금이 아닌 API 환산 추정치. 결정론 폴백/미호출이면 미기록.
+   */
+  analystUsage?: import("@/lib/types/stock/aiAnalysis").AgentUsage;
+  judgeUsage?: import("@/lib/types/stock/aiAnalysis").AgentUsage;
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**
@@ -56,9 +69,27 @@ export type PaperTradingOrder = {
   name: string;
   side: "BUY" | "SELL";
   quantity: number;
+  /** 체결가(원) — 비용 모델 주입 시 슬리피지가 반영된 가격. */
   price: number;
   notional: number;
+  /** 수수료+제세금(원) — 비용 모델 미주입 시 0. 슬리피지는 price 에 반영. */
+  costKrw?: number;
+  /** 매도 실현손익(원, 비용 차감 후) — SELL 주문에만. 거래별 +/− 결과 표시용. */
+  realizedPnl?: number;
   reason: string;
+};
+
+/**
+ * 가상 체결 거래 비용 모델(bp, 1bp=0.01%) — 단타(cli-agent) 세션에서 주입한다.
+ * 미주입(undefined)이면 비용 0 = 기존 동작 무변경. 수익률 낙관 편향 방지용.
+ */
+export type PaperTradingCostModel = {
+  /** 위탁수수료 bp/편도 — 매수·매도 각각 부과. */
+  feeBpPerSide: number;
+  /** 매도 제세금 bp — 증권거래세+농특세(매도에만). */
+  sellTaxBp: number;
+  /** 슬리피지 bp/편도 — 시장가 체결 가정, 체결가를 불리한 쪽으로 조정. */
+  slippageBp: number;
 };
 
 export type PaperTradingPosition = {
@@ -145,6 +176,23 @@ export type PaperTradingSessionDetail = {
   latestDecision: PaperTradingDecision | null;
 };
 
+/** 단타(cli-agent) 판단 주기 선택지(분) — UI 드랍다운·서버 검증 공용. 15분 초과는 단타 아님. */
+export const PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS = [1, 2, 3, 5, 10, 15] as const;
+
+/**
+ * 판단 주기 → 분봉 단위 자동 파생(UI 라벨·서버 공용).
+ * 원칙: 분봉 ≤ 주기(주기마다 최소 1봉이 마감돼 "이전 봉 꼬리" 판단이 성립), 초단타로 갈수록 세분.
+ * 2·10분은 표준 분봉이 아니라 한 단계 아래 프로파일(1·5분봉)을 쓴다(주기당 2봉 마감).
+ */
+export const INTRADAY_TIMEFRAME_BY_INTERVAL: Record<number, number> = {
+  1: 1,
+  2: 1,
+  3: 3,
+  5: 5,
+  10: 5,
+  15: 15,
+};
+
 export type CreatePaperTradingSessionRequest = {
   name: string;
   tickers: string[];
@@ -153,6 +201,8 @@ export type CreatePaperTradingSessionRequest = {
   targetReturnPct: number;
   riskMode: PaperTradingRiskMode;
   decisionProvider: PaperTradingDecisionProvider;
+  /** 단타(cli-agent) 판단 주기(분) — 미지정 시 서버 기본(env). mock 세션에선 무시. */
+  tickIntervalMinutes?: number;
 };
 
 export type PaperTradingSessionsResponse = {

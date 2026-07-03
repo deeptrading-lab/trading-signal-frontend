@@ -21,6 +21,9 @@ export async function createPaperTradingSession(
   const response = await httpClient.post<CreatePaperTradingSessionResponse>(
     "/paper-trading/sessions",
     payload,
+    // 생성은 서버가 첫 틱(분봉 페치 + CLI 에이전트 콜, 재시도 포함)을 동기 완료 후 응답 —
+    // 공용 30초 타임아웃이면 성공 중에도 클라만 끊겨 재클릭 중복 생성을 유발한다(리뷰 #6).
+    { timeout: 120_000 },
   );
   return response.data;
 }
@@ -52,6 +55,8 @@ export async function runPaperTradingTick(
   const response = await httpClient.post<PaperTradingSessionResponse>(
     `/paper-trading/sessions/${sessionId}/tick`,
     payload,
+    // 틱도 LLM 판단(직렬화 대기 포함)이 30초를 넘을 수 있다 — 생성과 동일 사유로 상향.
+    { timeout: 120_000 },
   );
   return response.data;
 }

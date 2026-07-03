@@ -13,7 +13,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext): Promise<Response> {
   const { sessionId } = await context.params;
   try {
-    const existing = getPaperTradingSessionDetail(sessionId);
+    const existing = await getPaperTradingSessionDetail(sessionId);
     if (!existing) {
       return NextResponse.json({ error: "모의투자 세션을 찾지 못했어요." }, { status: 404 });
     }

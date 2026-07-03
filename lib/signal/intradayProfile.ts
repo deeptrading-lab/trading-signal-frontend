@@ -20,7 +20,7 @@ import type {
   SignalResult,
 } from "@/lib/types/signal";
 
-export type IntradayTimeframe = 3 | 5 | 15;
+export type IntradayTimeframe = 1 | 3 | 5 | 15;
 
 export type IntradayProfile = {
   timeframe: IntradayTimeframe;
@@ -39,6 +39,22 @@ export type IntradayProfile = {
  *  base ≈ 1세션 컨텍스트, long ≈ 반~1세션. MACD/ADX 는 봉이 커질수록 단축.
  */
 export const INTRADAY_PROFILES: Record<IntradayTimeframe, IntradayProfile> = {
+  1: {
+    // 1분봉 — 세션 390봉. 노이즈가 커서 주기는 3분 프로파일을 계승(무차원 임계값 동일)하고
+    // base(장기선)만 130(≈2시간)으로 둔다. 전일 warmup(381봉)으로 개장부터 풀 품질.
+    timeframe: 1,
+    indicators: {
+      maPeriods: { short: 5, mid: 20, long: 60, base: 130 },
+      macd: { fast: 12, slow: 26, signal: 9 },
+      rsiPeriod: 14,
+      bollinger: { period: 20, mult: 2 },
+      adxPeriod: 14,
+      volumeMaPeriod: 20,
+    },
+    softMinBars: 80,
+    minBars: 156,
+    structureLookback: 130,
+  },
   3: {
     timeframe: 3,
     indicators: {

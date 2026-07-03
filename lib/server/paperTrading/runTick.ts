@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { PAPER_TRADING_INTRADAY_COSTS } from "@/lib/server/paperTrading/constants";
 import { decideWithMockProvider } from "@/lib/server/paperTrading/decisionProviders/mock";
 import {
   getLivePriceSnapshot,
@@ -100,6 +101,8 @@ export async function runPaperTradingTick(
     priceSnapshot,
     maxPositionPct: input.session.maxPositionPct,
     cashBufferPct: input.session.cashBufferPct,
+    // 거래 비용은 단타(cli-agent)에만 반영 — 판단 품질 테스트의 낙관 편향 방지. mock 경로 무변경.
+    costs: input.session.decisionProvider === "cli-agent" ? PAPER_TRADING_INTRADAY_COSTS : undefined,
     forcedExit,
   });
 

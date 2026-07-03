@@ -14,9 +14,9 @@ import { INTRADAY_READ_COPY as C } from "@/lib/copy/stock/intradayRead";
 
 export interface IntradayReadSectionProps {
   ticker: string;
-  /** 카드 제목 — 워크스페이스는 종목명을 넘긴다. 미지정 시 "장중 단타 판단". */
+  /** 카드 제목 — 미지정 시 "장중 단타 판단". */
   heading?: string;
-  /** 워치 목록에서 제거(워크스페이스 전용). 미지정 시 제거 버튼 없음. */
+  /** 목록에서 제거 콜백. 미지정 시 제거 버튼 없음. */
   onRemove?: () => void;
 }
 

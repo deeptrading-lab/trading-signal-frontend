@@ -37,6 +37,8 @@ export interface IntradayPositionView {
   unrealizedPnlPct: number;
   /** 진입 후 경과 분. */
   heldMinutes: number;
+  /** 포트폴리오 대비 현재 비중(%) — AI 분할 청산 비율의 기준. */
+  allocationPct: number;
 }
 
 /** 직전 틱 결정 요약 — "열린 거래 관리" 연속성 인식용. */
@@ -58,6 +60,11 @@ export interface IntradayContext {
   price: number;
   /** 분봉 단위(분). */
   timeframe: number;
+  /**
+   * 판단 주기(분) — 다음 점검까지 개입할 수 없는 시간. LLM 이 진입/청산 시야(horizon)를
+   * 주기에 맞추도록 컨텍스트에 노출한다(5분 이상 = 다음 주기까지 견딜 셋업만).
+   */
+  intervalMinutes: number;
   /** 분봉 결정론 시그널 압축본(4축/score/action/regime). */
   signal: DecisionSignal;
   levels: IntradayLevels;
@@ -67,6 +74,14 @@ export interface IntradayContext {
   previousDecision: IntradayDecisionEcho | null;
   /** 장중 시각 "HH:mm"(KST) — 15:00 이후 신규진입 금지 게이트. */
   nowHhmm: string;
+  /**
+   * 캔들 미시구조 피처 블록(결정론 산출, 한국어 포맷) — 마감봉 꼬리·스윙 구조(저점 붕괴/전고
+   * 돌파)·피보나치 되돌림·단기 박스. `lib/signal/intradayFeatures` 가 만들고 프롬프트에 그대로
+   * 끼운다. 봉 부족 시 빈 문자열(무주입).
+   */
+  featuresText?: string;
+  /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") — 사전 게이트의 LLM 스킵을 뚫는 트리거. */
+  structureEvent?: string | null;
 }
 
 /** LLM(②진입·청산 판단가)이 생성하는 부분 — 서버가 메타로 보강. */
@@ -82,6 +97,16 @@ export interface IntradayDecisionLlm {
   /** 논거 무효가(이 가격 이탈 시 추적). */
   invalidationPrice: number | null;
   expectedHoldingMinutes: number | null;
+  /**
+   * BUY 시 포트폴리오 대비 목표 비중(%, 5~100) — AI 가 확신·손익비·변동성에 따라 분할 진입
+   * 크기를 정한다. null 이면 리스크모드 기본값. 서버가 maxPositionPct 로 상한 캡.
+   */
+  entryPositionPct: number | null;
+  /**
+   * SELL 시 보유 수량 중 청산 비율(%, 10~100) — 100 미만이면 분할 청산(REDUCE).
+   * null 이면 전량(100). HOLD/BUY 에선 무시.
+   */
+  sellRatioPct: number | null;
   /** 한국어 개조식 1~2문장. */
   rationale: string;
   riskNotes: string[];

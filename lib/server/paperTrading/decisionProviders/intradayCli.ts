@@ -9,6 +9,10 @@
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
+import {
+  extractIntradayFeatures,
+  formatIntradayFeatures,
+} from "@/lib/signal/intradayFeatures";
 import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
 import {
   FLOW_ANALYST_SYSTEM,
@@ -18,7 +22,7 @@ import {
 } from "@/lib/prompts/intraday/agents";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type { RuleDirection, SignalResult } from "@/lib/types/signal";
-import type { AIAnalysisProvider, DecisionSignal } from "@/lib/types/stock/aiAnalysis";
+import type { AgentUsage, AIAnalysisProvider, DecisionSignal } from "@/lib/types/stock/aiAnalysis";
 import type {
   PaperTradingDecision,
   PaperTradingRiskMode,
@@ -56,6 +60,8 @@ export interface IntradayCliInput {
   /** 오름차순 분봉(date="YYYY-MM-DDTHH:mm"). */
   minuteCandles: StockMinuteCandle[];
   timeframe: number;
+  /** 판단 주기(분) — 세션 tickIntervalMinutes. 프롬프트 horizon 인지용. */
+  tickIntervalMinutes: number;
   /** 일봉 레짐(-1/0/1) — 분봉 평가 regimeOverride. */
   dailyRegime: RuleDirection;
   /** 현재가(원). */
@@ -150,18 +156,34 @@ function buildContext(
   signal: DecisionSignal,
   levels: IntradayLevels,
 ): IntradayContext {
+  // 캔들 미시구조(마감봉 꼬리·스윙·피보나치·박스) — 결정론 산출, 봉 부족 시 빈 문자열.
+  const profile = resolveIntradayProfile(input.timeframe);
+  const features = extractIntradayFeatures(
+    input.minuteCandles,
+    input.timeframe,
+    profile.structureLookback,
+  );
+  const featuresText = formatIntradayFeatures(features);
+  // 매수 관심 구조 이벤트 — 결정론 시그널(4축)이 늦게 반응해도 전고 돌파 순간엔 AI 에 묻는다
+  // (쌍바닥→돌파를 사전 게이트가 걸러버리던 커버리지 갭, 사용자 관찰 사례). 약세 흐름이면
+  // 어차피 사후 게이트가 매수를 차단하므로 트리거로 치지 않는다.
+  const structureEvent =
+    features?.swing.highBroken && signal.regime !== -1 ? "전고 돌파 진행" : null;
   return {
     ticker: input.ticker,
     name: input.name,
     asOf: signal.asOf,
     price: input.price,
     timeframe: input.timeframe,
+    intervalMinutes: input.tickIntervalMinutes,
     signal,
     levels,
     recentBars: buildRecentBars(input.minuteCandles),
     position: input.position,
     previousDecision: input.previousDecision,
     nowHhmm: input.nowHhmm,
+    featuresText,
+    structureEvent,
   };
 }
 
@@ -179,8 +201,13 @@ export function evaluatePreGate(ctx: IntradayContext, dailyLossKill: boolean): P
   const flat = !ctx.position;
 
   // 무포지션 + 분봉 HOLD + 직전도 HOLD → 변화 없음, LLM 호출 생략(비용 절감).
+  // 단, 구조 이벤트(전고 돌파 등)가 잡히면 신규 진입 가능 상태에 한해 AI 에 묻는다 —
+  // 4축 점수가 아직 HOLD 여도 돌파 셋업은 다음 주기까지 기다리면 늦는다.
   if (flat && ctx.signal.action === "HOLD" && (ctx.previousDecision?.action ?? "HOLD") === "HOLD") {
-    return { callLlm: false, noNewEntry, reason: "변화 없음(무포지션·HOLD 지속)" };
+    if (ctx.structureEvent && !noNewEntry) {
+      return { callLlm: true, noNewEntry };
+    }
+    return { callLlm: false, noNewEntry, reason: "상황 변화 없음 — AI 호출 생략(포지션·신호 그대로)" };
   }
   return { callLlm: true, noNewEntry };
 }
@@ -199,16 +226,19 @@ export function applyPostGate(
     if (d.action === "BUY") {
       d.action = "HOLD";
       d.entryZone = null;
+      d.entryPositionPct = null;
       adj.push(reason);
     }
   };
 
   // 1. 15:00+/일일손실: 신규 BUY 차단.
-  if (noNewEntry) demoteToHold("장막판/일일손실: 신규 진입 차단 → HOLD");
+  if (noNewEntry) demoteToHold("장 막판(15:00 이후)이거나 일일 손실 한도 도달 — 신규 진입 차단 → 관망");
   // 2. 약세 일봉 레짐 veto.
-  if (ctx.signal.regime === -1) demoteToHold("약세 레짐 veto: BUY → HOLD");
-  // 3. RRR<1.5: 진입 보류.
-  if (d.action === "BUY" && (lv.rrr == null || lv.rrr < MIN_RRR)) demoteToHold("RRR<1.5: 진입 보류 → HOLD");
+  if (ctx.signal.regime === -1)
+    demoteToHold("일봉 큰 흐름이 약세 — 하락 국면 역행 매수 차단 → 관망");
+  // 3. 손익비(RRR)<1.5: 진입 보류.
+  if (d.action === "BUY" && (lv.rrr == null || lv.rrr < MIN_RRR))
+    demoteToHold("손익비 1.5 미만 — 먹을 공간 대비 손절 폭이 커서 진입 보류 → 관망");
 
   // 4. TP/SL 을 구조 barrier 밖으로 못 넓힘 + 과욕(+5%) 캡.
   if (d.action === "BUY") {
@@ -244,12 +274,14 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
       action: "BUY",
       confidence: "LOW",
       entryZone: { low: Math.round(ctx.price * 0.999), high: Math.round(ctx.price * 1.002) },
+      entryPositionPct: null, // 리스크모드 기본 비중으로 진입.
+      sellRatioPct: null,
       targetPrice: lv.tpPrice,
       stopPrice: lv.slPrice,
       invalidationPrice: lv.slPrice,
       expectedHoldingMinutes: 60,
-      rationale: "결정론 폴백 — 분봉 BUY 시그널 + 구조 TP/SL(RRR 충족) 기준 진입.",
-      riskNotes: ["에이전트 미응답으로 결정론 신호 사용."],
+      rationale: "지표가 매수 신호 — 구조상 목표·손절 구간이 손익비 기준을 충족해 규칙대로 진입.",
+      riskNotes: ["AI 응답이 없어 지표 계산만으로 결정했어요."],
     };
   }
 
@@ -259,12 +291,14 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
       action: "SELL",
       confidence: "LOW",
       entryZone: null,
+      entryPositionPct: null,
+      sellRatioPct: 100, // 폴백은 전량 정리(보수적).
       targetPrice: null,
       stopPrice: null,
       invalidationPrice: null,
       expectedHoldingMinutes: 0,
-      rationale: "결정론 폴백 — 분봉 SELL 시그널로 보유분 정리.",
-      riskNotes: [],
+      rationale: "지표가 매도 신호로 돌아서 보유분을 정리.",
+      riskNotes: ["AI 응답이 없어 지표 계산만으로 결정했어요."],
     };
   }
 
@@ -272,11 +306,13 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
     action: "HOLD",
     confidence: "LOW",
     entryZone: null,
+    entryPositionPct: null,
+    sellRatioPct: null,
     targetPrice: ctx.previousDecision?.targetPrice ?? null,
     stopPrice: ctx.previousDecision?.stopPrice ?? null,
     invalidationPrice: ctx.previousDecision?.invalidationPrice ?? null,
     expectedHoldingMinutes: null,
-    rationale: "결정론 폴백 — 명확한 셋업 없음, 관망.",
+    rationale: "지표에 뚜렷한 매수·매도 신호가 없어 관망.",
     riskNotes: [],
   };
 }
@@ -285,6 +321,12 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
 
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** null 통과 clamp — LLM 이 범위 밖 값을 내면 안전 범위로 자른다. */
+function clampOrNull(v: number | null, min: number, max: number): number | null {
+  if (v == null) return null;
+  return Math.min(max, Math.max(min, v));
 }
 
 function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
@@ -305,6 +347,9 @@ function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
       ? d.confidence
       : "MEDIUM") as IntradayDecisionLlm["confidence"],
     entryZone,
+    // AI 분할 비율 — 진입 비중 5~100%, 청산 비율 10~100% 로 clamp(범위 밖 환각 차단).
+    entryPositionPct: action === "BUY" ? clampOrNull(num(d.entryPositionPct), 5, 100) : null,
+    sellRatioPct: action === "SELL" ? clampOrNull(num(d.sellRatioPct), 10, 100) : null,
     targetPrice: num(d.targetPrice),
     stopPrice: num(d.stopPrice),
     invalidationPrice: num(d.invalidationPrice),
@@ -324,45 +369,84 @@ function riskTargetPct(riskMode: PaperTradingRiskMode): number {
   return 60;
 }
 
-function toPaperTradingDecision(
+/**
+ * IntradayDecision → PaperTradingDecision 목표 비중 매핑 — AI 분할 매수·분할 매도.
+ *
+ * - BUY: AI 가 정한 목표 비중(entryPositionPct, 없으면 리스크모드 기본)으로 진입/추가 매수.
+ *   maxPositionPct 로 상한 캡. **기존 비중보다 낮춰 잡진 않는다**(BUY 액션이 매도를 유발하는
+ *   역전 방지 — 수익으로 비중이 캡을 넘어도 유지).
+ * - SELL: sellRatioPct(없으면 100=전량). 100 미만 + 보유 중이면 분할 청산(REDUCE) —
+ *   목표 비중 = 현재 비중 × (1 − 비율).
+ * - HOLD: **현재 비중 그대로**(리밸런싱 트레이드 금지 — 이전엔 리스크모드 기본 비중으로
+ *   재조정 주문이 발생할 수 있었다).
+ *
+ * 테스트를 위해 export (CLI 없이 순수 매핑 검증).
+ */
+export function toPaperTradingDecision(
   intraday: IntradayDecision,
-  input: IntradayCliInput,
+  input: Pick<IntradayCliInput, "ticker" | "name" | "position" | "riskMode" | "maxPositionPct">,
 ): PaperTradingDecision {
   const { action } = intraday;
-  // 단타 단일 종목: BUY→목표비중 진입, SELL→전량 청산, HOLD→유지.
-  const targetPct =
-    action === "BUY"
-      ? Math.min(input.maxPositionPct, riskTargetPct(input.riskMode))
-      : action === "SELL"
-        ? 0
-        : input.position
-          ? input.position.quantity > 0
-            ? Math.min(input.maxPositionPct, riskTargetPct(input.riskMode))
-            : 0
-          : 0;
+  const currentPct = input.position?.allocationPct ?? 0;
 
-  const ptAction = action === "SELL" ? (input.position ? "EXIT" : "SELL") : action;
+  let targetPct: number;
+  let ptAction: PaperTradingDecision["action"];
+  /** false = 리밸런싱 주문 금지(targetAllocations 비움 — virtualExecution 계약, 리뷰 #1). */
+  let trade = true;
+
+  if (action === "BUY") {
+    const desired = intraday.entryPositionPct ?? riskTargetPct(input.riskMode);
+    targetPct = Math.max(currentPct, Math.min(input.maxPositionPct, desired));
+    ptAction = "BUY";
+    // 캡에 걸려 현 비중 이하가 되면 살 여력이 없음 — %→floor(주수) 재계산 드리프트로
+    // BUY 액션이 1주 매도를 만드는 역전을 막기 위해 주문을 내지 않는다.
+    trade = targetPct > currentPct;
+  } else if (action === "SELL") {
+    const ratio = intraday.sellRatioPct ?? 100;
+    if (input.position && ratio < 100) {
+      targetPct = round2(currentPct * (1 - ratio / 100));
+      ptAction = "REDUCE";
+    } else {
+      targetPct = 0;
+      ptAction = input.position ? "EXIT" : "SELL";
+    }
+  } else {
+    // HOLD = 현 포지션 그대로 — stale allocationPct 를 목표로 되먹이면 가격 미세 변동마다
+    // floor 재계산 매도가 새므로(리뷰 #1) 주문 자체를 내지 않는다(익절/손절은 forcedExit 담당).
+    targetPct = input.position && input.position.quantity > 0 ? currentPct : 0;
+    ptAction = "HOLD";
+    trade = false;
+  }
 
   return {
     action: ptAction,
     targetAllocationPct: targetPct,
-    targetAllocations: [
-      {
-        ticker: input.ticker,
-        name: input.name,
-        targetAllocationPct: targetPct,
-        rationale: intraday.rationale,
-      },
-    ],
+    targetAllocations: trade
+      ? [
+          {
+            ticker: input.ticker,
+            name: input.name,
+            targetAllocationPct: targetPct,
+            rationale: intraday.rationale,
+          },
+        ]
+      : [],
     confidence: intraday.confidence,
     rationale: intraday.rationale,
     riskNotes: intraday.riskNotes,
+    // "왜 이런 판단" 메모 — 분석가 진단·룰 조정 내역을 틱 로그(체결 내역 시트)까지 보존.
+    analystNote: intraday.analystNote,
+    gateAdjustments: intraday.gateAdjustments,
     expectedHoldingMinutes: intraday.expectedHoldingMinutes ?? undefined,
     // 청산 트리거(virtualExecution forced-exit): 손절가 우선, 없으면 무효화가.
     invalidationPrice: intraday.stopPrice ?? intraday.invalidationPrice ?? null,
     targetPrice: intraday.targetPrice ?? null,
     source: "cli-agent",
   };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 // ─── 공개 진입점 ──────────────────────────────────────────────────────────────
@@ -398,7 +482,7 @@ export async function decideIntradayWithCli(
   const pre = evaluatePreGate(ctx, input.dailyLossKill);
   if (!pre.callLlm && !input.forceAgents) {
     return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", undefined, [
-      pre.reason ?? "사전 게이트 스킵",
+      pre.reason ?? "규칙 사전 점검으로 AI 호출 생략",
     ]);
   }
 
@@ -407,6 +491,25 @@ export async function decideIntradayWithCli(
   // 미설정 시 INTRADAY_MODEL, 그래도 없으면 invokeAgentCliStream 이 CLAUDE_CLI_MODEL 로 폴백.
   const analystModel = process.env.INTRADAY_ANALYST_MODEL ?? process.env.INTRADAY_MODEL;
   const judgeModel = process.env.INTRADAY_JUDGE_MODEL ?? process.env.INTRADAY_MODEL;
+  // 판단을 내린 모델·토큰 사용량을 틱에 기록 — 모델 A/B·세션 누적 비용 집계의 원장 근거.
+  const effectiveModel = (model?: string) =>
+    model ?? process.env.CLAUDE_CLI_MODEL ?? "cli-default";
+  let analystUsage: AgentUsage | undefined;
+  let judgeUsage: AgentUsage | undefined;
+  const withModels = (
+    result: IntradayProviderResult,
+    used: { analyst: boolean; judge: boolean },
+  ): IntradayProviderResult => {
+    if (used.analyst) {
+      result.decision.analystModel = effectiveModel(analystModel);
+      result.decision.analystUsage = analystUsage;
+    }
+    if (used.judge) {
+      result.decision.judgeModel = effectiveModel(judgeModel);
+      result.decision.judgeUsage = judgeUsage;
+    }
+    return result;
+  };
 
   // ① 흐름·세력 분석가 — 실패해도 진단 없이 ②로 진행(분석가는 보조).
   let analystNote = "";
@@ -425,6 +528,7 @@ export async function decideIntradayWithCli(
       () => {},
     );
     analystNote = r1.text.trim();
+    analystUsage = r1.usage;
   } catch {
     analystNote = "";
   }
@@ -447,17 +551,24 @@ export async function decideIntradayWithCli(
         () => {},
       );
       llm = normalizeLlm(parseLooseJson(r2.text));
+      judgeUsage = r2.usage;
     } catch {
       llm = null;
     }
   }
 
   if (!llm) {
-    return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
-      "판단가 응답 실패 — 결정론 폴백",
-    ]);
+    return withModels(
+      finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
+        "AI 판단 응답 실패 — 지표 계산으로 대신 결정",
+      ]),
+      { analyst: analystNote !== "", judge: false },
+    );
   }
 
   const gated = applyPostGate(llm, ctx, pre.noNewEntry);
-  return finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments);
+  return withModels(
+    finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments),
+    { analyst: analystNote !== "", judge: true },
+  );
 }
