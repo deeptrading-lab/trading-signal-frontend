@@ -563,8 +563,9 @@ function WatchRow({
                 <ExternalLink className="size-4" aria-hidden />
               </Link>
             ) : null}
-            {/* 활성 세션 행은 표에 자동 상주(제거해도 재등장) — ✕ 대신 일시정지/완료로 관리. */}
-            {!current || current.status === "completed" ? (
+            {/* 진행중 행만 자동 상주(제거해도 재등장) — 멈춘 세션(일시정지·완료·실패)·세션 없음 행은
+                ✕ 로 제거 가능. 제거해도 세션은 지워지지 않는다(재추가 시 재개로 복귀). */}
+            {!current || current.status !== "running" ? (
               <button
                 type="button"
                 className={ICON_BTN}
