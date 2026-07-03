@@ -39,7 +39,7 @@ export function BrandLockup({
       {showWordmark ? (
         <WordmarkTag
           id={wordmarkId}
-          className="bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-font-display text-transparent"
+          className="bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-font-display font-font-display text-transparent"
         >
           {NAV_BRAND_LABEL}
         </WordmarkTag>
