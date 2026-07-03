@@ -5588,3 +5588,38 @@
   - 단타워치/모의투자 후속 PR: 틱 판단 컨텍스트(`formatIntradayContext`)에 경보 1줄 주입 + volume-rank 후보표 경고 칩 — 본 PR 의 `fetchActiveWarnings`·`toWarningChips` 재사용.
   - 밸류트랩 스냅샷(`/api/stock/snapshot`) warnings 포함, 시그널 룰 엔진 게이트(정리매매·투자위험 하드 제외), 관심종목 행 배지(보류 주석 해제), 스코어카드 지정 이벤트 스탬프.
   - prod 활성화는 Vercel 에 TOSS 키 등록만으로 가능(시세 소스 전환과 독립) — 단일 활성 토큰은 기존 KV 공유로 해결됨.
+
+### 2026-07-03 — feat(intraday): 단타 지면에 매수 유의(경보·VI) 배선 — 틱 판단 주입 + 워치/후보 칩 (#205)
+
+- **slug**: `intraday-warnings` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/205
+- **요약**: feat(intraday): 단타 지면에 매수 유의(경보·VI) 배선 — 틱 판단 주입 + 워치/후보 칩
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > #204 로 만든 토스 매수 유의사항(`fetchActiveWarnings`·`toWarningChips`)을 단타 지면에 배선한다 — PRD `docs/prd/intraday-warnings.md`. #203 자동틱 루프가 생기면서 단타는 VI(이 API의 유일한 실시간 계열)를 소비할 수 있는 유일한 자동 루프가 됐다.
+  > 
+  > - **배치 인프라**: `fetchActiveWarningsBatch`(동시성 제한·60s 캐시 재사용·never-throw) + `/api/stock/warnings/batch`(캡 50, X-Data-Source) + `useQueryStockWarningsBatch`.
+  > - **⑥a 틱 판단 주입**: `IntradayContext.warnings` → `formatIntradayContext` 에 `[매수 유의]` 1줄. **사전 게이트 통과(LLM 실제 호출) 시에만** fail-soft 페치 — 변화없음 스킵 틱은 미조회(낭비 방지). 틱 루프와 on-demand 판단 카드 양쪽 자동 적용.
+  > - **⑥b 워치/후보 칩**: 단타 워치 표 행 + 추천 후보 칩에 경고 배지(`StockWarningBadges` 공유 컴포넌트, 헤더도 이걸로 리팩터). 키 없음·실패·빈 배열 = 미표시.
+  > 
+  > ## 검증 (docs/qa/intraday-warnings.md)
+  > 
+  > - AC 7건 ✅ — 배치 실응답: 거래량 상위 **금호전기(001210)·금호건설(002990) 투자경고 검출**, 111710 단기과열, 005930 무경보.
+  > - vitest 742 passed(신규 9) · tsc · eslint · next build 클린. paperTrading 69 무회귀.
+  > - 토스 키 없는 동료 로컬: 배치 무호출·주입 없음·칩 없음·틱 판단 무회귀(AC-1 유닛).
+  > 
+  > ## 적대 리뷰
+  > 
+  > reviewer 적대 리뷰 **블로킹 정확성 버그 0건**. 비블로킹 3건 반영: 배치 캡 30→50(가시 union 커버, 거래량 후보 tail 유실 방지), 틱 페치 abort 가드, 주석 정확화. useMemo→refetch 우려는 queryKey value-hash 로 무해 확인.
+  > 
+  > ## 다음 작업
+  > 
+  > - ④ 시그널 룰 엔진 게이트(정리매매·투자위험 하드 제외), ⑦ 스코어카드 지정 이벤트 스탬프, ③ 밸류트랩 스냅샷, ⑤ 관심종목 행 배지.
+  > - (미발현) 배치 fn 소문자 티커 키 정규화 — 미국 소문자 티커 지면 재사용 시.
+  > - prod 활성화는 Vercel TOSS 키 등록만으로(시세 소스 전환과 독립). 단타 루프는 로컬 CLI 전용이라 prod 서버리스에선 no-op.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - ④ 시그널 룰 엔진 게이트(정리매매·투자위험 하드 제외), ⑦ 스코어카드 지정 이벤트 스탬프, ③ 밸류트랩 스냅샷, ⑤ 관심종목 행 배지.
+  - (미발현) 배치 fn 소문자 티커 키 정규화 — 미국 소문자 티커 지면 재사용 시.
+  - prod 활성화는 Vercel TOSS 키 등록만으로(시세 소스 전환과 독립). 단타 루프는 로컬 CLI 전용이라 prod 서버리스에선 no-op.
