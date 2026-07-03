@@ -14,7 +14,7 @@
  *   result       → 최종 완성 텍스트
  */
 
-import { spawn } from "node:child_process";
+import { spawn } from "child_process";
 import readline from "node:readline";
 import { type AgentUsage, UNMEASURED_USAGE } from "@/lib/types/stock/aiAnalysis";
 

@@ -19,10 +19,22 @@ import {
   type AgentUsageRecord,
 } from "@/lib/server/ai/agentUsageStore";
 import { getAllScorecardRows } from "@/lib/server/scorecard/scorecardStore";
-import { aggregateAgentRows, runStats, mean, nums } from "@/lib/server/ai/usageAggregate";
-import { buildWasteReport, type WasteReport } from "./waste";
-import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
+import {
+  aggregateAgentRows,
+  runStats,
+  runWallClockMs,
+  mean,
+  nums,
+} from "@/lib/server/ai/usageAggregate";
+import { buildWasteReport } from "./waste";
 import type { ScorecardRow } from "@/lib/types/scorecard/scorecard";
+import type {
+  AbComparison,
+  ConfigDelta,
+  ConfigPerRunTokens,
+  ConfigRunHealth,
+  ConfigStats,
+} from "@/lib/types/stock/abHarness";
 import {
   AB_VERDICT_AGREEMENT_MIN,
   AB_TARGET_DRIFT_MAX,
@@ -32,53 +44,7 @@ import {
 } from "./constants";
 
 const ROW_LIMIT = 2000;
-
-export interface ConfigPerRunTokens {
-  newInputTokens: number | null;
-  cacheReadTokens: number | null;
-  cacheCreationTokens: number | null;
-  outputTokens: number | null;
-  costUsd: number | null;
-}
-
-export interface ConfigStats {
-  configId: string;
-  configLabel: string | null;
-  runCount: number;
-  avgWallClockMs: number | null;
-  /** 분석 1회(run) 당 평균 토큰/비용(에이전트 합산 후 run 평균 — 토론 2회도 정확 합산). */
-  perRun: ConfigPerRunTokens;
-  verdictCounts: Record<string, number>;
-  confidenceCounts: Record<string, number>;
-  /** 에이전트별 집계(낭비 진단·세부 비교용). */
-  agents: AgentUsageRow[];
-}
-
-export interface ConfigDelta {
-  configId: string;
-  baselineId: string;
-  costDeltaPct: number | null;
-  wallClockDeltaPct: number | null;
-  cacheCreationDeltaPct: number | null;
-  outputDeltaPct: number | null;
-  commonTickers: number;
-  verdictAgreementRate: number | null;
-  targetPctDrift: number | null;
-  stopLossPctDrift: number | null;
-  signalScoreDrift: number | null;
-  status: "PASS" | "REVIEW" | "INSUFFICIENT";
-  reasons: string[];
-}
-
-export interface AbComparison {
-  configured: boolean;
-  session: string;
-  configs: ConfigStats[];
-  deltas: ConfigDelta[];
-  waste: WasteReport | null;
-  generatedAt: string;
-  note: string;
-}
+const LONG_AGENT_DURATION_MS = 10 * 60 * 1000;
 
 const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
 
@@ -117,6 +83,19 @@ function countBy<T>(rows: T[], pick: (r: T) => string): Record<string, number> {
   return out;
 }
 
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const sorted = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function maxOrNull(xs: number[]): number | null {
+  return xs.length ? Math.max(...xs) : null;
+}
+
 /** ticker 별 최빈 verdict(반복 run 중 다수결). */
 function modeVerdictByTicker(rows: ScorecardRow[]): Map<string, string> {
   const byTicker = new Map<string, Map<string, number>>();
@@ -133,6 +112,54 @@ function modeVerdictByTicker(rows: ScorecardRow[]): Map<string, string> {
     out.set(ticker, best);
   }
   return out;
+}
+
+const VERDICT_ORDINAL: Record<string, number> = {
+  BUY: 0,
+  OVERWEIGHT: 1,
+  HOLD: 2,
+  UNDERWEIGHT: 3,
+  REDUCE: 4,
+  SELL: 5,
+};
+
+function verdictDirection(verdict: string): "bullish" | "neutral" | "bearish" | null {
+  if (verdict === "BUY" || verdict === "OVERWEIGHT") return "bullish";
+  if (verdict === "HOLD") return "neutral";
+  if (verdict === "UNDERWEIGHT" || verdict === "REDUCE" || verdict === "SELL") return "bearish";
+  return null;
+}
+
+export function verdictOrdinalDistance(
+  baseVerdicts: Map<string, string>,
+  cfgVerdicts: Map<string, string>,
+): number | null {
+  const diffs: number[] = [];
+  for (const [ticker, base] of baseVerdicts) {
+    const other = cfgVerdicts.get(ticker);
+    const baseOrd = VERDICT_ORDINAL[base];
+    const otherOrd = other == null ? undefined : VERDICT_ORDINAL[other];
+    if (baseOrd == null || otherOrd == null) continue;
+    diffs.push(Math.abs(otherOrd - baseOrd));
+  }
+  return mean(diffs);
+}
+
+export function verdictDirectionAgreementRate(
+  baseVerdicts: Map<string, string>,
+  cfgVerdicts: Map<string, string>,
+): number | null {
+  let common = 0;
+  let agree = 0;
+  for (const [ticker, base] of baseVerdicts) {
+    const other = cfgVerdicts.get(ticker);
+    const baseDirection = verdictDirection(base);
+    const otherDirection = other == null ? null : verdictDirection(other);
+    if (baseDirection == null || otherDirection == null) continue;
+    common += 1;
+    if (baseDirection === otherDirection) agree += 1;
+  }
+  return common > 0 ? agree / common : null;
 }
 
 /** ticker 별 평균값(null 제외). */
@@ -156,6 +183,36 @@ function avgByTicker(rows: ScorecardRow[], pick: (r: ScorecardRow) => number | n
 function deltaPct(base: number | null, other: number | null): number | null {
   if (base == null || other == null || base === 0) return null;
   return (other - base) / base;
+}
+
+function totalInputTokens(tokens: ConfigPerRunTokens): number | null {
+  const fresh = tokens.newInputTokens;
+  const cache = tokens.cacheReadTokens;
+  if (fresh == null && cache == null) return null;
+  return (fresh ?? 0) + (cache ?? 0);
+}
+
+export function buildRunHealth(
+  usageRows: AgentUsageRecord[],
+  scRows: ScorecardRow[],
+): ConfigRunHealth {
+  const byRun = new Map<string, AgentUsageRecord[]>();
+  for (const r of usageRows) {
+    const list = byRun.get(r.runId) ?? [];
+    list.push(r);
+    byRun.set(r.runId, list);
+  }
+  const scorecardRunIds = new Set(scRows.map((r) => r.runId).filter((runId): runId is string => !!runId));
+  const wallClocks = nums([...byRun.values()].map(runWallClockMs));
+
+  return {
+    completedRunCount: scorecardRunIds.size,
+    incompleteRunCount: Math.max(0, byRun.size - scorecardRunIds.size),
+    unmeasuredAgentCount: usageRows.filter((r) => !r.measured).length,
+    longAgentCount: usageRows.filter((r) => (r.durationMs ?? 0) >= LONG_AGENT_DURATION_MS).length,
+    medianWallClockMs: median(wallClocks),
+    worstWallClockMs: maxOrNull(wallClocks),
+  };
 }
 
 /** 공통 ticker 의 두 맵 평균값 |Δ| 평균. */
@@ -186,6 +243,7 @@ function buildConfigStats(
     configLabel,
     runCount: new Set(usageRows.map((r) => r.runId)).size,
     avgWallClockMs: runStats(usageRows).avgWallClockMs,
+    runHealth: buildRunHealth(usageRows, scRows),
     perRun: perRunTokens(usageRows),
     verdictCounts: countBy(scRows, (r) => r.verdict),
     confidenceCounts: countBy(scRows, (r) => r.decisionConfidence),
@@ -205,6 +263,8 @@ function buildDelta(
 
   const agree = commonT.filter((t) => baseVerdicts.get(t) === cfgVerdicts.get(t)).length;
   const verdictAgreementRate = commonT.length > 0 ? agree / commonT.length : null;
+  const ordinalDistance = verdictOrdinalDistance(baseVerdicts, cfgVerdicts);
+  const directionAgreementRate = verdictDirectionAgreementRate(baseVerdicts, cfgVerdicts);
 
   const targetDrift = driftBetween(
     avgByTicker(baseSc, (r) => r.targetPct),
@@ -226,7 +286,10 @@ function buildDelta(
     reasons.push(`공통 ticker ${commonT.length}개 < 최소 ${AB_MIN_COMMON_TICKERS}개 — 품질 판정 보류`);
   } else {
     if ((verdictAgreementRate ?? 0) < AB_VERDICT_AGREEMENT_MIN) {
-      reasons.push(`verdict 일치율 ${((verdictAgreementRate ?? 0) * 100).toFixed(0)}% < ${AB_VERDICT_AGREEMENT_MIN * 100}%`);
+      const direction = directionAgreementRate == null
+        ? ""
+        : `, 방향 일치 ${Math.round(directionAgreementRate * 100)}%`;
+      reasons.push(`verdict 일치율 ${((verdictAgreementRate ?? 0) * 100).toFixed(0)}% < ${AB_VERDICT_AGREEMENT_MIN * 100}%${direction}`);
     }
     if ((targetDrift ?? 0) > AB_TARGET_DRIFT_MAX) {
       reasons.push(`목표가 drift ${(targetDrift ?? 0).toFixed(1)}%p > ${AB_TARGET_DRIFT_MAX}%p`);
@@ -245,12 +308,15 @@ function buildDelta(
   return {
     configId: cfgStats.configId,
     baselineId: baseStats.configId,
+    inputDeltaPct: deltaPct(totalInputTokens(baseStats.perRun), totalInputTokens(cfgStats.perRun)),
     costDeltaPct: deltaPct(baseStats.perRun.costUsd, cfgStats.perRun.costUsd),
     wallClockDeltaPct: deltaPct(baseStats.avgWallClockMs, cfgStats.avgWallClockMs),
     cacheCreationDeltaPct: deltaPct(baseStats.perRun.cacheCreationTokens, cfgStats.perRun.cacheCreationTokens),
     outputDeltaPct: deltaPct(baseStats.perRun.outputTokens, cfgStats.perRun.outputTokens),
     commonTickers: commonT.length,
     verdictAgreementRate,
+    verdictOrdinalDistance: ordinalDistance,
+    directionAgreementRate,
     targetPctDrift: targetDrift,
     stopLossPctDrift: stopDrift,
     signalScoreDrift: signalDrift,

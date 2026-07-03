@@ -38,6 +38,7 @@ function makeState(overrides: Partial<AnalysisState> = {}): AnalysisState {
 describe("analysisConfig — 무회귀", () => {
   it("DEFAULT_ANALYSIS_CONFIG 가 현 하드코딩값과 일치", () => {
     expect(DEFAULT_ANALYSIS_CONFIG.debateRounds).toBe(2);
+    expect(DEFAULT_ANALYSIS_CONFIG.downstreamReportCharLimit).toBeNull();
     expect(DEFAULT_ANALYSIS_CONFIG.slices).toEqual({
       traderBull: 1500,
       traderBear: 1500,
@@ -59,12 +60,17 @@ describe("analysisConfig — 무회귀", () => {
   it("부분 override 는 기본값 위에 병합(나머지 불변)", () => {
     const c = resolveAnalysisConfig({ debateRounds: 1 });
     expect(c.debateRounds).toBe(1);
+    expect(c.downstreamReportCharLimit).toBeNull();
     expect(c.slices).toEqual(DEFAULT_ANALYSIS_CONFIG.slices);
 
     const c2 = resolveAnalysisConfig({ slices: { traderBull: 500 } });
     expect(c2.slices.traderBull).toBe(500);
     expect(c2.slices.pmBull).toBe(2000); // 나머지 slice 유지
     expect(c2.debateRounds).toBe(2);
+
+    const c3 = resolveAnalysisConfig({ downstreamReportCharLimit: 900 });
+    expect(c3.downstreamReportCharLimit).toBe(900);
+    expect(c3.slices).toEqual(DEFAULT_ANALYSIS_CONFIG.slices);
   });
 
   // config 미주입 vs DEFAULT 주입이 프롬프트 바이트 동일해야 한다.
@@ -107,6 +113,16 @@ describe("analysisConfig — 무회귀", () => {
     });
     expect(tight).toContain("B".repeat(500));
     expect(tight).not.toContain("B".repeat(501));
+  });
+
+  it("C1 downstreamReportCharLimit 은 후단 1차 리포트만 압축 발췌", () => {
+    const out = AGENT_PROMPTS.portfolio_manager.user(
+      makeState({ config: resolveAnalysisConfig({ downstreamReportCharLimit: 900 }) }),
+    );
+    expect(out).toContain("[C1 압축 발췌 — 기술 분석");
+    expect(out).toContain("M".repeat(900));
+    expect(out).not.toContain("M".repeat(901));
+    expect(out).toContain("원문 전문은 토큰 절감을 위해 후단 프롬프트에서 생략됨");
   });
 });
 

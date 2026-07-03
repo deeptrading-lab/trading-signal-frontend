@@ -75,6 +75,14 @@ export const queryConfig = {
       gcTime: 5 * MINUTE,
     },
     /**
+     * A/B 토큰 최적화 리포트 — 실험 실행 후 수동 새로고침으로 확인하는 운영자 뷰.
+     * usage 와 동일하게 짧은 stale 을 둬 방금 끝난 run 이 빠르게 반영되게 한다.
+     */
+    abHarnessReport: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
+    /**
      * AI 분석 결론 카드 목록 — 로컬 분석 실행 시에만 갱신되는 공유 결론. 실시간성 낮아 staleTime 60s,
      * 분석 1회 후 재진입 시 바로 반영. agentUsage 와 동일 정책.
      */

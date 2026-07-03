@@ -76,6 +76,22 @@ function orderedDebate(s: AnalysisState, bullBlock: string, bearBlock: string): 
     : `${bullBlock}\n\n${bearBlock}`;
 }
 
+/**
+ * C1 토큰 실험: 후단 단계가 1차 분석가 원문을 다시 읽을 때만 압축 발췌한다.
+ * 기본(null)은 원문 그대로 반환해 일반 분석 프롬프트를 바이트 단위로 보존한다.
+ */
+function downstreamReport(s: AnalysisState, label: string, text: string): string {
+  const limit = cfg(s).downstreamReportCharLimit;
+  if (limit == null) return text;
+  const normalized = text.trim();
+  if (normalized.length <= limit) return normalized;
+  return [
+    `[C1 압축 발췌 — ${label}, 원문 ${normalized.length.toLocaleString("ko-KR")}자 중 핵심 앞부분 ${limit.toLocaleString("ko-KR")}자]`,
+    normalized.slice(0, limit),
+    "(원문 전문은 토큰 절감을 위해 후단 프롬프트에서 생략됨)",
+  ].join("\n");
+}
+
 /** PM 프롬프트에 주입할 정형 감성 한 줄 컨텍스트(없으면 "데이터 없음"). */
 export function buildSentimentContext(sentiment?: SentimentReport): string {
   if (!sentiment) {
@@ -294,16 +310,16 @@ summary: 한 줄 요약(80자 이내, 한글)
 ${s.priceContext}
 
 [기술 분석]
-${s.marketReport}
+${downstreamReport(s, "기술 분석", s.marketReport)}
 
 [뉴스·공시]
-${s.newsReport}
+${downstreamReport(s, "뉴스·공시", s.newsReport)}
 
 [펀더멘털]
-${s.fundamentalsReport}
+${downstreamReport(s, "펀더멘털", s.fundamentalsReport)}
 
 [SNS·커뮤니티 심리]
-${s.socialReport}`,
+${downstreamReport(s, "SNS·커뮤니티 심리", s.socialReport)}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -328,16 +344,16 @@ ${s.socialReport}`,
 ${s.priceContext}
 
 [기술 분석]
-${s.marketReport}
+${downstreamReport(s, "기술 분석", s.marketReport)}
 
 [뉴스·공시]
-${s.newsReport}
+${downstreamReport(s, "뉴스·공시", s.newsReport)}
 
 [펀더멘털]
-${s.fundamentalsReport}
+${downstreamReport(s, "펀더멘털", s.fundamentalsReport)}
 
 [SNS·커뮤니티 심리]
-${s.socialReport}
+${downstreamReport(s, "SNS·커뮤니티 심리", s.socialReport)}
 
 [강세 측 논거 — 직접 반박 대상]
 ${s.bullArgument}`,
@@ -380,16 +396,16 @@ ${orderedDebate(s, `[강세 연구원 논거]\n${s.bullArgument}`, `[약세 연�
 ${s.signalSummary}
 
 [기술 분석]
-${s.marketReport}
+${downstreamReport(s, "기술 분석", s.marketReport)}
 
 [뉴스·공시]
-${s.newsReport}
+${downstreamReport(s, "뉴스·공시", s.newsReport)}
 
 [펀더멘털]
-${s.fundamentalsReport}
+${downstreamReport(s, "펀더멘털", s.fundamentalsReport)}
 
 [SNS·커뮤니티 심리]
-${s.socialReport}`,
+${downstreamReport(s, "SNS·커뮤니티 심리", s.socialReport)}`,
     tools: [],
     timeoutMs: T.NO_TOOL,
   },
@@ -572,16 +588,16 @@ stop_loss_pct 설정 기준:
 ${s.priceContext}
 
 [기술 분석]
-${s.marketReport}
+${downstreamReport(s, "기술 분석", s.marketReport)}
 
 [뉴스·공시]
-${s.newsReport}
+${downstreamReport(s, "뉴스·공시", s.newsReport)}
 
 [펀더멘털]
-${s.fundamentalsReport}
+${downstreamReport(s, "펀더멘털", s.fundamentalsReport)}
 
 [SNS·커뮤니티 심리]
-${s.socialReport}
+${downstreamReport(s, "SNS·커뮤니티 심리", s.socialReport)}
 ${buildSentimentContext(s.sentiment)}
 
 ${orderedDebate(s, `[강세 연구원 최종 논거]\n${s.bullArgument.slice(0, cfg(s).slices.pmBull)}`, `[약세 연구원 최종 논거]\n${s.bearArgument.slice(0, cfg(s).slices.pmBear)}`)}

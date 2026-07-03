@@ -24,7 +24,7 @@
  * Vercel 안전 가드 (§3.7) — `process.env.VERCEL` 감지 시 호출 거부.
  */
 
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import { execFile, type ExecFileOptionsWithStringEncoding } from "child_process";
 
 import type {
   AnalyzeAnalysis,

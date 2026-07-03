@@ -9,7 +9,12 @@
  * 사용:
  *   1) 로컬 dev 가동: npx next dev --webpack -p 3100
  *   2) node scripts/ab-harness/run-golden-set.mjs
- *   환경변수: BASE_URL(기본 http://localhost:3100), SESSION(기본 ab-<timestamp>)
+ *   환경변수:
+ *     BASE_URL(기본 http://localhost:3100)
+ *     SESSION(기본 ab-<timestamp>)
+ *     TICKERS 또는 GOLDEN_TICKERS(쉼표 구분, 예: 005930)
+ *     REPEATS(기본 2)
+ *     CONFIG_IDS(쉼표 구분, 예: A,C1)
  *
  * 주의: 분석 1회 ~9분 + 실제 Claude 비용. tickers/repeats 를 작게 유지하라.
  *       claude 고정(codex 는 비용 미측정). ticker 내 A/B 는 순차(이전결론 upsert race 회피),
@@ -23,15 +28,32 @@ const SESSION = process.env.SESSION ?? `ab-${Date.now()}`;
 const CONCURRENCY = 3;
 
 // ── 실험 정의(편집 지점) ──────────────────────────────────────────────────────
-const GOLDEN_TICKERS = ["005930", "000660", "035720", "005380", "035420"];
-const REPEATS = 2;
-/** config A=현행(override 없음), B=토론 1라운드(smoke 예시). 필요시 slices/effort 등 추가. */
+function parseTickers(raw) {
+  return raw
+    .split(",")
+    .map((ticker) => ticker.trim())
+    .filter(Boolean);
+}
+
+const DEFAULT_GOLDEN_TICKERS = ["005930", "000660", "035720", "005380", "035420"];
+const GOLDEN_TICKERS = process.env.TICKERS || process.env.GOLDEN_TICKERS
+  ? parseTickers(process.env.TICKERS ?? process.env.GOLDEN_TICKERS)
+  : DEFAULT_GOLDEN_TICKERS;
+const REPEATS = Number.parseInt(process.env.REPEATS ?? "2", 10);
+/** config A=현행, B=토론 1라운드, C1=후단 1차 리포트 900자 압축. */
 const CONFIGS = [
   { id: "A", label: "baseline", override: null },
   { id: "B", label: "debateRounds=1", override: { debateRounds: 1 } },
+  { id: "C1", label: "downstream reports 900 chars", override: { downstreamReportCharLimit: 900 } },
 ];
+const SELECTED_CONFIG_IDS = process.env.CONFIG_IDS
+  ? new Set(parseTickers(process.env.CONFIG_IDS))
+  : null;
+const ACTIVE_CONFIGS = SELECTED_CONFIG_IDS
+  ? CONFIGS.filter((config) => SELECTED_CONFIG_IDS.has(config.id))
+  : CONFIGS;
 
-const PROVIDER = "claude";
+const PROVIDER = process.env.PROVIDER ?? "claude";
 
 /** 분석 1건 실행 + SSE 소비. 완료(done)/에러까지 대기. */
 async function runOne(ticker, config) {
@@ -88,7 +110,7 @@ async function runOne(ticker, config) {
 
 /** 한 ticker 의 모든 config×repeat 를 순차 실행(같은 ticker 동시 금지 — upsert race 회피). */
 async function runTicker(ticker) {
-  for (const config of CONFIGS) {
+  for (const config of ACTIVE_CONFIGS) {
     for (let i = 1; i <= REPEATS; i++) {
       const tag = `${ticker} ${config.id}#${i}`;
       const t0 = Date.now();
@@ -106,7 +128,10 @@ async function runTicker(ticker) {
 /** ticker 들을 동시성 CONCURRENCY 로 처리. */
 async function main() {
   console.log(`A/B 하니스 시작 — session=${SESSION}, base=${BASE_URL}`);
-  console.log(`tickers=${GOLDEN_TICKERS.length} × configs=${CONFIGS.length} × repeats=${REPEATS} = ${GOLDEN_TICKERS.length * CONFIGS.length * REPEATS} runs`);
+  console.log(`tickers=${GOLDEN_TICKERS.length} × configs=${ACTIVE_CONFIGS.length} × repeats=${REPEATS} = ${GOLDEN_TICKERS.length * ACTIVE_CONFIGS.length * REPEATS} runs`);
+  if (ACTIVE_CONFIGS.length === 0) {
+    throw new Error(`실행할 config가 없습니다. CONFIG_IDS=${process.env.CONFIG_IDS}`);
+  }
 
   const queue = [...GOLDEN_TICKERS];
   async function worker() {

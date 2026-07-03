@@ -1,4 +1,4 @@
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import { execFile, type ExecFileOptionsWithStringEncoding } from "child_process";
 import {
   invokeClaudeAgentStream,
   type AgentCallOpts,
