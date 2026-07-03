@@ -47,16 +47,16 @@ const T = P.table;
 
 /**
  * 컴팩트 버튼 — button-primary/secondary 합성 클래스는 높이·패딩 토큰이 달라 크기가 어긋나므로
- * (40px 고정 높이 등) 여기선 쓰지 않고 동일 스펙(h-8·px-sm·rounded-md·text-caption)으로 직접
+ * (40px 고정 높이 등) 여기선 쓰지 않고 동일 스펙(h-7·px-sm·rounded-md·text-caption)으로 직접
  * 정의한다. 색만 다르고 크기는 픽셀 단위로 같다(디자인 일관성 피드백).
  */
 const BTN_BASE =
-  "inline-flex h-8 items-center justify-center rounded-md px-sm text-caption font-medium whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default";
+  "inline-flex h-7 items-center justify-center rounded-md px-sm text-caption font-medium whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default";
 const BTN_PRIMARY = `${BTN_BASE} border-0 bg-accent-vivid text-surface hover:bg-accent-vivid/90`;
 /** 틴트 필 버튼 — 테두리형(input·select 와 닮음) 대신 은은한 액센트 배경으로 '버튼'임을 구분. */
 const BTN_TONAL = `${BTN_BASE} border-0 bg-accent-vivid/10 text-accent-vivid hover:bg-accent-vivid/20`;
 const ICON_BTN =
-  "inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
+  "inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
 
 type WatchItem = { ticker: string; name: string };
 
@@ -197,7 +197,7 @@ function IntervalSelect({ value, onChange }: { value: number; onChange: (v: numb
         aria-haspopup="listbox"
         aria-expanded={menu.open}
         aria-label={T.colInterval}
-        className="inline-flex h-8 cursor-pointer items-center gap-xs rounded-md border border-border-line bg-surface-base pl-sm pr-xs text-body-sm text-text-strong tabular-nums transition-colors hover:bg-surface-muted"
+        className="inline-flex h-7 cursor-pointer items-center gap-xs rounded-md border border-border-line bg-surface-base pl-sm pr-xs text-caption text-text-strong tabular-nums transition-colors hover:bg-surface-muted"
         onClick={() => menu.toggle(buttonRef.current)}
       >
         {value}분
@@ -254,7 +254,7 @@ function CashInput({ value, onChange }: { value: string; onChange: (v: string) =
     <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <div ref={boxRef} className="relative">
         <input
-          className="h-8 w-[9rem] rounded-md border border-border-line bg-surface-base pl-sm pr-7 text-right text-body-sm text-text-strong tabular-nums"
+          className="h-7 w-[9rem] rounded-md border border-border-line bg-surface-base pl-sm pr-7 text-right text-caption text-text-strong tabular-nums"
           inputMode="numeric"
           value={value}
           aria-label={P.cashLabel}
