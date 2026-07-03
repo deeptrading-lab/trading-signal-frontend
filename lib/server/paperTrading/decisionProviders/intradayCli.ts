@@ -8,6 +8,7 @@
 
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
+import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
 import {
   extractIntradayFeatures,
@@ -485,6 +486,10 @@ export async function decideIntradayWithCli(
       pre.reason ?? "규칙 사전 점검으로 AI 호출 생략",
     ]);
   }
+
+  // LLM 을 실제로 호출하는 경로에서만 매수 유의(경보·VI)를 fail-soft 로 조회해 컨텍스트에 얹는다
+  // (스킵 틱은 미조회 — 낭비 방지, PRD §3-2). 토스 키 없으면 빈 배열이라 프롬프트 무변경.
+  ctx.warnings = await fetchActiveWarnings(input.ticker);
 
   const provider: AIAnalysisProvider = input.provider ?? "claude";
   // 에이전트별 모델 분리 — 분석가(요약, 싸고 빠르게)와 판단가(필요 시 더 무겁게)를 따로 둔다.
