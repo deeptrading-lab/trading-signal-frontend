@@ -54,6 +54,12 @@ export type PaperTradingDecision = {
    */
   analystUsage?: import("@/lib/types/stock/aiAnalysis").AgentUsage;
   judgeUsage?: import("@/lib/types/stock/aiAnalysis").AgentUsage;
+  /**
+   * 판단 시점 정량 스냅샷(시그널·구조 레벨·기준가·구조 이벤트) — 단타 cli-agent 만.
+   * 결정론 폴백 포함 모든 단타 틱에 기록. 사후 미스 분석·진입 게이트 A/B 의 숫자 근거이며
+   * payload(jsonb)로 함께 영속된다(무마이그레이션). mock/existing-ai 는 미설정.
+   */
+  intradaySnapshot?: import("@/lib/types/intraday/intradayDecision").IntradaySnapshot;
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**

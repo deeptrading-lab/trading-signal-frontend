@@ -286,4 +286,23 @@ describe("toPaperTradingDecision (AI 분할 매수·분할 매도)", () => {
     expect(d.targetAllocationPct).toBe(40);
     expect(d.targetAllocations).toHaveLength(0);
   });
+
+  it("정량 스냅샷 — 전달 시 저장 틱에 그대로 실린다(사후 미스 분석·A/B 근거)", () => {
+    const snap = {
+      basePrice: 10_000,
+      signal: signal({ score: 35, action: "HOLD" as const, regime: 1 }),
+      levels: levels({ rrr: 1.1, tpPct: 0.5, boxHigh: 10_050 }),
+      structureEvent: "전고 돌파 진행",
+    };
+    const d = toPaperTradingDecision(intraday({ action: "HOLD" }), { ...base, position }, snap);
+    expect(d.intradaySnapshot).toBe(snap);
+    expect(d.intradaySnapshot?.levels.rrr).toBe(1.1);
+    expect(d.intradaySnapshot?.signal.regime).toBe(1);
+    expect(d.intradaySnapshot?.structureEvent).toBe("전고 돌파 진행");
+  });
+
+  it("정량 스냅샷 — 미전달(mock/구 경로)이면 미기록", () => {
+    const d = toPaperTradingDecision(intraday({ action: "HOLD" }), { ...base, position });
+    expect(d.intradaySnapshot).toBeUndefined();
+  });
 });
