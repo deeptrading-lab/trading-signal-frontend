@@ -35,26 +35,27 @@ export function DebateSection({
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <MessageSquare size={14} className="text-slate-400" />
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{COPY.debate.title}</span>
-          <span className="ml-auto text-[10px] text-slate-400 font-medium">
+      {/* 탈-카드: 바깥 박스를 걷어내고 헤더 + 여백으로만 구분(토론 메시지 타일이 강세/약세 tint 로 구분). */}
+      <div className="flex flex-col gap-md border-t border-border-line pt-lg">
+        <div className="flex items-center gap-sm">
+          <MessageSquare size={14} className="text-text-muted" />
+          <span className="text-body-sm-strong text-text-strong">{COPY.debate.title}</span>
+          <span className="ml-auto text-caption text-text-muted">
             {COPY.debate.roundCounter(currentRound, DEBATE_ROUNDS)}
           </span>
         </div>
 
-        <div className="grid grid-cols-[1fr_28px_1fr] gap-2 mb-3">
-          <div className="text-[11px] font-extrabold text-red-600 dark:text-red-400">
+        <div className="grid grid-cols-[1fr_28px_1fr] gap-sm">
+          <div className="text-caption font-extrabold text-signal-up">
             {COPY.debate.bullColumn}
           </div>
           <div />
-          <div className="text-[11px] font-extrabold text-blue-600 dark:text-blue-400 text-right">
+          <div className="text-caption font-extrabold text-signal-down text-right">
             {COPY.debate.bearColumn}
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-md">
           {Array.from({ length: DEBATE_ROUNDS }, (_, i) => {
             const round = i + 1;
             const bullMsg = bullMsgs.find(m => m.round === round);
@@ -82,8 +83,8 @@ export function DebateSection({
                   {isBullThisRound && !bullMsg && <DebateLoadingCard side="bull" />}
                 </div>
                 <div className="flex flex-col items-center gap-1 py-1">
-                  <span className="text-[10px] font-black text-slate-500 dark:text-slate-400">R{round}</span>
-                  <div className="flex-1 w-0.5 bg-slate-400 dark:bg-slate-500 min-h-[20px]" />
+                  <span className="text-caption font-black text-text-muted">R{round}</span>
+                  <div className="flex-1 w-px bg-border-line min-h-[20px]" />
                 </div>
                 <div>
                   {bearMsg && (

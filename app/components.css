@@ -332,6 +332,27 @@
     animation: wl-particle-8 1s ease-out;
   }
 
+  /* ---------- AI 분석 마크다운 본문 (ai-panel-reskin — CardDetailOverlay) ----------
+   * react-markdown 결과의 prose 색 변수를 토큰으로 오버라이드 — dark: 없이 라이트/다크 자동 전환.
+   * `.markdown-content.prose`(0,2,0)로 typography 플러그인의 `.prose`(0,1,0)를 확실히 이긴다.
+   * theme(colors.*) 은 빌드 시 var(--fs-*) 로 해석돼 다크에서 자동 스왑(‥app/components 의 var(-- 직타 아님).
+   * 배경(th/code)·간격·폰트크기는 호출 측 prose-* 모디파이어(토큰)가 담당. */
+  .markdown-content.prose {
+    --tw-prose-body: theme(colors.text-strong);
+    --tw-prose-headings: theme(colors.text-strong);
+    --tw-prose-bold: theme(colors.text-strong);
+    --tw-prose-links: theme(colors.accent-vivid);
+    --tw-prose-code: theme(colors.accent-vivid);
+    --tw-prose-counters: theme(colors.text-muted);
+    --tw-prose-bullets: theme(colors.text-muted);
+    --tw-prose-quotes: theme(colors.text-muted);
+    --tw-prose-captions: theme(colors.text-muted);
+    --tw-prose-hr: theme(colors.border-line);
+    --tw-prose-quote-borders: theme(colors.border-line);
+    --tw-prose-th-borders: theme(colors.border-line);
+    --tw-prose-td-borders: theme(colors.border-line);
+  }
+
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
   .price-bar-track {
     @apply absolute top-[6px] left-0 right-0 h-[6px] bg-border-line rounded-pill;

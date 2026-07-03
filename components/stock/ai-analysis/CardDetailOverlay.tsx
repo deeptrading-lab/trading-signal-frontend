@@ -38,27 +38,27 @@ export function CardDetailOverlay({ title, content, highlight, onClose }: CardDe
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 28, stiffness: 260 }}
-      className="absolute inset-0 bg-slate-50 dark:bg-slate-950 z-10 flex flex-col"
+      className="absolute inset-0 bg-surface-muted z-10 flex flex-col"
     >
-      <div className="flex-none flex items-center gap-3 px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex-none flex items-center gap-md px-lg py-md bg-surface border-b border-border-line">
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium cursor-pointer transition-colors"
+          className="flex items-center gap-1.5 text-caption text-text-muted hover:text-text-strong font-medium cursor-pointer transition-colors"
         >
           <ArrowLeft size={14} /> {COPY.overlay.back}
         </button>
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{title}</h3>
+        <h3 className="text-body-sm-strong text-text-strong truncate">{title}</h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-lg">
         {highlight && (
-          <div className="mb-4 flex gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/40 px-3.5 py-3">
-            <MessageSquareQuote size={15} aria-hidden="true" className="flex-none mt-0.5 text-slate-400 dark:text-slate-500" />
+          <div className="mb-4 flex gap-2.5 rounded-md border border-border-line bg-surface px-md py-md">
+            <MessageSquareQuote size={15} aria-hidden="true" className="flex-none mt-0.5 text-text-muted" />
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">
                 {COPY.sentiment.summaryLabel}
               </p>
-              <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200">{highlight}</p>
+              <p className="text-caption leading-relaxed text-text-strong">{highlight}</p>
             </div>
           </div>
         )}

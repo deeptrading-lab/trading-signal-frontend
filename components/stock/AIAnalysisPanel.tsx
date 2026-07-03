@@ -68,20 +68,20 @@ function PreviousDecisionIntro({
     // 라이브 분석 뷰(풀 width)와 동일하게 패널 폭을 꽉 채운다 — 데스크탑에서 좌우 여백 제거.
     // 배치: 안내 박스 → 슬라이드 스위치 → 이전 결론 카드.
     <div className="w-full space-y-3">
-      {/* 안내 박스 — 좌측 안내 텍스트 + 우측 슬라이드 스위치(한 박스 안에). */}
-      <div className="rounded-2xl border border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/20 px-4 py-3">
+      {/* 안내 박스 — 좌측 안내 텍스트 + 우측 슬라이드 스위치. 탈-카드: 테두리 제거, 옅은 info 배경으로만 묶음. */}
+      <div className="rounded-md bg-info-soft px-md py-md">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
+            <p className="text-caption font-bold text-info">
               {COPY.previousDecision.title}
-              <span className="ml-1.5 font-normal text-blue-600/70 dark:text-blue-300/70">
+              <span className="ml-1.5 font-normal text-text-muted">
                 · {COPY.previousDecision.meta(
                   formatUpdatedAt(snapshot.updatedAt),
                   COPY.provider[snapshot.provider],
                 )}
               </span>
             </p>
-            <p className="mt-0.5 text-xs text-blue-600/70 dark:text-blue-300/70 leading-relaxed">
+            <p className="mt-0.5 text-caption text-text-muted leading-relaxed">
               {COPY.previousDecision.pmOnly}
             </p>
           </div>
@@ -97,7 +97,7 @@ function PreviousDecisionIntro({
             ) : isProvidersLoading ? (
               // 조회 중 — 활성 스위치 대신 스켈레톤(스펙 §S5).
               <div
-                className="h-11 w-full sm:w-[22rem] animate-pulse rounded-full bg-slate-200 dark:bg-slate-800"
+                className="h-11 w-full sm:w-[22rem] animate-pulse rounded-pill bg-surface-muted"
                 role="status"
                 aria-live="polite"
                 aria-label={COPY.chooser.loading}
@@ -107,7 +107,7 @@ function PreviousDecisionIntro({
               <button
                 type="button"
                 onClick={onChooseProvider}
-                className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                className="button-secondary w-full sm:w-auto"
               >
                 {COPY.previousDecision.chooseProvider}
               </button>
@@ -255,33 +255,38 @@ export function AIAnalysisPanel({
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="group fixed right-0 top-1/2 -translate-y-1/2 z-[70]"
           >
-            {/* 컴팩트 핀(기본) — hover 시 숨김. 클릭/터치 시 분석 패널 열기(키보드 접근 폴백). */}
+            {/* 컴팩트 핀(기본) — hover 시 숨김. 클릭/터치 시 분석 패널 열기(키보드 접근 폴백).
+                AI 시그니처 — 재열기 핀은 gradient-ai 정체성을 유지(브랜드 강조 지점). */}
             <button
               type="button"
               onClick={() => open()}
-              aria-label={`AI 분석 ${tabs.length}건 열기`}
-              className="flex flex-col items-center gap-1 rounded-l-2xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 px-2.5 py-3 text-white shadow-xl transition-colors cursor-pointer group-hover:hidden"
+              aria-label={COPY.panel.reopenPin(tabs.length)}
+              className="gradient-ai-bg flex flex-col items-center gap-1 rounded-l-xl px-sm py-md shadow-overlay transition hover:brightness-110 cursor-pointer group-hover:hidden"
             >
               {runningTabCount > 0
                 ? <Loader2 size={16} className="animate-spin" />
                 : <Sparkles size={16} />
               }
-              <span className="text-[10px] font-bold leading-tight text-center">AI<br />종합<br />분석</span>
-              <span className="text-[10px] font-bold tabular-nums leading-none px-1.5 py-0.5 rounded-full bg-white/20">{tabs.length}</span>
+              <span className="text-caption font-bold leading-tight text-center">
+                {COPY.panel.reopenBrand.map((line, i) => (
+                  <span key={line}>{i > 0 && <br />}{line}</span>
+                ))}
+              </span>
+              <span className="text-caption font-bold tabular-nums leading-none px-1.5 py-0.5 rounded-pill bg-surface/20">{tabs.length}</span>
             </button>
 
-            {/* 상세 카드(hover) — 헤더 + 종목별 행. */}
+            {/* 상세 카드(hover) — 헤더 + 종목별 행. 떠있는 면 → surface-elevated + overlay 그림자. */}
             <div
               role="group"
               aria-label={COPY.panel.title}
-              className="hidden w-52 max-h-[70vh] overflow-y-auto rounded-l-2xl border border-r-0 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl group-hover:block"
+              className="hidden w-52 max-h-[70vh] overflow-y-auto rounded-l-xl border border-r-0 border-border-line bg-surface-elevated shadow-overlay group-hover:block"
             >
               {/* 트레이 헤더 — 라벨 + 진행 중 개수 배지 */}
-              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                <Sparkles size={13} className="text-blue-500 dark:text-blue-400" />
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{COPY.panel.title}</span>
+              <div className="flex items-center gap-1.5 px-md py-sm border-b border-border-line">
+                <Sparkles size={13} className="text-accent-vivid" />
+                <span className="text-caption font-bold text-text-muted">{COPY.panel.title}</span>
                 {runningTabCount > 0 && (
-                  <span className="ml-auto text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                  <span className="ml-auto text-caption font-bold tabular-nums px-1.5 py-0.5 rounded-pill bg-accent-vivid-soft text-accent-vivid">
                     {runningTabCount}
                   </span>
                 )}
@@ -295,19 +300,19 @@ export function AIAnalysisPanel({
                       type="button"
                       onClick={() => switchTab(t.ticker)}
                       aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                      className="flex w-full items-center gap-sm px-md py-sm text-left transition-colors hover:bg-surface-muted cursor-pointer"
                     >
                       {t.isRunning
-                        ? <Loader2 size={14} className="shrink-0 animate-spin text-blue-500 dark:text-blue-400" />
-                        : <Sparkles size={14} className="shrink-0 text-blue-400 dark:text-blue-500" />
+                        ? <Loader2 size={14} className="shrink-0 animate-spin text-accent-vivid" />
+                        : <Sparkles size={14} className="shrink-0 text-accent-vivid" />
                       }
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                      <span className="min-w-0 flex-1 truncate text-body-sm-strong text-text-strong">
                         {t.name ?? t.ticker}
                       </span>
                       {/* 진행수 — 비실행(닫기 ×) 행은 hover 시 페이드아웃해 ×에 자리를 내준다. */}
                       <span
                         className={cn(
-                          "shrink-0 text-[11px] font-bold tabular-nums text-slate-400 dark:text-slate-500",
+                          "shrink-0 text-caption font-bold tabular-nums text-text-muted",
                           !t.isRunning && "transition-opacity group-hover/row:opacity-0",
                         )}
                       >
@@ -320,7 +325,7 @@ export function AIAnalysisPanel({
                         type="button"
                         onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
                         aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-surface-muted hover:text-text-strong cursor-pointer"
                       >
                         <X size={12} />
                       </button>
@@ -343,7 +348,7 @@ export function AIAnalysisPanel({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={close}
-              className="fixed top-[56px] inset-x-0 bottom-0 bg-slate-900/60 backdrop-blur-sm z-[65]"
+              className="fixed top-[56px] inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm z-[65]"
             />
 
           {/* 패널 — navbar 아래에서 시작(상단 지수·테마토글 노출 유지) */}
@@ -354,25 +359,26 @@ export function AIAnalysisPanel({
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
-              "fixed top-[56px] right-0 bottom-0 z-[70] bg-slate-50 dark:bg-slate-950 shadow-2xl border-t border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden",
+              "fixed top-[56px] right-0 bottom-0 z-[70] bg-surface-muted shadow-overlay border-t border-l border-border-line flex flex-col overflow-hidden",
               "w-full",
             )}
             aria-label={COPY.panel.title}
             role="complementary"
           >
             {/* ── 헤더 ──────────────────────────────────────────────────── */}
-            <div className="flex-none flex items-center justify-between px-5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex-none flex items-center justify-between px-lg py-sm bg-surface border-b border-border-line">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Sparkles className="text-blue-500 dark:text-blue-400 shrink-0" size={18} />
-                <h2 className="font-bold text-base leading-tight text-slate-900 dark:text-white shrink-0">{displayName}</h2>
+                {/* AI 시그니처 — 헤더 브랜드 아이콘은 gradient-ai 인디고 톤. */}
+                <Sparkles className="text-gradient-ai-from shrink-0" size={18} />
+                <h2 className="text-body-strong leading-tight text-text-strong shrink-0">{displayName}</h2>
                 {/* 분석에 사용 중인 공급자 표시(읽기 전용) — 공급자 선택은 진입 화면에서만. */}
                 {!isAllPending && (
                   <span
                     className={cn(
-                      "shrink-0 px-2 py-0.5 rounded-md text-[11px] font-bold hidden md:inline-block",
+                      "shrink-0 px-sm py-0.5 rounded-sm text-caption font-bold hidden md:inline-block",
                       provider === "claude"
-                        ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                        : "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                        ? "bg-warn-soft text-warn"
+                        : "bg-info-soft text-info",
                     )}
                   >
                     {COPY.provider[provider]}
@@ -380,7 +386,7 @@ export function AIAnalysisPanel({
                 )}
                 {/* 분석 중 — 현재 진행 에이전트 기준 상태 */}
                 {isRunning && (
-                  <span className="inline-flex items-center gap-1.5 min-w-0 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  <span className="inline-flex items-center gap-1.5 min-w-0 text-caption font-medium text-accent-vivid">
                     <Loader2 size={12} className="animate-spin shrink-0" />
                     <span className="truncate">{runningStatus}…</span>
                   </span>
@@ -393,7 +399,7 @@ export function AIAnalysisPanel({
                     type="button"
                     onClick={stop}
                     aria-label={COPY.panel.stop}
-                    className="flex items-center gap-1.5 p-1.5 text-red-500 border border-slate-200 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-slate-700 dark:hover:text-red-300 dark:hover:bg-red-900/30 rounded-md transition-colors cursor-pointer md:px-2.5 md:py-1.5 md:text-[11px] md:font-medium md:text-red-600 md:bg-red-50 md:hover:bg-red-100 md:dark:text-red-400 md:dark:bg-red-900/30 md:dark:hover:bg-red-900/50"
+                    className="flex items-center gap-1.5 p-1.5 text-critical border border-border-line hover:bg-critical-soft rounded-sm transition-colors cursor-pointer md:px-2.5 md:py-1.5 md:text-caption md:font-medium md:bg-critical-soft md:border-transparent"
                   >
                     <Square size={11} fill="currentColor" /> <span className="hidden md:inline">{COPY.panel.stop}</span>
                   </button>
@@ -403,7 +409,7 @@ export function AIAnalysisPanel({
                       <button
                         type="button"
                         onClick={() => resume(resumeFrom)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-md transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-caption font-medium text-accent-vivid bg-accent-vivid-soft hover:brightness-105 rounded-sm transition cursor-pointer"
                       >
                         <RefreshCw size={11} />
                         {COPY.panel.resumeFrom(AGENT_META.find(m => m.key === resumeFrom)?.label ?? resumeFrom)}
@@ -412,7 +418,7 @@ export function AIAnalysisPanel({
                     <button
                       type="button"
                       onClick={chooseAgain}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-caption font-medium text-text-muted bg-surface-muted hover:bg-border-line rounded-sm transition-colors cursor-pointer"
                     >
                       <RefreshCw size={11} /> {COPY.panel.restartAll}
                     </button>
@@ -422,7 +428,7 @@ export function AIAnalysisPanel({
                 <button
                   type="button"
                   onClick={close}
-                  className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
+                  className="p-1.5 text-text-muted hover:text-text-strong hover:bg-surface-muted rounded-sm transition-colors cursor-pointer"
                   aria-label={COPY.panel.close}
                 >
                   <X size={18} />
@@ -432,7 +438,7 @@ export function AIAnalysisPanel({
 
                 {/* ── 동시 분석 탭 스트립(2건 이상일 때만) ─────────────── */}
                 {tabs.length > 1 && (
-                  <div className="flex-none flex items-center gap-1.5 px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-hide-mobile">
+                  <div className="flex-none flex items-center gap-1.5 px-lg py-sm bg-surface border-b border-border-line overflow-x-auto scrollbar-hide-mobile">
                     {tabs.map((t) => {
                       const activeTab = t.ticker === ticker;
                       return (
@@ -442,10 +448,10 @@ export function AIAnalysisPanel({
                           onClick={() => switchTab(t.ticker)}
                           aria-current={activeTab ? "true" : undefined}
                           className={cn(
-                            "flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer border",
+                            "flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-pill text-caption font-bold transition-colors cursor-pointer border",
                             activeTab
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700",
+                              ? "bg-accent-vivid text-surface border-accent-vivid"
+                              : "bg-surface-muted text-text-muted border-transparent hover:bg-border-line",
                           )}
                         >
                           {t.isRunning
@@ -462,11 +468,13 @@ export function AIAnalysisPanel({
                   </div>
                 )}
 
-                {/* ── 에이전트 진행 바 ────────────────────────────────── */}
-                <div className="flex-none px-5 py-2.5 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+                {/* ── 에이전트 진행 바 ──────────────────────────────────
+                    탈-카드: 상태칩 테두리 제거. 진행/오류만 색으로(accent/critical soft), 대기·완료는 muted.
+                    완료(초록 없음)는 muted 칩 + 체크로 표시(진행=파랑칩+스피너와 구분). */}
+                <div className="flex-none px-lg py-sm bg-surface border-b border-border-line">
                   <div
                     ref={chipsRef}
-                    className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide-mobile -mx-5 px-5 md:mx-0 md:px-0 md:flex-wrap md:overflow-x-visible"
+                    className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide-mobile -mx-lg px-lg md:mx-0 md:px-0 md:flex-wrap md:overflow-x-visible"
                   >
                     {AGENT_META.map((meta) => {
                       const agentStatus = agents.find((a) => a.key === meta.key)?.status ?? "pending";
@@ -487,12 +495,12 @@ export function AIAnalysisPanel({
                           } : undefined}
                           title={isClickable ? COPY.card.resumeTitle(meta.label) : undefined}
                           className={cn(
-                            "flex items-center gap-1 shrink-0 px-2 py-1 rounded-full text-[10px] font-bold transition-colors",
-                            agentStatus === "pending" && "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
-                            agentStatus === "running" && "bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
-                            agentStatus === "done" && "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
-                            isError && "bg-red-50 text-red-600 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-                            isClickable && "cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50",
+                            "flex items-center gap-1 shrink-0 px-sm py-1 rounded-pill text-caption font-bold transition",
+                            agentStatus === "pending" && "bg-surface-muted text-text-muted",
+                            agentStatus === "running" && "bg-accent-vivid-soft text-accent-vivid",
+                            agentStatus === "done" && "bg-surface-muted text-text-strong",
+                            isError && "bg-critical-soft text-critical",
+                            isClickable && "cursor-pointer hover:brightness-105",
                           )}
                         >
                           {agentStatus === "done" && <Check size={10} />}
@@ -512,7 +520,7 @@ export function AIAnalysisPanel({
                   <div className="p-4 space-y-4">
                     {/* 동시 분석 상한 안내(최대 3개) */}
                     {limitNotice && (
-                      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+                      <div className="card-warn text-body-sm font-medium">
                         {limitNotice}
                       </div>
                     )}
@@ -525,23 +533,23 @@ export function AIAnalysisPanel({
                           initial={{ opacity: 0, y: -8 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -8 }}
-                          className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          className="card-info flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         >
-                          <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
+                          <p className="text-body-sm text-info font-medium">
                             {COPY.reanalysis.prompt}
                           </p>
-                          <div className="flex gap-2 flex-none">
+                          <div className="flex gap-sm flex-none">
                             <button
                               type="button"
                               onClick={chooseAgain}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                              className="px-md py-1.5 bg-accent-vivid hover:brightness-110 text-surface text-caption font-bold rounded-sm transition cursor-pointer"
                             >
                               {COPY.reanalysis.confirm}
                             </button>
                             <button
                               type="button"
                               onClick={dismissReanalysisPrompt}
-                              className="px-3 py-1.5 text-indigo-600 dark:text-indigo-400 text-xs font-medium cursor-pointer hover:opacity-70"
+                              className="px-md py-1.5 text-text-muted hover:text-text-strong text-caption font-medium cursor-pointer"
                             >
                               {COPY.reanalysis.dismiss}
                             </button>
@@ -554,8 +562,8 @@ export function AIAnalysisPanel({
                     {isAllPending && !error && !isRunning && (
                       isPreviousDecisionLoading ? (
                         <div className="mx-auto w-full max-w-[22rem] px-6 py-16 text-center" role="status" aria-live="polite">
-                          <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-slate-400" />
-                          <p className="text-sm text-slate-400 break-keep">{COPY.previousDecision.loading}</p>
+                          <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-text-muted" />
+                          <p className="text-body-sm text-text-muted break-keep">{COPY.previousDecision.loading}</p>
                         </div>
                       ) : IS_PROD ? (
                         // prod 한정 — enqueue 비동기 모델(이전 결론 신선도/접수/오프라인/중복).
@@ -579,9 +587,9 @@ export function AIAnalysisPanel({
 
                     {/* 오류 */}
                     {error && (
-                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-                        <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">{error}</p>
-                        <button type="button" onClick={run} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+                      <div className="card-critical">
+                        <p className="text-body-sm font-medium text-critical mb-md">{error}</p>
+                        <button type="button" onClick={run} className="px-md py-2 bg-accent-vivid text-surface text-caption font-bold rounded-sm hover:brightness-110 transition cursor-pointer">
                           {COPY.errorState.retry}
                         </button>
                       </div>
@@ -595,7 +603,7 @@ export function AIAnalysisPanel({
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
                             return (
-                              <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[120px]" />
+                              <div key={key} className="bg-surface-muted rounded-md border border-dashed border-border-line min-h-[120px]" />
                             );
                           }
                           return (
@@ -636,13 +644,14 @@ export function AIAnalysisPanel({
                           const meta = AGENT_META.find(m => m.key === key)!;
                           const agentState = agents.find(a => a.key === key)!;
                           if (agentState.status === "pending") {
-                            return <div key={key} className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[120px]" />;
+                            return <div key={key} className="bg-surface-muted rounded-md border border-dashed border-border-line min-h-[120px]" />;
                           }
                           if (key === "trader") {
                             return (
                               <div key={key} className="relative">
-                                <span className="absolute -top-3.5 right-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
-                                  🧠 심층 추론
+                                {/* AI 시그니처 — 심층 추론 배지는 gradient-ai 인디고 톤(브랜드 강조). */}
+                                <span className="absolute -top-3.5 right-3 z-10 text-caption font-bold px-2 py-0.5 rounded-pill bg-gradient-ai-soft text-gradient-ai-from">
+                                  {COPY.panel.deepReasoning}
                                 </span>
                                 <AnalystCard
                                   meta={meta}
@@ -687,7 +696,7 @@ export function AIAnalysisPanel({
                           return (
                             <div key={key} className="snap-start shrink-0 w-[78%] sm:w-[46%] md:w-auto">
                               {agentState.status === "pending" ? (
-                                <div className="bg-slate-100/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 min-h-[120px] h-full" />
+                                <div className="bg-surface-muted rounded-md border border-dashed border-border-line min-h-[120px] h-full" />
                               ) : (
                                 <AnalystCard
                                   meta={meta}
@@ -726,11 +735,11 @@ export function AIAnalysisPanel({
                       }
                       if (pmAgent.status === "error") {
                         return (
-                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-5 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
-                              <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                                최종 결론 도출 실패
+                          <div className="card-critical flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-md">
+                              <AlertCircle size={18} className="text-critical flex-shrink-0" />
+                              <p className="text-body-sm font-medium text-critical">
+                                {COPY.verdict.pmFailed}
                                 {pmAgent.failReason ? ` · ${COPY.card.failReason[pmAgent.failReason]}` : ""}
                               </p>
                             </div>
@@ -738,7 +747,7 @@ export function AIAnalysisPanel({
                               <button
                                 type="button"
                                 onClick={() => resume("portfolio_manager")}
-                                className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1 cursor-pointer hover:opacity-70"
+                                className="text-caption font-bold text-critical flex items-center gap-1 cursor-pointer hover:opacity-70"
                               >
                                 <RefreshCw size={11} /> {COPY.card.retry}
                               </button>
