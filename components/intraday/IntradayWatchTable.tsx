@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ExternalLink, History, Pause, Play, X } from "lucide-react";
+import { ChevronDown, ExternalLink, History, Loader2, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
 import { isApiError } from "@/lib/api/errors";
@@ -345,6 +345,8 @@ function WatchRow({
   const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
   const [startError, setStartError] = useState<string | null>(null);
+  // 생성 진행 표시는 "내가 누른 행"에만 — isCreating(전역)은 중복 클릭 방지용 disabled 로만 쓴다.
+  const [starting, setStarting] = useState(false);
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
   const { detail, isPatching, setStatus } = usePaperTradingSession(session?.id ?? "");
@@ -376,11 +378,14 @@ function WatchRow({
       return;
     }
     setStartError(null);
+    setStarting(true);
     try {
       await onStart({ ticker: item.ticker, name: item.name }, amount, intervalMin);
     } catch (err) {
       setStartError(isApiError(err) ? err.message : P.error);
       setExpanded(true);
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -465,7 +470,14 @@ function WatchRow({
               runRead();
             }}
           >
-            {read.isPending ? T.readRunning : T.readRun}
+            {read.isPending ? (
+              <>
+                <Loader2 className="mr-xs size-4 animate-spin" aria-hidden />
+                {T.readRunning}
+              </>
+            ) : (
+              T.readRun
+            )}
           </button>
         </td>
 
@@ -509,7 +521,14 @@ function WatchRow({
                 void handleStart();
               }}
             >
-              {isCreating ? P.creating : T.startRun}
+              {starting ? (
+                <>
+                  <Loader2 className="mr-xs size-4 animate-spin" aria-hidden />
+                  {P.creating}
+                </>
+              ) : (
+                T.startRun
+              )}
             </button>
           )}
         </td>
