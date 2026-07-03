@@ -5659,3 +5659,35 @@
   - 호가 피처(토스 getOrderBook — 체결강도·잔량 불균형) 틱 컨텍스트 주입
   - 누적 성적 대시보드(Supabase 원장 기반 모델 A/B 판단 품질 비교)
   - 레거시 /dashboard/paper-trading 목록·마이페이지 메뉴 정리 여부 결정
+
+### 2026-07-03 — feat(intraday): 정리매매·투자위험 신규 진입 결정론 차단 — 자동 체결 안전핀 (#207)
+
+- **slug**: `intraday-warning-gate` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/207
+- **요약**: feat(intraday): 정리매매·투자위험 신규 진입 결정론 차단 — 자동 체결 안전핀
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > #205 는 매수 유의를 단타 LLM 프롬프트에 **참고 주입**한다(소프트). 자동 틱 단타는 가상이지만 스스로 체결하므로, LLM 이 정리매매(상폐 절차)·투자위험 종목에 BUY 를 내면 자동 루프가 실제 진입할 수 있다. 이 PR 은 결정론 안전핀을 추가한다 — PRD `docs/prd/intraday-warning-gate.md`.
+  > 
+  > - `isEntryBlockingWarning`(critical 심각도 = 정리매매·투자위험) 재사용 — UI 빨간 배지 = 진입 차단이 구조적으로 일치.
+  > - **두 경로 차단**: `applyPostGate`(LLM 판단) + `deriveFromSignal`(LLM 실패 폴백) — 폴백이 게이트를 우회해 BUY 가 새던 갭 방지.
+  > - 단기과열·투자경고·VI(warn/info)는 차단 안 함(진입 금지까지 갈 신호 아님 — #205 참고 주입 유지).
+  > - **순수 시그널 엔진엔 넣지 않음** — 경보는 이력이 없어 백테스트 불가, 엔진은 캔들만 받는 순수 함수. 라이브 결정 계층에만.
+  > 
+  > ## 검증 (docs/qa/intraday-warning-gate.md)
+  > 
+  > - AC 6건 + copy ✅ — 정리매매·투자위험 BUY→HOLD(양 경로), warn/info 유지, SELL 무영향.
+  > - 프로젝트 스위트 709 passed / 0 failed(신규 8) · tsc · eslint · build 클린.
+  > - (환경 노트) 무스코프 vitest 가 병렬 세션 워크트리의 3rd-party node_modules 테스트를 글로빙 — 본 변경 무관, 워크트리 미조작.
+  > 
+  > ## 다음 작업
+  > 
+  > - (test 위생) vitest.config `exclude` 를 `node_modules/**` → `**/node_modules/**` 로(중첩 워크트리 node_modules 제외) — 별도 chore.
+  > - ⑦ 스코어카드 지정 이벤트 스탬프, ③ 밸류트랩 스냅샷, ⑤ 관심종목 행 배지.
+  > - 보유분 강제 청산(경보 발효 시)은 비범위 — 신규 진입만 차단, 청산은 기존 손절/익절 트리거 유지.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (test 위생) vitest.config `exclude` 를 `node_modules/**` → `**/node_modules/**` 로(중첩 워크트리 node_modules 제외) — 별도 chore.
+  - ⑦ 스코어카드 지정 이벤트 스탬프, ③ 밸류트랩 스냅샷, ⑤ 관심종목 행 배지.
+  - 보유분 강제 청산(경보 발효 시)은 비범위 — 신규 진입만 차단, 청산은 기존 손절/익절 트리거 유지.

@@ -9,6 +9,7 @@
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
 import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
+import { isEntryBlockingWarning } from "@/lib/copy/stock/warnings";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
 import {
   extractIntradayFeatures,
@@ -188,6 +189,15 @@ function buildContext(
   };
 }
 
+/**
+ * 신규 진입을 차단할 거래소 시장경보(정리매매·투자위험)가 활성인가 — PRD intraday-warning-gate.
+ * ctx.warnings 는 #205 에서 LLM 호출 시에만 채워진다(없으면 빈 배열 → false). 결정론 게이트와
+ * 폴백이 공유해 두 경로 모두 차단한다.
+ */
+function hasEntryBlockingWarning(ctx: IntradayContext): boolean {
+  return (ctx.warnings ?? []).some((w) => isEntryBlockingWarning(w.warningType));
+}
+
 // ─── 룰 게이트 (순수, 테스트 대상) ────────────────────────────────────────────
 
 export interface PreGate {
@@ -204,6 +214,9 @@ export function evaluatePreGate(ctx: IntradayContext, dailyLossKill: boolean): P
   // 무포지션 + 분봉 HOLD + 직전도 HOLD → 변화 없음, LLM 호출 생략(비용 절감).
   // 단, 구조 이벤트(전고 돌파 등)가 잡히면 신규 진입 가능 상태에 한해 AI 에 묻는다 —
   // 4축 점수가 아직 HOLD 여도 돌파 셋업은 다음 주기까지 기다리면 늦는다.
+  // ⚠️ 스킵 조건에 `signal.action === "HOLD"` 를 유지하라 — 스킵 경로는 ctx.warnings 를 조회하지
+  //    않으므로(비용 절감), deriveFromSignal 이 여기서 BUY 를 낼 수 있게 바뀌면 시장경보 게이트가
+  //    우회된다(정리매매 종목 자동 진입). BUY 신호에서 스킵하려면 먼저 warnings 를 채워야 한다.
   if (flat && ctx.signal.action === "HOLD" && (ctx.previousDecision?.action ?? "HOLD") === "HOLD") {
     if (ctx.structureEvent && !noNewEntry) {
       return { callLlm: true, noNewEntry };
@@ -232,6 +245,10 @@ export function applyPostGate(
     }
   };
 
+  // 0. 거래소 시장경보(정리매매·투자위험) — 신규 진입 하드 차단(가장 우선하는 안전핀).
+  //    LLM 이 #205 프롬프트 주입을 무시하고 BUY 를 내도 자동 체결 루프가 진입하지 못하게 막는다.
+  if (hasEntryBlockingWarning(ctx))
+    demoteToHold("거래소 시장경보(정리매매·투자위험) 발효 — 신규 진입 차단 → 관망");
   // 1. 15:00+/일일손실: 신규 BUY 차단.
   if (noNewEntry) demoteToHold("장 막판(15:00 이후)이거나 일일 손실 한도 도달 — 신규 진입 차단 → 관망");
   // 2. 약세 일봉 레짐 veto.
@@ -267,6 +284,8 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
     ctx.signal.action === "BUY" &&
     !noNewEntry &&
     ctx.signal.regime !== -1 &&
+    // 거래소 시장경보(정리매매·투자위험) 발효 종목은 폴백에서도 신규 진입 금지(applyPostGate 우회 방지).
+    !hasEntryBlockingWarning(ctx) &&
     lv.rrr != null &&
     lv.rrr >= MIN_RRR;
 
