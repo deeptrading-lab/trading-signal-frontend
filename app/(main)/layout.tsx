@@ -33,10 +33,18 @@ import { AIAnalysisProvider } from "@/hooks/stock/aiAnalysisProvider";
 import { GlobalAIAnalysis } from "@/components/stock/GlobalAIAnalysis";
 import { cn } from "@/lib/utils/cn";
 
-/** 카드리스 화이트 포워드 리스킨을 적용한 라우트(home-reskin). 점진 롤아웃 — 이 목록의 라우트만
- * main 배경을 흰색(surface)으로 덮는다. 나머지는 기존 회색(surface-muted)+카드 유지.
- * 전역 `main-area`/`surface-muted` 토큰은 무변경(홈 한정 override). */
-const WHITE_SURFACE_ROUTES = new Set<string>(["/"]);
+/** 카드리스 화이트 포워드 리스킨을 적용한 라우트(home-reskin → stock-detail-reskin). 점진 롤아웃 —
+ * 아래 조건에 맞는 라우트만 main 배경을 흰색(surface)으로 덮는다. 나머지는 기존 회색(surface-muted)+
+ * 카드 유지. 전역 `main-area`/`surface-muted` 토큰은 무변경(라우트 한정 override).
+ *
+ * 대상:
+ *   - `/`            홈(home-reskin)
+ *   - `/stock*`      종목 상세·검색(`/stock`, `/stock/[ticker]`) — stock-detail-reskin
+ * `startsWith("/stock")` 는 `/stockfoo` 같은 유령 경로가 없어(라우트 트리상 `/stock` 세그먼트뿐)
+ * 다른 도메인(`/market`·`/profile`·`/watchlist`·`/analyze`·`/dashboard`)으로 새지 않는다. */
+function isWhiteSurfaceRoute(pathname: string): boolean {
+  return pathname === "/" || pathname.startsWith("/stock");
+}
 
 export default function MainLayout({
   children,
@@ -45,7 +53,7 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   // usePathname 은 SSR/클라 초기 렌더 동일값 → hydration mismatch 0.
-  const isWhiteSurface = WHITE_SURFACE_ROUTES.has(pathname);
+  const isWhiteSurface = isWhiteSurfaceRoute(pathname);
   return (
     <WorkbenchSessionProvider>
       <AIAnalysisProvider>

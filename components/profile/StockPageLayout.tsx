@@ -1,16 +1,31 @@
+/**
+ * StockPageLayout — `/stock/[ticker]` 카드리스·T4 티어링 본문(stock-detail-reskin).
+ *
+ * 노스스타 `#detailScreen` 정합 — **단일 컬럼 카드리스**(데스크탑·모바일 공통). 카드 박스 대신
+ * 헤어라인·여백으로 섹션을 구분(토스 톤). 정보 티어링(T4):
+ *   - 항시(always): 시세 헤더 → 일봉 차트 → 컴팩트 시그널 요약. 화면에 늘 떠 있다.
+ *   - 온디맨드(잠깐): 회사개요·최근공시·투자자 수급 — **데스크탑·모바일 공통 기본 접힘**(CollapsibleCard
+ *     `variant="flat"`). 접힘 상태에선 자식이 미마운트라 해당 API 도 펼치기 전까진 호출되지 않는다.
+ *
+ * 이전(카드 스택) 대비 변경:
+ *   - 데스크탑 2-col grid + 차트 확대/축소 토글 제거 → 차트가 항상 콘텐츠 전폭이라 "확대"가 무의미해짐.
+ *     차트 컨트롤 상태(봉/기간/차트타입/오버레이)는 그대로 부모가 소유(StockDailyChart controlled).
+ *   - 반응형 분기(useBreakpoint)는 ChartShell 내부(기간 드롭다운)만 남기고, 레이아웃은 단일화.
+ */
+
 "use client";
 
-import { useRef, useState } from "react";
-import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
+import { useState } from "react";
 import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { StockHeader } from "./StockHeader";
 import { StockDailyChart } from "./StockDailyChart";
-import { SignalCard } from "./SignalCard";
+import { SignalSummary } from "./SignalSummary";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
+import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
 import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
@@ -20,20 +35,14 @@ import {
 } from "./stockChartConfig";
 
 export function StockPageLayout({ ticker }: { ticker: string }) {
-  const { isMobile } = useBreakpoint();
   const { openFor } = useAIAnalysisContext();
   const openAIAnalysis = () => openFor(ticker);
-  const [chartExpanded, setChartExpanded] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 차트 컨트롤 상태 — 여기(부모)에서 소유한다. 데스크탑 확대/축소 토글 시 StockDailyChart 가
-  //   서로 다른 트리 위치로 리마운트되어도 선택값(라인/캔들·봉·기간)이 보존된다.
+  // 차트 컨트롤 상태 — 부모가 소유해 StockDailyChart 를 controlled 로 두고 값(라인/캔들·봉·기간)을 보존.
   const [period, setPeriod] = useState<ChartPeriod>(DEFAULT_PERIOD);
   const [days, setDays] = useState<number>(DEFAULT_DAYS);
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
   // 오버레이 옵션(매물대·볼린저밴드) — 기본 off, 드롭다운 체크박스로 토글. localStorage 지속.
-  //   확대/축소 리마운트에도 보존(부모 소유 + 저장값).
   const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
 
   function handlePeriodChange(p: ChartPeriod) {
@@ -54,89 +63,32 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     onToggleBollinger: () => toggleChartOption("bollinger"),
   };
 
-  // 레이아웃 전환 시 fade-out → 상태 변경 → fade-in (데스크탑 확대/축소 한정)
-  function transition(nextExpanded: boolean) {
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
-    setVisible(false);
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      setChartExpanded(nextExpanded);
-      setVisible(true);
-    }, 180);
-  }
+  return (
+    <div className="flex flex-col">
+      {/* ── 항시(T4): 시세 헤더 ── */}
+      <StockHeader ticker={ticker} onAIAnalysis={openAIAnalysis} />
 
-  // 모바일(`< md`): 종목명·현재가 → 차트 → 수급(차트 바로 아래) → 기업개황 → 최근공시.
-  //   수급은 합계 3칸 항상 노출 + 일자별 표 기본 접힘(tableDefaultOpen=false). 기업개황·최근공시는
-  //   접기/펼치기 카드(기본 접힘). 차트 확대는 데스크탑 전용이라 onExpand 미전달.
-  if (isMobile) {
-    return (
-      <>
-      <div className="flex flex-col gap-lg">
-        <StockHeader ticker={ticker} onAIAnalysis={openAIAnalysis} />
+      {/* ── 항시: 일봉 차트(플랫) — 시맨틱 <section> 은 자식(ChartShell)이 소유, 래퍼는 헤어라인만 ── */}
+      <div className="mt-lg border-t border-border-line pt-lg">
         <StockDailyChart ticker={ticker} {...chartControls} />
-        <SignalCard ticker={ticker} />
-        <StockInvestorTrend ticker={ticker} tableDefaultOpen={false} />
+      </div>
+
+      {/* ── 항시: 컴팩트 시그널 요약(플랫) — 시맨틱 <section> 은 자식(SignalSummary)이 소유 ── */}
+      <div className="mt-lg border-t border-border-line pt-lg">
+        <SignalSummary ticker={ticker} />
+      </div>
+
+      {/* ── 온디맨드(T4): 회사개요·최근공시·수급 — 데스크탑·모바일 공통 기본 접힘 ── */}
+      <div className="mt-lg border-t border-border-line">
         <CompanyOverview ticker={ticker} collapsible />
         <DisclosureList ticker={ticker} count={5} collapsible />
+        <StockInvestorTrend ticker={ticker} collapsible />
       </div>
-      </>
-    );
-  }
 
-  return (
-    <>
-    <div
-      style={{
-        opacity: visible ? 1 : 0,
-        transition: "opacity 180ms ease",
-      }}
-    >
-      {chartExpanded ? (
-        /* 확대: 헤더 → 차트(풀너비) → 기업정보. lg:pb-2xl — 수급 하단 여백(PC). */
-        <div className="flex flex-col gap-lg lg:pb-2xl">
-          <StockHeader ticker={ticker} onAIAnalysis={openAIAnalysis} />
-          <StockDailyChart
-            ticker={ticker}
-            expanded
-            onCollapse={() => transition(false)}
-            {...chartControls}
-          />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-            <CompanyOverview ticker={ticker} />
-            <DisclosureList ticker={ticker} count={5} />
-          </div>
-          <SignalCard ticker={ticker} />
-          <StockInvestorTrend ticker={ticker} />
-        </div>
-      ) : (
-        /* 기본: 헤더(전폭) → 데스크탑 2-col (좌=기업정보, 우=차트) / 모바일 1-col 스택.
-         *   헤더를 그리드 밖 전폭으로 올려 좌측 기업개황 카드와 우측 차트 카드의 시작 높이선을 맞춘다.
-         *   lg:pb-2xl — 수급 하단 여백(PC). */
-        <div className="flex flex-col gap-lg lg:pb-2xl">
-          <StockHeader ticker={ticker} onAIAnalysis={openAIAnalysis} />
-          {/* items-start 제거 → 좌측 컬럼이 우측 차트 높이에 stretch. 최근 공시 카드를
-           *   flex-1 grid 로 남는 높이를 채워 좌우 하단선을 맞춘다(빈 공간 제거). */}
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-lg">
-            <div className="flex flex-col gap-lg">
-              <CompanyOverview ticker={ticker} />
-              <div className="flex-1 grid">
-                <DisclosureList ticker={ticker} count={5} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-lg lg:sticky lg:top-4">
-              <StockDailyChart
-                ticker={ticker}
-                onExpand={() => transition(true)}
-                {...chartControls}
-              />
-              <SignalCard ticker={ticker} />
-            </div>
-          </div>
-          {/* 수급 — 표가 넓어(min-w 520px) 2-col 밖 전폭으로 배치 */}
-          <StockInvestorTrend ticker={ticker} />
-        </div>
-      )}
+      {/* T4 안내 — 무엇이 항시이고 무엇이 펼침인지 */}
+      <p className="mt-md text-caption text-text-muted">
+        {STOCK_DETAIL_TIERING_NOTE}
+      </p>
     </div>
-    </>
   );
 }
