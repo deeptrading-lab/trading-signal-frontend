@@ -9,7 +9,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchActiveWarnings, resetWarningsForTest } from "../warnings";
+import {
+  fetchActiveWarnings,
+  fetchActiveWarningsBatch,
+  resetWarningsForTest,
+} from "../warnings";
 import { isTossConfigured, tossGet } from "../client";
 
 vi.mock("../client", () => ({
@@ -143,5 +147,53 @@ describe("fetchActiveWarnings", () => {
     await fetchActiveWarnings("AAPL");
     expect(mockTossGet).toHaveBeenCalledTimes(1);
     expect(mockTossGet).toHaveBeenCalledWith("/api/v1/stocks/AAPL/warnings");
+  });
+});
+
+describe("fetchActiveWarningsBatch", () => {
+  it("여러 심볼을 티커별 맵으로 반환한다 (AC-3)", async () => {
+    mockTossGet.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("111710") ? [{ warningType: "OVERHEATED" }] : [],
+      ),
+    );
+
+    const result = await fetchActiveWarningsBatch(["111710", "005930"]);
+    expect(result).toEqual({
+      "111710": [
+        { warningType: "OVERHEATED", exchange: null, startDate: null, endDate: null },
+      ],
+      "005930": [],
+    });
+  });
+
+  it("중복·형식 밖 티커를 정규화·제거하고 캐시로 1콜에 수렴한다 (AC-6)", async () => {
+    mockTossGet.mockResolvedValue([]);
+
+    await fetchActiveWarningsBatch(["005930", "005930", "aapl", "AAPL", ".."]);
+    // 005930·AAPL 각 1콜(중복·소문자 정규화), ".." 는 거부.
+    expect(mockTossGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("동시 실행을 concurrency 로 제한한다 (AC-6 — 5/s 준수)", async () => {
+    let active = 0;
+    let peak = 0;
+    mockTossGet.mockImplementation(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      active -= 1;
+      return [];
+    });
+
+    const tickers = Array.from({ length: 12 }, (_, i) => `T${String(i).padStart(5, "0")}`);
+    await fetchActiveWarningsBatch(tickers, 3);
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+
+  it("키 미설정이면 빈 맵 — 토스 무호출 (AC-1)", async () => {
+    mockConfigured.mockReturnValue(false);
+    await expect(fetchActiveWarningsBatch(["005930", "111710"])).resolves.toEqual({});
+    expect(mockTossGet).not.toHaveBeenCalled();
   });
 });

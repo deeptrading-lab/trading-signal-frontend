@@ -5,7 +5,10 @@
  */
 
 import { httpClient } from "@/lib/api/client";
-import type { StockWarningsResponse } from "@/lib/types/stock/warnings";
+import type {
+  StockWarningsResponse,
+  StockWarningsBatchResponse,
+} from "@/lib/types/stock/warnings";
 
 export async function getStockWarnings(
   ticker: string,
@@ -13,6 +16,16 @@ export async function getStockWarnings(
   const response = await httpClient.get<StockWarningsResponse>(
     "/stock/warnings",
     { params: { ticker } },
+  );
+  return response.data;
+}
+
+export async function getStockWarningsBatch(
+  tickers: readonly string[],
+): Promise<StockWarningsBatchResponse> {
+  const response = await httpClient.get<StockWarningsBatchResponse>(
+    "/stock/warnings/batch",
+    { params: { tickers: tickers.join(",") } },
   );
   return response.data;
 }

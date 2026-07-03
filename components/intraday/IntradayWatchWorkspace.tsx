@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils/cn";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
+import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
+import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
@@ -24,8 +26,12 @@ import {
   INTRADAY_WATCH_COPY as W,
 } from "@/lib/copy/stock/intradayRead";
 import type { InvestorFlowRow } from "@/lib/types/flow/top10";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 type Watch = { ticker: string; name: string };
+
+/** 티커별 활성 경보 맵(빈 맵이면 전부 미표시) — 배치 훅 결과 fail-soft 기본. */
+type WarningsByTicker = Record<string, StockWarningItem[]>;
 
 /** 추천 칩 1개 데이터 — 수급·거래량 소스 공통 최소 형태. */
 type Candidate = { ticker: string; name: string; changePercent: number };
@@ -120,6 +126,21 @@ export function IntradayWatchWorkspace() {
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
   const watching = new Set(rowTickers);
 
+  // 가시 티커(워치 행 + 추천 후보) union 으로 경보를 1회 배치 조회 — 티커별 칩에 내려준다.
+  // 토스 키 없으면 빈 맵(fail-soft), 60s 캐시. 순서 무관 정규화는 훅 queryKey 가 담당.
+  const warningTickers = useMemo(
+    () => [
+      ...new Set([
+        ...rowTickers,
+        ...flowCandidates.map((c) => c.ticker),
+        ...volumeCandidates.map((c) => c.ticker),
+      ]),
+    ],
+    [rowTickers, flowCandidates, volumeCandidates],
+  );
+  const { data: warningsData } = useQueryStockWarningsBatch(warningTickers);
+  const warningsByTicker: WarningsByTicker = warningsData?.warnings ?? {};
+
   const add = (item: Watch) =>
     setWatch((prev) => (prev.some((x) => x.ticker === item.ticker) ? prev : [...prev, item]));
   const remove = (ticker: string) => setWatch((prev) => prev.filter((x) => x.ticker !== ticker));
@@ -149,6 +170,7 @@ export function IntradayWatchWorkspace() {
           isLoading={flowLoading}
           candidates={flowCandidates}
           watching={watching}
+          warningsByTicker={warningsByTicker}
           onAdd={add}
         />
         <CandidateChips
@@ -157,6 +179,7 @@ export function IntradayWatchWorkspace() {
           isLoading={volumeLoading}
           candidates={volumeCandidates}
           watching={watching}
+          warningsByTicker={warningsByTicker}
           onAdd={add}
         />
       </section>
@@ -175,6 +198,7 @@ export function IntradayWatchWorkspace() {
             items={rows}
             quotes={quotes}
             sessionByTicker={sessionByTicker}
+            warningsByTicker={warningsByTicker}
             isCreating={isCreating}
             onStart={start}
             onRemove={remove}
@@ -192,6 +216,7 @@ function CandidateChips({
   isLoading,
   candidates,
   watching,
+  warningsByTicker,
   onAdd,
 }: {
   title: string;
@@ -199,6 +224,7 @@ function CandidateChips({
   isLoading: boolean;
   candidates: Candidate[];
   watching: Set<string>;
+  warningsByTicker: WarningsByTicker;
   onAdd: (item: Watch) => void;
 }) {
   return (
@@ -220,11 +246,11 @@ function CandidateChips({
               onClick={() => onAdd({ ticker: c.ticker, name: c.name })}
               disabled={watching.has(c.ticker)}
               className={cn(
-                "text-caption px-sm py-xs rounded-pill border border-border-line transition-colors cursor-pointer",
+                "inline-flex items-center gap-xs text-caption px-sm py-xs rounded-pill border border-border-line transition-colors cursor-pointer",
                 "hover:bg-surface-muted disabled:opacity-40 disabled:cursor-default",
               )}
             >
-              <span className="text-text-strong">{c.name}</span>{" "}
+              <span className="text-text-strong">{c.name}</span>
               <span
                 className={cn(
                   "tabular-nums",
@@ -238,6 +264,8 @@ function CandidateChips({
                 {c.changePercent >= 0 ? "+" : ""}
                 {c.changePercent.toFixed(1)}%
               </span>
+              {/* 좁은 칩이라 최상위 심각도 1개만 병기(단기과열/투자경고 구분이 픽 결정에 유효). */}
+              <StockWarningBadges warnings={warningsByTicker[c.ticker]} max={1} size="sm" />
             </button>
           ))}
         </div>

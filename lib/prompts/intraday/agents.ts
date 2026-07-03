@@ -10,11 +10,23 @@
  */
 
 import type { IntradayContext } from "@/lib/types/intraday/intradayDecision";
+import { warningLabel } from "@/lib/copy/stock/warnings";
 
 const won = (v: number | null | undefined): string =>
   v == null ? "—" : `${Math.round(v).toLocaleString("ko-KR")}원`;
 const pct = (v: number | null | undefined): string =>
   v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+
+/**
+ * 매수 유의(거래소 시장경보·VI) 줄 — 활성 항목이 있을 때만. VI 는 단일가 냉각 중이라 진입/청산
+ * 타이밍에 직결하고, 정리매매·투자위험은 진입 자체를 재고할 신호다. 라벨 중복(VI 3종)은 Set 제거.
+ */
+function warningLine(ctx: IntradayContext): string | null {
+  const items = ctx.warnings ?? [];
+  if (items.length === 0) return null;
+  const labels = [...new Set(items.map((w) => warningLabel(w.warningType)))];
+  return `[매수 유의] 거래소 시장경보 ${labels.join(", ")} 발효 중 — 변동성·단일가(VI)·거래정지 리스크를 진입/청산 판단에 반드시 반영`;
+}
 
 /** 시그널·레벨·포지션·최근흐름 공통 컨텍스트 블록(두 에이전트 공유). */
 export function formatIntradayContext(ctx: IntradayContext): string {
@@ -35,8 +47,12 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     ? `${ctx.previousDecision.action} | 목표 ${won(ctx.previousDecision.targetPrice)} | 손절 ${won(ctx.previousDecision.stopPrice)} | 무효화 ${won(ctx.previousDecision.invalidationPrice)} | 근거: ${ctx.previousDecision.rationale}`
     : "없음 (첫 틱)";
 
+  const warning = warningLine(ctx);
+
   return [
     `종목: ${ctx.ticker} ${ctx.name} | 시각: ${ctx.nowHhmm} KST | 현재가: ${won(ctx.price)} | ${ctx.timeframe}분봉 | 판단 주기 ${ctx.intervalMinutes}분(다음 점검은 약 ${ctx.intervalMinutes}분 후)`,
+    // 매수 유의는 헤더 바로 아래 노출(활성 시에만) — 진입 판단 전에 먼저 눈에 들어오도록.
+    ...(warning ? ["", warning] : []),
     "",
     `[분봉 시그널] 종합 ${s.action} | 점수 ${s.score.toFixed(0)}/100 | 동의도 ${Math.round(s.confidence * 100)}% | 일봉 큰 흐름 ${regimeLabel}`,
     `  축별: ${axes}`,
