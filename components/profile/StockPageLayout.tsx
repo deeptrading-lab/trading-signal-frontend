@@ -16,9 +16,10 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import type { ChartPeriod } from "@/hooks/stock/useQueryStockChart";
 import { StockHeader } from "./StockHeader";
-import { StockDailyChart } from "./StockDailyChart";
+import { StockChartSkeleton } from "./StockChartSkeleton";
 import { SignalSummary } from "./SignalSummary";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
@@ -33,6 +34,17 @@ import {
   defaultDaysForPeriod,
   type ChartType,
 } from "./stockChartConfig";
+
+/**
+ * 가격 차트 — recharts(≈104kB gzip)를 끌어오므로 `next/dynamic({ssr:false})` 로 지연 로드
+ * (stock-route-perf #3 · mobile-perf WS-4 완료). recharts 가 라우트 셸(첫 로드) 청크에서 빠져
+ * 헤더·시그널이 먼저 페인트되고, 차트는 청크 로드 후 스트리밍된다. 컨트롤·동작은 로드 후 동일
+ * (props 그대로 전달). loading 스켈레톤은 StockChartSkeleton — loading.tsx·내부 로딩과 높이 정합.
+ */
+const StockDailyChart = dynamic(
+  () => import("./StockDailyChart").then((m) => m.StockDailyChart),
+  { ssr: false, loading: () => <StockChartSkeleton /> },
+);
 
 export function StockPageLayout({ ticker }: { ticker: string }) {
   const { openFor } = useAIAnalysisContext();

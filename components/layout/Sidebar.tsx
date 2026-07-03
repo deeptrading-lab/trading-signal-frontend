@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils/cn";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const handleStockNavClick = useStockNavClick();
+  const stockNavBinding = useStockNavClick();
 
   return (
     <aside
@@ -54,7 +54,7 @@ export function Sidebar() {
                 active && "sidebar-nav-item-active",
               )}
               aria-current={active ? "page" : undefined}
-              onClick={item.path === "/stock" ? (e) => handleStockNavClick(e, active) : undefined}
+              {...(item.path === "/stock" ? stockNavBinding(active) : {})}
             >
               <Icon className="sidebar-nav-item-icon" aria-hidden="true" />
               <span className="sidebar-nav-item-label">{item.label}</span>

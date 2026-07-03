@@ -14,7 +14,7 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { SignalSummarySkeleton } from "@/components/profile/SignalSummarySkeleton";
 import { useSignalResult } from "@/hooks/stock/useSignalResult";
 import {
   AXIS_LABEL,
@@ -22,7 +22,6 @@ import {
   REGIME_LABEL,
   SIGNAL_DISCLAIMER,
   SIGNAL_SUMMARY_TITLE,
-  SIGNAL_SUMMARY_LOADING,
   SIGNAL_SUMMARY_ERROR,
   SIGNAL_SUMMARY_INSUFFICIENT,
   SIGNAL_SUMMARY_LIMITED,
@@ -89,22 +88,7 @@ export function SignalSummary({ ticker }: SignalSummaryProps) {
   const { result, isLoading, isError } = useSignalResult(ticker);
 
   if (isLoading) {
-    return (
-      <SummaryShell>
-        <div
-          className="flex flex-col gap-md sm:flex-row sm:items-center sm:gap-lg"
-          aria-busy="true"
-        >
-          <span className="sr-only">{SIGNAL_SUMMARY_LOADING}</span>
-          <Skeleton variant="line" className="mb-0 h-8 w-24" />
-          <div className="grid flex-1 grid-cols-2 gap-x-lg gap-y-md sm:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} variant="line" className="mb-0 h-4 w-full" />
-            ))}
-          </div>
-        </div>
-      </SummaryShell>
-    );
+    return <SignalSummarySkeleton />;
   }
 
   if (isError || !result) {

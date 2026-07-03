@@ -24,12 +24,11 @@ import { useQueryStockWarnings } from "@/hooks/stock/useQueryStockWarnings";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { WatchlistStarButton } from "@/components/watchlist/WatchlistStarButton";
 import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { StockHeaderSkeleton } from "@/components/profile/StockHeaderSkeleton";
 import { readRecentSearches } from "@/lib/utils/recentSearch";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { rankLogoDotClass, rankLogoInitial } from "@/lib/utils/rankLogoDot";
 import {
-  STOCK_DETAIL_LOADING,
   STOCK_DETAIL_LOAD_ERROR,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
@@ -48,13 +47,7 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col gap-md" aria-busy="true">
-        <span className="sr-only">{STOCK_DETAIL_LOADING}</span>
-        <Skeleton variant="line" className="mb-0 h-6 w-40" />
-        <Skeleton variant="line" className="mb-0 h-10 w-56" />
-      </div>
-    );
+    return <StockHeaderSkeleton />;
   }
 
   if (isError) {

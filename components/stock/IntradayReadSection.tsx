@@ -11,6 +11,7 @@ import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { useMutationIntradayRead } from "@/hooks/stock/useMutationIntradayRead";
 import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
 import { INTRADAY_READ_COPY as C } from "@/lib/copy/stock/intradayRead";
+import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 
 export interface IntradayReadSectionProps {
   ticker: string;
@@ -21,7 +22,12 @@ export interface IntradayReadSectionProps {
 }
 
 export function IntradayReadSection({ ticker, heading, onRemove }: IntradayReadSectionProps) {
-  const { data: providers, isLoading: gateLoading } = useQueryAIProviders();
+  // 로컬 CLI 게이트 — Vercel(prod)에는 AI CLI 가 없어 항상 0개라, 마운트 시 무의미한 요청이 나갔다
+  //   (모바일 종목 상세 진입마다 1건). `/intraday` 네비를 숨기는 것과 동일한 로컬/Vercel 검사로
+  //   게이트해 prod 마운트 요청을 제거한다. off 면 providers=undefined → 아래 `!provider` 로컬 전용
+  //   안내로 귀결(prod 기존 UI 와 동일, 로딩 플래시만 사라짐).
+  const isLocal = !isVercelRuntime();
+  const { data: providers, isLoading: gateLoading } = useQueryAIProviders(isLocal);
   const read = useMutationIntradayRead();
 
   const provider = providers?.available[0]; // claude 우선(detectProviders 순서)
