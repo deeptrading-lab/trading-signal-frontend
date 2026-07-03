@@ -46,7 +46,7 @@ import type { CompanyProfile } from "@/lib/api/dart/types";
 
 export interface CompanyOverviewProps {
   ticker: string;
-  /** 모바일 — 접기/펼치기 카드로 렌더(기본 접힘). 미지정 시 기존 항상 펼친 카드. */
+  /** 온디맨드(T4) — 카드리스 접힘 행으로 렌더(데스크탑·모바일 공통 기본 접힘). 미지정 시 항상 펼친 카드. */
   collapsible?: boolean;
 }
 
@@ -146,7 +146,7 @@ function CompanyOverviewContent({ ticker }: { ticker: string }) {
 export function CompanyOverview({ ticker, collapsible = false }: CompanyOverviewProps) {
   if (collapsible) {
     return (
-      <CollapsibleCard title={STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}>
+      <CollapsibleCard variant="flat" title={STOCK_DETAIL_COMPANY_OVERVIEW_TITLE}>
         <CompanyOverviewContent ticker={ticker} />
       </CollapsibleCard>
     );

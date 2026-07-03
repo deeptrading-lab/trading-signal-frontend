@@ -62,7 +62,8 @@ export function ChartShell({
   const ChartTypeIcon = chartType === "candle" ? ChartCandlestick : ChartLine;
 
   return (
-    <section className="card" aria-label={STOCK_DETAIL_PRICE_CHART_TITLE}>
+    // 카드리스(stock-detail-reskin) — `.card` 박스 제거, 플랫 섹션. 헤어라인은 상위(StockPageLayout)가 관리.
+    <section aria-label={STOCK_DETAIL_PRICE_CHART_TITLE}>
       {/* 헤더 행 1: 타이틀 + 확대/축소 버튼 */}
       <header className="flex justify-between items-center mb-sm">
         <h2 className="text-h2 text-text-strong">{STOCK_DETAIL_PRICE_CHART_TITLE}</h2>

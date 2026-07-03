@@ -32,7 +32,7 @@ import {
 export interface DisclosureListProps {
   ticker: string;
   count?: number;
-  /** 모바일 — 접기/펼치기 카드로 렌더(기본 접힘). 미지정 시 기존 항상 펼친 카드. */
+  /** 온디맨드(T4) — 카드리스 접힘 행으로 렌더(데스크탑·모바일 공통 기본 접힘). 미지정 시 항상 펼친 카드. */
   collapsible?: boolean;
 }
 
@@ -108,7 +108,7 @@ export function DisclosureList({
 }: DisclosureListProps) {
   if (collapsible) {
     return (
-      <CollapsibleCard title={STOCK_DETAIL_DISCLOSURE_LIST_TITLE}>
+      <CollapsibleCard variant="flat" title={STOCK_DETAIL_DISCLOSURE_LIST_TITLE}>
         <DisclosureListContent ticker={ticker} count={count} />
       </CollapsibleCard>
     );
