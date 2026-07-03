@@ -24,6 +24,7 @@
 import { useCallback } from "react";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
+import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { useStockMetaStore } from "@/lib/store/stockMetaStore";
@@ -58,6 +59,10 @@ export function WatchlistContainer() {
 
   const query = useQueryWatchlist(tickers);
   const quotes = query.data ?? [];
+
+  // 매수 유의(시장경보·VI) 배치 — 담은 종목 전체를 1회 조회(fail-soft·60s 캐시·키 없으면 빈 맵).
+  const warningsQuery = useQueryStockWarningsBatch(tickers);
+  const warningsByTicker = warningsQuery.data?.warnings ?? {};
 
   // tickers 0건 — 시드 전부 삭제 등(§3.9 빈 상태). enabled=false 라 query 는 idle.
   const isEmpty = tickers.length === 0;
@@ -108,6 +113,7 @@ export function WatchlistContainer() {
         <WatchlistTable
           tickers={tickers}
           quotes={quotes}
+          warningsByTicker={warningsByTicker}
           isLoading={showSkeleton}
           skeletonRows={Math.min(tickers.length, 6)}
           getName={resolveName}

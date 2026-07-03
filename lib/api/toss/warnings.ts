@@ -123,7 +123,9 @@ export async function fetchActiveWarnings(
  * 요청수는 아니다(리뷰 F-3) — 실제 `STOCK` 5/s 준수는 `tossGet` 의 429 Retry-After 백오프 +
  * 60s 캐시가 담당하고, 여기선 버스트 폭만 좁힌다.
  *
- * @returns 심볼(정규화 대문자) → 유의사항 배열. 실패 심볼은 빈 배열(fail-soft).
+ * @returns 심볼(**정규화 대문자**) → 유의사항 배열. 실패 심볼은 빈 배열(fail-soft).
+ *   ⚠️ 출력 키는 대문자다. 현재 소비 지면은 전부 KR 6자리 숫자 티커(대문자 no-op)라 원본 조회가
+ *   그대로 맞지만, 소문자 알파 티커(미국·크립토)를 다루면 조회 측도 `.toUpperCase()` 로 맞춰야 한다.
  */
 export async function fetchActiveWarningsBatch(
   symbols: readonly string[],

@@ -9,7 +9,11 @@
  * `watchlist-batch-quotes` §3.4·§4 (q2 RESOLVED):
  *   - per-row "다시 시도" 버튼·재시도 콜백 prop 제거. 디그레이드 행은 안내 + 삭제만 두고,
  *     전체 재조회는 표 상단 단일 "새로고침"(`WatchlistPage`) 으로 일원화한다.
- *   - 거래정지/관리종목 배지 미표시(보류) — `search-stock-info` 호출 제거로 데이터 소스 부재.
+ *
+ * `watchlist-warning-badge` (§3): 매수 유의(거래소 시장경보·VI) 칩을 종목명 옆에 표시(토스
+ *   warnings, `StockWarningBadges` 공유). 정상·디그레이드 행 모두 적용(경보는 시세와 무관).
+ *   토스 키 없음·무경보·실패면 미표시. 거래정지/관리종목 **자체**는 warnings API 미제공이라
+ *   여기서 다루지 않는다(관리종목은 #201 KIS 보강 경로 별도).
  *
  * `fix/watchlist-partial-render` — 부분실패 종목 누락 방지(좌조인 렌더):
  *   - `quote` 가 없는(시세 실패/누락) ticker 는 "디그레이드 행" 으로 렌더한다. 종목명은 추가
@@ -32,7 +36,9 @@ import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
+import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
 import {
   WATCHLIST_REMOVE_LABEL,
   WATCHLIST_ROW_FAILED,
@@ -49,6 +55,8 @@ export interface WatchlistRowProps {
    * 정상 행: `fallbackName ?? quote.name`. 디그레이드 행: 있으면 표시, 없으면 ticker 만 노출.
    */
   fallbackName?: string | null;
+  /** 활성 매수 유의(경보·VI) — 없거나 빈 배열이면 칩 미표시(fail-soft). */
+  warnings?: StockWarningItem[];
   onRemove: (ticker: string) => void;
 }
 
@@ -56,6 +64,7 @@ function WatchlistRowBase({
   ticker,
   quote,
   fallbackName,
+  warnings,
   onRemove,
 }: WatchlistRowProps) {
   const router = useRouter();
@@ -73,13 +82,19 @@ function WatchlistRowBase({
         <div className="col-span-4 flex flex-col gap-xs min-w-0">
           {fallbackName ? (
             <>
-              <span className="text-body-strong text-text-strong truncate">
-                {fallbackName}
+              <span className="inline-flex items-center gap-xs min-w-0">
+                <span className="text-body-strong text-text-strong truncate">
+                  {fallbackName}
+                </span>
+                <StockWarningBadges warnings={warnings} max={1} size="sm" />
               </span>
               <span className="text-caption text-text-muted">{ticker}</span>
             </>
           ) : (
-            <span className="text-body-strong text-text-strong">{ticker}</span>
+            <span className="inline-flex items-center gap-xs">
+              <span className="text-body-strong text-text-strong">{ticker}</span>
+              <StockWarningBadges warnings={warnings} max={1} size="sm" />
+            </span>
           )}
         </div>
 
@@ -137,6 +152,7 @@ function WatchlistRowBase({
             <span className="text-body-strong text-text-strong truncate">
               {displayName}
             </span>
+            <StockWarningBadges warnings={warnings} max={1} size="sm" />
           </div>
           <div className="text-caption text-text-muted">{quote.ticker}</div>
         </div>

@@ -21,7 +21,15 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
-    exclude: ["node_modules/**", ".next/**", "Stock and Coin Analysis App/**"],
+    // `**/node_modules/**` — 중첩 node_modules(3rd-party 라이브러리 테스트)까지 제외.
+    // `.claude/**` — 병렬 세션의 git 워크트리(`.claude/worktrees/*`)는 프로젝트 소스의 복제본이라
+    //   그 안의 테스트를 다시 수집하면 무스코프 run 이 중복·오탐으로 부풀려진다. 툴링 디렉터리 전체 제외.
+    exclude: [
+      "**/node_modules/**",
+      ".claude/**",
+      ".next/**",
+      "Stock and Coin Analysis App/**",
+    ],
     globals: false,
     clearMocks: true,
   },

@@ -5691,3 +5691,30 @@
   - (test 위생) vitest.config `exclude` 를 `node_modules/**` → `**/node_modules/**` 로(중첩 워크트리 node_modules 제외) — 별도 chore.
   - ⑦ 스코어카드 지정 이벤트 스탬프, ③ 밸류트랩 스냅샷, ⑤ 관심종목 행 배지.
   - 보유분 강제 청산(경보 발효 시)은 비범위 — 신규 진입만 차단, 청산은 기존 손절/익절 트리거 유지.
+
+### 2026-07-03 — feat(watchlist): 관심종목 행 매수 유의 경고 칩 + vitest 워크트리 제외 (#208)
+
+- **slug**: `watchlist-warning-badge` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/208
+- **요약**: feat(watchlist): 관심종목 행 매수 유의 경고 칩 + vitest 워크트리 제외
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 매수 유의사항 트랙(§4) 후속 ⑤ — `WatchlistRow.tsx` 의 "거래정지/관리종목 배지 미표시(보류)" 주석을 닫는다. #205 의 배치 훅·공유 배지를 재사용.
+  > 
+  > - **관심종목 행 경고 칩**: `WatchlistContainer` 가 담은 티커 전체를 `useQueryStockWarningsBatch` 로 1회 조회 → 표 → 행에 by-ticker 전달. 정상·디그레이드 행 모두 종목명 옆 `StockWarningBadges`(최상위 심각도 1개·sm). 키 없음·무경보·실패 = 미표시.
+  > - **테스트 위생**: `vitest.config` exclude 에 `**/node_modules/**`(중첩 3rd-party) + `.claude/**`(병렬 세션 워크트리 복제) 추가 — 무스코프 `vitest run` 이 워크트리 테스트를 글로빙해 오탐/중복되던 것 소거(184→92 파일).
+  > 
+  > ## 검증 (docs/qa/watchlist-warning-badge.md)
+  > 
+  > - AC 5건 ✅ — 배치 실응답 001210 투자경고 검출, `/watchlist` 200, 무스코프 vitest 750 passed / 0 failed(이전 12 오탐 소거).
+  > - tsc · eslint · build 클린.
+  > 
+  > ## 다음 작업
+  > 
+  > - (사용자 확인) 001210 등 지정 종목을 관심종목에 담아 "투자경고" 칩 시각 확인.
+  > - 남은 매수유의 후속: ③ 밸류트랩 스냅샷(소비자=봇 레포), ⑦ 스코어카드 지정 이벤트 스탬프(경보 이력 없어 결정시점 스탬프 필요). 둘 다 소비자 준비 시.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (사용자 확인) 001210 등 지정 종목을 관심종목에 담아 "투자경고" 칩 시각 확인.
+  - 남은 매수유의 후속: ③ 밸류트랩 스냅샷(소비자=봇 레포), ⑦ 스코어카드 지정 이벤트 스탬프(경보 이력 없어 결정시점 스탬프 필요). 둘 다 소비자 준비 시.

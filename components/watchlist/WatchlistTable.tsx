@@ -20,6 +20,7 @@
 import { useMemo } from "react";
 import { WatchlistRow } from "./WatchlistRow";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
 import {
   WATCHLIST_TABLE_NAME,
   WATCHLIST_TABLE_PRICE,
@@ -33,6 +34,8 @@ export interface WatchlistTableProps {
   tickers: readonly string[];
   /** BFF 성공 시세 — ticker 로 매칭. 누락분은 디그레이드 행. */
   quotes: WatchlistQuote[];
+  /** 티커별 활성 매수 유의(경보·VI) — 빈 맵/미제공이면 칩 미표시(fail-soft). */
+  warningsByTicker?: Record<string, StockWarningItem[]>;
   isLoading?: boolean;
   skeletonRows?: number;
   /** ticker → 표시명 fallback(추가 시점 store name → 시드 name). 디그레이드 행 식별용. */
@@ -43,6 +46,7 @@ export interface WatchlistTableProps {
 export function WatchlistTable({
   tickers,
   quotes,
+  warningsByTicker,
   isLoading = false,
   skeletonRows = 3,
   getName,
@@ -95,6 +99,7 @@ export function WatchlistTable({
               ticker={ticker}
               quote={quoteByTicker.get(ticker)}
               fallbackName={getName?.(ticker) ?? null}
+              warnings={warningsByTicker?.[ticker]}
               onRemove={onRemove}
             />
           ))
