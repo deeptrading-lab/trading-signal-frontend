@@ -17,6 +17,7 @@ colors:
   warn-soft: "#fff3df"
   info: "#1c4fd1"
   info-soft: "#e7efff"
+  link: "#1c4fd1"
   critical: "#8e1717"
   critical-soft: "#fde1e1"
   signal-up: "#c81e1e"
@@ -68,6 +69,7 @@ colors-dark:
   warn-soft: "#3a2a14"
   info: "#6ea8ff"
   info-soft: "#15263f"
+  link: "#6ea8ff"
   critical: "#f08585"
   critical-soft: "#3a1d1f"
   signal-up: "#f47171"
@@ -104,6 +106,22 @@ colors-dark:
   fng-extreme-greed: "#e8697f"
   fng-extreme-greed-soft: "#3a1f28"
   fng-track: "#2a333e"
+shadows:
+  card: "0 1px 2px rgba(15, 23, 42, 0.05)"
+  elevated: "0 10px 28px rgba(23, 32, 42, 0.08)"
+  overlay: "0 16px 48px rgba(23, 32, 42, 0.16)"
+  tooltip: "0 4px 12px rgba(23, 32, 42, 0.10)"
+shadows-dark:
+  card: "0 1px 2px rgba(0, 0, 0, 0.40)"
+  elevated: "0 10px 28px rgba(0, 0, 0, 0.50)"
+  overlay: "0 16px 48px rgba(0, 0, 0, 0.60)"
+  tooltip: "0 4px 12px rgba(0, 0, 0, 0.45)"
+motion:
+  duration-fast: "120ms"
+  duration-base: "200ms"
+  duration-slow: "320ms"
+  ease-standard: "cubic-bezier(0.2, 0, 0, 1)"
+  ease-emphasized: "cubic-bezier(0.25, 0.1, 0.25, 1)"
 typography:
   display:
     fontFamily: Pretendard, -apple-system, BlinkMacSystemFont, Arial

@@ -15,7 +15,7 @@
     "backfill:decision-names": "node --env-file=.env.local --import tsx scripts/backfillDecisionNames.ts",
     "toss:smoke": "node --env-file=.env.local scripts/tossSmokeTest.mjs",
     "all": "concurrently -n dev,worker -c blue,green \"npm run dev\" \"npm run analyze:worker\"",
-    "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs"
+    "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs && node scripts/inject-shadows.mjs && node scripts/inject-motion.mjs"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",

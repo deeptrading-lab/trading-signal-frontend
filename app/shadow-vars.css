@@ -1,0 +1,15 @@
+/* 생성 파일 — design:sync(inject-shadows) 산출물. 직접 편집 금지. 그림자는 docs/design/finsight-redesign.md(shadows/shadows-dark)에서 고친다. */
+
+:root {
+  --fs-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --fs-shadow-elevated: 0 10px 28px rgba(23, 32, 42, 0.08);
+  --fs-shadow-overlay: 0 16px 48px rgba(23, 32, 42, 0.16);
+  --fs-shadow-tooltip: 0 4px 12px rgba(23, 32, 42, 0.10);
+}
+
+html.dark {
+  --fs-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --fs-shadow-elevated: 0 10px 28px rgba(0, 0, 0, 0.50);
+  --fs-shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.60);
+  --fs-shadow-tooltip: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
