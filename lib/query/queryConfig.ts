@@ -40,6 +40,14 @@ export const queryConfig = {
       staleTime: 45 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * 매수 유의사항(시장경보·VI) — 지정 계열은 일배치라 길어도 되지만 VI(실시간 계열)
+     * 신선도 기준 60s(서버 로더 캐시와 동일). 장중 자동 갱신은 훅 refetchInterval 담당.
+     */
+    warnings: {
+      staleTime: 1 * MINUTE,
+      gcTime: 10 * MINUTE,
+    },
     /** 종목 검색 — 키워드 변동 적음. */
     search: {
       staleTime: 5 * MINUTE,
