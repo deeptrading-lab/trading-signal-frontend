@@ -5623,3 +5623,39 @@
   - ④ 시그널 룰 엔진 게이트(정리매매·투자위험 하드 제외), ⑦ 스코어카드 지정 이벤트 스탬프, ③ 밸류트랩 스냅샷, ⑤ 관심종목 행 배지.
   - (미발현) 배치 fn 소문자 티커 키 정규화 — 미국 소문자 티커 지면 재사용 시.
   - prod 활성화는 Vercel TOSS 키 등록만으로(시세 소스 전환과 독립). 단타 루프는 로컬 CLI 전용이라 prod 서버리스에선 no-op.
+
+### 2026-07-03 — feat(intraday): 멈춘 세션 종목 워치에서 제거 가능 (#206)
+
+- **slug**: `intraday-paused-remove` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/206
+- **요약**: feat(intraday): 멈춘 세션 종목 워치에서 제거 가능
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 일시정지(멈춘) 상태의 모의 단타 세션 종목을 워치 표에서 ✕ 로 제거할 수 있게 한다. 기존에는 활성(running·paused) 세션 종목이 전부 자동 상주라 제거 버튼이 아예 없었고, 지워도 다시 나타났다.
+  > 
+  > ## 변경
+  > 
+  > - `hooks/intraday/useIntradayPaperWatch.ts` — 표 자동 상주(`activeStocks`)를 **running 세션만**으로 좁힘. 일시정지·완료 세션은 상주 대상에서 제외.
+  > - `components/intraday/IntradayWatchTable.tsx` — ✕ 버튼 노출 조건을 `세션 없음 || status !== "running"`으로 확장 → 일시정지·완료·실패 행에서 제거 가능. 진행중 행은 기존대로 일시정지/재개로만 관리.
+  > 
+  > ## 동작
+  > 
+  > - 일시정지 행: [내역] [재개] 버튼과 함께 ✕ 노출. ✕ 는 **로컬 워치 목록에서만 제거** — 세션 데이터는 지우지 않는다.
+  > - 같은 종목을 검색으로 다시 추가하면 보존된 세션이 재연결돼 재개 버튼으로 이어진다.
+  > - 트레이드오프: 일시정지 세션은 이제 로컬 워치(localStorage)에만 얹혀 보이므로, 다른 브라우저/localStorage 초기화 상태에서는 표에 안 뜰 수 있다. 세션 자체는 /dashboard/paper-trading 목록과 재추가로 언제든 접근 가능.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` / eslint 클린, vitest 734 passed.
+  > 
+  > ## 다음 작업
+  > 
+  > - 호가 피처(토스 getOrderBook — 체결강도·잔량 불균형) 틱 컨텍스트 주입
+  > - 누적 성적 대시보드(Supabase 원장 기반 모델 A/B 판단 품질 비교)
+  > - 레거시 /dashboard/paper-trading 목록·마이페이지 메뉴 정리 여부 결정
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 호가 피처(토스 getOrderBook — 체결강도·잔량 불균형) 틱 컨텍스트 주입
+  - 누적 성적 대시보드(Supabase 원장 기반 모델 A/B 판단 품질 비교)
+  - 레거시 /dashboard/paper-trading 목록·마이페이지 메뉴 정리 여부 결정
