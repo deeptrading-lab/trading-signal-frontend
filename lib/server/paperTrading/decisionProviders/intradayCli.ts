@@ -193,7 +193,7 @@ export function evaluatePreGate(ctx: IntradayContext, dailyLossKill: boolean): P
 
   // 무포지션 + 분봉 HOLD + 직전도 HOLD → 변화 없음, LLM 호출 생략(비용 절감).
   if (flat && ctx.signal.action === "HOLD" && (ctx.previousDecision?.action ?? "HOLD") === "HOLD") {
-    return { callLlm: false, noNewEntry, reason: "변화 없음(무포지션·HOLD 지속)" };
+    return { callLlm: false, noNewEntry, reason: "상황 변화 없음 — AI 호출 생략(포지션·신호 그대로)" };
   }
   return { callLlm: true, noNewEntry };
 }
@@ -264,8 +264,8 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
       stopPrice: lv.slPrice,
       invalidationPrice: lv.slPrice,
       expectedHoldingMinutes: 60,
-      rationale: "결정론 폴백 — 분봉 BUY 시그널 + 구조 TP/SL(RRR 충족) 기준 진입.",
-      riskNotes: ["에이전트 미응답으로 결정론 신호 사용."],
+      rationale: "지표가 매수 신호 — 구조상 목표·손절 구간이 손익비 기준을 충족해 규칙대로 진입.",
+      riskNotes: ["AI 응답이 없어 지표 계산만으로 결정했어요."],
     };
   }
 
@@ -281,8 +281,8 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
       stopPrice: null,
       invalidationPrice: null,
       expectedHoldingMinutes: 0,
-      rationale: "결정론 폴백 — 분봉 SELL 시그널로 보유분 정리.",
-      riskNotes: [],
+      rationale: "지표가 매도 신호로 돌아서 보유분을 정리.",
+      riskNotes: ["AI 응답이 없어 지표 계산만으로 결정했어요."],
     };
   }
 
@@ -296,7 +296,7 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
     stopPrice: ctx.previousDecision?.stopPrice ?? null,
     invalidationPrice: ctx.previousDecision?.invalidationPrice ?? null,
     expectedHoldingMinutes: null,
-    rationale: "결정론 폴백 — 명확한 셋업 없음, 관망.",
+    rationale: "지표에 뚜렷한 매수·매도 신호가 없어 관망.",
     riskNotes: [],
   };
 }
@@ -466,7 +466,7 @@ export async function decideIntradayWithCli(
   const pre = evaluatePreGate(ctx, input.dailyLossKill);
   if (!pre.callLlm && !input.forceAgents) {
     return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", undefined, [
-      pre.reason ?? "사전 게이트 스킵",
+      pre.reason ?? "규칙 사전 점검으로 AI 호출 생략",
     ]);
   }
 
@@ -544,7 +544,7 @@ export async function decideIntradayWithCli(
   if (!llm) {
     return withModels(
       finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
-        "판단가 응답 실패 — 결정론 폴백",
+        "AI 판단 응답 실패 — 지표 계산으로 대신 결정",
       ]),
       { analyst: analystNote !== "", judge: false },
     );

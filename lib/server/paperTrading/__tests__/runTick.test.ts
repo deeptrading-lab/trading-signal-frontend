@@ -136,7 +136,7 @@ describe("cli-agent 세션 생성 (intraday-paper-watch)", () => {
     expect(detail.latestDecision?.source).toBe("cli-agent");
     // 테스트 환경 = KIS 미설정 → 분봉 없음 → 사전 게이트가 LLM 을 스킵하고 결정론 폴백(HOLD).
     expect(detail.latestDecision?.action).toBe("HOLD");
-    expect(detail.ticks[0]?.rationale).toContain("결정론 폴백");
+    expect(detail.ticks[0]?.rationale).toContain("신호가 없어 관망");
   });
 
   it("같은 종목 running 단타 세션이 있으면 새로 만들지 않고 그 세션을 반환한다(타임아웃 재클릭 멱등)", async () => {
