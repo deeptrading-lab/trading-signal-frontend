@@ -23,7 +23,8 @@
  * 매수 유의 경고칩(`watchlist-warning-badge`): 종목명 옆 `StockWarningBadges`(토스 warnings 공유,
  *   fail-soft). 정상·디그레이드 행 모두 적용(경보는 시세와 무관). 키 없음·무경보·실패면 미표시.
  *
- * 상세 선반입: hover/focus/click 시 `usePrefetchStockDetail`(peek 는 후속 — prefetch intent·경로만 부착).
+ * 상세 선반입 + 차트 Peek: hover/focus·롱프레스 시 `useStockPeek`(선반입 + 미리보기 팝오버/시트).
+ *   시드(가격/등락/방향)를 넘겨 즉시 페인트. 디그레이드 행(시세 없음)은 Peek 미부착.
  */
 
 "use client";
@@ -31,7 +32,7 @@
 import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Star } from "lucide-react";
-import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
+import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -138,12 +139,23 @@ function WatchlistRowBase({
   onRemove,
 }: WatchlistRowProps) {
   const router = useRouter();
-  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
+  // ★ 훅은 조건 분기 전에 무조건 호출(rules-of-hooks). 시드는 정상 행에서만 존재.
+  const displayName = fallbackName ?? quote?.name ?? ticker;
+  const { peekProps, prefetch } = useStockPeek({
+    ticker,
+    name: displayName,
+    seed: quote
+      ? {
+          price: quote.price,
+          changePercent: quote.changePercent,
+          direction: quote.direction,
+        }
+      : undefined,
+  });
 
   if (!quote) {
-    // 디그레이드 행 — 담은 종목은 사라지지 않는다. 시세 미확정이라 클릭(상세 라우팅) 미부착.
+    // 디그레이드 행 — 담은 종목은 사라지지 않는다. 시세 미확정이라 클릭(상세 라우팅)·Peek 미부착.
     // 표시명: fallbackName(있으면) → 없으면 ticker 자체(코드 미표시 규칙상 별도 코드 줄 없음).
-    const displayName = fallbackName ?? ticker;
     return (
       <ListRow
         role="listitem"
@@ -161,8 +173,7 @@ function WatchlistRowBase({
     );
   }
 
-  // 표시명 — store name(추가 시점) → 시드 name 우선, 없으면 BFF 폴백 quote.name(§3.3).
-  const displayName = fallbackName ?? quote.name;
+  // 표시명 — store name(추가 시점) → 시드 name 우선, 없으면 BFF 폴백 quote.name(§3.3). 상단 계산 재사용.
   const go = () => {
     prefetch(quote.ticker);
     router.push(stockDetailPath(quote.ticker, displayName));
@@ -184,10 +195,7 @@ function WatchlistRowBase({
           go();
         }
       }}
-      onMouseEnter={() => onIntent(quote.ticker)}
-      onMouseLeave={cancelIntent}
-      onFocus={() => onIntent(quote.ticker)}
-      onBlur={cancelIntent}
+      {...peekProps}
     >
       <RemoveStarButton
         label={`${displayName} ${WATCHLIST_REMOVE_LABEL}`}
