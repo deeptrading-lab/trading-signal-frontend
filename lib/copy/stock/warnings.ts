@@ -41,3 +41,36 @@ export function warningLabel(warningType: string): string {
 export function warningSeverity(warningType: string): StockWarningSeverity {
   return WARNING_SEVERITIES[warningType] ?? "info";
 }
+
+const SEVERITY_ORDER: Record<StockWarningSeverity, number> = {
+  critical: 0,
+  warn: 1,
+  info: 2,
+};
+
+export type StockWarningChip = {
+  label: string;
+  severity: StockWarningSeverity;
+};
+
+/**
+ * 경보 → 칩 뷰모델 — 라벨 기준 중복 제거(VI 3종이 같은 "VI 발동" 라벨) 후 심각도 순 정렬.
+ * 같은 라벨이 서로 다른 심각도로 오는 방어 케이스는 더 높은 심각도를 유지.
+ * 종목 헤더 칩이 사용하고, 후속 지면(관심종목 행·단타 후보표)도 재사용한다.
+ */
+export function toWarningChips(
+  items: readonly { warningType: string }[],
+): StockWarningChip[] {
+  const byLabel = new Map<string, StockWarningSeverity>();
+  for (const item of items) {
+    const label = warningLabel(item.warningType);
+    const severity = warningSeverity(item.warningType);
+    const existing = byLabel.get(label);
+    if (existing == null || SEVERITY_ORDER[severity] < SEVERITY_ORDER[existing]) {
+      byLabel.set(label, severity);
+    }
+  }
+  return [...byLabel.entries()]
+    .map(([label, severity]) => ({ label, severity }))
+    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+}
