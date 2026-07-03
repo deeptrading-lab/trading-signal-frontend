@@ -25,8 +25,21 @@ import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 const SUCCESS_TTL_MS = 60_000;
 const FAILURE_TTL_MS = 60_000;
-/** 스펙 Symbol 패턴 — 국내 6자리 숫자 + 미국 영문 티커('.'·'-' 허용). */
-const SYMBOL_RE = /^[A-Za-z0-9.\-]+$/;
+/**
+ * 스펙 Symbol 패턴(국내 6자리 + 미국 티커, '.'·'-' 허용)에 두 가지 강화 — 리뷰 F-1:
+ * 길이 캡(20)과 영문숫자 1자 이상. `encodeURIComponent` 는 `.` 을 인코딩하지 않아
+ * "." / ".." 만으로 된 입력이 URL 정규화 시 경로 세그먼트를 이탈할 수 있다.
+ */
+const SYMBOL_RE = /^[A-Za-z0-9.\-]{1,20}$/;
+const HAS_ALNUM_RE = /[A-Za-z0-9]/;
+
+/** BFF route 의 400 판정과 로더 게이트가 같은 규칙을 쓰도록 단일 위치. */
+export function isValidWarningsSymbol(symbol: string): boolean {
+  return SYMBOL_RE.test(symbol) && HAS_ALNUM_RE.test(symbol);
+}
+
+/** 캐시 상한 — 유니크 심볼 난사로 Map 이 무한 성장하지 않게 오래된 키부터 축출(리뷰 F-2). */
+const MAX_CACHE_ENTRIES = 512;
 
 type CacheEntry = {
   /** null = 직전 조회 실패(실패 캐시). */
@@ -52,17 +65,26 @@ function normalizeWarnings(rows: TossStockWarning[]): StockWarningItem[] {
     }));
 }
 
+/** 상한 초과 시 삽입 순서상 가장 오래된 키 축출 후 적재. */
+function setCache(symbol: string, value: StockWarningItem[] | null): void {
+  if (!cache.has(symbol) && cache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest != null) cache.delete(oldest);
+  }
+  cache.set(symbol, { value, cachedAt: Date.now() });
+}
+
 async function load(symbol: string): Promise<StockWarningItem[]> {
   try {
     const rows = await tossGet<TossStockWarning[]>(
       `/api/v1/stocks/${encodeURIComponent(symbol)}/warnings`,
     );
     const items = normalizeWarnings(Array.isArray(rows) ? rows : []);
-    cache.set(symbol, { value: items, cachedAt: Date.now() });
+    setCache(symbol, items);
     return items;
   } catch {
     // 404(종목 없음)·5xx·네트워크 전부 빈 배열 수렴 + 실패 캐시로 재시도 억제.
-    cache.set(symbol, { value: null, cachedAt: Date.now() });
+    setCache(symbol, null);
     return [];
   } finally {
     inflight.delete(symbol);
@@ -78,7 +100,7 @@ export async function fetchActiveWarnings(
 ): Promise<StockWarningItem[]> {
   const normalized = symbol.trim().toUpperCase();
   if (!isTossConfigured()) return [];
-  if (!normalized || !SYMBOL_RE.test(normalized)) return [];
+  if (!isValidWarningsSymbol(normalized)) return [];
 
   const hit = cache.get(normalized);
   if (hit) {

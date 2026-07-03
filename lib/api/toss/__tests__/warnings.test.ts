@@ -113,6 +113,29 @@ describe("fetchActiveWarnings", () => {
     expect(mockTossGet).not.toHaveBeenCalled();
   });
 
+  it("점/하이픈만으로 된 심볼·과길이 심볼은 거부한다 (리뷰 F-1 — URL 경로 이탈 차단)", async () => {
+    await expect(fetchActiveWarnings("..")).resolves.toEqual([]);
+    await expect(fetchActiveWarnings(".")).resolves.toEqual([]);
+    await expect(fetchActiveWarnings("-.-")).resolves.toEqual([]);
+    await expect(fetchActiveWarnings("A".repeat(21))).resolves.toEqual([]);
+    expect(mockTossGet).not.toHaveBeenCalled();
+  });
+
+  it("캐시가 상한(512)에서 가장 오래된 키를 축출한다 (리뷰 F-2 — 무한 성장 차단)", async () => {
+    mockTossGet.mockResolvedValue([]);
+
+    for (let i = 0; i < 513; i += 1) {
+      await fetchActiveWarnings(`T${String(i).padStart(5, "0")}`);
+    }
+    expect(mockTossGet).toHaveBeenCalledTimes(513);
+
+    // 최초 키(T00000)는 축출됐으므로 재조회가 발생, 최신 키(T00512)는 캐시 히트.
+    await fetchActiveWarnings("T00000");
+    expect(mockTossGet).toHaveBeenCalledTimes(514);
+    await fetchActiveWarnings("T00512");
+    expect(mockTossGet).toHaveBeenCalledTimes(514);
+  });
+
   it("소문자 미국 티커는 대문자로 정규화해 조회·캐시한다", async () => {
     mockTossGet.mockResolvedValue([]);
 

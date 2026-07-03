@@ -9,7 +9,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
+import {
+  fetchActiveWarnings,
+  isValidWarningsSymbol,
+} from "@/lib/api/toss/warnings";
 import { isTossConfigured } from "@/lib/api/toss/client";
 import type { StockWarningsResponse } from "@/lib/types/stock/warnings";
 import {
@@ -17,14 +20,12 @@ import {
   jsonWithDataSource,
 } from "@/lib/server/bffUtils";
 
-/** 스펙 Symbol 패턴 — 국내 6자리 + 미국 티커. */
-const SYMBOL_RE = /^[A-Za-z0-9.\-]+$/;
 /** route 자체 타임아웃 가드 — 초과 시 빈 배열 디그레이드(에러 아님). */
 const BFF_TIMEOUT_MS = 5_000;
 
 export async function GET(request: NextRequest) {
   const ticker = (request.nextUrl.searchParams.get("ticker") ?? "").trim();
-  if (!ticker || !SYMBOL_RE.test(ticker)) {
+  if (!isValidWarningsSymbol(ticker)) {
     return NextResponse.json(
       { error: "ticker query parameter 가 필요합니다." },
       { status: 400 },
