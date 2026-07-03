@@ -1,14 +1,16 @@
 /**
- * InflightCard — 완료 결과가 아직 없는 진행중 종목(첫 분석) 플레이스홀더 카드. (unified-analysis-jobs)
+ * InflightCard — 완료 결과가 아직 없는 진행중 종목(첫 분석) 플레이스홀더 행. (unified-analysis-jobs)
  *
- * AIDecisionCard(완료 결과)와 분리 — verdict 가 없으므로 클릭·상세 없이 "분석 중/대기 중"만 알린다.
- * 결과가 저장되면 다음 폴링에서 이 자리가 결과 카드로 바뀐다. 색·아이콘은 기존 토큰·합성 클래스 재사용.
+ * analyze-reskin — AIDecisionCard 와 동일하게 카드 → 플랫 목록 행(`ListRow`)으로 낮춘다.
+ *   verdict 가 없으므로 클릭·상세 없이 "분석 중/대기 중"만 알린다(role=status, 비클릭). 결과가 저장되면
+ *   다음 폴링에서 이 자리가 결과 행으로 바뀐다. 색은 상태 토큰(처리=accent / 대기=warn) — 다크 자동 대응.
  */
 
 "use client";
 
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { ListRow } from "@/components/ui/ListRow";
 import { InflightBadge } from "./InflightBadge";
 import {
   INFLIGHT_PLACEHOLDER_HINT,
@@ -25,30 +27,30 @@ interface InflightCardProps {
 export function InflightCard({ item, name }: InflightCardProps) {
   const processing = item.status === "processing";
   return (
-    <div
-      className="card relative overflow-hidden flex flex-col gap-md"
-      role="status"
+    <ListRow
+      role="listitem"
       aria-busy={processing}
+      className="grid grid-cols-[auto_1fr] items-center gap-md"
     >
       <span
+        className={cn(
+          "inline-grid h-8 w-8 shrink-0 place-items-center rounded-full",
+          processing ? "bg-accent-vivid-soft text-primary" : "bg-warn-soft text-warn",
+        )}
         aria-hidden="true"
-        className="absolute left-0 top-0 bottom-0 w-1 bg-accent-vivid-soft"
-      />
-      <div className="flex items-center gap-md">
-        <span className="flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full bg-accent-vivid-soft text-primary">
-          <Loader2 className={cn("w-5 h-5", processing && "animate-spin")} aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-body-strong text-text-strong truncate">{name}</div>
-          <div className="mt-[2px] flex items-center gap-xs">
-            <InflightBadge status={item.status} />
-            {item.source === "bot" && (
-              <span className="text-caption text-text-muted">{INFLIGHT_SOURCE_BOT}</span>
-            )}
-          </div>
+      >
+        <Loader2 className={cn("h-4 w-4", processing && "animate-spin")} aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex items-center gap-sm">
+          <span className="truncate text-body-sm-strong text-text-strong">{name}</span>
+          <InflightBadge status={item.status} />
+          {item.source === "bot" && (
+            <span className="shrink-0 text-caption text-text-muted">{INFLIGHT_SOURCE_BOT}</span>
+          )}
         </div>
+        <p className="mt-xs text-caption text-text-muted">{INFLIGHT_PLACEHOLDER_HINT}</p>
       </div>
-      <p className="text-caption text-text-muted">{INFLIGHT_PLACEHOLDER_HINT}</p>
-    </div>
+    </ListRow>
   );
 }

@@ -8,6 +8,7 @@
 
 import type { AgentUsageRow } from "@/lib/types/stock/agentUsage";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { Section } from "@/components/ui/Section";
 import { agentLabel, fmtCostRounded, fmtRate, fmtTokens } from "./format";
 import { groupByModel } from "./modelBreakdown";
 import {
@@ -26,11 +27,15 @@ export function ModelCostBreakdown({ rows }: { rows: AgentUsageRow[] }) {
   if (groups.length === 0) return null;
 
   return (
-    <section className="card" aria-label={MODEL_COST_TITLE}>
-      <h2 className="mb-lg flex items-center gap-xs text-h3 text-text-strong">
-        {MODEL_COST_TITLE}
-        <InfoTooltip label={MODEL_COST_HINT} />
-      </h2>
+    <Section
+      aria-label={MODEL_COST_TITLE}
+      title={
+        <span className="inline-flex items-center gap-xs">
+          {MODEL_COST_TITLE}
+          <InfoTooltip label={MODEL_COST_HINT} />
+        </span>
+      }
+    >
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
@@ -52,12 +57,12 @@ export function ModelCostBreakdown({ rows }: { rows: AgentUsageRow[] }) {
           </thead>
           <tbody>
             {groups.map((g) => (
-              <tr key={g.family} className="border-b border-border-line hover:bg-surface-hover">
+              <tr key={g.family} className="border-b border-border-line hover:bg-surface-muted">
                 <td className="py-md pr-md text-body-sm-strong text-text-strong whitespace-nowrap tabular-nums">
                   {g.family}
                 </td>
                 <td
-                  className="py-md pl-md text-right text-body-sm text-text-default tabular-nums"
+                  className="py-md pl-md text-right text-body-sm text-text-strong tabular-nums"
                   title={g.agentKeys.map(agentLabel).join(", ")}
                 >
                   {g.agentCount}
@@ -73,7 +78,7 @@ export function ModelCostBreakdown({ rows }: { rows: AgentUsageRow[] }) {
           </tbody>
         </table>
       </div>
-    </section>
+    </Section>
   );
 }
 
@@ -88,7 +93,7 @@ function ShareBar({ share }: { share: number | null }) {
       <div className="h-[6px] flex-1 overflow-hidden rounded-pill bg-accent-vivid-soft">
         <div className="h-full rounded-pill bg-accent-vivid" style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-12 shrink-0 text-right text-body-sm text-text-default tabular-nums">
+      <span className="w-12 shrink-0 text-right text-body-sm text-text-strong tabular-nums">
         {fmtRate(share)}
       </span>
     </div>
@@ -109,7 +114,7 @@ function Num({ value, strong }: { value: string; strong?: boolean }) {
       className={
         strong
           ? "py-md pl-md text-right text-body-sm-strong text-text-strong tabular-nums whitespace-nowrap"
-          : "py-md pl-md text-right text-body-sm text-text-default tabular-nums whitespace-nowrap"
+          : "py-md pl-md text-right text-body-sm text-text-strong tabular-nums whitespace-nowrap"
       }
     >
       {value}

@@ -38,10 +38,10 @@ export function StageInputTrendChart({ rows }: { rows: AgentUsageRow[] }) {
   }));
 
   return (
-    <section className="card">
-      <header className="mb-md">
-        <h2 className="text-h3 text-text-strong">{CHART_TREND_TITLE}</h2>
-        <p className="text-caption text-text-muted mt-xs">{CHART_TREND_HINT}</p>
+    <section className="flex flex-col gap-md">
+      <header className="flex flex-col gap-xs">
+        <h2 className="text-h2 text-text-strong">{CHART_TREND_TITLE}</h2>
+        <p className="text-caption text-text-muted">{CHART_TREND_HINT}</p>
       </header>
       <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height={300}>

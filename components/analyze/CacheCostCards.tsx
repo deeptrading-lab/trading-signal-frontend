@@ -23,7 +23,7 @@ function sum(xs: (number | null)[]): number {
   return xs.reduce<number>((a, b) => a + (b ?? 0), 0);
 }
 
-function MetricCard({
+function MetricCell({
   label,
   value,
   hint,
@@ -33,7 +33,7 @@ function MetricCard({
   hint?: string;
 }) {
   return (
-    <div className="card flex flex-col gap-xs">
+    <div className="flex flex-col gap-xs">
       <span className="flex items-center gap-xs text-caption text-text-muted">
         {label}
         {hint ? <InfoTooltip label={hint} /> : null}
@@ -58,16 +58,17 @@ export function CacheCostCards({
   const cacheHit = denom > 0 ? totalCacheRead / denom : null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-md">
-      <MetricCard label={CARD_AVG_COST} value={fmtCostRounded(totalCost > 0 ? totalCost : null)} />
-      <MetricCard
+    // 5개 박스 카드 → 하나의 subtle 요약 밴드(surface-muted) 안의 플랫 스탯 셀. 카드 벽 제거.
+    <div className="grid grid-cols-2 gap-lg rounded-lg bg-surface-muted p-md md:grid-cols-3 md:p-lg lg:grid-cols-5">
+      <MetricCell label={CARD_AVG_COST} value={fmtCostRounded(totalCost > 0 ? totalCost : null)} />
+      <MetricCell
         label={CARD_WALL_CLOCK}
         value={fmtDuration(wallClockMs)}
         hint={CARD_WALL_CLOCK_HINT}
       />
-      <MetricCard label={CARD_TOTAL_AVG_INPUT} value={fmtTokens(totalInput > 0 ? totalInput : null)} />
-      <MetricCard label={CARD_TOTAL_AVG_OUTPUT} value={fmtTokens(totalOutput > 0 ? totalOutput : null)} />
-      <MetricCard label={CARD_CACHE_HIT} value={fmtRate(cacheHit)} hint={CARD_CACHE_HINT} />
+      <MetricCell label={CARD_TOTAL_AVG_INPUT} value={fmtTokens(totalInput > 0 ? totalInput : null)} />
+      <MetricCell label={CARD_TOTAL_AVG_OUTPUT} value={fmtTokens(totalOutput > 0 ? totalOutput : null)} />
+      <MetricCell label={CARD_CACHE_HIT} value={fmtRate(cacheHit)} hint={CARD_CACHE_HINT} />
     </div>
   );
 }

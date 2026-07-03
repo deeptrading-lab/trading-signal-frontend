@@ -15,6 +15,7 @@ import { RefreshCw } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils/cn";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useQueryAIDecisions } from "@/hooks/stock/useQueryAIDecisions";
 import { useQueryStockNames } from "@/hooks/stock/useQueryStockNames";
 import { AIDecisionCard } from "./AIDecisionCard";
@@ -94,20 +95,14 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
   }, [inflight, names, dbNames, query]);
 
   if (isLoading) {
-    return (
-      <div className="card skeleton min-h-[160px]" aria-busy="true">
-        <span className="sr-only">{RESULTS_LOADING}</span>
-        <div className="skeleton-line skeleton-line-medium" />
-        <div className="skeleton-line skeleton-line-narrow" />
-        <div className="skeleton-line skeleton-line-medium" />
-      </div>
-    );
+    return <ResultsSkeleton />;
   }
 
   if (isError || !data) {
+    // 카드리스 플랫 알림(홈 랭킹·관심종목 에러 정합) — 박스 없이 헤어라인/여백만.
     return (
-      <div className="card-critical" role="alert">
-        <p className="text-body-strong mb-md">{RESULTS_ERROR}</p>
+      <div className="flex flex-col items-start gap-md py-md" role="alert">
+        <p className="text-body-sm text-text-muted">{RESULTS_ERROR}</p>
         <button type="button" className="button-secondary" onClick={() => refetch()}>
           {USAGE_RETRY}
         </button>
@@ -117,20 +112,12 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
 
   if (!data.configured) {
     return (
-      <div className="card" role="status">
-        <h2 className="text-h3 text-text-strong mb-sm">{RESULTS_NOT_CONFIGURED_TITLE}</h2>
-        <p className="text-body-sm text-text-muted">{RESULTS_NOT_CONFIGURED_BODY}</p>
-      </div>
+      <StatusBlock title={RESULTS_NOT_CONFIGURED_TITLE} body={RESULTS_NOT_CONFIGURED_BODY} />
     );
   }
 
   if (items.length === 0 && inflight.length === 0) {
-    return (
-      <div className="card" role="status">
-        <h2 className="text-h3 text-text-strong mb-sm">{RESULTS_EMPTY_TITLE}</h2>
-        <p className="text-body-sm text-text-muted">{RESULTS_EMPTY_BODY}</p>
-      </div>
-    );
+    return <StatusBlock title={RESULTS_EMPTY_TITLE} body={RESULTS_EMPTY_BODY} />;
   }
 
   return (
@@ -164,13 +151,10 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
       />
 
       {filtered.length === 0 && filteredInflight.length === 0 ? (
-        <div className="card" role="status">
-          <h2 className="text-h3 text-text-strong mb-sm">{RESULTS_SEARCH_EMPTY_TITLE}</h2>
-          <p className="text-body-sm text-text-muted">{RESULTS_SEARCH_EMPTY_BODY}</p>
-        </div>
+        <StatusBlock title={RESULTS_SEARCH_EMPTY_TITLE} body={RESULTS_SEARCH_EMPTY_BODY} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
-          {/* 진행중(첫 분석) 플레이스홀더 — 최신순, 결과 카드 위에. 완료되면 다음 폴링에 결과 카드로 대체. */}
+        // 카드 그리드 → 카드리스 플랫 목록(헤어라인 행). 진행중 행이 위, 완료 결과가 아래(최신순).
+        <div role="list">
           {filteredInflight.map((item) => (
             <InflightCard
               key={`inflight-${item.ticker}`}
@@ -198,6 +182,38 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** 미설정·빈·검색없음 — 카드 박스 없이 흰 바탕 + 여백만(관심종목 빈 상태 정합). */
+function StatusBlock({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center gap-xs py-2xl text-center" role="status">
+      <p className="text-body-strong text-text-strong">{title}</p>
+      <p className="text-body-sm text-text-muted">{body}</p>
+    </div>
+  );
+}
+
+/** 로딩 — 플랫 스켈레톤 행(홈 RankSkeleton 정합: 박스 없이 헤어라인 + Skeleton 원자). */
+function ResultsSkeleton() {
+  return (
+    <div aria-busy="true" aria-label={RESULTS_LOADING}>
+      <span className="sr-only">{RESULTS_LOADING}</span>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-md border-b border-border-line py-md last:border-b-0"
+          aria-hidden="true"
+        >
+          <Skeleton variant="line" className="mb-0 h-8 w-8 rounded-full" />
+          <div className="flex flex-1 flex-col gap-xs">
+            <Skeleton variant="line" className="mb-0 h-4 w-1/3" />
+            <Skeleton variant="line" className="mb-0 h-3 w-1/2" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
