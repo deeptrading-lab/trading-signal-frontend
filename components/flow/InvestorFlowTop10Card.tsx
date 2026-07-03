@@ -12,12 +12,16 @@
  * 상태: loading(스켈레톤) / empty(장전·주말 안내) / error(재시도 안내).
  *
  * 색은 부호로 결정(DESIGN.md 절대 원칙): 순매수 양수=빨강(signal-up), 음수=파랑(signal-down).
+ *
+ * home-reskin — 카드 박스(`.card`) 제거 → 플랫 `Section`(흰 바탕 + 헤어라인). 외국인|기관 2열
+ *   사이 세로 헤어라인만 유지(노스스타 `#homeScreen .duo` 정합). 데이터·토글·행은 무변경.
  */
 
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Section } from "@/components/ui/Section";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
 import { cn } from "@/lib/utils/cn";
@@ -287,12 +291,10 @@ export function InvestorFlowTop10Card() {
   const headerMeta = buildHeaderMeta(mode, data?.asOf, data?.cumulativeDays);
 
   return (
-    <section className="card flex flex-col gap-md" aria-label={FLOW_TOP10_TITLE}>
-      <header className="flex items-center justify-between gap-sm">
-        <h2 className="text-h2 text-text-strong">{FLOW_TOP10_TITLE}</h2>
-        <ModeToggle mode={mode} onChange={setMode} />
-      </header>
-
+    <Section
+      title={FLOW_TOP10_TITLE}
+      action={<ModeToggle mode={mode} onChange={setMode} />}
+    >
       {isLoading ? (
         <>
           <p className="sr-only" aria-busy="true">
@@ -335,6 +337,6 @@ export function InvestorFlowTop10Card() {
           />
         </div>
       )}
-    </section>
+    </Section>
   );
 }
