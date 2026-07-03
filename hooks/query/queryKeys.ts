@@ -33,6 +33,8 @@ export const queryKeys = {
     /** 당일 분봉(단타워치 차트 탭) — 타임프레임별. */
     minuteChart: (ticker: string, timeframe: number) =>
       ["stock", "minute-chart", ticker, timeframe] as const,
+    /** 매수 유의사항(거래소 시장경보·VI) — 종목 헤더 경고 칩. */
+    warnings: (ticker: string) => ["stock", "warnings", ticker] as const,
     search: (keyword: string) => ["stock", "search", keyword] as const,
     /** 종목별 개인/외국인/기관 최근 N일 순매수 추이(투자자 도메인 표면 B). */
     investors: (ticker: string) => ["stock", "investors", ticker] as const,

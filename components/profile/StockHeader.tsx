@@ -9,6 +9,9 @@
  *     + 대형 가격 + 등락률 / 등락 절대값.
  *   - 한국식 등락 컬러: red=상승 (`signal-up`), blue=하락 (`signal-down`).
  *   - 로딩 / 에러 / 빈 상태 카피 (§3.6).
+ *   - 매수 유의 경고 칩 (PRD `stock-warnings` §3-3) — 활성 시장경보(정리매매·투자위험 =
+ *     critical / 투자경고·단기과열 = warn / VI = info)를 종목명 옆에 표시. 토스 키 없음·
+ *     실패·빈 배열 = 미표시(레이아웃 무변화). 기간 필드는 실측상 null 이라 상태만 표시.
  *
  * AssetHeader (`components/home/AssetHeader.tsx`) 와 시각 톤 정합. 본 컴포넌트는 별도 — Profile 도메인
  * (실데이터) + Home 도메인 (mock 시안) 의 책임 분리.
@@ -27,6 +30,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
+import { useQueryStockWarnings } from "@/hooks/stock/useQueryStockWarnings";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { WatchlistStarButton } from "@/components/watchlist/WatchlistStarButton";
 import { readRecentSearches } from "@/lib/utils/recentSearch";
@@ -36,6 +40,10 @@ import {
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
+import {
+  toWarningChips,
+  type StockWarningSeverity,
+} from "@/lib/copy/stock/warnings";
 
 export interface StockHeaderProps {
   ticker: string;
@@ -45,6 +53,8 @@ export interface StockHeaderProps {
 
 export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const { data, isLoading, isError, error } = useQueryStockPrice(ticker);
+  // 매수 유의 경고 칩 — fail-soft(BFF 가 실패도 200 + 빈 배열)라 data 만 보고, 없으면 미표시.
+  const { data: warningsData } = useQueryStockWarnings(ticker);
   const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
   if (isLoading) {
@@ -86,6 +96,7 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const nameForAdd = displayName === ticker ? undefined : displayName;
   const toggleWatch = () =>
     added ? removeTicker(ticker) : addTicker(ticker, nameForAdd);
+  const warningChips = toWarningChips(warningsData?.warnings ?? []);
   const direction = data.direction;
   const isUp = direction === "up";
   const isFlat = direction === "flat";
@@ -109,6 +120,11 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
             {displayName}
           </h1>
           <WatchlistStarButton added={added} onToggle={toggleWatch} />
+          {warningChips.map((chip) => (
+            <span key={chip.label} className={BADGE_BY_SEVERITY[chip.severity]}>
+              {chip.label}
+            </span>
+          ))}
         </div>
         {onAIAnalysis && (
           <button
@@ -145,3 +161,10 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
     </div>
   );
 }
+
+/** 심각도 → 디자인 시스템 배지 클래스 (`app/components.css` @layer components). */
+const BADGE_BY_SEVERITY: Record<StockWarningSeverity, string> = {
+  critical: "badge-critical",
+  warn: "badge-warn",
+  info: "badge-info",
+};

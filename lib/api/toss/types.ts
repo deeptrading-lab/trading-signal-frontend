@@ -58,6 +58,20 @@ export type TossKoreanMarketDetail = {
   nxtTradingSuspended?: boolean;
 };
 
+/**
+ * `GET /api/v1/stocks/{symbol}/warnings` 항목 — 매수 유의사항(시장경보·VI).
+ * 활성(오늘 적용 중) 항목만 응답. warningType 은 enum + unknown 허용 의무(스펙 명시).
+ * ⚠️ 실측(2026-07-03): 지정 중인 종목도 exchange·startDate·endDate 가 null 로 옴 —
+ * warningType 존재만 신뢰하고 날짜 필드에 의존하지 않는다.
+ */
+export type TossStockWarning = {
+  warningType?: string;
+  exchange?: string | null;
+  /** YYYY-MM-DD (KST). */
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
 /** `GET /api/v1/stocks` 종목 마스터 1건. 국내·미국 공통 스키마(미국은 koreanMarketDetail=null). */
 export type TossStockRow = {
   symbol?: string;
