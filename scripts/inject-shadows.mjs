@@ -68,7 +68,15 @@ function renderVars(selector, map) {
 const md = readFileSync(DESIGN_PATH, "utf8");
 const light = parseBlock(md, "shadows");
 if (!light) throw new Error("shadows 블록을 찾지 못했어요.");
-const dark = parseBlock(md, "shadows-dark") ?? { ...light };
+let dark = parseBlock(md, "shadows-dark");
+if (!dark) {
+  // 색 토큰 스크립트(inject-color-themes)와 동일한 방어선 — dark 미정의 시 조용히 넘기지 않고 명시 경고.
+  // (그림자는 알파를 담아, 어두운 배경에서 light 값이 사실상 안 보일 수 있으므로 무경고 폴백 금지.)
+  console.warn(
+    "design:sync — shadows-dark 블록이 없어 dark = light 로 폴백했어요(어두운 배경에서 그림자 미시인 위험). docs/design/finsight-redesign.md 에 shadows-dark 를 추가하세요.",
+  );
+  dark = { ...light };
+}
 assertParity(light, dark);
 
 const theme = JSON.parse(readFileSync(THEME_PATH, "utf8"));
