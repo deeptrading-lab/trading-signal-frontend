@@ -240,7 +240,8 @@ spacing:
   xl: 18px
   2xl: 24px
   navbar-h: 60px
-  sidebar-w: 264px
+  sidebar-w: 208px
+  sidebar-collapsed-w: 76px
   drawer-w: 304px
   main-max-w: 1152px
   input-h: 36px
