@@ -12,11 +12,27 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { proxy, config } from "../proxy";
-import { signSession } from "@/lib/auth/session";
+import { signSession, signIdentitySession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 
 const ORIGINAL_PASSWORD = process.env.APP_PASSWORD;
 const ORIGINAL_SECRET = process.env.APP_AUTH_SECRET;
+const ORIGINAL_OAUTH = {
+  id: process.env.GOOGLE_OAUTH_CLIENT_ID,
+  secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+  redirect: process.env.GOOGLE_OAUTH_REDIRECT_URI,
+};
+
+function restoreOAuthEnv() {
+  for (const [key, value] of [
+    ["GOOGLE_OAUTH_CLIENT_ID", ORIGINAL_OAUTH.id],
+    ["GOOGLE_OAUTH_CLIENT_SECRET", ORIGINAL_OAUTH.secret],
+    ["GOOGLE_OAUTH_REDIRECT_URI", ORIGINAL_OAUTH.redirect],
+  ] as const) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
 
 function makeRequest(
   path: string,
@@ -139,5 +155,72 @@ describe("proxy (app password gate)", () => {
       );
       expect(res.status).toBe(307);
     });
+  });
+});
+
+/**
+ * user-login-auth §3.6 / AC-4·5·15 — 게이트 활성 조건이 OAuth 로 확장.
+ * 활성 = (OAuth 구성) 또는 (APP_PASSWORD). 판정은 여전히 verifySession(네트워크 I/O 0).
+ */
+describe("proxy — OAuth 게이트 활성 조건", () => {
+  beforeEach(() => {
+    // 비밀번호는 끄고 OAuth 만으로 게이트를 활성화.
+    delete process.env.APP_PASSWORD;
+    process.env.APP_AUTH_SECRET = "gate-secret-0123456789abcdef";
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "client-123";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret-xyz";
+    process.env.GOOGLE_OAUTH_REDIRECT_URI =
+      "http://localhost:3000/api/auth/google/callback";
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_PASSWORD === undefined) delete process.env.APP_PASSWORD;
+    else process.env.APP_PASSWORD = ORIGINAL_PASSWORD;
+    if (ORIGINAL_SECRET === undefined) delete process.env.APP_AUTH_SECRET;
+    else process.env.APP_AUTH_SECRET = ORIGINAL_SECRET;
+    restoreOAuthEnv();
+  });
+
+  it("[AC-1] OAuth 구성 + 비밀번호 없음 + 미인증 페이지 → /login 307", async () => {
+    const res = await proxy(makeRequest("/dashboard"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+  });
+
+  it("[AC-8] 신원(v=2) 세션 쿠키 → 통과", async () => {
+    const token = (await signIdentitySession({
+      sub: "s",
+      email: "u@example.com",
+      role: "user",
+    })) as string;
+    const res = await proxy(makeRequest("/dashboard", { cookie: token }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("[AC-5] v=1(비밀번호) 세션도 통과 — 폴백 공존(강제 로그아웃 0)", async () => {
+    const token = (await signSession()) as string;
+    const res = await proxy(makeRequest("/dashboard", { cookie: token }));
+    expect(res.status).toBe(200);
+  });
+
+  it("[AC-3] /pending 은 미인증에서도 통과(공개 경로)", async () => {
+    const res = await proxy(makeRequest("/pending"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("[AC-3] /api/auth/google/start 는 미인증에서도 통과", async () => {
+    const res = await proxy(makeRequest("/api/auth/google/start"));
+    expect(res.status).toBe(200);
+  });
+
+  it("[AC-4] OAuth·비밀번호 둘 다 없음 → 앱 공개(통과)", async () => {
+    delete process.env.GOOGLE_OAUTH_CLIENT_ID;
+    delete process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+    delete process.env.GOOGLE_OAUTH_REDIRECT_URI;
+    const res = await proxy(makeRequest("/dashboard"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
   });
 });
