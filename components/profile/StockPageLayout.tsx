@@ -56,7 +56,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   const [days, setDays] = useState<number>(DEFAULT_DAYS); // 일/주/월봉 보기 범위
   const [timeframe, setTimeframe] = useState<number>(DEFAULT_TIMEFRAME); // 분봉 간격(분)
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
-  // 오버레이 옵션(매물대·볼린저밴드) — 기본 off, 드롭다운 체크박스로 토글. localStorage 지속.
+  // 오버레이 옵션(이평선·매물대·볼린저·VWAP·거래량 이평) — 이평선만 기본 ON, 드롭다운 체크박스로 토글. localStorage 지속.
   const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
 
   function handleIntervalChange(next: MainInterval) {
@@ -70,14 +70,12 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     days,
     timeframe,
     chartType,
-    showVolumeProfile: chartOptions.volumeProfile,
-    showBollinger: chartOptions.bollinger,
+    overlays: chartOptions,
     onIntervalChange: handleIntervalChange,
     onDaysChange: setDays,
     onTimeframeChange: setTimeframe,
     onChartTypeChange: setChartType,
-    onToggleVolumeProfile: () => toggleChartOption("volumeProfile"),
-    onToggleBollinger: () => toggleChartOption("bollinger"),
+    onToggleOverlay: toggleChartOption,
   };
 
   return (

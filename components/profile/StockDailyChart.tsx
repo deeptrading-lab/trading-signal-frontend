@@ -6,8 +6,9 @@
  *   - 분봉(당일): `inquire-time-itemchartprice`(FHKST03010200) — 당일 한 세션 전체, x축 "HH:mm".
  *
  * 서브플롯 구성 (syncId="stock-chart" 로 호버 연동):
- *   1. 가격 (240px) — 캔들(기본) 또는 라인. 하단에 날짜축(일정 간격) 표시.
- *   2. 거래량 BarChart (70px) — `acml_vol` (추가 KIS 콜 0)
+ *   1. 가격 (240px) — 캔들(기본) 또는 라인 + 이동평균선(MA 5/20/60/120, 기본 ON)·VWAP·볼린저·매물대 오버레이(옵션).
+ *      MA 색 범례는 차트 상단 인라인 스트립 + 캔들 툴팁 MA 값으로 안내. 하단에 날짜축(일정 간격) 표시.
+ *   2. 거래량 ComposedChart (70px) — `acml_vol` 봉 + 거래량 이동평균(VMA 20, 옵션 라인)
  *   3. MACD ComposedChart (90px) — 히스토그램(Bar) + MACD·시그널 라인(Line)
  *   4. RSI LineChart (80px) — 14기간 RSI + 과매수(70)/과매도(30) 기준선
  *
@@ -25,7 +26,6 @@ import { useMemo } from "react";
 import {
   AreaChart,
   Area,
-  BarChart,
   Bar,
   Cell,
   ComposedChart,
@@ -39,6 +39,7 @@ import {
   ResponsiveContainer,
   DefaultZIndexes,
 } from "recharts";
+import { cn } from "@/lib/utils/cn";
 import { useChartData } from "@/hooks/stock/useChartData";
 import {
   fmtYAxis,
@@ -52,7 +53,15 @@ import {
   STOCK_DETAIL_LOADING,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
-import { PERIOD_UNIT, CHART_AXIS_WIDTH, type ChartType, type MainInterval } from "./stockChartConfig";
+import {
+  PERIOD_UNIT,
+  CHART_AXIS_WIDTH,
+  MA_PERIODS,
+  type ChartType,
+  type MainInterval,
+  type MaPeriod,
+} from "./stockChartConfig";
+import type { ChartOptions } from "@/lib/store/chart/chartOptions";
 import { useChartTheme, SYNC_ID } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
@@ -64,6 +73,28 @@ import { SubLabel } from "./chart/SubLabel";
 import { VolumeProfileLayer } from "./chart/VolumeProfileLayer";
 import { computeVolumeProfile } from "@/lib/utils/volumeProfile";
 
+/** 이평선 범례 점 색 — Tailwind chart-ma{p} 유틸(= var(--fs-*), 다크 자동 전환). 라인 색과 동일 토큰. */
+const MA_DOT_CLASS: Record<MaPeriod, string> = {
+  5: "bg-chart-ma5",
+  20: "bg-chart-ma20",
+  60: "bg-chart-ma60",
+  120: "bg-chart-ma120",
+};
+
+/** 이평선 범례 스트립 — 어느 색이 어느 기간인지 한눈에(토스톤 인라인 범례). showMA 일 때만 렌더. */
+function MALegend() {
+  return (
+    <div className="mb-xs flex flex-wrap items-center gap-x-md gap-y-xs px-xs">
+      {MA_PERIODS.map((p) => (
+        <span key={p} className="inline-flex items-center gap-xs text-caption text-text-muted">
+          <span className={cn("h-0.5 w-3 rounded-pill", MA_DOT_CLASS[p])} aria-hidden="true" />
+          MA{p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export interface StockDailyChartProps {
   ticker: string;
   expanded?: boolean;
@@ -74,14 +105,13 @@ export interface StockDailyChartProps {
   days: number;
   timeframe: number;
   chartType: ChartType;
-  showVolumeProfile: boolean;
-  showBollinger: boolean;
+  /** 오버레이 토글 묶음(이평선·매물대·볼린저·VWAP·거래량 이평) — 값 소유·localStorage 지속은 상위. */
+  overlays: ChartOptions;
   onIntervalChange: (i: MainInterval) => void;
   onDaysChange: (d: number) => void;
   onTimeframeChange: (t: number) => void;
   onChartTypeChange: (t: ChartType) => void;
-  onToggleVolumeProfile: () => void;
-  onToggleBollinger: () => void;
+  onToggleOverlay: (key: keyof ChartOptions) => void;
 }
 
 export function StockDailyChart({
@@ -93,14 +123,12 @@ export function StockDailyChart({
   days,
   timeframe,
   chartType,
-  showVolumeProfile,
-  showBollinger,
+  overlays,
   onIntervalChange,
   onDaysChange,
   onTimeframeChange,
   onChartTypeChange,
-  onToggleVolumeProfile,
-  onToggleBollinger,
+  onToggleOverlay,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } =
     useChartData(ticker, interval, days, timeframe);
@@ -108,6 +136,13 @@ export function StockDailyChart({
   // 런타임 테마 색 — light/dark 전환 시 새 객체 reference 로 recharts 리렌더.
   const theme = useChartTheme();
   const { C, tooltipStyle, labelStyle, axisProps } = theme;
+
+  // 오버레이 토글 — 렌더 분기용 로컬. 이평선(MA)만 기본 ON, 나머지 기본 OFF.
+  const showMA = overlays.movingAverage;
+  const showVWAP = overlays.vwap;
+  const showVMA = overlays.volumeMA;
+  const showVolumeProfile = overlays.volumeProfile;
+  const showBollinger = overlays.bollinger;
 
   // 매물대 — 보이는 봉(candleSeries)의 high/low 범위에 거래량(volSeries) 분배. 캔들/라인 공통.
   //   index 정렬(둘 다 같은 보기 구간 슬라이스) → zip 안전. 토글 off 면 계산만 하고 렌더 생략.
@@ -123,10 +158,31 @@ export function StockDailyChart({
     [candleSeries, volSeries],
   );
 
-  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, onIntervalChange, onDaysChange, onTimeframeChange, chartType, onChartTypeChange, showVolumeProfile, onToggleVolumeProfile, showBollinger, onToggleBollinger };
+  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, onIntervalChange, onDaysChange, onTimeframeChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
 
   // 볼린저밴드 표시 여부 — 토글 on 이고 보기 구간에 유효한(룩백 20봉 충족) 값이 있을 때만 렌더.
   const showBB = showBollinger && candleSeries.some((c) => c.bbMid != null);
+
+  // MA·VWAP 오버레이 라인 — 캔들/라인 두 브랜치 공유(같은 dataKey, 두 시리즈 모두 필드 보유).
+  //   가격 스케일 내 값이라 YAxis auto 도메인에 영향 없음. 얇게(1px) 그려 캔들을 가리지 않는다.
+  //   recharts 는 children 을 React.Children.toArray 로 평탄화하므로 배열 보간이 안전(false 는 자동 제거).
+  const priceOverlayLines = [
+    showMA && (
+      <Line key="ma5" type="monotone" dataKey="ma5" stroke={C.ma5} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+    ),
+    showMA && (
+      <Line key="ma20" type="monotone" dataKey="ma20" stroke={C.ma20} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+    ),
+    showMA && (
+      <Line key="ma60" type="monotone" dataKey="ma60" stroke={C.ma60} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+    ),
+    showMA && (
+      <Line key="ma120" type="monotone" dataKey="ma120" stroke={C.ma120} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+    ),
+    showVWAP && (
+      <Line key="vwap" type="monotone" dataKey="vwap" stroke={C.vwap} strokeWidth={1.25} strokeDasharray="5 3" dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+    ),
+  ];
 
   // 데이터 부족 안내의 봉 단위(분/일/주/월) — 선택된 봉 종류에 따라 표기 변경.
   const periodUnit = PERIOD_UNIT[interval];
@@ -184,6 +240,8 @@ export function StockDailyChart({
   return (
     <ChartThemeProvider value={theme}>
     <ChartShell {...shellProps}>
+      {/* 이평선 색 범례 — 어느 색이 어느 기간인지 안내. showMA 일 때만, 가격 플롯 바로 위 */}
+      {showMA && <MALegend />}
       {/* ① 가격 — 라인 or 캔들 */}
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={240}>
@@ -197,7 +255,7 @@ export function StockDailyChart({
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip content={<CandleTooltip />} />
+              <Tooltip content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 캔들 위에 표시 */}
               {showBB && (
@@ -209,6 +267,8 @@ export function StockDailyChart({
               {showBB && (
                 <Line type="monotone" dataKey="bbMid" stroke={C.bb} strokeWidth={1} strokeDasharray="4 3" dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
+              {/* 이동평균선(MA 5/20/60/120)·VWAP — 캔들/라인 위에 표시(topmost). 기본 ON=MA */}
+              {priceOverlayLines}
               {lastClose != null && (
                 <ReferenceLine
                   y={lastClose}
@@ -248,6 +308,8 @@ export function StockDailyChart({
               {showBB && (
                 <Line type="monotone" dataKey="bbMid" stroke={C.bb} strokeWidth={1} strokeDasharray="4 3" dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
+              {/* 이동평균선(MA 5/20/60/120)·VWAP — 캔들/라인 위에 표시(topmost). 기본 ON=MA */}
+              {priceOverlayLines}
               {lastClose != null && (
                 <ReferenceLine
                   y={lastClose}
@@ -263,11 +325,11 @@ export function StockDailyChart({
         </ResponsiveContainer>
       </div>
 
-      {/* ② 거래량 */}
+      {/* ② 거래량 (+ 거래량 이평 옵션 라인) — Bar+Line 혼합이라 ComposedChart */}
       <SubLabel label="거래량" />
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={70}>
-          <BarChart data={volSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+          <ComposedChart data={volSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
             <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
@@ -277,7 +339,11 @@ export function StockDailyChart({
                 <Cell key={i} fill={entry.isUp ? C.volUp : C.volDown} />
               ))}
             </Bar>
-          </BarChart>
+            {/* 거래량 이동평균(VMA 20) — 연빨강/연파랑 봉 위에 또렷한 라인. 툴팁·범례 제외(봉만 유지) */}
+            {showVMA && (
+              <Line type="monotone" dataKey="vma" stroke={C.vma} strokeWidth={1.25} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 

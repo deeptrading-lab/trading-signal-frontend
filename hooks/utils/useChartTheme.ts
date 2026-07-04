@@ -46,6 +46,12 @@ const VAR_KEYS = {
   volDown: "chart-vol-down", // 거래량 하락 봉
   down: "chart-down", // 하락 캔들/라인 (파랑)
   bb: "chart-bb", // 볼린저밴드 상/하단·중심선·음영 (teal, 매물대 회색/보라와 구분)
+  ma5: "chart-ma5", // 이동평균선 5 (orange)
+  ma20: "chart-ma20", // 이동평균선 20 (pink)
+  ma60: "chart-ma60", // 이동평균선 60 (violet)
+  ma120: "chart-ma120", // 이동평균선 120 (green)
+  vwap: "chart-vwap", // VWAP 세션 기준선 (cyan, 점선)
+  vma: "chart-vma", // 거래량 이동평균 (violet, 거래량 서브플롯)
   surface: "surface", // 차트 배경 — 최신가 태그 외곽선 녹아웃(겹친 요소와 경계 분리)
 } as const;
 

@@ -33,20 +33,42 @@ export const CHART_TYPES: { label: string; type: ChartType }[] = [
 
 /** 매물대(가격대별 거래량) 오버레이 토글 라벨. */
 export const CHART_VOLUME_PROFILE_LABEL = "매물대";
+/** 이동평균선(MA) 오버레이 토글 라벨. */
+export const CHART_MA_LABEL = "이평선";
+/** 볼린저밴드 오버레이 토글 라벨. */
+export const CHART_BOLLINGER_LABEL = "볼린저밴드";
+/** 거래량 이동평균(VMA) 오버레이 토글 라벨. */
+export const CHART_VOLUME_MA_LABEL = "거래량 이평";
+/** VWAP(거래량 가중 평균가) 오버레이 토글 라벨 — 약어라 원문 유지(MACD·RSI 동일). */
+export const CHART_VWAP_LABEL = "VWAP";
 
 /** 차트 오버레이 옵션 드롭다운 트리거 라벨. */
 export const CHART_OPTIONS_LABEL = "옵션";
 
 /**
+ * 이동평균선(SMA) 기간 — 종가 시리즈에 5·20·60·120 을 겹쳐 그린다(HTS 표준). 색은 chart-ma{p} 토큰.
+ * `useChartData`(계산)·`StockDailyChart`(렌더·범례) 가 이 단일 배열을 공유해 기간/색 매핑을 일치시킨다.
+ */
+export const MA_PERIODS = [5, 20, 60, 120] as const;
+export type MaPeriod = (typeof MA_PERIODS)[number];
+
+/** 거래량 이동평균(VMA) 기간 — 거래량 서브플롯 SMA. */
+export const VMA_PERIOD = 20;
+
+/**
  * 차트 오버레이 옵션 목록 — "옵션 ▾" 드롭다운의 체크박스 항목.
  * `key` 는 `ChartOptions`(lib/store/chart/chartOptions) 필드와 1:1.
+ * 순서: 가격 서브플롯 오버레이(이평선·볼린저·VWAP·매물대) → 거래량 서브플롯(거래량 이평).
  */
 export const CHART_OVERLAY_OPTIONS: {
-  key: "volumeProfile" | "bollinger";
+  key: "movingAverage" | "volumeProfile" | "bollinger" | "volumeMA" | "vwap";
   label: string;
 }[] = [
+  { key: "movingAverage", label: CHART_MA_LABEL },
+  { key: "bollinger", label: CHART_BOLLINGER_LABEL },
+  { key: "vwap", label: CHART_VWAP_LABEL },
   { key: "volumeProfile", label: CHART_VOLUME_PROFILE_LABEL },
-  { key: "bollinger", label: "볼린저밴드" },
+  { key: "volumeMA", label: CHART_VOLUME_MA_LABEL },
 ];
 
 // ── 봉·기간 설정 ────────────────────────────────────────
