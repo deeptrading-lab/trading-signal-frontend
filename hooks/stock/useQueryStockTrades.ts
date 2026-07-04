@@ -3,9 +3,9 @@
  *
  * PRD `toss-trades` §3-5 (orderbook 쿼리 훅 `useQueryStockOrderbook` 과 동일 위치·형태):
  *   - 실패·빈 체결·토스 키 없음 전부 "빈 체결" 로 수렴 — BFF 가 fail-soft 200 이라 소비 측은 data 만 본다.
- *   - 폴링 주기는 **지면이 주입**(단타 3s·상세 10s). 장중(+마감 유예)에만 갱신, 장외엔 재요청 없음.
+ *   - 폴링 주기는 **지면이 주입**(단타 3s·상세 10s). 정규장(②의 `isRegularOpen`)에만 갱신, 장외엔 재요청 없음.
  *   - 백그라운드 탭은 `refetchIntervalInBackground` 기본 false 로 자동 정지(비용·레이트 보호).
- *   - 폴링 게이팅은 orderbook 훅과 **동일 정책**(`kstMarketHours` 휴리스틱) — 캘린더 통합은 호가와 함께 후속.
+ *   - 폴링 게이팅은 orderbook 훅과 **동일 정책**(②의 `useMarketStatus().isRegularOpen`, 공휴일 인지·fail-open).
  */
 
 "use client";
@@ -14,7 +14,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { getStockTrades } from "@/lib/api/stock/trades";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
-import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { useMarketStatus } from "@/hooks/market/useMarketStatus";
 import type { ApiError } from "@/lib/api/errors";
 import type { TradesResult } from "@/lib/types/stock/trades";
 
@@ -29,6 +29,8 @@ export function useQueryStockTrades(
   ticker: string,
   { enabled = true, refetchIntervalMs }: UseQueryStockTradesOptions = {},
 ): UseQueryResult<TradesResult, ApiError> {
+  // orderbook 훅과 동일 정책 — 휴리스틱 → ②의 `isRegularOpen`(공휴일 인지, fail-open). PRD §3-3.
+  const { isRegularOpen } = useMarketStatus();
   return useQuery({
     queryKey: queryKeys.stock.trades(ticker),
     queryFn: () => getStockTrades(ticker),
@@ -36,8 +38,6 @@ export function useQueryStockTrades(
     gcTime: queryConfig.stock.trades.gcTime,
     enabled: enabled && ticker.length > 0,
     refetchInterval: () =>
-      refetchIntervalMs != null && isKstMarketHoursWithCloseGrace()
-        ? refetchIntervalMs
-        : false,
+      refetchIntervalMs != null && isRegularOpen ? refetchIntervalMs : false,
   });
 }
