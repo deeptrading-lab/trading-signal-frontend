@@ -42,6 +42,16 @@
     @apply bg-surface-muted text-text-strong font-sans;
   }
 
+  /* 클릭 가능한 네이티브 요소 커서 — 브라우저 기본이 화살표(default)라 pointer 를 명시한다.
+   * preflight 가 흡수 못 하는 잔여물(본 globals 한정). 합성 클래스(components 레이어)·유틸의
+   * cursor-* 는 상위 레이어라 이 규칙을 항상 덮으므로(비활성 = not-allowed 등) 충돌 없다.
+   * → 합성 클래스를 안 쓴 인라인 <button>·[role=button]·<summary> 도 hover 시 손가락 커서. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
   /* 폰트 패밀리 — Pretendard self-host (next/font/local) → `--font-pretendard` 변수.
    * PRD finsight-redesign §3.1 + §9 q6 RESOLVED 옵션 B (self-host). 시스템 fallback 은
    * next/font 가 fallback 배열로 자동 주입하지만, html 레벨에서도 명시해 SSR 단계에서 안전망. */

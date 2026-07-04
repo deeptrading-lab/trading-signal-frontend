@@ -842,6 +842,11 @@
   .rank-row {
     @apply bg-surface text-text-strong text-body-sm-strong min-h-table-row-h px-table-cell-px;
   }
+  /* rank-row-hover 는 클릭 가능한 순위 행에 붙는다 — 자체적으로 pointer 커서를 갖게 해
+     사용처가 인라인 cursor-pointer 를 잊어도 손가락 커서가 나오도록(잠재 갭 차단). */
+  .rank-row-hover {
+    @apply cursor-pointer;
+  }
   .rank-row-hover:hover,
   .rank-row-hover:focus-visible {
     @apply bg-surface-muted outline-none;

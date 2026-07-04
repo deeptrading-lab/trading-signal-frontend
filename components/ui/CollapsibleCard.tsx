@@ -45,9 +45,11 @@ export function CollapsibleCard({
       <section aria-label={title} className="border-b border-border-line">
         <button
           type="button"
-          // -mx-xs/px-xs — hover 배경만 좌우 4px 번져 숨 쉬는 여백(텍스트는 콘텐츠 폭 정렬).
-          //   main-area 패딩이 흡수 → 가로 스크롤 없음.
-          className="-mx-xs flex w-full items-center gap-md rounded-sm px-xs py-lg text-left transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
+          // 전체 폭 클릭 행 — w-full 로 부모 콘텐츠 폭을 채우고 hover 배경이 그 폭을 좌우 대칭으로 꽉 채운다.
+          //   (이전엔 -mx-xs 로 좌우 4px 번지게 했으나 w-full + 음수마진이 오버컨스트레인(LTR)이라
+          //    오른쪽 마진이 +4px 로 뒤집혀 hover 배경 우측이 미달 → 음수마진 제거로 해소.)
+          //   px-xs 내부 여백은 펼침 본문(pl-xs)과 좌측 정렬을 맞춘다.
+          className="flex w-full items-center gap-md rounded-sm px-xs py-lg text-left transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
