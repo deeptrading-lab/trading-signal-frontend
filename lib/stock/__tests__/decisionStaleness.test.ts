@@ -56,6 +56,17 @@ describe("evaluateDecisionStaleness — 강세(양수 목표) 방향", () => {
   });
 });
 
+describe("evaluateDecisionStaleness — stop_loss_pct 0 방어(정규화가 0 을 통과)", () => {
+  it("stop_loss_pct 0 이면 손절-근접 규칙 미발화(base +1% 여도 not stale)", () => {
+    // 가드(`<0`) 없으면 stopPrice=base → live<=base*1.03 상시 오탐. 0 은 건너뛰어야 한다.
+    const r = evalStale({
+      decision: decision({ target_pct: 20, stop_loss_pct: 0 }),
+      livePrice: 10_100, // base +1% — 목표 한참 아래·큰이동 미만·신선
+    });
+    expect(r).toEqual({ stale: false, reason: null });
+  });
+});
+
 describe("evaluateDecisionStaleness — 약세 재진입(음수 목표) 방향", () => {
   it("재진입 구간 근접(±3% 밴드) → target-near", () => {
     // base 10000, −15% → 재진입 8500. live 8600 = 1.18% ≤ 3%.

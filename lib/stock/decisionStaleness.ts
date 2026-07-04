@@ -70,8 +70,10 @@ export function evaluateDecisionStaleness(input: DecisionStalenessInput): Decisi
   // ── 가격 3규칙 — base_price·live 둘 다 있어야 계산 가능(legacy/로딩 전이면 건너뜀). ──
   if (base != null && live != null) {
     // 1) 손절가 부근/하회 — 하방 리스크가 가장 급하므로 최우선.
+    //    stop_loss_pct 는 항상 음수여야 하나 정규화(route)가 0 은 통과시키므로 `< 0` 가드 추가
+    //    (0 이면 stopPrice=base → 현재가 +3% 이내에서 상시 오탐하는 것을 방지).
     const stopPrice = base * (1 + decision.stop_loss_pct / 100);
-    if (stopPrice > 0 && live <= stopPrice * STOP_PROXIMITY_MULT) {
+    if (decision.stop_loss_pct < 0 && stopPrice > 0 && live <= stopPrice * STOP_PROXIMITY_MULT) {
       return { stale: true, reason: "stop-near" };
     }
 
