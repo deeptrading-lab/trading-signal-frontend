@@ -88,44 +88,43 @@ export function IntradayWatchTable({
   onRemove,
 }: IntradayWatchTableProps) {
   return (
-    <div className="card overflow-hidden p-0">
-      <div className="overflow-x-auto">
-        <table className="w-full text-body-sm">
-          <thead>
-            <tr className="text-caption text-text-muted">
-              <th className="py-sm pl-lg pr-md text-left font-normal">{T.colStock}</th>
-              <th className="py-sm pr-md text-right font-normal">{T.colPrice}</th>
-              <th className="py-sm pr-md text-right font-normal">{T.colChange}</th>
-              {/* 여기부터 모의 투자 데이터 — 종목 정보와 세로 구분선으로 분리(피드백). */}
-              <th className="border-l border-border-line py-sm pl-md pr-md text-right font-normal">
-                {T.colReturn}
-              </th>
-              <th className="py-sm pr-md text-right font-normal">{T.colValue}</th>
-              <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
-              <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
-              <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
-              <th className="py-sm pr-md text-center font-normal">{T.colInterval}</th>
-              <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
-              <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
-              <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <WatchRow
-                key={item.ticker}
-                item={item}
-                quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
-                session={sessionByTicker.get(item.ticker) ?? null}
-                warnings={warningsByTicker?.[item.ticker]}
-                isCreating={isCreating}
-                onStart={onStart}
-                onRemove={() => onRemove(item.ticker)}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    // 카드 박스 제거 — 흰 바탕 위 헤어라인 표(홈 랭킹·보유종목 표 정합). 넓은 표라 가로 스크롤만 유지.
+    <div className="overflow-x-auto">
+      <table className="w-full text-body-sm">
+        <thead>
+          <tr className="border-b border-border-line text-caption text-text-muted">
+            <th className="py-sm pl-lg pr-md text-left font-normal">{T.colStock}</th>
+            <th className="py-sm pr-md text-right font-normal">{T.colPrice}</th>
+            <th className="py-sm pr-md text-right font-normal">{T.colChange}</th>
+            {/* 여기부터 모의 투자 데이터 — 종목 정보와 세로 구분선으로 분리(피드백). */}
+            <th className="border-l border-border-line py-sm pl-md pr-md text-right font-normal">
+              {T.colReturn}
+            </th>
+            <th className="py-sm pr-md text-right font-normal">{T.colValue}</th>
+            <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
+            <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
+            <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
+            <th className="py-sm pr-md text-center font-normal">{T.colInterval}</th>
+            <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
+            <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
+            <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <WatchRow
+              key={item.ticker}
+              item={item}
+              quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
+              session={sessionByTicker.get(item.ticker) ?? null}
+              warnings={warningsByTicker?.[item.ticker]}
+              isCreating={isCreating}
+              onStart={onStart}
+              onRemove={() => onRemove(item.ticker)}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -196,7 +195,12 @@ function IntervalSelect({ value, onChange }: { value: number; onChange: (v: numb
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={rootRef}
+      className="relative inline-block"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -257,7 +261,12 @@ function CashInput({ value, onChange }: { value: string; onChange: (v: string) =
   const boxRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={rootRef}
+      className="relative inline-block"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
       <div ref={boxRef} className="relative">
         <input
           className="h-7 w-[9rem] rounded-md border border-border-line bg-surface-base pl-sm pr-7 text-right text-caption text-text-strong tabular-nums"
@@ -485,6 +494,7 @@ function WatchRow({
               e.stopPropagation();
               runRead();
             }}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             {read.isPending ? (
               <>
@@ -510,6 +520,7 @@ function WatchRow({
                   e.stopPropagation();
                   setSheetOpen(true);
                 }}
+                onKeyDown={(e) => e.stopPropagation()}
               >
                 <History className="size-4" aria-hidden />
               </button>
@@ -523,6 +534,7 @@ function WatchRow({
                   e.stopPropagation();
                   void setStatus(running ? "paused" : "running");
                 }}
+                onKeyDown={(e) => e.stopPropagation()}
               >
                 {running ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
               </button>
@@ -536,6 +548,7 @@ function WatchRow({
                 e.stopPropagation();
                 void handleStart();
               }}
+              onKeyDown={(e) => e.stopPropagation()}
             >
               {starting ? (
                 <>
@@ -559,6 +572,7 @@ function WatchRow({
                 aria-label={P.detailLink}
                 title={P.detailLink}
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="size-4" aria-hidden />
               </Link>
@@ -574,6 +588,7 @@ function WatchRow({
                   e.stopPropagation();
                   onRemove();
                 }}
+                onKeyDown={(e) => e.stopPropagation()}
               >
                 <X className="size-4" aria-hidden />
               </button>
@@ -587,6 +602,7 @@ function WatchRow({
                 e.stopPropagation();
                 setExpanded((v) => !v);
               }}
+              onKeyDown={(e) => e.stopPropagation()}
             >
               <ChevronDown
                 className={cn("size-4 transition-transform", expanded && "rotate-180")}
@@ -667,7 +683,7 @@ function WatchRow({
                   {recentOrders.length === 0 ? (
                     <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
                   ) : (
-                    <ul className="flex flex-col gap-[2px] text-body-sm tabular-nums">
+                    <ul className="flex flex-col gap-xs text-body-sm tabular-nums">
                       {recentOrders.map((order, index) => (
                         <li key={`${order.at}-${index}`} className="flex flex-wrap items-center gap-sm">
                           <span className="text-text-muted">{kstHhmm(order.at)}</span>
