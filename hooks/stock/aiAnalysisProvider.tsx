@@ -658,8 +658,10 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
       const slot = target ? stateRef.current.slots[target] : null;
       if (!target || !slot) return;
       if (blockedByLimit(target)) return;
-      // bear 는 항상 bull 부터 재실행.
-      const effectiveFrom: AgentKey = fromAgent === "bear" ? "bull" : fromAgent;
+      // 재개 기점 정규화 — bear→bull, risk_neutral/safe→risk_risky(서버 배치 게이트 정합).
+      //   모든 콜사이트(PhaseRow·AnalystTile 카드 재시도·헤더 resumeFrom) 일괄 교정. getResumeKey 는 멱등이라
+      //   이미 매핑된 키(예: PhaseRow 가 넘긴 risk_risky)를 다시 넣어도 안전.
+      const effectiveFrom: AgentKey = getResumeKey(fromAgent);
       const fromIndex = AGENT_ORDER.indexOf(effectiveFrom);
       const preState = buildResumeState(slot, fromIndex);
       dispatch({
