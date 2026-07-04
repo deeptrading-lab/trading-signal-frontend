@@ -65,7 +65,7 @@ export function ChartRangeDropdown<T extends string | number>({
 
       {open && (
         <div
-          className="dropdown-panel absolute right-0 top-full z-[40] mt-xs min-w-[112px]"
+          className="dropdown-panel absolute left-0 top-full z-[40] mt-xs min-w-[112px]"
           role="listbox"
           aria-label={ariaLabel}
         >
