@@ -23,6 +23,7 @@ import { SignalSummary } from "./SignalSummary";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
+import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
 import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
@@ -90,6 +91,11 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       {/* ── 항시: 가격 차트(플랫, 봉 단위 선택) — 시맨틱 <section> 은 자식(ChartShell)이 소유, 래퍼는 헤어라인만 ── */}
       <div className="mt-lg border-t border-border-line pt-lg">
         <StockDailyChart ticker={ticker} {...chartControls} />
+      </div>
+
+      {/* ── 항시: 호가창(매수/매도 잔량) — 차트·수급 인접, variant="full"(느슨한 폴링). ── */}
+      <div className="mt-lg border-t border-border-line pt-lg">
+        <OrderbookPanel ticker={ticker} variant="full" />
       </div>
 
       {/* ── 항시: 컴팩트 시그널 요약(플랫) — 시맨틱 <section> 은 자식(SignalSummary)이 소유 ── */}

@@ -69,6 +69,9 @@ export interface IntradayWatchTableProps {
   sessionByTicker: Map<string, PaperTradingSession>;
   /** 티커별 활성 매수 유의(경보·VI) — 빈 맵/미제공이면 칩 미표시(fail-soft). */
   warningsByTicker?: Record<string, StockWarningItem[]>;
+  /** 호가창을 볼 선택 종목(단일) — 행 클릭으로 전환. */
+  selectedTicker?: string | null;
+  onSelect?: (ticker: string) => void;
   isCreating: boolean;
   onStart: (
     stock: PaperTradingSelectedStock,
@@ -83,6 +86,8 @@ export function IntradayWatchTable({
   quotes,
   sessionByTicker,
   warningsByTicker,
+  selectedTicker,
+  onSelect,
   isCreating,
   onStart,
   onRemove,
@@ -118,6 +123,8 @@ export function IntradayWatchTable({
               quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
               session={sessionByTicker.get(item.ticker) ?? null}
               warnings={warningsByTicker?.[item.ticker]}
+              selected={selectedTicker === item.ticker}
+              onSelect={onSelect}
               isCreating={isCreating}
               onStart={onStart}
               onRemove={() => onRemove(item.ticker)}
@@ -347,6 +354,8 @@ function WatchRow({
   quote,
   session,
   warnings,
+  selected,
+  onSelect,
   isCreating,
   onStart,
   onRemove,
@@ -355,6 +364,8 @@ function WatchRow({
   quote: WatchlistQuote | null;
   session: PaperTradingSession | null;
   warnings: StockWarningItem[] | undefined;
+  selected?: boolean;
+  onSelect?: (ticker: string) => void;
   isCreating: boolean;
   onStart: IntradayWatchTableProps["onStart"];
   onRemove: () => void;
@@ -416,8 +427,14 @@ function WatchRow({
   return (
     <>
       <tr
-        onClick={() => setExpanded((v) => !v)}
-        className="cursor-pointer border-t border-border-line transition-colors hover:bg-surface-muted"
+        onClick={() => {
+          onSelect?.(item.ticker);
+          setExpanded((v) => !v);
+        }}
+        className={cn(
+          "cursor-pointer border-t border-border-line transition-colors hover:bg-surface-muted",
+          selected && "bg-accent-soft",
+        )}
       >
         {/* 종목 — 코드 없이 이름만 + 매수 유의 칩 + 세션 상태 */}
         <td className="py-sm pl-lg pr-md">
