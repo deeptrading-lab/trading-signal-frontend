@@ -41,6 +41,19 @@ export function isKstMarketHoursWithCloseGrace(now: Date = new Date()): boolean 
 }
 
 /**
+ * 토·일(KST)이면 true — 주말 판정. **공휴일은 인지하지 못한다**(주말만).
+ * `deriveMarketStatus` 의 캘린더 미가용(키 없음/실패) 폴백에서 "장 마감"(평일) vs "휴장"(주말)
+ * 라벨 분기에 쓴다. `kstMinutesOfWeekday` 가 주말에 null 을 주는 것과 동일 기준(Asia/Seoul weekday).
+ */
+export function isKstWeekend(now: Date = new Date()): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    weekday: "short",
+  }).format(now);
+  return weekday === "Sat" || weekday === "Sun";
+}
+
+/**
  * 평일 마감 유예(15:40)를 지난 시각이면 true — 단타 세션 **마감 자동 완료** 게이트.
  * 장중·프리마켓(09:00 이전)·주말은 false. 15:20 전량 청산이 이미 지나 종료 시 열린 포지션은 없다.
  *

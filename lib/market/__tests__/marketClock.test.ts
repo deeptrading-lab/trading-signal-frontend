@@ -63,14 +63,54 @@ const holiday: TossMarketCalendar = {
   },
 };
 
-describe("deriveMarketStatus — unknown (fail-soft/fail-open)", () => {
-  it("calendar null 이면 unknown 이고 isRegularOpen 은 fail-open(true) (AC-1)", () => {
-    const s = deriveMarketStatus(null, at("10:00"));
-    expect(s.phase).toBe("unknown");
-    expect(s.isRegularOpen).toBe(true); // fail-open: 후속 폴링 게이트 오정지 방지.
-    expect(s.todayIsBusinessDay).toBe(false);
-    expect(s.nextOpen).toBeNull();
+describe("deriveMarketStatus — 캘린더 없음 KST 휴리스틱 폴백 (market-status-aware-home)", () => {
+  // 캘린더 null(키 없음/실패) → 공휴일 미인지 KST 폴백. 주말/야간 마감은 잡되 장중은 regular.
+  it("null + 평일 장중(월 10:00) → regular · isRegularOpen fail-open true", () => {
+    const s = deriveMarketStatus(null, at("10:00")); // 2026-07-06 월요일 10:00 KST.
+    expect(s.phase).toBe("regular");
+    expect(s.isRegularOpen).toBe(true); // 장중 취급(공휴일이어도 fail-open).
+    expect(s.todayIsBusinessDay).toBe(true);
+    expect(s.nextOpen).toBeNull(); // 캘린더 없이 다음 개장 산출 불가.
     expect(s.sessionTimes).toBeNull();
+  });
+
+  it("null + 평일 09:00 정각 → regular(엄격 정규장 시작 inclusive)", () => {
+    const s = deriveMarketStatus(null, at("09:00"));
+    expect(s.phase).toBe("regular");
+    expect(s.isRegularOpen).toBe(true);
+  });
+
+  it("null + 평일 15:31(마감 직후) → closed · isRegularOpen false(엄격 15:30, grace 손실 수용)", () => {
+    const s = deriveMarketStatus(null, at("15:31"));
+    expect(s.phase).toBe("closed");
+    expect(s.isRegularOpen).toBe(false);
+    expect(s.todayIsBusinessDay).toBe(true); // 평일 → 장 마감.
+  });
+
+  it("null + 평일 야간(월 20:30) → closed · 장 마감(평일)", () => {
+    const s = deriveMarketStatus(null, at("20:30"));
+    expect(s.phase).toBe("closed");
+    expect(s.isRegularOpen).toBe(false);
+    expect(s.todayIsBusinessDay).toBe(true);
+    expect(s.nextOpen).toBeNull();
+  });
+
+  it("null + 주말(토 10:00) → closed · 휴장(주말)", () => {
+    // 2026-07-04 는 토요일.
+    const sat = Date.parse("2026-07-04T10:00:00+09:00");
+    const s = deriveMarketStatus(null, sat);
+    expect(s.phase).toBe("closed");
+    expect(s.isRegularOpen).toBe(false);
+    expect(s.todayIsBusinessDay).toBe(false); // 주말 → 휴장 라벨.
+    expect(s.nextOpen).toBeNull();
+  });
+
+  it("null + 주말 장중 시각(일 11:00) → closed(주말은 시간 무관 휴장)", () => {
+    const sun = Date.parse("2026-07-05T11:00:00+09:00"); // 일요일.
+    const s = deriveMarketStatus(null, sun);
+    expect(s.phase).toBe("closed");
+    expect(s.isRegularOpen).toBe(false);
+    expect(s.todayIsBusinessDay).toBe(false);
   });
 });
 
