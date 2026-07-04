@@ -16,15 +16,27 @@ import {
   type ChartPeriod,
 } from "@/hooks/stock/useQueryStockChart";
 import { useQueryMinuteChart } from "@/hooks/stock/useQueryMinuteChart";
-import { calcMACD, calcRSI, calcBollinger } from "@/lib/utils/technicalIndicators";
-import { DEFAULT_TIMEFRAME, type MainInterval } from "@/components/profile/stockChartConfig";
+import {
+  calcMACD,
+  calcRSI,
+  calcBollinger,
+  calcSMA,
+  calcVWAP,
+} from "@/lib/utils/technicalIndicators";
+import {
+  DEFAULT_TIMEFRAME,
+  VMA_PERIOD,
+  type MainInterval,
+} from "@/components/profile/stockChartConfig";
 import type { ApiError } from "@/lib/api/errors";
 
 /**
- * 보조지표 워밍업(캘린더일) — 보기 구간보다 더 과거까지 받아 MACD(시그널 35봉)·RSI(15봉)를
- *   끊김 없이 계산. 봉당 대략: 일봉≈영업일, 주봉≈/7, 월봉≈/30. 35봉 확보분 + 여유.
+ * 보조지표 워밍업(캘린더일) — 보기 구간보다 더 과거까지 받아 지표를 끊김 없이 계산.
+ *   가장 긴 룩백은 이동평균선 MA120(120봉) — 첫 표시 봉부터 MA120 이 뜨도록 120봉+여유로 잡는다
+ *   (MACD 시그널 35봉·RSI 15봉은 자동 충족). 봉당 대략: 일봉≈영업일(×0.69), 주봉≈/7, 월봉≈/30.
+ *   월봉 MA120(=120개월)은 MAX_FETCH_DAYS 클램프로 과거 초반이 자연히 null(HTS 장기선 동일 거동).
  */
-const WARMUP_DAYS: Record<ChartPeriod, number> = { D: 60, W: 280, M: 1100 };
+const WARMUP_DAYS: Record<ChartPeriod, number> = { D: 190, W: 900, M: 2400 };
 const MAX_FETCH_DAYS = 3000; // 라우트 MAX_DAYS 와 정합(초과 클램프)
 
 /**
@@ -39,7 +51,20 @@ export type BollingerFields = {
   bbRange: [number, number] | null;
 };
 
-export type PriceDatum = { date: string; price: number } & BollingerFields;
+/**
+ * 이동평균선(MA 5/20/60/120) + VWAP — 가격 시리즈(캔들·라인)에 함께 실어 메인 차트에 겹쳐 그린다.
+ *   각 필드는 룩백 전 봉이 null(렌더 미표시). MA 기간은 `MA_PERIODS`(stockChartConfig)와 1:1.
+ */
+export type MovingAverageFields = {
+  ma5: number | null;
+  ma20: number | null;
+  ma60: number | null;
+  ma120: number | null;
+  vwap: number | null;
+};
+
+export type PriceDatum = { date: string; price: number } & BollingerFields &
+  MovingAverageFields;
 export type CandleDatum = {
   date: string;
   wickRange: [number, number];
@@ -50,8 +75,10 @@ export type CandleDatum = {
   isUp: boolean;
   change: number | null;
   changePct: number | null;
-} & BollingerFields;
-export type VolDatum = { date: string; volume: number; isUp: boolean };
+} & BollingerFields &
+  MovingAverageFields;
+/** 거래량 봉 + 거래량 이동평균(VMA). vma 는 룩백 전 null. */
+export type VolDatum = { date: string; volume: number; isUp: boolean; vma: number | null };
 export type MacdDatum = {
   date: string;
   macd: number | null;
@@ -114,6 +141,23 @@ export function useChartData(
     const rsi = calcRSI(closes);
     const bb = calcBollinger(closes); // 20기간·2σ(기본). 워밍업이 룩백 20봉 커버.
 
+    // 이동평균선(SMA) — 종가 시리즈에 5/20/60/120 겹침(HTS 표준). 필드명이 기간을 고정하므로 리터럴 사용
+    //   (기간 집합 SSOT 는 `MA_PERIODS`, 렌더/범례가 공유). 워밍업이 MA120(120봉) 룩백을 커버.
+    const ma5 = calcSMA(closes, 5);
+    const ma20 = calcSMA(closes, 20);
+    const ma60 = calcSMA(closes, 60);
+    const ma120 = calcSMA(closes, 120);
+    // VWAP — 대표가(HLC/3)×거래량 누적. 분봉은 당일 한 세션이라 자연히 세션 VWAP,
+    //   일/주/월봉은 워밍업 포함 시리즈 첫 봉부터 누적(세션 개념이 없어 누적 기준선).
+    const vwap = calcVWAP(
+      sorted.map((c) => ({ high: c.high, low: c.low, close: c.close, volume: c.volume })),
+    );
+    // 거래량 이동평균(VMA) — 거래량 시리즈 SMA(20). 거래량 서브플롯 라인.
+    const vma = calcSMA(
+      sorted.map((c) => c.volume),
+      VMA_PERIOD,
+    );
+
     // 볼린저 4필드 매핑 — 가격·캔들 시리즈 공통 주입(같은 인덱스). null 이면 렌더 미표시.
     const bbFields = (i: number): BollingerFields => ({
       bbUpper: bb[i].upper,
@@ -123,6 +167,15 @@ export function useChartData(
         bb[i].lower !== null && bb[i].upper !== null
           ? [bb[i].lower as number, bb[i].upper as number]
           : null,
+    });
+
+    // MA·VWAP 5필드 매핑 — 가격·캔들 시리즈 공통 주입(같은 인덱스). null 이면 렌더 미표시.
+    const maFields = (i: number): MovingAverageFields => ({
+      ma5: ma5[i],
+      ma20: ma20[i],
+      ma60: ma60[i],
+      ma120: ma120[i],
+      vwap: vwap[i],
     });
 
     // x축 라벨 — 분봉은 "YYYY-MM-DDTHH:mm" → 뒤 5글자("HH:mm"), 일/주/월봉은 "YYYY-MM-DD" → 앞 5글자 제거("MM-DD").
@@ -149,6 +202,7 @@ export function useChartData(
       date: label(c.date),
       price: c.close,
       ...bbFields(i),
+      ...maFields(i),
     }));
     const fullCandle: CandleDatum[] = sorted.map((c, i) => {
       // 등락률 — 직전 봉 종가 대비(일봉=전일/주봉=전주/월봉=전월/분봉=직전 분봉). 워밍업·직전봉 덕에 첫 표시 봉도 값 존재.
@@ -169,12 +223,14 @@ export function useChartData(
         change,
         changePct,
         ...bbFields(i),
+        ...maFields(i),
       };
     });
-    const fullVol: VolDatum[] = sorted.map((c) => ({
+    const fullVol: VolDatum[] = sorted.map((c, i) => ({
       date: label(c.date),
       volume: c.volume,
       isUp: c.close >= c.open,
+      vma: vma[i],
     }));
     const fullMacd: MacdDatum[] = sorted.map((c, i) => ({
       date: label(c.date),

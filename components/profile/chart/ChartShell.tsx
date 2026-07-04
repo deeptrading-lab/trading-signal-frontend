@@ -27,6 +27,7 @@ import {
   type ChartType,
   type MainInterval,
 } from "@/components/profile/stockChartConfig";
+import type { ChartOptions } from "@/lib/store/chart/chartOptions";
 
 export function ChartShell({
   children,
@@ -41,10 +42,8 @@ export function ChartShell({
   onTimeframeChange,
   chartType,
   onChartTypeChange,
-  showVolumeProfile,
-  onToggleVolumeProfile,
-  showBollinger,
-  onToggleBollinger,
+  overlays,
+  onToggleOverlay,
 }: {
   children: React.ReactNode;
   expanded?: boolean;
@@ -58,10 +57,8 @@ export function ChartShell({
   onTimeframeChange: (t: number) => void;
   chartType: ChartType;
   onChartTypeChange: (t: ChartType) => void;
-  showVolumeProfile: boolean;
-  onToggleVolumeProfile: () => void;
-  showBollinger: boolean;
-  onToggleBollinger: () => void;
+  overlays: ChartOptions;
+  onToggleOverlay: (key: keyof ChartOptions) => void;
 }) {
   const { isMobile } = useBreakpoint();
   const hasToggle = onExpand || onCollapse;
@@ -172,13 +169,8 @@ export function ChartShell({
             </div>
           )}
         </div>
-        {/* 우측: 오버레이 옵션(매물대·볼린저밴드) 드롭다운 — 맨 오른쪽 단독 */}
-        <ChartOptionsDropdown
-          options={{ volumeProfile: showVolumeProfile, bollinger: showBollinger }}
-          onToggle={(key) =>
-            key === "volumeProfile" ? onToggleVolumeProfile() : onToggleBollinger()
-          }
-        />
+        {/* 우측: 오버레이 옵션(이평선·볼린저·VWAP·매물대·거래량 이평) 드롭다운 — 맨 오른쪽 단독 */}
+        <ChartOptionsDropdown options={overlays} onToggle={onToggleOverlay} />
       </div>
 
       {children}
