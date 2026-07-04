@@ -6,6 +6,11 @@
  * 차원(verdict/confidence/horizon/signalScore)·평가시점(d1/w1/m1/all) 필터로 표를 좁힌다.
  * 필터는 로드된 집계를 클라이언트에서 거른다(소량, 네트워크 호출 없음).
  *
+ * scorecard-reskin(카드리스/화이트포워드) — 로딩/에러/미설정/빈 상태의 카드 박스(`.card`·
+ * `.card-critical`)를 걷어내고 흰 바탕 위 헤어라인 스켈레톤·플랫 알림·중앙 StatusBlock 으로,
+ * 표는 카드 래퍼 없이 직접 렌더한다. 새로고침은 subtle 텍스트 버튼(홈 대시보드 정합).
+ * 데이터·필터 로직은 무변경(표현만 교체).
+ *
  * 컨벤션(frontend.md) — useQuery 직접 import 금지(도메인 훅만), 색·px 직타 금지(토큰+cn), 한글 카피.
  */
 
@@ -78,20 +83,29 @@ export function ScorecardContainer() {
   }, [cells, dimension, horizon]);
 
   if (isLoading) {
+    // 카드리스 플랫 스켈레톤 — 박스 없이 헤어라인 행(홈 표 로딩 정합).
     return (
-      <div className="card skeleton min-h-[200px]" aria-busy="true">
+      <div aria-busy="true" aria-label={STATE_LOADING}>
         <span className="sr-only">{STATE_LOADING}</span>
-        <div className="skeleton-line skeleton-line-medium" />
-        <div className="skeleton-line skeleton-line-narrow" />
-        <div className="skeleton-line skeleton-line-medium" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-md border-b border-border-line py-md last:border-b-0"
+            aria-hidden="true"
+          >
+            <div className="h-4 w-1/4 animate-pulse rounded-sm bg-surface-muted" />
+            <div className="h-4 w-1/6 animate-pulse rounded-sm bg-surface-muted" />
+          </div>
+        ))}
       </div>
     );
   }
 
   if (isError || !data) {
+    // 카드리스 플랫 알림 — 박스 없이 여백만(홈 랭킹·결과 목록 에러 정합).
     return (
-      <div className="card-critical" role="alert">
-        <p className="text-body-strong mb-md">{STATE_ERROR}</p>
+      <div className="flex flex-col items-start gap-md py-md" role="alert">
+        <p className="text-body-sm text-text-muted">{STATE_ERROR}</p>
         <button type="button" className="button-secondary" onClick={() => refetch()}>
           {STATE_RETRY}
         </button>
@@ -100,12 +114,7 @@ export function ScorecardContainer() {
   }
 
   if (!data.configured) {
-    return (
-      <div className="card" role="status">
-        <h2 className="text-h2 text-text-strong mb-sm">{NOT_CONFIGURED_TITLE}</h2>
-        <p className="text-body-sm text-text-muted">{NOT_CONFIGURED_BODY}</p>
-      </div>
-    );
+    return <StatusBlock title={NOT_CONFIGURED_TITLE} body={NOT_CONFIGURED_BODY} />;
   }
 
   const isEmpty = data.scoredCount === 0;
@@ -152,11 +161,11 @@ export function ScorecardContainer() {
 
         <button
           type="button"
-          className="button-secondary ml-auto inline-flex items-center gap-xs"
+          className="ml-auto inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
           onClick={() => refetch()}
           disabled={isFetching}
         >
-          <RefreshCw className={cn("size-4", isFetching && "animate-spin")} aria-hidden />
+          <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} aria-hidden="true" />
           {STATE_REFRESH}
         </button>
       </div>
@@ -167,15 +176,21 @@ export function ScorecardContainer() {
       <p className="text-caption text-text-muted">{METRIC_NOTE_EXCESS}</p>
 
       {isEmpty || filtered.length === 0 ? (
-        <div className="card" role="status">
-          <h2 className="text-h2 text-text-strong mb-sm">{EMPTY_TITLE}</h2>
-          <p className="text-body-sm text-text-muted">{EMPTY_BODY}</p>
-        </div>
+        <StatusBlock title={EMPTY_TITLE} body={EMPTY_BODY} />
       ) : (
-        <div className="card">
-          <ScorecardTable cells={filtered} />
-        </div>
+        <ScorecardTable cells={filtered} />
       )}
+    </div>
+  );
+}
+
+/** 미설정·빈 — 카드 박스 없이 흰 바탕 + 여백만(홈 결과 목록 StatusBlock 정합).
+ *  제목은 `text-body-md font-bold`(= body-strong 조합) — 새 `text-body-strong` 미도입. */
+function StatusBlock({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center gap-xs py-2xl text-center" role="status">
+      <p className="text-body-md font-bold text-text-strong">{title}</p>
+      <p className="text-body-sm text-text-muted">{body}</p>
     </div>
   );
 }
