@@ -43,6 +43,12 @@ colors:
   chart-vol-down: "#93c5fd"
   chart-down: "#2563eb"
   chart-bb: "#0d9488"
+  chart-ma5: "#f08c00"
+  chart-ma20: "#e64980"
+  chart-ma60: "#7048e8"
+  chart-ma120: "#2f9e44"
+  chart-vwap: "#0c8599"
+  chart-vma: "#6741d9"
   fng-extreme-fear: "#1d6fb8"
   fng-extreme-fear-soft: "#e3f0fa"
   fng-fear: "#256353"
@@ -95,6 +101,12 @@ colors-dark:
   chart-vol-down: "#35527a"
   chart-down: "#5b9bff"
   chart-bb: "#2dd4bf"
+  chart-ma5: "#ffa94d"
+  chart-ma20: "#f783ac"
+  chart-ma60: "#9775fa"
+  chart-ma120: "#51cf66"
+  chart-vwap: "#3bc9db"
+  chart-vma: "#b197fc"
   fng-extreme-fear: "#4d9fe0"
   fng-extreme-fear-soft: "#13283b"
   fng-fear: "#3fae93"
@@ -704,6 +716,8 @@ v7 rev2 가 `accent-vivid` 를 도입했을 때의 사용처는 CTA 버튼 + dro
 차트 캔버스의 지표 라인·기준선·거래량 봉 색을 `components/profile/chart/chartTheme.ts` 의 hex 직타에서 토큰 참조로 이관하기 위한 11 키. **값 보존(value-preserving) 등록** — 기존 차트가 쓰던 hex 를 한 자도 바꾸지 않고 그대로 토큰화한다. 팔레트 재설계가 아니라 코드 hex 직타 제거가 목적이므로 시각 회귀 0. 신규 키: `chart-macd` `#2563eb` (MACD 라인 파랑), `chart-signal` `#f59e0b` (MACD 시그널 라인 앰버), `chart-hist-up` `#16a34a` / `chart-hist-down` `#dc2626` (MACD 히스토그램 부호별 초록/빨강), `chart-rsi` `#7c3aed` (RSI 라인 보라), `chart-ref-ob` `#dc2626` / `chart-ref-os` `#2563eb` / `chart-ref-mid` `#9ca3af` (RSI 과매수 70·과매도 30·중립 50 기준선 빨강/파랑/회색), `chart-vol-up` `#fca5a5` / `chart-vol-down` `#93c5fd` (거래량 봉 상승/하락 연빨강/연파랑), `chart-down` `#2563eb` (하락 캔들·라인 파랑).
 
 **볼린저밴드 추가 키(후속)** — `chart-bb` `#0d9488` (light, teal-600) / `#2dd4bf` (dark, teal-400). 메인 가격 차트 볼린저밴드 상·하단선·중심선(SMA20 점선)·음영 밴드에 공통 사용하는 단일 키. **의도적으로 매물대(회색 `text-muted`·POC 보라 `chart-rsi`)와 다른 teal 계열** — 두 오버레이를 동시에 켜도 색으로 구분되게 하기 위함. 다크는 어두운 캔버스 시인성 위해 명도 상향(teal-400). 상·하단은 실선, 중심선은 점선, 음영은 저투명(fillOpacity 0.1)으로 역할 구분하므로 단일 키로 충분.
+
+**이동평균선·VWAP·거래량 이평 추가 키(후속, `chart-indicators` — 6 키)** — 메인 차트 이동평균선(MA 5/20/60/120, 기본 ON)·VWAP·거래량 이동평균(VMA 20) 오버레이 색. **4개 MA 는 한 서브플롯에 동시 표시되므로 상호 구별이 최우선** — 색상환에서 최대한 벌린 Open Color 계열 4 색: `chart-ma5` `#f08c00`(orange) / `chart-ma20` `#e64980`(pink) / `chart-ma60` `#7048e8`(violet) / `chart-ma120` `#2f9e44`(green). 캔들 상승 빨강(`signal-up`)·하락 파랑(`chart-down`)과 겹치지 않는 4 색을 의도 선정(빨강·파랑 회피). `chart-vwap` `#0c8599`(cyan, **점선 렌더**로 teal 볼린저밴드와 구분 — 둘 다 기본 OFF 라 동시 표시는 드묾) 는 가격 서브플롯의 세션 기준선. `chart-vma` `#6741d9`(violet) 는 거래량 서브플롯의 이동평균선으로, 연빨강/연파랑 거래량 봉 위에서 또렷하게 읽히도록 진한 채도. 다크는 어두운 캔버스 시인성 위해 전반 명도 상향(Open Color light↔dark 페어): `#ffa94d` / `#f783ac` / `#9775fa` / `#51cf66` / `#3bc9db` / `#b197fc`. MA 선은 얇게(strokeWidth 1) 그려 캔들을 가리지 않으며, 어느 색이 어느 기간인지는 차트 상단 인라인 범례(`MA5·MA20·MA60·MA120`)와 캔들 툴팁의 MA 값으로 안내한다. `chart-ma60`(violet) = `chart-vma`(violet) 는 hue 가 가깝지만 각각 가격/거래량 **다른 서브플롯** 전용이라 공간적으로 겹치지 않는다(위 `chart-macd`=`chart-ref-os`=`chart-down` 동일 철학).
 
 **의도적 동일 hex 별도 토큰** — `chart-macd` = `chart-ref-os` = `chart-down` = `#2563eb`, `chart-hist-down` = `chart-ref-ob` = `#dc2626` 으로 값이 겹치지만 역할(MACD 라인 / RSI 과매도선 / 하락 캔들, MACD 히스토그램 음수 / RSI 과매수선)이 달라 별도 키로 박는다. v8 의 `gradient-ai-to` = `accent-vivid` = `signal-down` (동일 `#1d4ed8`, 의미 단위 분리) 선례와 동일 철학 — 추후 차트 색 재조정 시 역할별 독립 변경 가능. 차트의 상승색은 기존 `signal-up` `#c81e1e` 재사용, 축 눈금 `text-muted` / 그리드 `border-line` / 툴팁 텍스트 `text-strong` 재사용으로 신규 키 불필요. 툴팁 배경은 rgba 투명색이라 토큰화 제외(코드 리터럴 유지). `chart-*` 토큰은 차트 캔버스(데이터 시각화) 전용 — 본문 텍스트·등락률·배지에는 사용 금지(등락은 `signal-up` / `signal-down`, 자산은 `asset-*` 영역).
 

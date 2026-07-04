@@ -41,6 +41,12 @@
   --fs-chart-vol-down: #93c5fd;
   --fs-chart-down: #2563eb;
   --fs-chart-bb: #0d9488;
+  --fs-chart-ma5: #f08c00;
+  --fs-chart-ma20: #e64980;
+  --fs-chart-ma60: #7048e8;
+  --fs-chart-ma120: #2f9e44;
+  --fs-chart-vwap: #0c8599;
+  --fs-chart-vma: #6741d9;
   --fs-fng-extreme-fear: #1d6fb8;
   --fs-fng-extreme-fear-soft: #e3f0fa;
   --fs-fng-fear: #256353;
@@ -95,6 +101,12 @@ html.dark {
   --fs-chart-vol-down: #35527a;
   --fs-chart-down: #5b9bff;
   --fs-chart-bb: #2dd4bf;
+  --fs-chart-ma5: #ffa94d;
+  --fs-chart-ma20: #f783ac;
+  --fs-chart-ma60: #9775fa;
+  --fs-chart-ma120: #51cf66;
+  --fs-chart-vwap: #3bc9db;
+  --fs-chart-vma: #b197fc;
   --fs-fng-extreme-fear: #4d9fe0;
   --fs-fng-extreme-fear-soft: #13283b;
   --fs-fng-fear: #3fae93;
