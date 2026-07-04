@@ -15,8 +15,8 @@
  * 시안 A 다중 AI: available.length >= 2 면 provider 토글(radiogroup)을 트랙 위 행에 둔다.
  *   length === 1 이면 그 AI 로 바로 슬라이드(토글 없음). length === 0 / 로딩 = 호출부에서 비표시.
  *
- * 토큰: hex/px 직타 금지. 기존 AI 패널 Tailwind 패턴 재사용(blue-600 진행 / green threshold /
- *   amber·emerald provider 강조 / slate disabled). 다크모드 dark: variant 동시 적용.
+ * 토큰: hex/px·dark: 직타 0 — 색은 시맨틱 토큰(accent-vivid 진행·임계 / warn·info provider 강조 /
+ *   surface-muted·border-line rail·disabled). 라이트/다크는 토큰이 자동 스왑한다.
  */
 
 import { useState } from "react";
@@ -36,13 +36,13 @@ interface SlideToAnalyzeProps {
   onStart: (provider: AIAnalysisProvider) => void;
 }
 
-/** provider 별 노브 라벨 색 + 아이콘(ProviderChooser/codex 토큰 정합). */
+/** provider 별 노브 라벨 색 + 아이콘 — 토큰(claude=warn / codex=info). ProviderChooser 정합. */
 const PROVIDER_ACCENT: Record<
   AIAnalysisProvider,
   { text: string; icon: typeof Sparkles }
 > = {
-  claude: { text: "text-amber-700 dark:text-amber-500", icon: Sparkles },
-  codex: { text: "text-emerald-700 dark:text-emerald-500", icon: Zap },
+  claude: { text: "text-warn", icon: Sparkles },
+  codex: { text: "text-info", icon: Zap },
 };
 
 export function SlideToAnalyze({
@@ -76,7 +76,7 @@ export function SlideToAnalyze({
         <div
           role="radiogroup"
           aria-label={COPY.previousDecision.slide.pickProvider}
-          className="mb-2.5 inline-flex gap-1 rounded-full bg-blue-50 p-1 dark:bg-blue-950/40"
+          className="mb-2.5 inline-flex gap-1 rounded-pill bg-accent-vivid-soft p-1"
         >
           {available.map((p) => {
             const pAccent = PROVIDER_ACCENT[p];
@@ -91,11 +91,11 @@ export function SlideToAnalyze({
                 disabled={isBusy}
                 onClick={() => setSelected(p)}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-colors cursor-pointer",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-950",
+                  "inline-flex items-center gap-1 rounded-pill px-3 py-1 text-caption font-bold transition-colors cursor-pointer",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-vivid focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
                   active
-                    ? "bg-white text-blue-800 shadow-sm dark:bg-slate-100 dark:text-blue-900"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                    ? "bg-surface text-accent-vivid shadow-sm"
+                    : "text-text-muted hover:text-text-strong",
                   isBusy && "cursor-not-allowed opacity-60",
                 )}
               >
@@ -116,35 +116,36 @@ export function SlideToAnalyze({
           aria-busy={isCommitting}
           {...handlers}
           className={cn(
-            "group relative flex w-full items-center justify-between gap-2 overflow-hidden rounded-full p-1 sm:w-auto",
+            "group relative flex w-full items-center justify-between gap-2 overflow-hidden rounded-pill p-1 sm:w-auto",
             "h-11",
             "border transition-colors duration-200",
+            // 임계 도달 = accent 로 전환("놓으면 시작" 신호). 초록 토큰 부재 → 밝은 파랑 accent 로 상태 변화 표현.
             isThreshold
-              ? "border-green-300 bg-green-100 dark:border-green-900 dark:bg-green-950/40"
-              : "border-blue-200 bg-blue-100 dark:border-blue-900 dark:bg-blue-950/40",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950",
+              ? "border-accent-vivid bg-accent-vivid-soft"
+              : "border-border-line bg-surface-muted",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-vivid focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
             "cursor-pointer touch-none",
           )}
         >
-          {/* 노브 — 흰 pill "재분석". 좌측에서 우측(AI)으로 밀기. */}
+          {/* 노브 — 밝은 pill "재분석"(track 보다 밝은 surface). 좌측에서 우측(AI)으로 밀기. */}
           <motion.span
             ref={knobRef}
             aria-hidden
             style={{ x: knobX }}
             className={cn(
-              "z-10 inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-slate-50 px-2.5 dark:bg-slate-200",
-              "shadow-sm ring-1 ring-black/5 group-hover:shadow-md transition-shadow duration-200",
+              "z-10 inline-flex h-9 shrink-0 items-center gap-1 rounded-pill bg-surface px-2.5",
+              "shadow-sm ring-1 ring-border-line group-hover:shadow-md transition-shadow duration-200",
             )}
           >
             {isCommitting && (
-              <Loader2 size={13} className="animate-spin text-blue-600" />
+              <Loader2 size={13} className="animate-spin text-accent-vivid" />
             )}
-            <span className="whitespace-nowrap text-[13px] font-bold leading-none text-blue-700 dark:text-blue-800">
+            <span className="whitespace-nowrap text-label-sm leading-none text-accent-vivid">
               {COPY.previousDecision.slide.short}
             </span>
             <span
               aria-hidden
-              className="text-blue-400 transition-transform duration-200 group-hover:translate-x-0.5 dark:text-blue-500"
+              className="text-accent-vivid transition-transform duration-200 group-hover:translate-x-0.5"
             >
               <ArrowRight size={14} />
             </span>
@@ -154,8 +155,8 @@ export function SlideToAnalyze({
           <span
             aria-hidden
             className={cn(
-              "z-0 inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-bold pr-2",
-              isThreshold ? "text-green-700 dark:text-green-400" : accent.text,
+              "z-0 inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-label-sm pr-2",
+              isThreshold ? "text-accent-vivid" : accent.text,
             )}
           >
             <KnobIcon size={14} />

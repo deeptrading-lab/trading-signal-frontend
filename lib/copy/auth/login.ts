@@ -6,9 +6,7 @@
  *   - 실패 메시지에 비밀번호 값/구체적 사유/힌트 노출 금지(보안).
  */
 
-/** 서비스명(브랜드 워드마크). */
-export const LOGIN_BRAND = "FinSight";
-/** 화면 안내 1줄. */
+/** 화면 안내 1줄. 브랜드 워드마크는 `BrandLockup`(→ `NAV_BRAND_LABEL`) 단일 소스 공유. */
 export const LOGIN_SUBTITLE = "이용하려면 비밀번호를 입력해 주세요.";
 /** 비밀번호 입력 라벨. */
 export const LOGIN_PASSWORD_LABEL = "비밀번호";

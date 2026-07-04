@@ -19,6 +19,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useQueryStockInvestors } from "@/hooks/stock/useQueryStockInvestors";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
+import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatNetBuyAmount, formatNetBuyQty } from "@/lib/utils/formatNetBuy";
@@ -122,14 +123,19 @@ function sumBy(
 function StockInvestorTrendContent({
   ticker,
   tableDefaultOpen,
+  hideTableToggle = false,
 }: {
   ticker: string;
   tableDefaultOpen: boolean;
+  /** 상위(온디맨드 접힘 행)가 이미 노출을 게이트할 때 — 내부 표 토글을 숨기고 항상 표를 보인다. */
+  hideTableToggle?: boolean;
 }) {
   const { data, isLoading, isError, refetch } = useQueryStockInvestors(ticker);
   // 외국인 현재 지분율 — StockHeader 가 이미 패칭한 price 쿼리 캐시 재사용(추가 KIS 콜 0).
   const { data: price } = useQueryStockPrice(ticker);
   const [tableOpen, setTableOpen] = useState(tableDefaultOpen);
+  // 온디맨드 행 안에서는 이미 사용자가 펼친 상태 → 표를 바로 보여 이중 토글을 없앤다.
+  const showTable = hideTableToggle || tableOpen;
 
   if (isLoading) {
     return (
@@ -189,24 +195,27 @@ function StockInvestorTrendContent({
         />
       </div>
 
-      {/* 일자별 표 토글 — 합계 3칸은 항상 노출, 표만 펼침(모바일 기본 접힘) */}
-      <button
-        type="button"
-        className="self-start flex items-center gap-xs h-button-sm-h px-sm rounded-sm text-button-sm text-primary hover:bg-accent-soft"
-        aria-expanded={tableOpen}
-        onClick={() => setTableOpen((v) => !v)}
-      >
-        {tableOpen ? STOCK_INVESTORS_TABLE_HIDE : STOCK_INVESTORS_TABLE_SHOW}
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", tableOpen && "rotate-180")}
-          aria-hidden="true"
-        />
-      </button>
+      {/* 일자별 표 토글 — 합계 3칸은 항상 노출, 표만 펼침(모바일 기본 접힘).
+       *   온디맨드 행 안(hideTableToggle)에서는 상위가 이미 게이트하므로 토글을 숨긴다. */}
+      {!hideTableToggle && (
+        <button
+          type="button"
+          className="self-start flex items-center gap-xs h-button-sm-h px-sm rounded-sm text-button-sm text-primary hover:bg-accent-soft"
+          aria-expanded={tableOpen}
+          onClick={() => setTableOpen((v) => !v)}
+        >
+          {tableOpen ? STOCK_INVESTORS_TABLE_HIDE : STOCK_INVESTORS_TABLE_SHOW}
+          <ChevronDown
+            className={cn("h-4 w-4 transition-transform", tableOpen && "rotate-180")}
+            aria-hidden="true"
+          />
+        </button>
+      )}
 
       {/* 일자별 표 — 컬럼 순서: 일자·개인·외국인·기관·종가. 수급(3주체)이 핵심이라 일자 다음에
        *   바로 오게 하고 종가는 맨 뒤(차트에 이미 있어 부차적). 모바일에선 종가만 가로 스크롤로 밀려난다.
        *   일자는 년도 제거(`05-28`)로 폭 절약. */}
-      {tableOpen && (
+      {showTable && (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[400px] border-collapse">
           <thead>
@@ -271,12 +280,30 @@ export interface StockInvestorTrendProps {
    * 표만 토글한다(쿼리는 합계 표시를 위해 항상 실행).
    */
   tableDefaultOpen?: boolean;
+  /**
+   * 온디맨드(T4) — 카드리스 접힘 행으로 렌더(데스크탑·모바일 공통 기본 접힘). 펼치면 합계 3칸 +
+   * 일자별 표(내부 토글 없이 바로 노출). 미지정 시 기존 항상 펼친 카드.
+   */
+  collapsible?: boolean;
 }
 
 export function StockInvestorTrend({
   ticker,
   tableDefaultOpen = true,
+  collapsible = false,
 }: StockInvestorTrendProps) {
+  if (collapsible) {
+    return (
+      <CollapsibleCard variant="flat" title={STOCK_INVESTORS_TITLE}>
+        <StockInvestorTrendContent
+          ticker={ticker}
+          tableDefaultOpen
+          hideTableToggle
+        />
+      </CollapsibleCard>
+    );
+  }
+
   return (
     <section className="card" aria-label={STOCK_INVESTORS_TITLE}>
       <header className="mb-md">

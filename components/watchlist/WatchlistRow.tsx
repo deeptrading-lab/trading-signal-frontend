@@ -1,42 +1,45 @@
 /**
- * WatchlistRow — `/watchlist` 테이블 1 row (client component).
+ * WatchlistRow — `/watchlist` 관심종목 1행 (client component).
  *
- * PR9(finsight-redesign) 신규 → `watchlist-real-data` §3.6 실데이터 전환:
- *   - 표시 모델이 `WatchlistItem`(문자열 priceDisplay) → `WatchlistQuote`(number price) 로 교체.
- *     천단위 콤마·등락률 부호는 본 컴포넌트에서 `formatNumber`/`formatPct` 로 변환.
- *   - 행별 삭제 버튼 신설(§9 q5) — `onRemove(ticker)`. 행 본문 클릭 시 `/profile/[ticker]` 라우팅.
+ * PR9(finsight-redesign) → `watchlist-real-data` §3.6 → **watchlist-reskin**(카드리스 플랫 행).
  *
- * `watchlist-batch-quotes` §3.4·§4 (q2 RESOLVED):
- *   - per-row "다시 시도" 버튼·재시도 콜백 prop 제거. 디그레이드 행은 안내 + 삭제만 두고,
- *     전체 재조회는 표 상단 단일 "새로고침"(`WatchlistPage`) 으로 일원화한다.
+ * watchlist-reskin — 홈 랭킹(`RealtimeRankingSection`의 `RankRow`) 정합:
+ *   - 카드 박스·12-col grid 헤더 폐기 → `ListRow`(헤어라인 하단 구분선) + `grid-cols-[auto_1fr_auto]`.
+ *   - 행 구성: [★ 제거] [로고닷 + 종목명(**코드 미표시**) + 매수 유의 경고칩] [현재가 + 등락률].
+ *   - 색은 부호로 결정(한국식): 상승=빨강(signal-up) / 하락=파랑(signal-down).
+ *   - 로고닷은 `rankLogoDotClass`/`rankLogoInitial`(홈 공용, hex 직타 0)로 결정론 색·이니셜.
  *
- * `watchlist-warning-badge` (§3): 매수 유의(거래소 시장경보·VI) 칩을 종목명 옆에 표시(토스
- *   warnings, `StockWarningBadges` 공유). 정상·디그레이드 행 모두 적용(경보는 시세와 무관).
- *   토스 키 없음·무경보·실패면 미표시. 거래정지/관리종목 **자체**는 warnings API 미제공이라
- *   여기서 다루지 않는다(관리종목은 #201 KIS 보강 경로 별도).
+ * 관심종목 제거(★):
+ *   - 별은 이미 담긴 상태이므로 항상 채운 앰버(`text-chart-signal fill-chart-signal`) → 클릭 시 제거.
+ *   - ★ a11y — 행이 클릭 가능한 div 이므로 별 버튼에서 `onClick`/`onKeyDown` **stopPropagation** 으로
+ *     행 네비게이션과 분리(home-reskin 이 동일 버그를 겪음). 별 조작이 상세 진입을 트리거하지 않는다.
+ *   - 제거/멤버십 state 는 상위(`WatchlistContainer`)의 단일 `useWatchlistTickers` 인스턴스가 소유
+ *     (`onRemove` prop). 행마다 훅을 호출하면 스냅샷 desync 로 서로의 추가를 지운다.
  *
- * `fix/watchlist-partial-render` — 부분실패 종목 누락 방지(좌조인 렌더):
- *   - `quote` 가 없는(시세 실패/누락) ticker 는 "디그레이드 행" 으로 렌더한다. 종목명은 추가
- *     시점에 store 에 저장된 `fallbackName`(없으면 시드 name)으로 식별 가능하게 표시한다.
- *     삭제 버튼은 정상 행과 동일 제공.
- *   - 디그레이드 행은 시세 미확정이므로 `/profile` 라우팅(행 클릭) 을 막는다.
- *   - 기존 행 구조/토큰 재사용(신규 토큰 0).
+ * 디그레이드 행(부분 실패 — `fix/watchlist-partial-render`):
+ *   - `quote` 없는(시세 실패/누락) ticker 도 담은 채로 남긴다. 종목명(가능 시 `fallbackName`)+경고칩+
+ *     "시세를 불러오지 못했어요" 안내 + 별 제거만. 시세 미확정이라 행 클릭(상세 라우팅)은 막는다.
  *
- * v8 토큰 유지: 12-col grid · 등락 칩 `badge-signal-up`/`badge-signal-down`(상승 빨강/하락 파랑) ·
- *   row hover `hover:bg-surface-muted` · 삭제 버튼 `button-icon`.
+ * 매수 유의 경고칩(`watchlist-warning-badge`): 종목명 옆 `StockWarningBadges`(토스 warnings 공유,
+ *   fail-soft). 정상·디그레이드 행 모두 적용(경보는 시세와 무관). 키 없음·무경보·실패면 미표시.
+ *
+ * 상세 선반입 + 차트 Peek: hover/focus·롱프레스 시 `useStockPeek`(선반입 + 미리보기 팝오버/시트).
+ *   시드(가격/등락/방향)를 넘겨 즉시 페인트. 디그레이드 행(시세 없음)은 Peek 미부착.
  */
 
 "use client";
 
 import { memo } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
-import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
+import { Star } from "lucide-react";
+import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
+import { rankLogoDotClass, rankLogoInitial } from "@/lib/utils/rankLogoDot";
 import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
+import { ListRow } from "@/components/ui/ListRow";
 import type { WatchlistQuote } from "@/lib/api/watchlist/list";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 import {
@@ -60,6 +63,74 @@ export interface WatchlistRowProps {
   onRemove: (ticker: string) => void;
 }
 
+/** 등락 방향 → 등락률 색 토큰(합성 클래스라 cn 사이즈 override 시에도 색 유지). 홈 랭킹과 동일. */
+function changeClass(direction: WatchlistQuote["direction"]): string {
+  if (direction === "up") return "signal-up-text";
+  if (direction === "down") return "signal-down-text";
+  return "text-text-muted text-mono-numeric tabular-nums";
+}
+
+/** ★ 제거 버튼 — 채운 앰버 별(이미 담김). 행 네비게이션과 분리(stopPropagation). */
+function RemoveStarButton({
+  label,
+  onRemove,
+}: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="inline-grid h-8 w-8 cursor-pointer place-items-center rounded-sm transition-opacity hover:opacity-80"
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <Star
+        className="h-5 w-5 text-chart-signal fill-chart-signal"
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
+/** 로고닷 + 종목명(코드 미표시) + 매수 유의 경고칩 — 정상·디그레이드 공용 이름 클러스터. */
+function NameCluster({
+  ticker,
+  name,
+  warnings,
+}: {
+  ticker: string;
+  name: string;
+  warnings?: StockWarningItem[];
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-sm">
+      <span
+        className={cn(
+          "inline-grid h-6 w-6 shrink-0 place-items-center rounded-sm text-caption font-bold",
+          rankLogoDotClass(ticker),
+        )}
+        aria-hidden="true"
+      >
+        {rankLogoInitial(name)}
+      </span>
+      <span className="min-w-0 truncate text-body-sm-strong text-text-strong">
+        {name}
+      </span>
+      <StockWarningBadges
+        warnings={warnings}
+        max={1}
+        size="sm"
+        className="shrink-0"
+      />
+    </div>
+  );
+}
+
 function WatchlistRowBase({
   ticker,
   quote,
@@ -68,125 +139,83 @@ function WatchlistRowBase({
   onRemove,
 }: WatchlistRowProps) {
   const router = useRouter();
-  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
+  // ★ 훅은 조건 분기 전에 무조건 호출(rules-of-hooks). 시드는 정상 행에서만 존재.
+  const displayName = fallbackName ?? quote?.name ?? ticker;
+  const { peekProps, prefetch } = useStockPeek({
+    ticker,
+    name: displayName,
+    seed: quote
+      ? {
+          price: quote.price,
+          changePercent: quote.changePercent,
+          direction: quote.direction,
+        }
+      : undefined,
+  });
 
   if (!quote) {
-    // 디그레이드 행 — 담은 종목은 사라지지 않는다. 종목명(가능 시) + 안내 + 삭제.
-    // per-row 재시도는 제거(상단 단일 새로고침으로 일원화). 헤더(4/3/3/2) 정합:
-    // 이름 col-span-4 · 안내 col-span-6 · 삭제 col-span-2.
-    const removeTarget = fallbackName
-      ? `${fallbackName} (${ticker})`
-      : ticker;
+    // 디그레이드 행 — 담은 종목은 사라지지 않는다. 시세 미확정이라 클릭(상세 라우팅)·Peek 미부착.
+    // 표시명: fallbackName(있으면) → 없으면 ticker 자체(코드 미표시 규칙상 별도 코드 줄 없음).
     return (
-      <div className="grid grid-cols-12 gap-md items-center p-md">
-        <div className="col-span-4 flex flex-col gap-xs min-w-0">
-          {fallbackName ? (
-            <>
-              <span className="inline-flex items-center gap-xs min-w-0">
-                <span className="text-body-strong text-text-strong truncate">
-                  {fallbackName}
-                </span>
-                <StockWarningBadges warnings={warnings} max={1} size="sm" />
-              </span>
-              <span className="text-caption text-text-muted">{ticker}</span>
-            </>
-          ) : (
-            <span className="inline-flex items-center gap-xs">
-              <span className="text-body-strong text-text-strong">{ticker}</span>
-              <StockWarningBadges warnings={warnings} max={1} size="sm" />
-            </span>
-          )}
-        </div>
-
-        <div className="col-span-6 flex items-center justify-end">
-          <span className="text-caption text-text-muted truncate">
-            {WATCHLIST_ROW_FAILED}
-          </span>
-        </div>
-
-        <div className="col-span-2 flex justify-end">
-          <button
-            type="button"
-            className="button-icon"
-            aria-label={`${removeTarget} ${WATCHLIST_REMOVE_LABEL}`}
-            onClick={() => onRemove(ticker)}
-          >
-            <Trash2 className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+      <ListRow
+        role="listitem"
+        className="-mx-sm grid grid-cols-[auto_1fr_auto] items-center gap-md rounded-sm px-sm"
+      >
+        <RemoveStarButton
+          label={`${displayName} ${WATCHLIST_REMOVE_LABEL}`}
+          onRemove={() => onRemove(ticker)}
+        />
+        <NameCluster ticker={ticker} name={displayName} warnings={warnings} />
+        <span className="justify-self-end whitespace-nowrap text-caption text-text-muted">
+          {WATCHLIST_ROW_FAILED}
+        </span>
+      </ListRow>
     );
   }
 
-  const isUp = quote.direction === "up";
-  const isFlat = quote.direction === "flat";
-  const signalBadgeClass = isUp ? "badge-signal-up" : "badge-signal-down";
-  // 표시명 — store name(추가 시점) → 시드 name 우선, 없으면 BFF 폴백 quote.name(§3.3).
-  const displayName = fallbackName ?? quote.name;
+  // 표시명 — store name(추가 시점) → 시드 name 우선, 없으면 BFF 폴백 quote.name(§3.3). 상단 계산 재사용.
+  const go = () => {
+    prefetch(quote.ticker);
+    router.push(stockDetailPath(quote.ticker, displayName));
+  };
 
   return (
-    <div
-      className="grid grid-cols-12 gap-md items-center p-md transition-colors hover:bg-surface-muted cursor-pointer"
-      role="link"
+    <ListRow
+      role="listitem"
       tabIndex={0}
       aria-label={`${displayName} 상세 보기`}
-      onClick={() => {
-        prefetch(quote.ticker);
-        router.push(stockDetailPath(quote.ticker, displayName));
-      }}
+      className={cn(
+        "-mx-sm cursor-pointer rounded-sm px-sm transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none",
+        "grid grid-cols-[auto_1fr_auto] items-center gap-md",
+      )}
+      onClick={go}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          prefetch(quote.ticker);
-          router.push(stockDetailPath(quote.ticker, displayName));
+          go();
         }
       }}
-      onMouseEnter={() => onIntent(quote.ticker)}
-      onMouseLeave={cancelIntent}
-      onFocus={() => onIntent(quote.ticker)}
-      onBlur={cancelIntent}
+      {...peekProps}
     >
-      <div className="col-span-4 flex items-center gap-sm min-w-0">
-        <div className="min-w-0">
-          <div className="flex items-center gap-xs">
-            <span className="text-body-strong text-text-strong truncate">
-              {displayName}
-            </span>
-            <StockWarningBadges warnings={warnings} max={1} size="sm" />
-          </div>
-          <div className="text-caption text-text-muted">{quote.ticker}</div>
-        </div>
-      </div>
-
-      <div className="col-span-3 text-right text-body-strong text-text-strong tabular-nums">
-        {formatNumber(quote.price)}
-      </div>
-
-      <div className="col-span-3 flex justify-end">
+      <RemoveStarButton
+        label={`${displayName} ${WATCHLIST_REMOVE_LABEL}`}
+        onRemove={() => onRemove(quote.ticker)}
+      />
+      <NameCluster ticker={quote.ticker} name={displayName} warnings={warnings} />
+      <div className="flex items-center justify-end gap-md">
+        <span className="text-body-sm-strong tabular-nums text-text-strong">
+          {formatNumber(quote.price)}
+        </span>
         <span
           className={cn(
-            "tabular-nums",
-            isFlat ? "badge-accent" : signalBadgeClass,
+            "w-16 text-right text-body-sm-strong",
+            changeClass(quote.direction),
           )}
         >
           {formatPct(quote.changePercent, { sign: true })}
         </span>
       </div>
-
-      <div className="col-span-2 flex justify-end">
-        <button
-          type="button"
-          className="button-icon"
-          aria-label={`${displayName} ${WATCHLIST_REMOVE_LABEL}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(quote.ticker);
-          }}
-        >
-          <Trash2 className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
+    </ListRow>
   );
 }
 

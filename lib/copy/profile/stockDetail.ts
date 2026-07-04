@@ -12,6 +12,10 @@ export const STOCK_DETAIL_PRICE_CHART_TITLE = "가격 차트";
 export const STOCK_DETAIL_COMPANY_OVERVIEW_TITLE = "기업개황";
 export const STOCK_DETAIL_DISCLOSURE_LIST_TITLE = "최근 공시";
 
+/* 정보 티어링(T4) 안내 — 항시 노출 vs 온디맨드(펼침) 구분을 사용자에게 알린다. */
+export const STOCK_DETAIL_TIERING_NOTE =
+  "항시 노출은 시세·차트·시그널 요약이에요. 회사개요·공시·수급은 필요할 때 펼쳐 보세요.";
+
 /* 회사 소개(자유 텍스트, 외부 출처) */
 export const STOCK_DETAIL_COMPANY_DESCRIPTION_TITLE = "회사 소개";
 /** 출처 표기 접두 — `회사 소개` 문단 하단에 "출처: FnGuide" 형태로 노출. */
@@ -21,6 +25,8 @@ export const STOCK_DETAIL_DESCRIPTION_SOURCE_PREFIX = "출처";
 export const STOCK_DETAIL_LOADING = "불러오는 중…";
 export const STOCK_DETAIL_NOT_FOUND =
   "해당 종목을 찾을 수 없습니다. 종목코드를 다시 확인해주세요.";
+export const STOCK_DETAIL_LOAD_ERROR =
+  "시세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
 export const STOCK_DETAIL_MOCK_FALLBACK_NOTICE =
   "실시간 데이터 일시 연결 안 됨 — 샘플 데이터로 보고 있습니다.";
 

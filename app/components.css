@@ -332,6 +332,27 @@
     animation: wl-particle-8 1s ease-out;
   }
 
+  /* ---------- AI 분석 마크다운 본문 (ai-panel-reskin — CardDetailOverlay) ----------
+   * react-markdown 결과의 prose 색 변수를 토큰으로 오버라이드 — dark: 없이 라이트/다크 자동 전환.
+   * `.markdown-content.prose`(0,2,0)로 typography 플러그인의 `.prose`(0,1,0)를 확실히 이긴다.
+   * theme(colors.*) 은 빌드 시 var(--fs-*) 로 해석돼 다크에서 자동 스왑(‥app/components 의 var(-- 직타 아님).
+   * 배경(th/code)·간격·폰트크기는 호출 측 prose-* 모디파이어(토큰)가 담당. */
+  .markdown-content.prose {
+    --tw-prose-body: theme(colors.text-strong);
+    --tw-prose-headings: theme(colors.text-strong);
+    --tw-prose-bold: theme(colors.text-strong);
+    --tw-prose-links: theme(colors.accent-vivid);
+    --tw-prose-code: theme(colors.accent-vivid);
+    --tw-prose-counters: theme(colors.text-muted);
+    --tw-prose-bullets: theme(colors.text-muted);
+    --tw-prose-quotes: theme(colors.text-muted);
+    --tw-prose-captions: theme(colors.text-muted);
+    --tw-prose-hr: theme(colors.border-line);
+    --tw-prose-quote-borders: theme(colors.border-line);
+    --tw-prose-th-borders: theme(colors.border-line);
+    --tw-prose-td-borders: theme(colors.border-line);
+  }
+
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
   .price-bar-track {
     @apply absolute top-[6px] left-0 right-0 h-[6px] bg-border-line rounded-pill;
@@ -619,10 +640,10 @@
   }
 
   /* ===== v9 (home-market-redesign) PR1 — 마이페이지 "내 자산" 섹션 합성 토큰 =====
-   * DESIGN.md v9 §Components — asset-hero / holdings-table-*.
-   * 색 신규 0 — 기존 색만 cascade(주식=asset-stock / 코인=asset-coin / 수익률=signal-up/down).
-   * 신규 spacing(table-row-h/table-cell-px) + typography(table-cell-numeric)는
-   * tailwind.theme.json 에 주입(tailwind.config.ts 헤더 참조). hex/px 직타 0건. */
+   * DESIGN.md v9 §Components — asset-hero. 색 신규 0.
+   * profile-reskin(카드리스): 총자산 히어로만 라이트 카드로 남긴다(마이페이지의 유일 focal 카드).
+   *   보유종목 표는 홈 랭킹·관심종목 표 정합의 플랫 인라인(홈 ModelCostBreakdown 표 언어)으로 전환하며
+   *   기존 holdings-table-* 합성 토큰은 제거(사용처 0 — 트림). asset-hero 만 유지. hex/px 직타 0건. */
 
   /* asset-hero: 총자산 히어로 — rounded.xl. 가로는 hero padding(24), 상하는 card padding(20)으로 줄여
    * 불필요한 상하 여백 축소(도넛 120px 축소와 함께). DESIGN.md Elevation 절. */
@@ -630,25 +651,35 @@
     @apply bg-surface text-text-strong border border-border-line rounded-xl px-hero-px py-card-px;
   }
 
-  /* holdings-table-header: 보유종목 테이블 헤더 셀 — surface-muted × text-muted, label-sm. */
-  .holdings-table-header {
-    @apply bg-surface-muted text-text-muted text-label-sm px-table-cell-px;
+  /* ===== profile-reskin — 설정 메뉴 플랫 행(카드리스) =====
+   * 카드 박스·per-row 라운드 박스 폐기 → 흰 바탕 위 헤어라인 행(홈 랭킹 톤). 행 사이 구분선은
+   * 호출 컨테이너의 `divide-y divide-border-line` 이 담당(양 끝 선 없음). 3개 컴포넌트
+   * (SettingsMenuCard/ThemeMenuButton/LogoutMenuButton)가 공유하는 단일 진실 원천. hex/px 직타 0건.
+   * profile-menu-row: 일반 설정/이동 행(아이콘 + 라벨 + 우측 chevron/값). full-width hover.
+   * profile-menu-row-danger: 로그아웃(위험) 행 — critical 텍스트 + critical-soft hover. */
+  /* text-body-md font-bold = body-strong(16px/700) — `text-body-strong` 은 color 토큰과 이름이 겹쳐
+   * fontSize 유틸 생성에서 제외돼(@apply 불가, tailwind.config adaptFontSize 참조) 조합으로 푼다. */
+  .profile-menu-row,
+  .profile-menu-row-danger {
+    @apply flex w-full items-center gap-md py-md text-left text-body-md font-bold transition-colors cursor-pointer;
   }
-  /* holdings-table-row: 본문 행 — surface × text-strong, table-row-h 높이. */
-  .holdings-table-row {
-    @apply bg-surface text-text-strong h-table-row-h;
+  .profile-menu-row {
+    @apply text-text-strong;
   }
-  /* holdings-table-row-hover: 행 hover — surface-muted. */
-  .holdings-table-row-hover:hover {
-    @apply bg-surface-muted;
+  .profile-menu-row:hover,
+  .profile-menu-row:focus-visible {
+    @apply bg-surface-muted outline-none;
   }
-  /* holdings-table-cell-numeric: 평가액·비중 숫자 셀 — table-cell-numeric 타이포(14px/700/tnum). */
-  .holdings-table-cell-numeric {
-    @apply text-table-cell-numeric tabular-nums px-table-cell-px;
+  .profile-menu-row-danger {
+    @apply text-critical;
   }
-  /* holdings-table-cell: 일반 셀 좌우 패딩(table-cell-px). */
-  .holdings-table-cell {
-    @apply px-table-cell-px;
+  .profile-menu-row-danger:hover,
+  .profile-menu-row-danger:focus-visible {
+    @apply bg-critical-soft outline-none;
+  }
+  .profile-menu-row-danger[aria-disabled="true"],
+  .profile-menu-row-danger:disabled {
+    @apply opacity-[0.65] cursor-not-allowed;
   }
 
   /* ===== v9 (home-market-redesign) PR2 — nav "준비 중" 합성 토큰 =====

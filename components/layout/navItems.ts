@@ -29,6 +29,7 @@ import {
   NAV_MENU_WATCHLIST,
   NAV_MENU_PROFILE,
 } from "@/lib/copy/layout/navCopy";
+import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 
 export interface NavItem {
   /** 라우트 path — Next.js App Router 기준. */
@@ -63,8 +64,9 @@ export const NAV_ITEMS: NavItem[] = [
  * 동일 → 하이드레이션 불일치 없음. (서버 판별은 `lib/server/env.ts isVercelEnv()`.)
  */
 export function getVisibleNavItems(): NavItem[] {
-  const onVercel = typeof process.env.NEXT_PUBLIC_VERCEL_ENV === "string";
-  return onVercel ? NAV_ITEMS.filter((item) => !item.localOnly) : NAV_ITEMS;
+  return isVercelRuntime()
+    ? NAV_ITEMS.filter((item) => !item.localOnly)
+    : NAV_ITEMS;
 }
 
 /**

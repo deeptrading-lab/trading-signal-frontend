@@ -1,22 +1,23 @@
 /**
- * ProfileCard — `/profile` 사용자 hero 카드 (server component).
+ * ProfileCard — `/profile` 사용자 아이덴티티 헤더 (server component).
  *
- * PR9 (finsight-redesign) 신규.
+ * PR9 (finsight-redesign) → **profile-reskin**(카드리스 화이트 포워드).
  *
  * 시안 `Profile.tsx` L10~L25 정합 — avatar + 이름/email + 멤버십·투자성향 칩 + "프로필 수정" 버튼.
+ *
+ * profile-reskin — 카드 박스(`card-hero`) 폐기 → 흰 바탕 위 평탄 아이덴티티 밴드. 마이페이지의
+ *   유일 라이트 카드는 "내 자산" 히어로(`asset-hero`) 뿐이며, 본 아이덴티티는 페이지 상단 헤더로서
+ *   여백(컴포저 `gap-2xl`)으로만 아래 섹션과 분리한다(토스 톤 프로필 헤더).
  *
  * 구조:
  *   - 모바일: 1-col 세로 (avatar 위 + 정보 중앙 + 버튼 아래 전폭).
  *   - 데스크탑(md+): 가로 (avatar 좌 + 정보 좌측 + 버튼 우측 끝).
  *
- * v8 토큰:
- *   - 카드 셸 = `card-hero` 합성 토큰 (rounded.xl + hero-px padding).
+ * 토큰:
  *   - avatar = 그라데이션 (`bg-gradient-to-br from-gradient-ai-from to-gradient-ai-to`) +
- *     중앙 `User` 아이콘 (`text-surface`). 시안의 외부 이미지 (`pravatar.cc`) 는 Next.js
- *     image 도메인 등록 회피 위해 본 PR9 범위에서 lucide User cascade.
- *   - 이름 = `text-h1 text-text-strong`. email = `text-body-md text-text-muted`.
- *   - 멤버십 칩 = `badge-accent` (PRO/FREE/ENTERPRISE 무관 동일 시각 — 데모 단계).
- *   - 투자성향 칩 = `badge-info` (v8 정착 토큰).
+ *     중앙 `User` 아이콘 (`text-surface`). 카드리스에 맞춰 96→80px 로 컴팩트화.
+ *   - 이름 = `text-h1 text-text-strong`(아이덴티티 focal). email = `text-body-md text-text-muted`.
+ *   - 멤버십 칩 = `badge-accent`. 투자성향 칩 = `badge-info`.
  *   - "프로필 수정" = `button-primary`.
  */
 
@@ -59,17 +60,17 @@ const INVESTOR_LABEL: Record<InvestorType, string> = {
 
 export function ProfileCard({ user }: ProfileCardProps) {
   return (
-    <section className="card-hero flex flex-col items-center gap-lg md:flex-row md:items-center md:gap-2xl">
+    <section className="flex flex-col items-center gap-lg md:flex-row md:items-center md:gap-xl">
       <div
-        className="shrink-0 inline-flex items-center justify-center h-24 w-24 rounded-pill bg-gradient-to-br from-gradient-ai-from to-gradient-ai-to text-surface"
+        className="inline-flex h-20 w-20 shrink-0 items-center justify-center rounded-pill bg-gradient-to-br from-gradient-ai-from to-gradient-ai-to text-surface"
         aria-hidden="true"
       >
-        <User className="h-12 w-12" />
+        <User className="h-10 w-10" />
       </div>
-      <div className="flex-1 text-center md:text-left">
+      <div className="min-w-0 flex-1 text-center md:text-left">
         <h2 className="text-h1 text-text-strong">{user.name}</h2>
-        <p className="text-body-md text-text-muted">{user.email}</p>
-        <div className="mt-md flex flex-wrap gap-sm justify-center md:justify-start">
+        <p className="truncate text-body-md text-text-muted">{user.email}</p>
+        <div className="mt-md flex flex-wrap justify-center gap-sm md:justify-start">
           <span className="badge-accent">
             {MEMBERSHIP_LABEL[user.membership]}
           </span>

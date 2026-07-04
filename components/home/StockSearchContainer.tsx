@@ -21,6 +21,7 @@ import { Clock, Star } from "lucide-react";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { useQueryStockSearch } from "@/hooks/stock/useQueryStockSearch";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
+import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -48,7 +49,8 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
   const [activeTab, setActiveTab] = useState<Tab>("recent");
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
+  // 클릭(확정 의도) 선반입 — hover 의도·차트 Peek 은 각 결과행(SearchResultRow)의 useStockPeek 소유.
+  const { prefetch } = usePrefetchStockDetail();
 
   // 검색 결과 — keyword 있을 때만 활성
   const { data: searchResults, isLoading: searchLoading } = useQueryStockSearch(keyword, {
@@ -155,25 +157,13 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
               )}
               {!searchLoading &&
                 searchResults?.map((item) => (
-                  <button
+                  <SearchResultRow
                     key={item.ticker}
-                    type="button"
-                    className="search-result-item w-full text-left"
-                    role="option"
-                    aria-selected={false}
-                    onClick={() => handleSelect(item.ticker, item.name)}
-                    onMouseEnter={() => onIntent(item.ticker)}
-                    onMouseLeave={cancelIntent}
-                    onFocus={() => onIntent(item.ticker)}
-                    onBlur={cancelIntent}
-                  >
-                    <span className="text-body-sm-strong text-text-strong">
-                      {item.name}
-                    </span>
-                    <span className="search-result-item-meta">
-                      {item.ticker} · {item.market}
-                    </span>
-                  </button>
+                    ticker={item.ticker}
+                    name={item.name}
+                    market={item.market}
+                    onSelect={handleSelect}
+                  />
                 ))}
             </div>
           )}
@@ -248,6 +238,34 @@ export function StockSearchContainer({ initialKeyword = "" }: StockSearchContain
 }
 
 // ── 내부 컴포넌트 ──────────────────────────────────────────
+
+interface SearchResultRowProps {
+  ticker: string;
+  name: string;
+  market: string;
+  onSelect: (ticker: string, name: string) => void;
+}
+
+/** 키워드 검색 결과 1행 — hover/롱프레스 차트 Peek(useStockPeek) + 클릭 선택. */
+function SearchResultRow({ ticker, name, market, onSelect }: SearchResultRowProps) {
+  // 검색 결과는 시세 시드가 없다 → Peek 은 가격 쿼리 로딩 후 표시(단일 활성이라 1쿼리).
+  const { peekProps } = useStockPeek({ ticker, name });
+  return (
+    <button
+      type="button"
+      className="search-result-item w-full text-left"
+      role="option"
+      aria-selected={false}
+      onClick={() => onSelect(ticker, name)}
+      {...peekProps}
+    >
+      <span className="text-body-sm-strong text-text-strong">{name}</span>
+      <span className="search-result-item-meta">
+        {ticker} · {market}
+      </span>
+    </button>
+  );
+}
 
 interface TabButtonProps {
   active: boolean;

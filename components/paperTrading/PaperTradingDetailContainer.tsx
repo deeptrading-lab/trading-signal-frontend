@@ -33,6 +33,9 @@ import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSess
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { cn } from "@/lib/utils/cn";
+import { Badge } from "@/components/ui/Badge";
+import { Divider } from "@/components/ui/Divider";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { fmtCost, fmtTokensApprox } from "@/components/analyze/format";
 import {
   ACTION_LABEL,
@@ -108,19 +111,22 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
   );
 
   if (isLoading) {
+    // 카드 박스 스켈레톤 제거 — 흰 바탕 위 플랫 스켈레톤(제목 라인 + 차트 블록).
     return (
-      <div className="mx-auto w-full max-w-main-max-w">
-        <div className="card skeleton min-h-[260px]" aria-busy="true" />
+      <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-md" aria-busy="true">
+        <Skeleton variant="line" className="h-6 w-40" />
+        <Skeleton variant="block" className="h-[260px] w-full rounded-lg" />
       </div>
     );
   }
 
   if (isError || !detail) {
+    // card-critical 박스 제거 — 흰 바탕 위 플랫 알림.
     return (
       <div className="mx-auto w-full max-w-main-max-w">
-        <div className="card-critical" role="alert">
-          <p className="text-body-strong">{PAPER_TRADING_ERROR}</p>
-          <button type="button" className="button-secondary mt-md" onClick={() => refetch()}>
+        <div className="flex flex-col items-start gap-md py-md" role="alert">
+          <p className="text-body-md font-bold text-critical">{PAPER_TRADING_ERROR}</p>
+          <button type="button" className="button-secondary" onClick={() => refetch()}>
             {PAPER_TRADING_RETRY}
           </button>
         </div>
@@ -172,8 +178,8 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
           </Link>
           <div className="flex flex-wrap items-center gap-sm">
             <h1 className="text-h1 text-text-strong">{title}</h1>
-            <span className="badge-info">{STATUS_LABEL[session.status]}</span>
-            <span className="rounded-pill bg-surface-muted px-sm py-[2px] text-caption text-text-muted tabular-nums">
+            <Badge variant="info">{STATUS_LABEL[session.status]}</Badge>
+            <span className="rounded-pill bg-surface-muted px-sm py-xs text-caption text-text-muted tabular-nums">
               {session.tickIntervalMinutes}분 주기
             </span>
             <span className="text-caption text-text-muted tabular-nums">
@@ -213,8 +219,8 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
         </div>
       </div>
 
-      {/* 성과 지표 — 한 카드 안 컴팩트 스탯 행(개별 카드 6개는 과대하던 피드백 반영) */}
-      <section className="card" aria-label="모의투자 요약">
+      {/* 성과 지표 — 카드 박스 제거, 흰 바탕 위 플랫 KPI 행(라벨 캡션 + 값 강조). */}
+      <section className="flex flex-col gap-md" aria-label="모의투자 요약">
         <dl className="grid grid-cols-2 gap-x-lg gap-y-md sm:grid-cols-4 lg:grid-cols-8">
           <Stat
             label={PAPER_TRADING_METRIC_RETURN}
@@ -241,11 +247,13 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
         </dl>
       </section>
 
-      {/* 자산 곡선 + 포지션 현황 */}
-      <div className="grid gap-md lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
+      <Divider />
+
+      {/* 자산 곡선 + 포지션 현황 — 카드 박스 제거, 흰 바탕 위 플랫 2열(모바일 1열). */}
+      <div className="grid gap-lg lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
         {/* min-w-0 — 그리드 셀 최소폭 자동값이 차트 측정 실패(width -1 경고)를 유발하지 않게. */}
-        <section className="card min-h-[320px] min-w-0">
-          <div className="mb-md flex items-center justify-between gap-md">
+        <section className="flex min-w-0 flex-col gap-md">
+          <div className="flex items-center justify-between gap-md">
             <h2 className="text-h2 text-text-strong">{PAPER_TRADING_EQUITY_TITLE}</h2>
             {isIntraday ? (
               <span className="text-caption text-text-muted">{PAPER_TRADING_AUTO_TICK_NOTE}</span>
@@ -264,14 +272,19 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
           <EquityCurveChart points={equityCurve} initialCash={session.initialCash} />
         </section>
 
-        <section className="card">
+        <section className="flex flex-col gap-md">
           <h2 className="text-h2 text-text-strong">{PAPER_TRADING_POSITIONS_TITLE}</h2>
           {positions.length === 0 ? (
-            <p className="mt-md text-body-sm text-text-muted">{PAPER_TRADING_NO_POSITION}</p>
+            <p className="text-body-sm text-text-muted">{PAPER_TRADING_NO_POSITION}</p>
           ) : (
-            <div className="mt-md flex flex-col gap-sm">
+            // 미니 카드(surface-muted 박스) 제거 → 흰 바탕 위 헤어라인 행(종목명 코드 미표시).
+            <div role="list">
               {positions.map((position) => (
-                <div key={position.ticker} className="rounded-md bg-surface-muted p-sm text-body-sm">
+                <div
+                  key={position.ticker}
+                  role="listitem"
+                  className="flex flex-col gap-xs border-b border-border-line py-md text-body-sm last:border-b-0"
+                >
                   <div className="flex items-center justify-between gap-sm">
                     <span className="text-body-sm-strong text-text-strong">
                       {position.name ?? position.ticker}
@@ -285,7 +298,7 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
                       {formatPct(position.unrealizedPnlPct)}
                     </span>
                   </div>
-                  <dl className="mt-xs grid grid-cols-2 gap-x-md gap-y-[2px] text-caption text-text-muted tabular-nums">
+                  <dl className="grid grid-cols-2 gap-x-md gap-y-xs text-caption text-text-muted tabular-nums">
                     <div className="flex justify-between gap-sm">
                       <dt>{PAPER_TRADING_TABLE_QUANTITY}</dt>
                       <dd>{formatNumber(position.quantity)}주</dd>
@@ -321,8 +334,10 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
         </section>
       </div>
 
-      {/* 체결 내역 — 거래별 비용·실현손익·판단 메모(왜 이런 매매) */}
-      <section className="card">
+      <Divider />
+
+      {/* 체결 내역 — 거래별 비용·실현손익·판단 메모(왜 이런 매매). 카드 박스 제거, 플랫 헤어라인 표. */}
+      <section className="flex flex-col gap-md">
         <div className="flex items-baseline justify-between gap-md">
           <h2 className="text-h2 text-text-strong">{PAPER_TRADING_ORDERS_TITLE}</h2>
           <span
@@ -336,9 +351,9 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
           </span>
         </div>
         {orders.length === 0 ? (
-          <p className="mt-md text-body-sm text-text-muted">{PAPER_TRADING_ORDERS_EMPTY}</p>
+          <p className="text-body-sm text-text-muted">{PAPER_TRADING_ORDERS_EMPTY}</p>
         ) : (
-          <div className="mt-md overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-body-sm">
               <thead>
                 <tr className="text-left text-caption text-text-muted">
@@ -393,10 +408,12 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
         )}
       </section>
 
-      {/* 판단 타임라인 — 최신순 컴팩트 표(카드 스택은 과대하던 피드백). 흐름 진단 전문은 근거 hover. */}
-      <section className="card">
+      <Divider />
+
+      {/* 판단 타임라인 — 최신순 컴팩트 표. 카드 박스 제거, 플랫 헤어라인 표. 흐름 진단 전문은 근거 hover. */}
+      <section className="flex flex-col gap-md">
         <h2 className="text-h2 text-text-strong">{PAPER_TRADING_TIMELINE_TITLE}</h2>
-        <div className="mt-md overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-body-sm">
             <thead>
               <tr className="text-left text-caption text-text-muted">
@@ -445,7 +462,7 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
                         {tick.rationale}
                       </p>
                       {adjustments.length > 0 ? (
-                        <p className="mt-[2px] text-caption text-text-muted">
+                        <p className="mt-xs text-caption text-text-muted">
                           {PAPER_TRADING_GATE_PREFIX}: {adjustments.join(" · ")}
                         </p>
                       ) : null}
@@ -472,11 +489,11 @@ function Stat({
   tone?: "up" | "down";
 }) {
   return (
-    <div className="flex flex-col gap-[2px]">
+    <div className="flex flex-col gap-xs">
       <dt className="text-caption text-text-muted">{label}</dt>
       <dd
         className={cn(
-          "text-body-strong tabular-nums text-text-strong",
+          "text-body-md font-bold tabular-nums text-text-strong",
           tone === "up" && "text-signal-up",
           tone === "down" && "text-signal-down",
         )}

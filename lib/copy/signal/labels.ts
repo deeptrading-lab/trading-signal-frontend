@@ -22,6 +22,25 @@ export const ACTION_LABEL: Record<SignalAction, string> = {
   SELL: "매도 우위",
 };
 
+/** 장기추세 레짐 한글 라벨(키 = String(regime)). */
+export const REGIME_LABEL: Record<string, string> = {
+  "1": "장기 강세",
+  "-1": "장기 약세",
+  "0": "중립",
+};
+
+/* ── 컴팩트 시그널 요약(종목 상세 T4 "항시") 상태·필드 카피 ── */
+export const SIGNAL_SUMMARY_TITLE = "기술적 시그널";
+export const SIGNAL_SUMMARY_LOADING = "시그널 분석 중…";
+export const SIGNAL_SUMMARY_ERROR = "시그널을 불러올 수 없어요.";
+export const SIGNAL_SUMMARY_INSUFFICIENT =
+  "데이터가 부족해 시그널을 산출할 수 없어요. (최소 130봉 필요)";
+export const SIGNAL_SUMMARY_LIMITED =
+  "장기추세 데이터가 제한적이라 참고용으로만 보세요.";
+export const SIGNAL_SUMMARY_SCORE_SUFFIX = "/ 100";
+export const SIGNAL_SUMMARY_CONFIDENCE_LABEL = "동의도";
+export const SIGNAL_SUMMARY_REGIME_LABEL = "장기추세";
+
 /** 규칙키 → 한글 설명. detail(수치)은 호출부에서 덧붙인다. */
 export const RULE_LABEL: Record<string, string> = {
   // 추세

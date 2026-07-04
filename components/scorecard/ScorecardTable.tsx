@@ -6,7 +6,11 @@
  * - **적중률(초과)** = hit/(hit+miss) — 주 지표(시장 대비 초과수익). 분모 0 이면 "—".
  * - **적중률(절대)** = absHit/(absHit+absMiss) — 시장 베타 포함 참고치(병기).
  * - 표본 N<5 행은 회색 처리 + 안내(작은 표본 오해 방지).
- * - 색·px 직타 금지 — 디자인 토큰(text-text-*, text-signal-*, table-row-h 등) + cn 사용.
+ *
+ * scorecard-reskin(카드리스/화이트포워드) — 카드 박스 없이 흰 바탕 위 헤어라인 표
+ * (홈 `AgentUsageTable`·`ModelCostBreakdown` 표 언어: thead 하단 헤어라인 + `text-label-sm`
+ * 라벨, tbody 행 헤어라인 + hover, 셀 `py-md` 리듬). 등락색(적중=signal-up 빨강 / 미적중=
+ * signal-down 파랑)·표본 N<5 회색 처리는 무변경. 색·px 직타 금지 — 디자인 토큰 + cn.
  */
 
 "use client";
@@ -63,19 +67,34 @@ function rateText(rate: number | null, denom: number): string {
 export function ScorecardTable({ cells }: ScorecardTableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-body-sm">
+      <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="border-b border-border-line text-text-muted">
-            <th className="py-sm pr-md text-left font-medium">{COL_KEY}</th>
-            <th className="px-table-cell-px text-left font-medium">{COL_HORIZON}</th>
-            <th className="px-table-cell-px text-right font-medium">{COL_HIT}</th>
-            <th className="px-table-cell-px text-right font-medium">{COL_MISS}</th>
-            <th className="px-table-cell-px text-right font-medium">{COL_FLAT}</th>
-            <th className="px-table-cell-px text-right font-medium">{COL_TOTAL}</th>
-            <th className="px-table-cell-px text-right font-medium text-text-strong">
+          <tr className="border-b border-border-line">
+            <th scope="col" className="py-md pr-md text-left text-label-sm text-text-muted">
+              {COL_KEY}
+            </th>
+            <th
+              scope="col"
+              className="py-md pr-md text-left text-label-sm text-text-muted whitespace-nowrap"
+            >
+              {COL_HORIZON}
+            </th>
+            <Th>{COL_HIT}</Th>
+            <Th>{COL_MISS}</Th>
+            <Th>{COL_FLAT}</Th>
+            <Th>{COL_TOTAL}</Th>
+            <th
+              scope="col"
+              className="py-md pl-md text-right text-label-sm text-text-strong whitespace-nowrap"
+            >
               {COL_HIT_RATE_EXCESS}
             </th>
-            <th className="pl-table-cell-px text-right font-medium">{COL_HIT_RATE_ABS}</th>
+            <th
+              scope="col"
+              className="py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
+            >
+              {COL_HIT_RATE_ABS}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -86,11 +105,11 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
               <tr
                 key={`${cell.dimension}-${cell.key}-${cell.horizon}`}
                 className={cn(
-                  "h-table-row-h border-b border-border-line/60",
+                  "border-b border-border-line hover:bg-surface-muted",
                   small ? "text-text-muted" : "text-text-strong",
                 )}
               >
-                <td className="py-sm pr-md font-medium">
+                <td className="py-md pr-md text-body-sm-strong">
                   <span>{rowLabel(cell.dimension, cell.key)}</span>
                   {small && (
                     <span className="ml-sm text-caption text-text-muted">
@@ -98,23 +117,25 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                     </span>
                   )}
                 </td>
-                <td className="px-table-cell-px text-text-muted">
+                <td className="py-md pr-md text-body-sm text-text-muted whitespace-nowrap">
                   {horizonLabel(cell.horizon)}
                 </td>
-                <td className="px-table-cell-px text-right tabular-nums text-signal-up">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums text-signal-up">
                   {cell.hit}
                 </td>
-                <td className="px-table-cell-px text-right tabular-nums text-signal-down">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums text-signal-down">
                   {cell.miss}
                 </td>
-                <td className="px-table-cell-px text-right tabular-nums text-text-muted">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
                   {cell.flat}
                 </td>
-                <td className="px-table-cell-px text-right tabular-nums">{cell.total}</td>
-                <td className="px-table-cell-px text-right font-semibold tabular-nums text-text-strong">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums">
+                  {cell.total}
+                </td>
+                <td className="py-md pl-md text-right text-body-sm-strong tabular-nums text-text-strong">
                   {rateText(cell.hitRate, denom)}
                 </td>
-                <td className="pl-table-cell-px text-right tabular-nums text-text-muted">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
                   {rateText(cell.absHitRate, cell.absSample)}
                 </td>
               </tr>
@@ -123,5 +144,17 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** 우측 정렬 숫자 컬럼 헤더(적중/미적중/보합/표본수) — 홈 표 헤더 언어. */
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th
+      scope="col"
+      className="py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
+    >
+      {children}
+    </th>
   );
 }

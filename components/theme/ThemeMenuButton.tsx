@@ -4,8 +4,9 @@
  * ThemeMenuButton — `/profile` 설정 메뉴의 THEME(다크모드) 항목 (client component).
  *
  * 다크모드 PRD §3.1. SettingsMenuCard 는 server component 라 동작을 못 단다 →
- * THEME 항목만 client 로 분리(LogoutMenuButton 선례). 마크업·토큰은 SettingsMenuCard 의
- * MenuButton 과 동일(Moon 아이콘 + 라벨), 아래에 light/dark/system 3-state 세그먼트를 폄.
+ * THEME 항목만 client 로 분리(LogoutMenuButton 선례). 트리거 행은 SettingsMenuCard 의 MenuButton 과
+ * 동일한 `.profile-menu-row`(profile-reskin 공유 플랫 행)를 쓰고, 우측엔 chevron 대신 현재 모드 값을
+ * 표시한다. 아래에 light/dark/system 3-state 세그먼트를 편다.
  *
  * 토큰만 사용(hex/px 직타 0). cn 헬퍼로 선택 상태 합성. 토스톤 간결 세그먼트.
  */
@@ -44,16 +45,16 @@ export function ThemeMenuButton() {
 
   return (
     <div className="flex flex-col gap-xs">
-      {/* 메뉴 행 — SettingsMenuCard MenuButton 과 동일 마크업. 클릭 시 세그먼트 토글. */}
+      {/* 메뉴 행 — SettingsMenuCard MenuButton 과 동일 플랫 행. 클릭 시 세그먼트 토글. */}
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((prev) => !prev)}
-        className="w-full flex items-center gap-md p-md rounded-md text-left transition-colors hover:bg-surface-muted"
+        className="profile-menu-row"
       >
-        <Moon className="h-5 w-5 text-text-muted" aria-hidden="true" />
-        <span className="text-body-strong text-text-strong">{MENU_THEME}</span>
-        <span className="ml-auto text-body-sm text-text-muted">
+        <Moon className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
+        <span className="flex-1 truncate">{MENU_THEME}</span>
+        <span className="shrink-0 text-body-sm text-text-muted">
           {OPTION_LABEL[preference]}
         </span>
       </button>

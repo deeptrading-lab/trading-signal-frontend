@@ -53,6 +53,8 @@ export const SYNC_1H_AGO = "1시간 전 동기화";
 export const SYNC_NONE = "-";
 
 /* 설정 메뉴 라벨 (`lib/types/profile/menuItems.ts` 의 `ProfileMenuKey` 정합). */
+/* profile-reskin — 카드리스 플랫 섹션 제목(설정 목록의 섹션 헤더). */
+export const SETTINGS_SECTION_TITLE = "설정";
 export const MENU_NOTIFICATIONS = "알림 설정";
 export const MENU_SECURITY = "보안 및 인증";
 export const MENU_BILLING = "구독 / 결제 관리";

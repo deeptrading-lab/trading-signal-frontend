@@ -1,10 +1,11 @@
 /**
- * ChartRangeDropdown — 모바일 차트 기간(1개월/3개월/6개월…) 선택 드롭다운.
+ * ChartRangeDropdown — 모바일 차트 봉·기간 선택 드롭다운(기간 1개월/3개월… 또는 분봉 간격 1분/3분…).
  *
  * 좁은 화면에서 라인·캔들 / 봉 / 기간 버튼이 한 줄에 다 들어가지 못해 줄바꿈되는 문제를 피하려고,
- * 기간만 우측 드롭다운으로 접는다. 데스크탑은 기존 버튼 목록 유지(ChartShell 에서 분기).
+ * 우측 선택기를 드롭다운으로 접는다. 데스크탑은 기존 버튼 목록 유지(ChartShell 에서 분기).
+ * 옵션은 `{ label, value }` 중립 목록(value 타입 제네릭) — 봉 종류(interval 문자열)·기간(days)·분봉 간격(timeframe) 모두 재사용.
  *
- * 동작: 버튼(현재 기간 + chevron) 탭 → `.dropdown-panel` 목록 펼침. 옵션 선택/외부 클릭 시 닫힘.
+ * 동작: 버튼(현재 값 + chevron) 탭 → `.dropdown-panel` 목록 펼침. 옵션 선택/외부 클릭 시 닫힘.
  *   외부 클릭 닫힘 패턴은 `components/home/StockSearchContainer.tsx` 와 동일(mousedown).
  */
 
@@ -13,19 +14,25 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import type { RangeConfig } from "./stockChartConfig";
 
-export interface ChartRangeDropdownProps {
-  ranges: RangeConfig[];
-  value: number;
-  onChange: (days: number) => void;
+export interface ChartRangeDropdownProps<T extends string | number> {
+  options: { label: string; value: T }[];
+  value: T;
+  onChange: (value: T) => void;
+  /** 접근성 라벨 — 기간="기간 선택", 분봉 간격="봉 간격 선택", 봉 종류="봉 종류 선택". */
+  ariaLabel?: string;
 }
 
-export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdownProps) {
+export function ChartRangeDropdown<T extends string | number>({
+  options,
+  value,
+  onChange,
+  ariaLabel = "기간 선택",
+}: ChartRangeDropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const current = ranges.find((r) => r.days === value) ?? ranges[0];
+  const current = options.find((o) => o.value === value) ?? options[0];
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -58,28 +65,28 @@ export function ChartRangeDropdown({ ranges, value, onChange }: ChartRangeDropdo
 
       {open && (
         <div
-          className="dropdown-panel absolute right-0 top-full z-[40] mt-xs min-w-[112px]"
+          className="dropdown-panel absolute left-0 top-full z-[40] mt-xs min-w-[112px]"
           role="listbox"
-          aria-label="기간 선택"
+          aria-label={ariaLabel}
         >
-          {ranges.map((r) => (
+          {options.map((o) => (
             <button
-              key={r.days}
+              key={o.value}
               type="button"
               role="option"
-              aria-selected={r.days === value}
+              aria-selected={o.value === value}
               onClick={() => {
-                onChange(r.days);
+                onChange(o.value);
                 setOpen(false);
               }}
               className={cn(
                 "flex w-full items-center px-md py-sm rounded-sm text-body-sm-strong cursor-pointer text-left",
-                r.days === value
+                o.value === value
                   ? "bg-surface-muted text-text-strong"
                   : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
               )}
             >
-              {r.label}
+              {o.label}
             </button>
           ))}
         </div>

@@ -19,16 +19,18 @@ export type { ChartPeriod };
 export interface UseQueryStockChartOptions {
   period?: ChartPeriod;
   days?: number;
+  /** 분봉 활성 시 일봉 쿼리를 끄는 등 조건부 페치용(기본 true). ticker 유무와 AND. */
+  enabled?: boolean;
 }
 
 export function useQueryStockChart(
   ticker: string,
-  { period = "D", days = 100 }: UseQueryStockChartOptions = {},
+  { period = "D", days = 100, enabled = true }: UseQueryStockChartOptions = {},
 ): UseQueryResult<StockDailyCandle[], ApiError> {
   return useQuery<StockDailyCandle[], ApiError>({
     queryKey: queryKeys.stock.chart(ticker, period, days),
     queryFn: () => fetchStockChart(ticker, days, period),
-    enabled: Boolean(ticker),
+    enabled: Boolean(ticker) && enabled,
     staleTime: queryConfig.stock.daily.staleTime,
     gcTime: queryConfig.stock.daily.gcTime,
     retry: 1,

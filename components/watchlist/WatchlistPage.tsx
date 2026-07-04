@@ -1,22 +1,20 @@
 /**
  * WatchlistPage — `/watchlist` 셸 컴포저 (client component).
  *
- * PR9(finsight-redesign) 신규 → `watchlist-real-data` §3.6 실데이터 전환.
+ * PR9(finsight-redesign) → `watchlist-real-data` §3.6 → **watchlist-reskin**(카드리스 화이트 포워드).
  *
  * 책임(프레젠테이션 전용 — 데이터/상태는 `WatchlistContainer` 책임):
- *   - 페이지 헤더 (Star 아이콘 + "관심종목" + "새로고침"/"+ 종목 추가" 버튼).
- *   - children 슬롯에 테이블/빈/에러/로딩 분기 렌더.
+ *   - 플랫 헤더 (Star 아이콘 + "관심 종목" 제목 + "새로고침" 아이콘 버튼). **카드 박스 없음.**
+ *   - children 슬롯에 검색/표/빈/에러/로딩 분기 렌더.
  *
- * `watchlist-batch-quotes` §3.4 — 상단 단일 "새로고침" 신설:
- *   - per-row 재시도(전체 refetch 오해) 를 헤더 단일 버튼으로 일원화. `onRefresh` = `query.refetch()`.
- *   - `isRefreshing`(query.isFetching) 동안 비활성 + 아이콘 스핀. 깜박임은 훅의 placeholderData 가 흡수.
- *   - `canRefresh` false(빈 상태 등) 시 버튼 미노출.
- *
- * v8 토큰: 컨테이너 `mx-auto max-w-main-max-w flex flex-col gap-lg` · 타이틀 `text-h1` ·
- *   Star `text-chart-signal fill-chart-signal`(앰버/골드, 헤더 테마 토글 해와 색 통일).
- *   "새로고침" = **배경 투명** 아이콘 버튼(RefreshCw 만). 버튼 박스를 `h-2xl w-2xl`(24px)로 둬 타이틀
- *   행 높이(text-h1 ~26px) 이하 → 다른 페이지 헤더와 높이 일치(이전 32px 박스가 헤더를 더 키우던 것 수정).
- *   종목 추가는 상단 인라인 검색(`WatchlistSearch`)으로 이동(기존 "+ 종목 추가" 버튼 제거).
+ * watchlist-reskin — 홈 랭킹(`RealtimeRankingSection`) 정합:
+ *   - 제목은 페이지 `<h1>` 을 유지하되 `text-h2` 로 렌더 → 홈 섹션 제목("실시간")과 같은 시각 밀도.
+ *     (셸에 페이지 h1 이 없어 문서 아웃라인상 h1 이 필요 → 시맨틱 h1 + 컴팩트 h2 크기.)
+ *     `Section` 원자는 제목을 h2 로 고정하므로 헤더는 평탄 flex 로 직접 구성하고, 본문 목록은
+ *     `ListRow`/`Divider` 원자(`WatchlistTable`)로 카드리스 렌더한다.
+ *   - Star = `text-chart-signal fill-chart-signal`(앰버/골드 — 사이드바 관심종목 아이콘·검색 별과 통일).
+ *   - "새로고침" = 배경 투명 아이콘 버튼(RefreshCw). `isRefreshing` 동안 비활성 + 스핀.
+ *     `canRefresh` false(빈/초기 로딩/전체 에러) 시 미노출.
  */
 
 "use client";
@@ -48,10 +46,12 @@ export function WatchlistPage({
 }: WatchlistPageProps) {
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
-      <div className="flex items-center justify-between">
-        <h1 className="inline-flex items-center gap-sm text-h1 text-text-strong">
+      <div className="flex items-center gap-sm">
+        {/* 페이지 타이틀 — 모바일은 하단 탭이 현재 화면을 알려주므로 시각 숨김(문서 아웃라인용 h1 유지),
+         *  데스크탑(md+)에서만 노출. 새로고침 버튼은 그대로 유지. */}
+        <h1 className="sr-only md:not-sr-only inline-flex items-center gap-sm text-h2 text-text-strong">
           <Star
-            className="h-2xl w-2xl text-chart-signal fill-chart-signal"
+            className="h-5 w-5 text-chart-signal fill-chart-signal"
             aria-hidden="true"
           />
           {WATCHLIST_PAGE_TITLE}
@@ -59,7 +59,7 @@ export function WatchlistPage({
         {canRefresh ? (
           <button
             type="button"
-            className="inline-flex h-2xl w-2xl items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong cursor-pointer disabled:opacity-[0.65] disabled:cursor-not-allowed"
+            className="ml-auto inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}

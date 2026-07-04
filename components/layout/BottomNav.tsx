@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils/cn";
 export function BottomNav() {
   const { isMobile } = useBreakpoint();
   const pathname = usePathname();
-  const handleStockNavClick = useStockNavClick();
+  const stockNavBinding = useStockNavClick();
 
   if (!isMobile) return null;
 
@@ -47,7 +47,7 @@ export function BottomNav() {
               active && "bottom-nav-item-active",
             )}
             aria-current={active ? "page" : undefined}
-            onClick={item.path === "/stock" ? (e) => handleStockNavClick(e, active) : undefined}
+            {...(item.path === "/stock" ? stockNavBinding(active) : {})}
           >
             <Icon className="bottom-nav-item-icon" aria-hidden="true" />
             <span className="bottom-nav-item-label">{item.label}</span>

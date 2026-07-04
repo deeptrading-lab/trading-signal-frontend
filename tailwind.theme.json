@@ -42,6 +42,12 @@
         "chart-vol-down": "#93c5fd",
         "chart-down": "#2563eb",
         "chart-bb": "#0d9488",
+        "chart-ma5": "#f08c00",
+        "chart-ma20": "#e64980",
+        "chart-ma60": "#7048e8",
+        "chart-ma120": "#2f9e44",
+        "chart-vwap": "#0c8599",
+        "chart-vma": "#6741d9",
         "fng-extreme-fear": "#1d6fb8",
         "fng-extreme-fear-soft": "#e3f0fa",
         "fng-fear": "#256353",
@@ -109,20 +115,20 @@
       },
       "fontSize": {
         "display": [
-          "30px",
+          "27px",
           {
             "fontWeight": "700"
           }
         ],
         "font-display": [
-          "36px",
+          "32px",
           {
             "letterSpacing": "-0.02em",
             "fontWeight": "800"
           }
         ],
         "h1": [
-          "22px",
+          "20px",
           {
             "fontWeight": "700"
           }
@@ -214,7 +220,7 @@
           }
         ],
         "gauge-score": [
-          "40px",
+          "34px",
           {
             "letterSpacing": "-0.02em",
             "fontWeight": "800"
@@ -230,7 +236,7 @@
       "borderRadius": {
         "sm": "8px",
         "md": "12px",
-        "lg": "16px",
+        "lg": "13px",
         "xl": "24px",
         "pill": "999px"
       },
@@ -258,19 +264,19 @@
         "button-primary-h": "40px",
         "button-sm-h": "32px",
         "hit-area-min": "40px",
-        "card-px": "20px",
-        "card-py": "20px",
-        "card-px-mobile": "16px",
-        "card-py-mobile": "16px",
-        "hero-px": "24px",
-        "hero-py": "24px",
+        "card-px": "16px",
+        "card-py": "16px",
+        "card-px-mobile": "13px",
+        "card-py-mobile": "13px",
+        "hero-px": "18px",
+        "hero-py": "18px",
         "home-grid-gap": "16px",
         "gauge-w": "220px",
         "gauge-h": "120px",
         "gauge-track-w": "14px",
         "donut-size": "120px",
         "donut-thickness": "22px",
-        "table-row-h": "48px",
+        "table-row-h": "42px",
         "table-cell-px": "12px",
         "disclosure-row-py": "12px"
       },

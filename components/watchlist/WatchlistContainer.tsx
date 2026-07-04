@@ -86,24 +86,25 @@ export function WatchlistContainer() {
       />
 
       {isEmpty ? (
-        <div className="card flex flex-col items-center gap-sm py-2xl text-center">
+        // 빈 상태 — 카드리스(카드 박스 없이 흰 바탕 + 여백). 첫 진입 프롬프트.
+        <div className="flex flex-col items-center gap-xs py-2xl text-center">
           <p className="text-body-strong text-text-strong">
             {WATCHLIST_EMPTY_TITLE}
           </p>
           <p className="text-body-sm text-text-muted">{WATCHLIST_SEARCH_HINT}</p>
         </div>
       ) : showError ? (
-        <div
-          className="card flex flex-col items-center gap-sm py-2xl text-center"
-          role="alert"
-        >
-          <p className="text-body-strong text-text-strong">
-            {WATCHLIST_ERROR_TITLE}
-          </p>
-          <p className="text-body-sm text-text-muted">{WATCHLIST_ERROR_HINT}</p>
+        // 전체 에러(보유 데이터 0) — 카드리스 플랫(홈 랭킹 에러 정합). 부분 실패는 행 디그레이드.
+        <div className="flex flex-col items-start gap-md py-md" role="alert">
+          <div className="flex flex-col gap-xs">
+            <p className="text-body-strong text-text-strong">
+              {WATCHLIST_ERROR_TITLE}
+            </p>
+            <p className="text-body-sm text-text-muted">{WATCHLIST_ERROR_HINT}</p>
+          </div>
           <button
             type="button"
-            className="button-secondary mt-sm"
+            className="button-secondary"
             onClick={() => query.refetch()}
           >
             {WATCHLIST_RETRY}

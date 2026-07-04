@@ -194,6 +194,28 @@ export function calcVolumeMA(volumes: number[], period = 20): (number | null)[] 
   return calcSMA(volumes, period);
 }
 
+/** VWAP 한 봉 입력 — 대표가(HLC/3) × 거래량 누적. */
+export type VwapBar = { high: number; low: number; close: number; volume: number };
+
+/**
+ * VWAP(거래량 가중 평균가) — 누적 Σ(대표가×거래량) / 누적 Σ거래량. 대표가 = (고+저+종)/3.
+ *
+ * 입력 첫 봉부터 누적하므로 **한 세션(예: 당일 분봉)** 을 넘겨주면 세션 기준 VWAP 이 된다.
+ * 거래량이 0인 선행 구간은 분모가 0이라 null(미표시). 값 자체가 없을 순 없지만 방어적으로 null 처리.
+ */
+export function calcVWAP(bars: VwapBar[]): (number | null)[] {
+  const out: (number | null)[] = new Array(bars.length).fill(null);
+  let cumPV = 0;
+  let cumVol = 0;
+  for (let i = 0; i < bars.length; i++) {
+    const typical = (bars[i].high + bars[i].low + bars[i].close) / 3;
+    cumPV += typical * bars[i].volume;
+    cumVol += bars[i].volume;
+    out[i] = cumVol > 0 ? cumPV / cumVol : null;
+  }
+  return out;
+}
+
 /** OHLC 한 봉 — `calcADX` 입력 최소 형태. */
 export type AdxBar = { high: number; low: number; close: number };
 
