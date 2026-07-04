@@ -82,6 +82,8 @@ export const queryKeys = {
       ["market", "indices", normalizeTickers(codes)] as const,
     /** 헤더 글로벌 마켓 티커 5종 — 합성 BFF, 인자 없음. */
     ticker: ["market", "ticker"] as const,
+    /** 국내 장 상태(영업일·세션 경계·다음 개장) — 정적 캘린더, 인자 없음. */
+    calendar: ["market", "calendar"] as const,
     /** CNN(미국) 공포·탐욕 지수 — 단일, 인자 없음. */
     fearGreed: ["market", "fear-greed"] as const,
     /** 거래량/거래대금 순위 상위(단타워치 후보·실시간 랭킹) — 정렬 기준별 분리 캐시. */

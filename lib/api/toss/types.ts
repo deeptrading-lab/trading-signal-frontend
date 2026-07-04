@@ -94,6 +94,46 @@ export type TossOrderbook = {
   bids?: TossOrderbookLevel[];
 };
 
+/**
+ * `GET /api/v1/market-calendar/KR` 세션 1구간 — 모든 시각 ISO 8601(+09:00).
+ * 동시호가 시각은 세션별 존재 필드가 다르다(pre·regular=start auction, after=end auction) → 옵셔널.
+ * PRD `toss-market-calendar` §3-2 (2026-07-05 실측 확정).
+ */
+export type TossMarketSession = {
+  /** 세션 시작(예 preMarket "08:00", regularMarket "09:00"). */
+  startTime?: string;
+  /** 장전·정규장 동시호가 개시(preMarket 08:50 / regularMarket 15:20). afterMarket 엔 부재. */
+  singlePriceAuctionStartTime?: string;
+  /** 시간외 동시호가 종료(afterMarket). pre·regular 엔 부재. */
+  singlePriceAuctionEndTime?: string;
+  /** 세션 종료(예 regularMarket "15:30", afterMarket "20:00"). */
+  endTime?: string;
+};
+
+/** 하루의 세션 3종(장전·정규장·시간외). `TossCalendarDay.integrated === null` 이면 휴장이라 부재. */
+export type TossSessions = {
+  preMarket?: TossMarketSession; // 08:00~09:00 (동시호가 08:50)
+  regularMarket?: TossMarketSession; // 09:00~15:30 (동시호가 15:20)
+  afterMarket?: TossMarketSession; // 15:30~20:00
+};
+
+/** 캘린더 하루 — `integrated === null` = 휴장(주말·공휴일), non-null = 영업일 세션. */
+export type TossCalendarDay = {
+  /** YYYY-MM-DD (KST). */
+  date?: string;
+  integrated?: TossSessions | null;
+};
+
+/**
+ * `GET /api/v1/market-calendar/KR` 응답 — 오늘·직전 영업일·다음 영업일.
+ * `today.integrated === null` ⇒ 오늘 휴장. previous/nextBusinessDay.integrated 는 항상 non-null.
+ */
+export type TossMarketCalendar = {
+  today?: TossCalendarDay;
+  previousBusinessDay?: TossCalendarDay;
+  nextBusinessDay?: TossCalendarDay;
+};
+
 /** `GET /api/v1/stocks` 종목 마스터 1건. 국내·미국 공통 스키마(미국은 koreanMarketDetail=null). */
 export type TossStockRow = {
   symbol?: string;
