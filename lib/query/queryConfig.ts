@@ -48,6 +48,14 @@ export const queryConfig = {
       staleTime: 1 * MINUTE,
       gcTime: 10 * MINUTE,
     },
+    /**
+     * 호가창(매수/매도 잔량) — 초 단위로 변하는 순간 수급. staleTime 3s(서버 로더 성공 캐시와
+     * 정렬). 장중 갱신은 지면별 refetchInterval(단타 3s·상세 10s)이 담당, 백그라운드 탭은 정지.
+     */
+    orderbook: {
+      staleTime: 3 * SECOND,
+      gcTime: 1 * MINUTE,
+    },
     /** 종목 검색 — 키워드 변동 적음. */
     search: {
       staleTime: 5 * MINUTE,

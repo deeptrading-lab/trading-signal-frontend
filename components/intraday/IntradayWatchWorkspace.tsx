@@ -22,6 +22,7 @@ import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
+import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
@@ -124,6 +125,16 @@ export function IntradayWatchWorkspace() {
   const rowTickers = rows.map((item) => item.ticker);
   const { data: quotes = [] } = useQueryWatchlist(rowTickers);
 
+  // 호가창을 볼 선택 종목(단일 — 다종목 동시 호가 폴링 금지, PRD q4). 행 클릭으로 전환하고,
+  // 선택이 비었거나 목록에서 사라지면 첫 행으로 자동 수렴.
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedTicker((prev) =>
+      prev && rowTickers.includes(prev) ? prev : (rowTickers[0] ?? null),
+    );
+  }, [rowTickers]);
+  const selectedName = rows.find((item) => item.ticker === selectedTicker)?.name ?? null;
+
   const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
   const watching = new Set(rowTickers);
@@ -207,10 +218,27 @@ export function IntradayWatchWorkspace() {
             quotes={quotes}
             sessionByTicker={sessionByTicker}
             warningsByTicker={warningsByTicker}
+            selectedTicker={selectedTicker}
+            onSelect={setSelectedTicker}
             isCreating={isCreating}
             onStart={start}
             onRemove={remove}
           />
+
+          {/* 선택 종목 호가창(단일) — 촘촘한 폴링(compact). 행 클릭으로 종목 전환. */}
+          {selectedTicker ? (
+            <section
+              className="flex w-full flex-col gap-sm lg:max-w-[22rem]"
+              aria-label={W.orderbookTitle}
+            >
+              {selectedName ? (
+                <p className="text-caption text-text-muted">
+                  {selectedName} {W.orderbookHint}
+                </p>
+              ) : null}
+              <OrderbookPanel ticker={selectedTicker} variant="compact" />
+            </section>
+          ) : null}
         </>
       )}
     </div>

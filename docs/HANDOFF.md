@@ -5845,3 +5845,45 @@
   - A. 돌파 시 목표를 측정된 폭/다음 상위 구조로(진입 캘리브레이션 #1 원인) — PRD 권장, #209 스냅샷으로 before/after 측정.
   - B. 거래량 동의 baseline 재캘리브. C. 확정 상승 레짐 RSI 과매수 veto 제외.
   - (엣지) dev 서버가 마감 시점에 꺼져 있어 종료를 놓친 세션은 다음 거래일 장중 재틱 후 그날 15:40 에 완료됨 — 필요 시 startedAt 이 과거일이면 첫 틱 전 완료하는 가드 추가 검토.
+
+### 2026-07-04 — feat(stock): 토스 호가창 OrderbookPanel + BFF 프록시 (/stock·/intraday 배선) (#243)
+
+- **slug**: `toss-orderbook` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/243
+- **요약**: feat(stock): 토스 호가창 OrderbookPanel + BFF 프록시 (/stock·/intraday 배선)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 토스 `GET /api/v1/orderbook`(매도 10 · 매수 10 단계) 를 BFF 프록시로 붙이고, 공용 `OrderbookPanel` 을 `/stock/[ticker]`(full)·`/intraday`(compact) 두 지면에 배선한다. warnings 선례 답습 — 토스 전용(KIS 폴백 없음)·never-throw·`isTossConfigured` 게이트. 조회·표시 + 데이터 계층까지 (호가 기반 단타 컨텍스트 주입은 후속).
+  > 
+  > 커밋 분할(PRD §8): (1) 데이터 계층 → (2) UI + 토큰 → (3) 배선.
+  > 
+  > ## AC 대응 / 자가검증
+  > 
+  > 라이브 라운드트립(로컬 dev, TOSS 키 설정됨):
+  > 
+  > | AC | 결과 |
+  > |---|---|
+  > | AC-0 스키마 실측 | `TossOrderbook`={timestamp,currency,asks/bids[{price,volume}](문자열)}. `?symbol=` 단수. 확정 반영 |
+  > | AC-1 키 없음 | `isTossConfigured` false → 200 `{orderbook:empty}` + `X-Data-Source: none`, 토스 무호출(유닛 테스트) |
+  > | AC-2 정상 호가 | `005930` → `x-data-source: toss`, asks 10 + bids 10, 가격·잔량·바 |
+  > | AC-3 잔량 바 | 매수·매도 통합 max 정규화(inline width%), 잔량 0 단계 = 바 없음 |
+  > | AC-4 스프레드/총잔량 | bestAsk 315000 − bestBid 314500 = spread **500** (0.159%), totalAsk 313048 / totalBid 319595 |
+  > | AC-5 빈 호가 | `asks:[],bids:[]` → `isEmpty:true`, 크래시·NaN 없음, empty-state 카드 |
+  > | AC-6 미존재 종목 | `000000` → 200 + isEmpty:true fail-soft (`x-data-source: toss`) |
+  > | AC-7 양 지면 | `git grep OrderbookPanel` = `StockPageLayout.tsx`(full) + `IntradayWatchWorkspace.tsx`(compact) |
+  > | AC-8 폴링 | compact 3s / full 10s(`REFETCH_MS`), 장중만 갱신(`isKstMarketHoursWithCloseGrace`), 백그라운드 정지(기본 false) |
+  > | AC-9 캐시/single-flight | 성공 3s·실패 10s, 동시 요청 1콜(유닛 테스트) |
+  > | AC-10 반응형 | `md:`/`lg:` + `useBreakpoint`(모바일 잔량 만/억 축약). 행높이 토큰으로 10단계 노스크롤 |
+  > | AC-11 컨벤션 | OrderbookPanel hex/px 직타 0, 카피 `lib/copy/stock/orderbook.ts`, queryKey `queryKeys.ts` 단일, 클라 `fetch(` 0 |
+  > 
+  > 게이트: `npx tsc --noEmit` 0 · `npm run lint` 0 · `npm run build` 0(신규 `/api/stock/orderbook` route 등록 확인) · `npx vitest run lib/api/toss` **38 passed**(orderbook 8 신규 포함) · `design:sync` diff = orderbook-row-h 2키만.
+  > 
+  > 디자인 토큰: 색 신규 0(매도=`signal-up`/매수=`signal-down` soft 재매핑). spacing 신규 2(`orderbook-row-h` 30 / `-compact` 24) → `finsight-redesign.md` SSOT 병합 후 `design:sync`.
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **호가 기반 단타 컨텍스트 주입**(후속 PRD) — `fetchOrderbook`/`normalizeOrderbook` 를 순수하게 두었으니 매수벽/매도벽·스프레드를 LLM 프롬프트·결정론 게이트 입력으로 얹는 PR 이 바로 재사용 가능.
+  - **prod 활성화 검증** — prod 는 TOSS env 미설정 dormant. 키 등록 후 장중 `/stock`·`/intraday` 라이브 호가·폴링(3s/10s)·레이트 관찰.
+  - **후속 확장(비범위)** — KIS 호가 폴백, 웹소켓 스트리밍, 관심종목 행 미니 호가, 단타 다종목 동시(배치·간헐 폴링).

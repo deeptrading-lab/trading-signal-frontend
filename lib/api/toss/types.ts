@@ -72,6 +72,28 @@ export type TossStockWarning = {
   endDate?: string | null;
 };
 
+/** `GET /api/v1/orderbook` 호가 1단계 — price·volume 은 문자열(KIS 관례와 동일, toNumber 방어). */
+export type TossOrderbookLevel = {
+  /** 호가 가격(문자열, 예 "288500"). */
+  price?: string;
+  /** 잔량(문자열, 주). */
+  volume?: string;
+};
+
+/**
+ * `GET /api/v1/orderbook?symbol=` 응답 — 매도(asks)·매수(bids) 각 10단계.
+ * 국내·미국 공통 스키마. ⚠️ 실측(2026-07-04):
+ *   - `asks` 는 price 오름차순(asks[0]=최우선=최저 매도호가), `bids` 는 내림차순(bids[0]=최우선=최고 매수호가).
+ *   - 장 마감·미지원 종목은 `asks: []`, `bids: []`(빈 배열)로 옴 — 빈 호가로 디그레이드.
+ */
+export type TossOrderbook = {
+  /** ISO 8601 (+09:00). 시세 산출 시각. */
+  timestamp?: string;
+  currency?: string;
+  asks?: TossOrderbookLevel[];
+  bids?: TossOrderbookLevel[];
+};
+
 /** `GET /api/v1/stocks` 종목 마스터 1건. 국내·미국 공통 스키마(미국은 koreanMarketDetail=null). */
 export type TossStockRow = {
   symbol?: string;
