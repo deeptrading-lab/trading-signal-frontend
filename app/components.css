@@ -413,11 +413,8 @@
     transition-duration: theme(transitionDuration.base);
     transition-timing-function: theme(transitionTimingFunction.standard);
   }
-  /* 접힘 상태(아이콘 레일) — 폭만 sidebar-collapsed-w(76px)로 축소. px-lg 유지 → 콘텐츠(48px) 안에
-   * iconbox(36px) 가 여백 균형으로 중앙 정렬된다. */
-  .sidebar[data-collapsed="true"] {
-    @apply w-sidebar-collapsed-w;
-  }
+  /* 접힘 상태 폭(76px)은 Sidebar.tsx 가 `collapsed` 시 `w-sidebar-collapsed-w` 유틸을 덮어 적용한다
+   *   (utilities 레이어가 .sidebar 의 w-sidebar-w 를 이김). 속성-선택자 CSS 는 아래 사유로 미사용. */
   /* prefers-reduced-motion 존중 — 폭 전환 애니메이션 제거(상태는 즉시 반영). */
   @media (prefers-reduced-motion: reduce) {
     .sidebar {
@@ -563,9 +560,10 @@
    *   - 텍스트 = 다크→미드 그레이 그라데이션 워드마크 (extrabold, tracking-tight)
    *   - 아이콘 24px (h-6 w-6) + 텍스트 22px (text-h1) + badge 36px (h-9 w-9) + rounded-pill(원형) — 시안 정합
    *   - hover 시 배지 미세 확대(group-hover:scale-105). 헤더 브랜드와 동일 규격. */
-  /* sidebar-collapsible — 컴팩트화: 브랜드 하단 여백 mb-2xl→mb-md(24→10px, 아래 토글과 근접). */
+  /* sidebar-collapsible — 브랜드+토글을 한 헤더 행(.sidebar-header)으로 묶으므로 하단 여백은
+   *   래퍼가 담당(brand 자체 mb 제거). */
   .sidebar-brand {
-    @apply inline-flex items-center gap-md mb-md px-sm no-underline;
+    @apply inline-flex items-center gap-md px-sm no-underline;
   }
   .sidebar-brand-badge {
     @apply inline-flex items-center justify-center h-9 w-9 rounded-pill bg-surface border border-border-line shadow-sm transition-transform duration-300 group-hover:scale-105;
@@ -579,9 +577,9 @@
     @apply text-h1 font-extrabold tracking-tight bg-gradient-to-r from-text-strong to-text-muted bg-clip-text text-transparent;
   }
 
-  /* 접기/펼치기 토글 — 펼침: 우측 정렬(`<<`) / 접힘: 중앙 정렬(`>>`, 아래 오버라이드). 32×32. */
+  /* 접기/펼치기 토글 — 위치·정렬은 헤더 래퍼(.sidebar-header)가 담당(펼침 우측/접힘 중앙). 32×32. */
   .sidebar-collapse-toggle {
-    @apply inline-flex items-center justify-center self-end h-8 w-8 mb-sm rounded-md bg-surface text-text-muted cursor-pointer border-0;
+    @apply inline-flex items-center justify-center shrink-0 h-8 w-8 rounded-md bg-surface text-text-muted cursor-pointer border-0;
   }
   .sidebar-collapse-toggle:hover,
   .sidebar-collapse-toggle:focus-visible {
@@ -620,38 +618,15 @@
     @apply text-body-sm-strong;
   }
 
-  /* ---------- 접힘(아이콘 레일) 상태 오버라이드 (sidebar-collapsible) ---------- */
-  /* 브랜드 — 배지만 중앙 정렬(워드마크는 컴포넌트에서 미렌더). */
-  .sidebar[data-collapsed="true"] .sidebar-brand {
-    @apply flex w-full justify-center gap-0 px-0;
-  }
-  /* 토글 — 중앙 정렬(`>>`). */
-  .sidebar[data-collapsed="true"] .sidebar-collapse-toggle {
-    @apply self-center;
-  }
-  /* 네비 항목 — 아이콘 위 / 짧은 라벨 아래 세로 스택, 중앙 정렬. */
-  .sidebar[data-collapsed="true"] .sidebar-nav-item {
-    @apply flex-col justify-center gap-xs h-auto px-0 py-xs;
-  }
-  /* 활성 하이라이트를 아이템 전체 → 아이콘박스로 이동(아이템 배경 투명, 텍스트 accent 는 유지). */
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-active,
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-active:hover,
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-active:focus-visible {
-    @apply bg-transparent;
-  }
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-iconbox {
-    @apply h-9 w-9 rounded-md;
-  }
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-active .sidebar-nav-item-iconbox {
-    @apply bg-accent-vivid-soft;
-  }
-  /* 짧은 라벨 — caption(12px) 뮤트, 활성 시 accent. */
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-label {
-    @apply text-caption text-text-muted;
-  }
-  .sidebar[data-collapsed="true"] .sidebar-nav-item-active .sidebar-nav-item-label {
-    @apply text-accent-vivid;
-  }
+  /* ---------- 접힘(아이콘 레일) 상태 스타일 ----------
+   * ★ Sidebar.tsx 의 `collapsed` 조건부 Tailwind 클래스로 적용한다. 과거 여기 있던
+   *   `.sidebar[data-collapsed="true"] …` 속성-선택자 + `@apply` + `@layer` 규칙들은 이
+   *   Tailwind v4 / Turbopack 파이프라인에서 **컴파일 CSS 로 방출되지 않아**(collapsedRuleCount 0)
+   *   접힘 레일이 렌더되지 않던 버그가 있었음 → 리터럴 유틸 className 으로 이관(스캐너가 항상 방출).
+   *   적용 유틸: nav-item `flex-col justify-center gap-xs h-auto px-0 py-xs`(세로 스택),
+   *   활성 nav-item `bg-transparent`, iconbox `h-9 w-9 rounded-md`(+활성 `bg-accent-vivid-soft`),
+   *   label `text-caption text-text-muted`(+활성 `text-accent-vivid`), brand `w-full justify-center gap-0 px-0`,
+   *   toggle `self-center`, aside `w-sidebar-collapsed-w`. */
 
   /* ---------- BottomNav (모바일 < md) ----------
    * PRD §5.3 AC-L-3 + DESIGN.md v8 components.bottom-nav / bottom-nav-item-active.
