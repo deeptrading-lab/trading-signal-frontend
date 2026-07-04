@@ -41,6 +41,8 @@ export const queryKeys = {
       ["stock", "minute-chart", ticker, timeframe, priorDays] as const,
     /** 매수 유의사항(거래소 시장경보·VI) — 종목 헤더 경고 칩. */
     warnings: (ticker: string) => ["stock", "warnings", ticker] as const,
+    /** 호가창(매수/매도 잔량) — 종목 상세·단타 워치 OrderbookPanel. 지면별 폴링 주기 주입. */
+    orderbook: (ticker: string) => ["stock", "orderbook", ticker] as const,
     /** 매수 유의사항 배치(단타 워치/후보 칩) — 티커 집합, 순서 무관 정규화. */
     warningsBatch: (tickers: readonly string[]) =>
       ["stock", "warnings-batch", normalizeTickers(tickers)] as const,
