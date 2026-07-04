@@ -7,6 +7,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
+import { Section } from "@/components/ui/Section";
+import { Badge } from "@/components/ui/Badge";
 import { isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput } from "@/lib/utils/formatMoney";
@@ -104,12 +106,13 @@ export function PaperTradingListContainer() {
         <p className="text-body-sm text-text-muted">{PAPER_TRADING_PAGE_SUBTITLE}</p>
       </header>
 
-      <div className="grid gap-md lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <form className="card flex flex-col gap-md" onSubmit={handleSubmit}>
-          <div>
+      <div className="grid gap-xl lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        {/* 새 모의투자 — 카드 박스 제거, 흰 바탕 위 플랫 폼(입력 컨트롤 자체 테두리로 구조 유지). */}
+        <form className="flex flex-col gap-md" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-xs">
             <h2 className="text-h2 text-text-strong">{PAPER_TRADING_CREATE_TITLE}</h2>
-            <p className="mt-xs text-caption text-text-muted">{PAPER_TRADING_MOCK_NOTICE}</p>
-            <p className="mt-xs text-caption text-text-muted">{PAPER_TRADING_LIVE_PRICE_NOTICE}</p>
+            <p className="text-caption text-text-muted">{PAPER_TRADING_MOCK_NOTICE}</p>
+            <p className="text-caption text-text-muted">{PAPER_TRADING_LIVE_PRICE_NOTICE}</p>
           </div>
 
           <label className="flex flex-col gap-xs text-body-sm text-text-muted">
@@ -141,7 +144,6 @@ export function PaperTradingListContainer() {
                     className="inline-flex items-center gap-xs rounded-full bg-surface-base px-sm py-xs text-caption text-text-strong"
                   >
                     {stock.name}
-                    <span className="font-mono text-text-muted">{stock.ticker}</span>
                     <button
                       type="button"
                       className="text-text-muted hover:text-text-strong"
@@ -214,66 +216,74 @@ export function PaperTradingListContainer() {
             {isCreating ? PAPER_TRADING_CREATING : PAPER_TRADING_CREATE_BUTTON}
           </button>
           {createError ? (
-            <div className="card-critical" role="alert">
-              <p className="text-body-sm">{createError}</p>
-            </div>
+            <p className="text-body-sm text-critical" role="alert">
+              {createError}
+            </p>
           ) : null}
         </form>
 
-        <section className="card flex flex-col gap-md" aria-label="모의투자 세션 목록">
-          <div className="flex items-center justify-between gap-md">
-            <h2 className="text-h2 text-text-strong">세션 목록</h2>
+        {/* 세션 목록 — 카드 박스·per-row 아웃라인 제거, 플랫 섹션 + 헤어라인 Link 행(홈 랭킹 톤). */}
+        <Section
+          aria-label="모의투자 세션 목록"
+          title="세션 목록"
+          action={
             <button
               type="button"
-              className="button-secondary inline-flex items-center gap-xs"
+              className="inline-flex items-center gap-xs text-caption text-text-muted transition-colors hover:text-text-strong"
               onClick={() => refetch()}
             >
               <RefreshCw className={cn("size-4", isLoading && "animate-spin")} aria-hidden />
               {PAPER_TRADING_REFRESH}
             </button>
-          </div>
-
+          }
+        >
           {isError ? (
-            <div className="card-critical" role="alert">
-              <p className="text-body-sm">{PAPER_TRADING_ERROR}</p>
-              <button type="button" className="button-secondary mt-sm" onClick={() => refetch()}>
+            <div className="flex flex-col items-start gap-md py-md" role="alert">
+              <p className="text-body-sm text-critical">{PAPER_TRADING_ERROR}</p>
+              <button type="button" className="button-secondary" onClick={() => refetch()}>
                 {PAPER_TRADING_RETRY}
               </button>
             </div>
           ) : null}
 
           {!isLoading && sessions.length === 0 ? (
-            <div className="rounded-md bg-surface-muted p-md" role="status">
-              <p className="text-body-strong text-text-strong">{PAPER_TRADING_EMPTY_TITLE}</p>
-              <p className="mt-xs text-body-sm text-text-muted">{PAPER_TRADING_EMPTY_BODY}</p>
+            <div className="flex flex-col items-start gap-xs py-md" role="status">
+              <p className="text-body-md font-bold text-text-strong">{PAPER_TRADING_EMPTY_TITLE}</p>
+              <p className="text-body-sm text-text-muted">{PAPER_TRADING_EMPTY_BODY}</p>
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-sm">
+          <div role="list">
             {sessions.map((session) => (
               <Link
                 key={session.id}
                 href={`/dashboard/paper-trading/${session.id}`}
-                className="rounded-md border border-border-line bg-surface-base p-md transition-colors hover:bg-surface-muted"
+                role="listitem"
+                className="-mx-sm flex flex-col gap-sm rounded-sm border-b border-border-line px-sm py-md transition-colors last:border-b-0 hover:bg-surface-muted"
               >
-                <div className="flex flex-wrap items-center justify-between gap-sm">
-                  <div>
-                    <p className="text-body-strong text-text-strong">{session.name}</p>
-                    <p className="text-caption text-text-muted">
+                <div className="flex items-center justify-between gap-sm">
+                  <div className="min-w-0">
+                    <p className="truncate text-body-sm-strong text-text-strong">{session.name}</p>
+                    <p className="truncate text-caption text-text-muted">
                       {getSessionStockNames(session)}
                     </p>
                   </div>
-                  <span className="badge-info">{STATUS_LABEL[session.status]}</span>
+                  <Badge variant="info" className="shrink-0">
+                    {STATUS_LABEL[session.status]}
+                  </Badge>
                 </div>
-                <div className="mt-sm grid grid-cols-3 gap-sm text-caption text-text-muted">
+                {/* P&L 등락색(한국식: 이익=빨강/손실=파랑) — 수익률만 색, 평가·목표는 중립. */}
+                <div className="grid grid-cols-3 gap-sm text-caption text-text-muted tabular-nums">
                   <span>평가 {formatNumber(session.portfolioValue)}</span>
-                  <span>수익률 {formatPct(session.returnPct)}</span>
+                  <span className={cn(session.returnPct >= 0 ? "text-signal-up" : "text-signal-down")}>
+                    수익률 {formatPct(session.returnPct)}
+                  </span>
                   <span>목표 {formatPct(session.targetReturnPct, false)}</span>
                 </div>
               </Link>
             ))}
           </div>
-        </section>
+        </Section>
       </div>
     </div>
   );
