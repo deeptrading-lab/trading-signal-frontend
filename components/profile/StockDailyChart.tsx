@@ -56,6 +56,7 @@ import {
 import {
   PERIOD_UNIT,
   CHART_AXIS_WIDTH,
+  CHART_MA_LABEL,
   MA_PERIODS,
   type ChartType,
   type MainInterval,
@@ -81,14 +82,18 @@ const MA_DOT_CLASS: Record<MaPeriod, string> = {
   120: "bg-chart-ma120",
 };
 
-/** 이평선 범례 스트립 — 어느 색이 어느 기간인지 한눈에(토스톤 인라인 범례). showMA 일 때만 렌더. */
+/**
+ * 이평선 범례 스트립 — "이평선  ─5 ─20 ─60 ─120" (─ 는 각 기간 고유색). showMA 일 때만 렌더.
+ * 라벨 하나 + 색·숫자만으로 "MA5 MA20…" 보다 직관적(사용자 피드백).
+ */
 function MALegend() {
   return (
-    <div className="mb-xs flex flex-wrap items-center gap-x-md gap-y-xs px-xs">
+    <div className="mb-xs flex flex-wrap items-center gap-x-md gap-y-xs px-xs text-caption text-text-muted">
+      <span className="font-medium text-text-strong">{CHART_MA_LABEL}</span>
       {MA_PERIODS.map((p) => (
-        <span key={p} className="inline-flex items-center gap-xs text-caption text-text-muted">
+        <span key={p} className="inline-flex items-center gap-xs">
           <span className={cn("h-0.5 w-3 rounded-pill", MA_DOT_CLASS[p])} aria-hidden="true" />
-          MA{p}
+          {p}
         </span>
       ))}
     </div>
