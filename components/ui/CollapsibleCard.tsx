@@ -63,7 +63,7 @@ export function CollapsibleCard({
             aria-hidden="true"
           />
         </button>
-        {open && <div className="pb-lg">{children}</div>}
+        {open && <div className="pt-sm pb-lg pl-xs">{children}</div>}
       </section>
     );
   }

@@ -122,7 +122,7 @@ function CompanyOverviewContent({ ticker }: { ticker: string }) {
   }
   return (
     <>
-      <h3 className="text-h2 text-text-strong mb-md">{data.corpName}</h3>
+      <h3 className="text-body-md font-bold text-text-strong mb-sm">{data.corpName}</h3>
       <CompanyDescriptionBlock ticker={ticker} />
       <dl className="grid grid-cols-1 md:grid-cols-2 gap-md">
         <OverviewRow label={COMPANY_LABEL_CEO} value={data.ceoName} />
