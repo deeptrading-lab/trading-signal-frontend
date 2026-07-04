@@ -45,3 +45,9 @@ export const FLOW_TOP10_ERROR =
 export const FLOW_TOP10_RETRY = "다시 시도";
 /** 한 주체(외국인/기관)만 비었을 때 — 공백 대신 컬럼에 노출. */
 export const FLOW_TOP10_COLUMN_EMPTY = "아직 집계 전이거나 일시적으로 못 불러왔어요.";
+
+/* 당일 탭 마감 소프트 넛지 (market-status-aware-home §3-2) */
+/** 당일 탭이 마감 상태일 때 안내 — 장중 제공 유도. */
+export const FLOW_CLOSED_NUDGE = "실시간 순매수는 장중에 제공돼요";
+/** 넛지 인라인 링크 — 클릭 시 토글을 7일 누적으로 되돌린다. */
+export const FLOW_CLOSED_NUDGE_LINK = "7일 누적 보기";

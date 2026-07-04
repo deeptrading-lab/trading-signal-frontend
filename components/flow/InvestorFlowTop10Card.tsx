@@ -19,11 +19,14 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Section } from "@/components/ui/Section";
+import { MarketClosedNotice } from "@/components/market/MarketClosedNotice";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
+import { useMarketStatus } from "@/hooks/market/useMarketStatus";
+import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -46,6 +49,8 @@ import {
   FLOW_MODE_TODAY,
   FLOW_MODE_CUMULATIVE,
   FLOW_CUMULATIVE_COLLECTING,
+  FLOW_CLOSED_NUDGE,
+  FLOW_CLOSED_NUDGE_LINK,
   flowCumulativeLabel,
 } from "@/lib/copy/flow/labels";
 
@@ -279,10 +284,56 @@ function buildHeaderMeta(
   return `${FLOW_TOP10_TODAY_LABEL}${meta ? ` · ${meta}` : ""}`;
 }
 
+/** 당일 탭 마감 시 안내 하단 넛지 — "…장중에 제공돼요 · 7일 누적 보기"(모바일은 링크 다음 줄). */
+function FlowClosedNudge({ onShowCumulative }: { onShowCumulative: () => void }) {
+  const { isMobile } = useBreakpoint();
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center gap-xs",
+        isMobile && "flex-col",
+      )}
+    >
+      <span className="text-caption text-text-muted">{FLOW_CLOSED_NUDGE}</span>
+      <button
+        type="button"
+        className="rounded-sm px-xs text-button-sm text-link transition-colors hover:underline"
+        onClick={onShowCumulative}
+      >
+        {FLOW_CLOSED_NUDGE_LINK}
+      </button>
+    </div>
+  );
+}
+
 export function InvestorFlowTop10Card() {
   const [mode, setMode] = useState<FlowMode>("today");
-  const { data, isLoading, isError, refetch } = useQueryFlowTop10(mode);
+  // 장 상태 게이트(②) — "당일"만 마감 시 게이팅. "7일 누적"(KV 스냅샷)은 장 상태와 무관.
+  const status = useMarketStatus();
+  const isRegularOpen = status.isRegularOpen;
 
+  // 소프트 넛지(§3-2): 마감이 확인되면 **초기 1회** 토글을 누적으로 착지(강제 전환 아님).
+  // 사용자가 토글을 직접 조작했으면 그 선택을 존중해 넛지하지 않는다.
+  const settledRef = useRef(false);
+  useEffect(() => {
+    if (settledRef.current) return;
+    if (!isRegularOpen) {
+      settledRef.current = true;
+      setMode("cumulative");
+    }
+  }, [isRegularOpen]);
+
+  const changeMode = (next: FlowMode) => {
+    settledRef.current = true; // 사용자 조작 후엔 넛지 억제(세션 중 선택 존중).
+    setMode(next);
+  };
+
+  // 당일 + 마감이면 KIS 무호출. 누적은 항상 조회(마감 무관).
+  const { data, isLoading, isError, refetch } = useQueryFlowTop10(mode, {
+    enabled: mode === "cumulative" || isRegularOpen,
+  });
+
+  const marketClosedToday = mode === "today" && !isRegularOpen;
   const hasRows =
     !!data && (data.foreign.length > 0 || data.institution.length > 0);
   // 누적 부트스트랩 — 적립 전(cumulativeDays=0, 행 없음)이면 "모으는 중" 안내.
@@ -293,9 +344,17 @@ export function InvestorFlowTop10Card() {
   return (
     <Section
       title={FLOW_TOP10_TITLE}
-      action={<ModeToggle mode={mode} onChange={setMode} />}
+      action={<ModeToggle mode={mode} onChange={changeMode} />}
     >
-      {isLoading ? (
+      {marketClosedToday ? (
+        // 당일 탭 마감 — 중립 안내 + 넛지("7일 누적 보기"). KIS 무호출. 누적 토글은 유지.
+        <MarketClosedNotice
+          status={status}
+          nudge={
+            <FlowClosedNudge onShowCumulative={() => changeMode("cumulative")} />
+          }
+        />
+      ) : isLoading ? (
         <>
           <p className="sr-only" aria-busy="true">
             {FLOW_TOP10_LOADING}

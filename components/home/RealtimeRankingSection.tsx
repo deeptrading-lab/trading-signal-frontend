@@ -40,6 +40,8 @@ import { Heart } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { MarketClosedNotice } from "@/components/market/MarketClosedNotice";
+import { useMarketStatus } from "@/hooks/market/useMarketStatus";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryFluctuation } from "@/hooks/market/useQueryFluctuation";
 import { useStockPeek } from "@/hooks/stock/useStockPeek";
@@ -114,15 +116,24 @@ export function RealtimeRankingSection() {
     () => new Set<RankTab>(),
   );
 
-  // 4개 랭킹 훅을 항상 호출(rules of hooks)하되, 활성 탭만 enabled-게이트로 실제 페치한다.
+  // 장 상태 게이트(②) — 마감/휴장(`!isRegularOpen`)이면 KIS 랭킹 TR 을 아예 호출하지 않는다.
+  // unknown(키 없음/캘린더 실패)은 fail-open(true)이라 기존처럼 조회(장중 취급, AC-10).
+  const status = useMarketStatus();
+  const isRegularOpen = status.isRegularOpen;
+
+  // 4개 랭킹 훅을 항상 호출(rules of hooks)하되, 활성 탭 && 정규장일 때만 enabled-게이트로 페치한다.
   const volumeQuery = useQueryVolumeRank("volume", {
-    enabled: tab === "volume",
+    enabled: tab === "volume" && isRegularOpen,
   });
   const turnoverQuery = useQueryVolumeRank("value", {
-    enabled: tab === "turnover",
+    enabled: tab === "turnover" && isRegularOpen,
   });
-  const surgeQuery = useQueryFluctuation("up", { enabled: tab === "surge" });
-  const plungeQuery = useQueryFluctuation("down", { enabled: tab === "plunge" });
+  const surgeQuery = useQueryFluctuation("up", {
+    enabled: tab === "surge" && isRegularOpen,
+  });
+  const plungeQuery = useQueryFluctuation("down", {
+    enabled: tab === "plunge" && isRegularOpen,
+  });
 
   // ★ 관심종목 훅은 섹션에서 **단일 인스턴스**로 소유한다. 행마다 useWatchlistTickers 를 호출하면
   //   각 행이 독립 state 스냅샷을 들고 전체 배열을 덮어써(writeEntries) 서로의 추가를 지운다.
@@ -184,7 +195,10 @@ export function RealtimeRankingSection() {
         className="inline-flex self-start sm:hidden"
       />
 
-      {activeQuery.isLoading ? (
+      {!isRegularOpen ? (
+        // 마감/휴장 — 탭바는 유지하고 콘텐츠 영역만 중립 안내로 대체(KIS 무호출).
+        <MarketClosedNotice status={status} />
+      ) : activeQuery.isLoading ? (
         <RankSkeleton />
       ) : activeQuery.isError ? (
         <div className="flex flex-col items-start gap-md py-md" role="alert">
