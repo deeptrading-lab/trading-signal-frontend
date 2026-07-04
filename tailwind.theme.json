@@ -58,7 +58,9 @@
         "fng-greed-soft": "#fbf0dc",
         "fng-extreme-greed": "#a83246",
         "fng-extreme-greed-soft": "#fbe4e8",
-        "fng-track": "#eceff3"
+        "fng-track": "#eceff3",
+        "market-open": "#166534",
+        "market-open-soft": "#dcfce7"
       },
       "fontFamily": {
         "display": [

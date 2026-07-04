@@ -110,6 +110,18 @@
   .badge-asset-coin {
     @apply bg-asset-coin-soft text-asset-coin;
   }
+
+  /* ---------- 장 상태 배지 (toss-market-calendar) ----------
+   * 점(●) + 라벨의 작고 조용한 인라인 칩. DESIGN `components.market-badge*` 정합.
+   *   - market-badge: 배경 없는 기본형(마감·장전·시간외·휴장). 라벨 slate(primary).
+   *   - market-badge-open: 장중 전용 라이브 강조 — 옅은 녹색 필 + 녹색 라벨.
+   * 점 색·펄스·모바일 축약은 컴포넌트 측 토큰 유틸(조건부 cn)이 담당. hex/px 직타 0. */
+  .market-badge {
+    @apply inline-flex items-center gap-xs rounded-pill py-xs px-sm text-label-sm text-primary whitespace-nowrap;
+  }
+  .market-badge-open {
+    @apply inline-flex items-center gap-xs rounded-pill py-xs px-sm text-label-sm bg-market-open-soft text-market-open whitespace-nowrap;
+  }
   /* v8 신규 — 등락 수치 텍스트 (mono-numeric 폰트로 자릿수 정렬).
    * tabular-nums (font-variant-numeric) 는 Tailwind utility `tabular-nums` 로 적용. */
   .signal-up-text {

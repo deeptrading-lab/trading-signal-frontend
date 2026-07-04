@@ -24,6 +24,31 @@ const KST_TIME_FMT = new Intl.DateTimeFormat("sv-SE", {
   hourCycle: "h23",
 });
 
+/** ko-KR 짧은 요일("월"·"화"…) — KST 기준. 장 캘린더 "다음 개장" 요일 표기용. */
+const KST_WEEKDAY_KO_FMT = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  weekday: "short",
+});
+
+/** ISO timestamp → KST "HH:mm" (h23). 세션 경계·다음 개장 시각 표기용. 파싱 실패 시 null. */
+export function isoToKstHm(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const epoch = Date.parse(iso);
+  if (!Number.isFinite(epoch)) return null;
+  return KST_TIME_FMT.format(epoch);
+}
+
+/**
+ * "YYYY-MM-DD"(KST 캘린더 날짜) → 짧은 한글 요일("월"…). KST 자정 anchor 로 파싱해
+ * 서버 타임존과 무관하게 안정적(문자열 slice·new Date 로컬 파싱 회피). 파싱 실패 시 "".
+ */
+export function kstWeekdayKo(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  const epoch = Date.parse(`${dateStr}T00:00:00+09:00`);
+  if (!Number.isFinite(epoch)) return "";
+  return KST_WEEKDAY_KO_FMT.format(epoch);
+}
+
 /** ISO timestamp → KST "YYYY-MM-DD". 파싱 실패 시 null. */
 export function isoToKstDate(iso: string | undefined): string | null {
   if (!iso) return null;

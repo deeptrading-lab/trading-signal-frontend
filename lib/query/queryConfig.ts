@@ -166,6 +166,15 @@ export const queryConfig = {
       gcTime: 5 * MINUTE,
     },
     /**
+     * 국내 장 캘린더 — 하루 단위로 사실상 정적(영업일 여부·세션 경계는 하루 안 바뀜).
+     * 서버 로더가 15분 캐시라 쿼리 staleTime 도 길게(30분) + 폴링 없음. phase 만 시간 경과로
+     * 바뀌는데, 이는 네트워크 재요청이 아니라 `useMarketStatus` 훅의 세션 경계 재평가가 담당한다.
+     */
+    calendar: {
+      staleTime: 30 * MINUTE,
+      gcTime: 1 * HOUR,
+    },
+    /**
      * CNN(미국) 공포·탐욕 지수 — 하루 단위로 의미 있는 지표(장중 소폭 변동). 외부 비공식 출처
      * 부하 최소화 위해 staleTime 30분. 단일 진실 원천.
      */

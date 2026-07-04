@@ -34,6 +34,7 @@ import {
 } from "@/lib/copy/layout/navCopy";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
 import { ThemeToggleButton } from "@/components/theme/ThemeToggleButton";
+import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
 import { HeaderMarketTicker } from "./HeaderMarketTicker";
 
 export function Header() {
@@ -52,6 +53,9 @@ export function Header() {
         <span className="header-brand-text">{NAV_BRAND_LABEL}</span>
       </Link>
       <div className="flex items-center gap-lg ml-auto">
+        {/* 국내 장 상태 배지 — 지수 스트립 자리. 티커의 `hidden lg:flex` gate 를 상속하지 않는
+         *  독립 슬롯이라 모바일에도 렌더(장 상태는 전역 컨텍스트). unknown 이면 자기 은닉. */}
+        <MarketStatusBadge />
         {/* 글로벌 마켓 티커 (데스크탑 한정 `hidden lg:flex`) — 실데이터 5종 client 컨테이너. */}
         <HeaderMarketTicker />
         {/* 전역 테마 빠른 토글(light↔dark) — 홈 포함 모든 탭에서 한 번에 전환. */}
