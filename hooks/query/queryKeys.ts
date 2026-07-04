@@ -107,4 +107,8 @@ export const queryKeys = {
     /** AI 모의투자 세션 상세 — 세션별 tick/포지션/자산곡선. */
     session: (sessionId: string) => ["paper-trading", "session", sessionId] as const,
   },
+  admin: {
+    /** 가입 승인 대기(`pending`) 목록 — Supabase profiles BFF(user-login-auth §3.7). 인자 없는 단일 키. */
+    pendingApprovals: ["admin", "pending-approvals"] as const,
+  },
 } as const;
