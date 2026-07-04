@@ -109,12 +109,15 @@ export interface StockDailyChartProps {
   interval: MainInterval;
   days: number;
   timeframe: number;
+  /** 분봉 기간(과거 거래일 수) — 0=당일, 5=1주, 20=1개월. 분봉 활성일 때만 의미. */
+  minutePriorDays: number;
   chartType: ChartType;
   /** 오버레이 토글 묶음(이평선·매물대·볼린저·VWAP·거래량 이평) — 값 소유·localStorage 지속은 상위. */
   overlays: ChartOptions;
   onIntervalChange: (i: MainInterval) => void;
   onDaysChange: (d: number) => void;
   onTimeframeChange: (t: number) => void;
+  onMinutePriorDaysChange: (d: number) => void;
   onChartTypeChange: (t: ChartType) => void;
   onToggleOverlay: (key: keyof ChartOptions) => void;
 }
@@ -127,16 +130,18 @@ export function StockDailyChart({
   interval,
   days,
   timeframe,
+  minutePriorDays,
   chartType,
   overlays,
   onIntervalChange,
   onDaysChange,
   onTimeframeChange,
+  onMinutePriorDaysChange,
   onChartTypeChange,
   onToggleOverlay,
 }: StockDailyChartProps) {
-  const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries } =
-    useChartData(ticker, interval, days, timeframe);
+  const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
+    useChartData(ticker, interval, days, timeframe, minutePriorDays);
 
   // 런타임 테마 색 — light/dark 전환 시 새 객체 reference 로 recharts 리렌더.
   const theme = useChartTheme();
@@ -163,7 +168,10 @@ export function StockDailyChart({
     [candleSeries, volSeries],
   );
 
-  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, onIntervalChange, onDaysChange, onTimeframeChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
+  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
+
+  // 멀티데이 분봉 x축 눈금(날짜 경계) 유무 — 있으면 그 눈금만(interval=0), 없으면 recharts 자동(양끝 보존).
+  const xAxisInterval = xTicks ? 0 : "preserveStartEnd";
 
   // 볼린저밴드 표시 여부 — 토글 on 이고 보기 구간에 유효한(룩백 20봉 충족) 값이 있을 때만 렌더.
   const showBB = showBollinger && candleSeries.some((c) => c.bbMid != null);
@@ -258,7 +266,7 @@ export function StockDailyChart({
               {showBB && (
                 <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
-              <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
+              <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
@@ -299,7 +307,7 @@ export function StockDailyChart({
               {showBB && (
                 <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
-              <XAxis dataKey="date" {...axisProps} dy={8} interval="preserveStartEnd" minTickGap={40} />
+              <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />

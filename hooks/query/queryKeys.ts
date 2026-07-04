@@ -33,9 +33,12 @@ export const queryKeys = {
       ["stock", "daily", ticker, period] as const,
     chart: (ticker: string, period: string, days: number) =>
       ["stock", "chart", ticker, period, days] as const,
-    /** 당일 분봉(단타워치 차트 탭) — 타임프레임별. */
-    minuteChart: (ticker: string, timeframe: number) =>
-      ["stock", "minute-chart", ticker, timeframe] as const,
+    /**
+     * 분봉(단타워치·종목 상세 차트 탭) — 간격(timeframe)·기간(priorDays)별.
+     *   priorDays 0 = 당일 한 세션, >0 = 멀티데이(minute-chart-interval-period). 소스별 분리 캐시.
+     */
+    minuteChart: (ticker: string, timeframe: number, priorDays: number) =>
+      ["stock", "minute-chart", ticker, timeframe, priorDays] as const,
     /** 매수 유의사항(거래소 시장경보·VI) — 종목 헤더 경고 칩. */
     warnings: (ticker: string) => ["stock", "warnings", ticker] as const,
     /** 매수 유의사항 배치(단타 워치/후보 칩) — 티커 집합, 순서 무관 정규화. */

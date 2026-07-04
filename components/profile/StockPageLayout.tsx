@@ -30,6 +30,7 @@ import {
   DEFAULT_CHART_TYPE,
   DEFAULT_DAYS,
   DEFAULT_INTERVAL,
+  DEFAULT_MINUTE_PRIOR_DAYS,
   DEFAULT_TIMEFRAME,
   defaultDaysForPeriod,
   type ChartType,
@@ -51,10 +52,11 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   const { openFor } = useAIAnalysisContext();
   const openAIAnalysis = () => openFor(ticker);
 
-  // 차트 컨트롤 상태 — 부모가 소유해 StockDailyChart 를 controlled 로 두고 값(라인/캔들·봉·기간/간격)을 보존.
+  // 차트 컨트롤 상태 — 부모가 소유해 StockDailyChart 를 controlled 로 두고 값(라인/캔들·봉·간격·기간)을 보존.
   const [interval, setChartInterval] = useState<MainInterval>(DEFAULT_INTERVAL);
   const [days, setDays] = useState<number>(DEFAULT_DAYS); // 일/주/월봉 보기 범위
   const [timeframe, setTimeframe] = useState<number>(DEFAULT_TIMEFRAME); // 분봉 간격(분)
+  const [minutePriorDays, setMinutePriorDays] = useState<number>(DEFAULT_MINUTE_PRIOR_DAYS); // 분봉 기간(과거 거래일 수)
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
   // 오버레이 옵션(이평선·매물대·볼린저·VWAP·거래량 이평) — 이평선만 기본 ON, 드롭다운 체크박스로 토글. localStorage 지속.
   const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
@@ -69,11 +71,13 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     interval,
     days,
     timeframe,
+    minutePriorDays,
     chartType,
     overlays: chartOptions,
     onIntervalChange: handleIntervalChange,
     onDaysChange: setDays,
     onTimeframeChange: setTimeframe,
+    onMinutePriorDaysChange: setMinutePriorDays,
     onChartTypeChange: setChartType,
     onToggleOverlay: toggleChartOption,
   };
