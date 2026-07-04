@@ -5887,3 +5887,45 @@
   - **호가 기반 단타 컨텍스트 주입**(후속 PRD) — `fetchOrderbook`/`normalizeOrderbook` 를 순수하게 두었으니 매수벽/매도벽·스프레드를 LLM 프롬프트·결정론 게이트 입력으로 얹는 PR 이 바로 재사용 가능.
   - **prod 활성화 검증** — prod 는 TOSS env 미설정 dormant. 키 등록 후 장중 `/stock`·`/intraday` 라이브 호가·폴링(3s/10s)·레이트 관찰.
   - **후속 확장(비범위)** — KIS 호가 폴백, 웹소켓 스트리밍, 관심종목 행 미니 호가, 단타 다종목 동시(배치·간헐 폴링).
+
+### 2026-07-04 — feat(market): 토스 장 캘린더 → 장 상태 배지 + 장시계 유틸 (토스 배선 ②) (#244)
+
+- **slug**: `toss-market-calendar` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/244
+- **요약**: feat(market): 토스 장 캘린더 → 장 상태 배지 + 장시계 유틸 (토스 배선 ②)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 토스 국내 장 캘린더(`GET /api/v1/market-calendar/KR`)를 진실원천으로 심어, **공휴일까지 인지하는 장 상태 배지**와 재사용 가능한 장시계 유틸을 제공한다. 기존 시각 휴리스틱(`kstMarketHours.ts`·`estimateSession()`)은 병존(치환은 후속). PRD `toss-market-calendar` §3 전 범위 + DESIGN 핸드오프 매트릭스 구현.
+  > 
+  > - **데이터 계층**: 토스 어댑터(never-throw·15분/30s 캐시·single-flight) → 앱 표준 `MarketStatus`(phase 5종) → 순수 파생 `deriveMarketStatus` → BFF `/api/market/calendar`(서버 시각 주입·fail-soft) → `useQueryMarketCalendar` + `useMarketStatus`(세션 경계 setTimeout 재평가, 네트워크 콜 0).
+  > - **UI**: 자족 컴포넌트 `MarketStatusBadge`(점+라벨 이중 인코딩, 장중 라이브 펄스, 반응형 축약, unknown 자기 은닉). 헤더 지수 스트립 자리에 배선(모바일에도 렌더).
+  > - **토큰**: 신규 색 2개(`market-open`·`market-open-soft`)만 `finsight-redesign.md` colors+colors-dark 병합 후 `design:sync`. 나머지 전부 기존 토큰 재사용.
+  > 
+  > ## AC 대응 (self-verified)
+  > 
+  > | AC | 검증 | 결과 |
+  > |---|---|---|
+  > | AC-0 스키마 | `git grep TossMarketCalendar` | §3-2 확정 스키마대로(integrated nullable·세션 3종·동시호가 옵셔널). 실측 응답과 1:1 |
+  > | AC-1 키 없음 fail-soft | 라우트 `isTossConfigured` false → `phase="unknown"`+`X-Data-Source: none`, 로더 유닛 무호출 | ✅ 유닛 통과 |
+  > | AC-2~6 phase | `npx vitest run lib/market` (deriveMarketStatus) | ✅ regular/pre/after/closed(개장전·마감후)/휴장 13 tests |
+  > | AC-7 경계값 | 09:00·15:30·20:00·08:00 정각 결정 고정 | ✅ |
+  > | AC-8 캐시/single-flight | `npx vitest run lib/api/toss` (marketCalendar) | ✅ TTL 히트·동시요청 1콜·실패 캐시 5 tests |
+  > | AC-11 컨벤션 | 아래 grep | ✅ hex/px 0·fetch 0·var(--) 0·카피 단일·queryKey 단일 |
+  > | AC-12 isRegularOpen | `git grep useMarketStatus` | ✅ 훅이 fail-open `isRegularOpen` 노출 |
+  > 
+  > ### 게이트 결과
+  > - `npm run design:sync` — colors-dark 59키 1:1 검증 통과, theme-vars light 59 / dark 59
+  > - `npx tsc --noEmit` — 0 에러
+  > - `npm run lint` — 0
+  > - `npm run build` — ✓ Compiled successfully, `/api/market/calendar` 라우트 등록
+  > - `npx vitest run lib/api/toss lib/market` — 12 files / 99 tests 전부 통과(신규 marketClock 13 + marketCalendar 5)
+  > 
+  > ### 컨벤션 grep
+  > ```
+  > hex/px 직타(MarketStatusBadge·copy·market css): 0
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 호가/시세 폴링 게이트 스왑 후속 PR: `useQueryStockOrderbook` 등 `isKstMarketHoursWithCloseGrace()` → `useMarketStatus().isRegularOpen`(fail-open) 2줄 교체 + "캘린더 실패→장중 폴링 오정지" fail-open QA 케이스 1줄.
+  - `MarketPhase` ↔ `estimateSession()` `MarketSession`(pre/open/post/closed) 통합 + 스케줄러(`tickScheduler.ts`) 휴장가드(`todayIsBusinessDay`) 실적용 — 회귀면적 커서 별도 PR.
+  - 토스 조기마감/반차(연말 15:30 조기 등) 실측 스팟 확인(§9 q4 백로그) — 해당일 도래 시.
