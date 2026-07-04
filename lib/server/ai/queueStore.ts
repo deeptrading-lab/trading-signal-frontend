@@ -13,6 +13,7 @@
  */
 
 import { createLogger } from "@/lib/server/logTag";
+import { HEARTBEAT_TTL_SEC, readWorkerHeartbeat } from "@/lib/server/ai/workerHeartbeat";
 import type {
   AnalysisJobSource,
   AnalysisQueueRow,
@@ -40,6 +41,21 @@ const RECOVER_MARKER_RE = /\[recovered:(\d+)\]/;
  * → 최대 실행시간+마진(55분)을 넘겨 '연결 유실(핸들러 프로세스 크래시)'이 확실할 때만 failed 종결한다.
  */
 const BOT_STUCK_MS = 55 * 60_000;
+
+/**
+ * 사망 워커 행을 **fast-recover 하기 위한 최소 나이**(ms) = 하트비트 TTL(60s).
+ *
+ * 워커는 claim(`claimNextPending` 이 worker_id 세팅) 직후가 아니라 **별도 타이머 beat** 로 워커별
+ * 하트비트를 올린다 — claim 과 첫 성공 beat 사이엔 그 워커의 키가 아직 KV 에 없다(게다가 write 는
+ * fail-soft 라 조용히 실패할 수 있다). 이 창에서 '키 부재=사망' 으로 읽어 즉시 복구하면 **라이브 워커가
+ * 방금 claim 해 지금 스트리밍 중인 행을 이중 처리**한다(12분짜리 분석 2회 = 토큰 낭비 + decision upsert 경합).
+ *
+ * → 사망 판정만으로는 부족하고 행이 이 나이(=TTL)를 넘겨야만 fast-recover 한다:
+ *   (a) 라이브 워커면 claim 후 ~20s 안에 beat 가 반드시 도달 → 다음 조회가 `alive` 로 뒤집혀 보호되고,
+ *   (b) 진짜 죽었으면(첫 beat 도 못 올림) 키가 계속 부재라 60s 뒤 그대로 복구된다.
+ *   어느 쪽이든 20분 시간 컷오프보다 훨씬 빠르다.
+ */
+export const DEAD_RECOVER_AGE_FLOOR_MS = HEARTBEAT_TTL_SEC * 1000;
 
 type SupabaseQueueRow = {
   id: number;
@@ -438,25 +454,53 @@ async function patchById(
 }
 
 /**
- * processing 에 `timeoutMs` 초과 잔류한(워커가 죽은) row 를 복구한다(PRD AC-10/§9 q2).
+ * 소유 워커의 생존 판정(recoverStuck 내부). 워커별 하트비트로 결정한다.
+ * - `dead`      — 하트비트 부재/만료 → 워커 확실히 죽음 → **즉시** 복구(fast path, 나이 무관).
+ * - `alive`     — 하트비트 있음 → 워커 살아있음 → 사망 근거 복구 금지(시간 컷오프 폴백만).
+ * - `indeterminate` — 하트비트 조회가 store 장애로 실패(throw) → 사망으로 오판 금지(fail-safe).
+ *   `alive` 와 동일하게 취급(시간 컷오프 폴백만) — KV 오류로 라이브 행을 오복구하지 않는다.
+ */
+type WorkerLiveness = "dead" | "alive" | "indeterminate";
+
+/**
+ * processing 에 잔류한 stuck row 를 복구한다(PRD AC-10/§9 q2 + queue-per-worker-heartbeat).
  *
- * 정책: **pending 재투입 1회**, 2회째도 stuck 이면 **failed 종결**(무한 루프 방지).
- *   재투입 횟수는 error 텍스트의 `[recovered:N]` 마커로 추적한다.
+ * **판정(비-봇 행):**
+ *   1) 소유 워커가 죽었고(워커별 하트비트 만료) **행이 ≥60s(DEAD_RECOVER_AGE_FLOOR_MS) 됐으면** → 즉시 복구.
+ *      사망이라도 60s 미만이면 이번 사이클 **보류** — 방금 claim 한 라이브 워커가 아직 첫 beat 를 못 올렸을
+ *      뿐일 수 있어(fail-soft) 그 행을 이중 처리하지 않는다. (young 사망은 20분 컷오프로 보내지 않고,
+ *      다음 사이클에 60s 를 넘기면 복구한다 — '첫 beat 전 사망' 을 과도 지연시키지 않기 위함.)
+ *   2) 워커가 살아있거나(하트비트 존재) 판정 불가(하트비트 조회 실패)면 → 사망 근거 복구를 하지 않고,
+ *      기존 **시간 컷오프**(`claimed_at < now-timeoutMs`)에 걸릴 때만 복구(hung CLI 안전망 보존).
+ *   3) worker_id 가 없으면(legacy 행) → 시간 컷오프 폴백.
  *
- * @returns 이번 사이클에 복구(pending 재투입)되거나 failed 종결된 row 수.
- * 미설정/오류 시 0(fail-soft).
+ * **정책(복구 시):** pending 재투입 1회, 2회째 stuck 이면 failed 종결(무한 루프 방지, `[recovered:N]` 마커).
+ * **봇 행:** 변경 없음 — 55분(BOT_STUCK_MS) 넘겨 연결 유실이 확실할 때만 failed.
+ *
+ * **안전 불변식:**
+ *   - 현재 워커의 건강한 in-progress 행은 (a) 자기 하트비트가 살아있어 사망 복구 대상이 아니고,
+ *     (b) 20분 내 완료되므로 컷오프에도 안 걸린다 → 이중 처리 없음.
+ *   - 방금 claim 해 아직 첫 beat 전인 라이브 워커의 행은 60s 나이 플로어가 보호한다(사망 오판 즉시복구 차단).
+ *   - 하트비트 조회 실패는 `indeterminate` 로 흡수(사망 오판 금지, fail-safe).
+ *
+ * @returns 이번 사이클에 복구(재투입)되거나 failed 종결된 row 수. 미설정/오류 시 0(fail-soft).
  */
 export async function recoverStuck(timeoutMs: number): Promise<number> {
   const config = supabaseConfig();
   if (!config) return 0;
 
-  const cutoff = new Date(Date.now() - timeoutMs).toISOString();
+  const now = Date.now();
+  const cutoffMs = now - timeoutMs;
 
-  // claimed_at 이 cutoff 이전인 processing row 들을 조회.
+  // ⚠️ 시간 컷오프를 **쿼리에서 빼고** processing 행을 넓게 조회한다 — fast path 는 죽은 워커의 행을
+  //   (컷오프보다 훨씬 이른) 60s 플로어만 넘기면 복구해야 하는데, `claimed_at<cutoff` 필터를 걸면 그
+  //   행이 안 잡힌다. 컷오프/플로어는 아래 per-row 판정에서 적용한다.
+  //   컷오프 필터가 없어 행이 많을 수 있으니 **오래된 순(claimed_at asc)** 으로 정렬 + limit 로 상한 —
+  //   >50 행이 쌓여도 가장 오래된 stuck 행이 굶지 않는다(F4).
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
-  url.searchParams.set("select", "id,error,claimed_at,source");
+  url.searchParams.set("select", "id,error,claimed_at,source,worker_id");
   url.searchParams.set("status", "eq.processing");
-  url.searchParams.set("claimed_at", `lt.${cutoff}`);
+  url.searchParams.set("order", "claimed_at.asc");
   url.searchParams.set("limit", "50");
 
   const res = await fetch(url, {
@@ -480,8 +524,26 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
     error: string | null;
     claimed_at: string | null;
     source: AnalysisJobSource | null;
+    worker_id: string | null;
   }[];
   if (!Array.isArray(rows) || rows.length === 0) return 0;
+
+  // 같은 워커가 여러 행을 소유할 수 있으니 하트비트 조회를 workerId 당 1회로 캐시(KV 부하·일관성).
+  const livenessCache = new Map<string, WorkerLiveness>();
+  const livenessOf = async (workerId: string): Promise<WorkerLiveness> => {
+    const cached = livenessCache.get(workerId);
+    if (cached) return cached;
+    let liveness: WorkerLiveness;
+    try {
+      const hb = await readWorkerHeartbeat(workerId);
+      liveness = hb === null ? "dead" : "alive";
+    } catch {
+      // store 장애(타임아웃·에러) → 사망 오판 금지. 시간 컷오프로만 폴백(fail-safe, not fail-open).
+      liveness = "indeterminate";
+    }
+    livenessCache.set(workerId, liveness);
+    return liveness;
+  };
 
   let recovered = 0;
   for (const row of rows) {
@@ -500,6 +562,28 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
       recovered += 1;
       continue;
     }
+
+    // 비-봇 행: 소유 워커 생존으로 복구 여부 결정.
+    const claimedMs = row.claimed_at ? Date.parse(row.claimed_at) : Number.NaN;
+    const pastCutoff = Number.isFinite(claimedMs) && claimedMs < cutoffMs;
+    // 사망 fast-recover 자격 = 행이 ≥60s(하트비트 TTL) 됐는가. 방금 claim 한 라이브 워커가 아직 첫
+    //   beat 를 못 올린 창을 이 플로어가 보호한다. claimed_at 이 null/파싱불가면 자격 없음(=false).
+    const pastDeadFloor =
+      Number.isFinite(claimedMs) && now - claimedMs >= DEAD_RECOVER_AGE_FLOOR_MS;
+
+    let shouldRecover: boolean;
+    if (row.worker_id) {
+      const liveness = await livenessOf(row.worker_id);
+      // 사망 확정이라도 60s 플로어를 넘겨야 즉시 복구(첫 beat 전 라이브 워커 오복구 차단). 60s 미만이면
+      //   이번 사이클 보류 → 다음 사이클에 라이브면 alive 로 뒤집히고, 진짜 죽었으면 60s 뒤 복구된다.
+      //   살아있음/판정불가 → 사망 근거 복구 금지, 시간 컷오프에 걸릴 때만(hung 안전망).
+      shouldRecover = liveness === "dead" ? pastDeadFloor : pastCutoff;
+    } else {
+      // worker_id 부재(legacy/edge) → 기존 시간 컷오프 동작 유지.
+      shouldRecover = pastCutoff;
+    }
+    if (!shouldRecover) continue;
+
     const prevCount = recoverCountOf(row.error);
     if (prevCount >= 1) {
       // 이미 1회 재투입했는데 또 stuck → failed 종결(무한 루프 방지).
