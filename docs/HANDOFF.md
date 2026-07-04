@@ -5929,3 +5929,45 @@
   - 호가/시세 폴링 게이트 스왑 후속 PR: `useQueryStockOrderbook` 등 `isKstMarketHoursWithCloseGrace()` → `useMarketStatus().isRegularOpen`(fail-open) 2줄 교체 + "캘린더 실패→장중 폴링 오정지" fail-open QA 케이스 1줄.
   - `MarketPhase` ↔ `estimateSession()` `MarketSession`(pre/open/post/closed) 통합 + 스케줄러(`tickScheduler.ts`) 휴장가드(`todayIsBusinessDay`) 실적용 — 회귀면적 커서 별도 PR.
   - 토스 조기마감/반차(연말 15:30 조기 등) 실측 스팟 확인(§9 q4 백로그) — 해당일 도래 시.
+
+### 2026-07-04 — feat(stock): 토스 체결강도(틱룰 파생) + 체결 테이프 — /stock·/intraday 배선 (#245)
+
+- **slug**: `toss-trades` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/245
+- **요약**: feat(stock): 토스 체결강도(틱룰 파생) + 체결 테이프 — /stock·/intraday 배선
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 토스 `GET /api/v1/trades` 를 배선한 **체결강도(틱룰 파생) + 체결 테이프** 기능. 시리즈 ③ (① `toss-orderbook` #243 의 쌍둥이 패턴). `OrderbookPanel` 과 같은 지면에 나란히 놓이는 공용 `TradeStrengthPanel` 을 `/stock/[ticker]`(full)·`/intraday`(compact) 두 지면에 배선.
+  > 
+  > **★ 결정적 한계**: 토스 체결 응답에 매수/매도 방향(side) 필드가 없어(§6 AC-0 실측), 체결강도는 **틱룰(Lee-Ready 간이)로 파생한 추정치**다. 타입(`method:"tick-rule"`·`isApproximation:true`)·UI("추정치" 칩+툴팁)·카피 전반에 정직하게 표기.
+  > 
+  > ### 커밋 분할 (PRD §8)
+  > 1. `a2fa274` 데이터 계층 — 어댑터·순수 틱룰 파생·BFF·타입·클라·훅·유닛 17건
+  > 2. `97fac3b` UI + 토큰 — `TradeStrengthPanel`·카피·`strength-gauge-h`(10px) SSOT 병합
+  > 3. `c20a029` 배선 — 두 지면
+  > 
+  > ## AC 대응 / 자가검증
+  > 
+  > 라이브 라운드트립 (dev :3099, TOSS 키 present):
+  > 
+  > | AC | 검증 | 결과 |
+  > |---|---|---|
+  > | AC-0 스키마/한계 | `TossTrade`(price/volume/timestamp/currency, **side 부재**), `strength.method:"tick-rule"`·`isApproximation:true` | 확정 |
+  > | AC-2 정상 체결 | `curl /api/stock/trades?ticker=005930` | `X-Data-Source: toss`, 50건, `strength 0.2645`(buyVol 114/sellVol 317), side 부착, NaN 없음 |
+  > | AC-3/4/5 틱룰 유닛 | `npx vitest run lib/api/toss` | 60 passed (신규 17: 상승/하락/동일틱 상속·혼합·빈배열·단일·전부동일가·방어정렬) |
+  > | AC-7 빈 체결 | 주말 스냅샷(동일 timestamp 다수) | 크래시·NaN 없음, 강도 파생 정상 |
+  > | AC-8 미존재/부정 | `ticker=999999`→200 `isEmpty:true` · `ticker=`→400 · `ticker=@@`→400 | fail-soft/검증 정상 |
+  > | AC-9 양 지면 | `git grep TradeStrengthPanel` | StockPageLayout·IntradayWatchWorkspace 두 지면 import |
+  > | AC-11 캐시/single-flight | 유닛(3s 내 동시요청 1콜) + `count=5` slice | 통과 |
+  > | AC-14 컨벤션 | hex/px 직타 0 · `var(--)` 0 · 컴포넌트 `useQuery` 직접 import 0 · 클라 `fetch(` 0 · queryKey 단일 · 파생 순수함수 유닛 | 전부 0/존재 |
+  > 
+  > 게이트: `npm run design:sync`·`npx tsc --noEmit`·`npm run lint`·`npm run build` 모두 0 에러. `npx vitest run lib/api/toss` 60 passed.
+  > 
+  > 색 매핑(DESIGN R1): 매수/상승틱=`signal-up`(빨강)·매도/하락틱=`signal-down`(파랑) — OrderbookPanel 과 의도적 반대(테이프 상승틱=매수=빨강 일치). 색 단독 의존 금지(readout·라벨 병기).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **호가 대조(방식 B) 정밀 분류**: 체결가를 최우선 호가와 대조해 side 정밀 판정 — 틱룰 근사의 정밀버전(비범위, §4).
+  - **체결강도 단타 LLM 판단 컨텍스트 주입**: `deriveTradeStrength` 순수함수를 단타 틱 프롬프트/게이트에 주입(호가 주입 PR 과 함께, §9 q4).
+  - **폴링 게이팅 캘린더 통합**: `kstMarketHours` 휴리스틱 → `useMarketStatus().isRegularOpen`(#244 캘린더) 로 호가·체결 동시 스왑(§9 q3).
