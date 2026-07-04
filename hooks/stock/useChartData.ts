@@ -4,7 +4,8 @@
  * 봉 단위(interval)로 소스가 갈린다:
  *   - 일/주/월봉("D"|"W"|"M"): `/stock/chart`(일봉 라우트). 워밍업 포함 fetch(보기 구간보다 더
  *     과거까지)로 MACD(12/26/9)·RSI(14)를 끊김 없이 계산한 뒤 표시는 고른 구간(days)으로 잘라낸다.
- *   - 분봉("m"): `/stock/chart-minute`(당일 한 세션). 컷오프 없이 반환 봉 전체를 그린다.
+ *   - 분봉("m"): `/stock/chart-minute`. `minutePriorDays` 0=당일 한 세션, >0=멀티데이(과거 거래일
+ *     포함). 컷오프 없이 반환 봉 전체를 그린다. 멀티데이는 x축 라벨/눈금을 날짜 경계로 전환한다.
  *
  * 두 쿼리 훅은 매 렌더 항상 호출하고(rules of hooks), 활성 봉만 `enabled` 로 켠다. 지표(MACD/RSI/BB)는
  *   종가 시리즈에서만 계산하므로 일봉·분봉 어느 쪽이든 동일 매핑을 탄다.
@@ -96,6 +97,8 @@ export type UseChartDataResult = {
   volSeries: VolDatum[];
   macdSeries: MacdDatum[];
   rsiSeries: RsiDatum[];
+  /** 멀티데이 분봉의 x축 눈금(날짜 경계 "MM-DD", ~8개로 솎음). 그 외엔 undefined(recharts 자동 눈금). */
+  xTicks?: string[];
 };
 
 export function useChartData(
@@ -103,6 +106,7 @@ export function useChartData(
   interval: MainInterval,
   days: number,
   timeframe: number = DEFAULT_TIMEFRAME,
+  minutePriorDays: number = 0,
 ): UseChartDataResult {
   const isMinute = interval === "m";
   // 분봉일 때 일봉 훅에 넘길 안전한 ChartPeriod(비활성이라 값 자체는 무의미).
@@ -118,7 +122,7 @@ export function useChartData(
     days: fetchDays,
     enabled: !isMinute,
   });
-  const minute = useQueryMinuteChart(ticker, timeframe, { enabled: isMinute });
+  const minute = useQueryMinuteChart(ticker, timeframe, minutePriorDays, { enabled: isMinute });
 
   // 활성 봉의 쿼리 결과만 소비(둘은 동일 OHLCV 스키마 — StockMinuteCandle = StockDailyCandle).
   const { data, isLoading, isError, error } = isMinute ? minute : daily;
@@ -131,6 +135,7 @@ export function useChartData(
         volSeries: [] as VolDatum[],
         macdSeries: [] as MacdDatum[],
         rsiSeries: [] as RsiDatum[],
+        xTicks: undefined as string[] | undefined,
       };
     }
 
@@ -178,9 +183,40 @@ export function useChartData(
       vwap: vwap[i],
     });
 
-    // x축 라벨 — 분봉은 "YYYY-MM-DDTHH:mm" → 뒤 5글자("HH:mm"), 일/주/월봉은 "YYYY-MM-DD" → 앞 5글자 제거("MM-DD").
-    //   (IntradayMiniChart 와 동일한 분봉 라벨 규칙.)
-    const label = (d: string) => (isMinute ? d.slice(-5) : d.slice(5));
+    // 분봉이 여러 거래일에 걸치는지 — 멀티데이면 x축 라벨/눈금을 날짜 경계로 전환.
+    const minuteDayCount = isMinute
+      ? new Set(sorted.map((c) => c.date.slice(0, 10))).size
+      : 0;
+    const isMultiDayMinute = minuteDayCount > 1;
+
+    // x축 라벨:
+    //   - 일/주/월봉: "YYYY-MM-DD" → "MM-DD"
+    //   - 분봉(당일): "YYYY-MM-DDTHH:mm" → "HH:mm" (IntradayMiniChart 규칙)
+    //   - 분봉(멀티데이): 각 거래일 첫 봉은 "MM-DD"(날짜 경계), 그 외는 "HH:mm".
+    const label = (d: string, i: number) => {
+      if (!isMinute) return d.slice(5);
+      if (!isMultiDayMinute) return d.slice(-5);
+      const day = d.slice(0, 10);
+      const prevDay = i > 0 ? sorted[i - 1].date.slice(0, 10) : null;
+      return day !== prevDay ? d.slice(5, 10) : d.slice(-5);
+    };
+
+    // 멀티데이 분봉 x축 눈금 — 거래일 경계(첫 봉의 "MM-DD")만 노출. 많으면(1개월≈20) 균등 솎아 ~8개 이하.
+    let xTicks: string[] | undefined;
+    if (isMultiDayMinute) {
+      const boundaries: string[] = [];
+      let prevDay: string | null = null;
+      for (const c of sorted) {
+        const day = c.date.slice(0, 10);
+        if (day !== prevDay) {
+          boundaries.push(day.slice(5)); // "MM-DD" — label() 의 경계 라벨과 정확히 일치
+          prevDay = day;
+        }
+      }
+      const MAX_TICKS = 8;
+      const step = Math.ceil(boundaries.length / MAX_TICKS);
+      xTicks = step > 1 ? boundaries.filter((_, i) => i % step === 0) : boundaries;
+    }
 
     // 2) 보기 구간 컷오프 — 마지막 봉 날짜에서 days 캘린더일 이전. 워밍업 구간은 표시에서 잘라낸다.
     //   분봉은 당일 한 세션(라우트가 이미 하루치)이라 컷오프를 건너뛰고 반환 봉 전체를 그린다.
@@ -199,7 +235,7 @@ export function useChartData(
 
     // 3) 전체 시리즈 빌드 후 보기 구간으로 슬라이스(지표는 워밍업 덕에 첫 봉부터 값이 있음).
     const fullPrice: PriceDatum[] = sorted.map((c, i) => ({
-      date: label(c.date),
+      date: label(c.date, i),
       price: c.close,
       ...bbFields(i),
       ...maFields(i),
@@ -213,7 +249,7 @@ export function useChartData(
           ? ((c.close - prevClose) / prevClose) * 100
           : null;
       return {
-        date: label(c.date),
+        date: label(c.date, i),
         wickRange: [c.low, c.high] as [number, number],
         open: c.open,
         close: c.close,
@@ -227,19 +263,19 @@ export function useChartData(
       };
     });
     const fullVol: VolDatum[] = sorted.map((c, i) => ({
-      date: label(c.date),
+      date: label(c.date, i),
       volume: c.volume,
       isUp: c.close >= c.open,
       vma: vma[i],
     }));
     const fullMacd: MacdDatum[] = sorted.map((c, i) => ({
-      date: label(c.date),
+      date: label(c.date, i),
       macd: macd[i].macd,
       signal: macd[i].signal,
       histogram: macd[i].histogram,
     }));
     const fullRsi: RsiDatum[] = sorted.map((c, i) => ({
-      date: label(c.date),
+      date: label(c.date, i),
       rsi: rsi[i],
     }));
 
@@ -249,6 +285,7 @@ export function useChartData(
       volSeries: fullVol.slice(visibleStart),
       macdSeries: fullMacd.slice(visibleStart),
       rsiSeries: fullRsi.slice(visibleStart),
+      xTicks,
     };
   }, [data, days, isMinute]);
 

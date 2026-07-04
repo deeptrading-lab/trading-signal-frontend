@@ -75,6 +75,7 @@ export const CHART_OVERLAY_OPTIONS: {
 export type IntervalConfig = { label: string; interval: MainInterval };
 export type RangeConfig = { label: string; days: number };
 export type TimeframeConfig = { label: string; timeframe: number };
+export type MinutePeriodConfig = { label: string; priorDays: number };
 
 /** 봉 종류 토글 순서: 분봉(당일) → 일봉 → 주봉 → 월봉. */
 export const INTERVALS: IntervalConfig[] = [
@@ -85,14 +86,30 @@ export const INTERVALS: IntervalConfig[] = [
 ];
 
 /**
- * 분봉 간격 선택지 — 분봉이 활성일 때 우측 기간 슬롯이 이 목록으로 바뀐다(당일 한 세션이라
- *   1개월/3개월… 범위가 무의미). 값은 `useQueryMinuteChart` 의 `timeframe`(분). 기본 5분.
+ * 분봉 간격 선택지 — 분봉이 활성일 때 **간격 하위 선택기**로 노출된다(기간과 별개 슬롯).
+ *   값은 `useQueryMinuteChart` 의 `timeframe`(분). 기본 5분.
+ *   일/주/월봉이 "기간"을 고르듯 분봉은 "간격(1/3/5/10/15분)"과 "기간(당일/1주/1개월)"을 각각 고른다.
  */
 export const MINUTE_TIMEFRAMES: TimeframeConfig[] = [
   { label: "1분", timeframe: 1 },
   { label: "3분", timeframe: 3 },
   { label: "5분", timeframe: 5 },
+  { label: "10분", timeframe: 10 },
   { label: "15분", timeframe: 15 },
+];
+
+/**
+ * 분봉 기간 선택지 — 고른 간격을 **며칠치** 볼지(과거 거래일 수 priorDays). 일/주/월봉의 범위(days)와
+ *   같은 자리에서 같은 UI 로 노출한다(분봉만의 별도 슬롯이라 간격 선택기와 나란히 뜬다).
+ *   · 당일 → priorDays 0 (오늘 한 세션)  · 1주 → 5거래일  · 1개월 → 20거래일
+ *
+ *   ⚠️ 멀티데이 분봉은 페이지네이션 호출·봉 수가 크다(1개월 1분봉 ≈ 7,800봉·수십 콜). 3개월+ 는
+ *   비현실적이라 1개월(20거래일)에서 컷 — 모든 간격에 동일 적용(간격별 가변 아님).
+ */
+export const MINUTE_PERIODS: MinutePeriodConfig[] = [
+  { label: "당일", priorDays: 0 },
+  { label: "1주", priorDays: 5 },
+  { label: "1개월", priorDays: 20 },
 ];
 
 export const RANGES: Record<ChartPeriod, RangeConfig[]> = {
@@ -121,6 +138,8 @@ export const DEFAULT_INTERVAL: MainInterval = "D";
 export const DEFAULT_DAYS = RANGES["D"][1].days;
 /** 분봉 기본 간격(분) — `MINUTE_TIMEFRAMES` 세 번째(5분)와 정합. */
 export const DEFAULT_TIMEFRAME = 5;
+/** 분봉 기본 기간 — `MINUTE_PERIODS` 첫 항목(당일=priorDays 0)과 정합. */
+export const DEFAULT_MINUTE_PRIOR_DAYS = MINUTE_PERIODS[0].priorDays;
 
 /**
  * 봉 종류 변경 시 기본으로 잡는 범위(각 봉의 첫 범위).
