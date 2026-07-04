@@ -12,8 +12,9 @@ import {
 import { readWorkerHeartbeat } from "@/lib/server/ai/workerHeartbeat";
 
 // recoverStuck 의 워커별 하트비트 조회를 제어하기 위해 모듈을 목킹(생존/사망/조회실패 시나리오 주입).
-//   queueStore 는 이 모듈에서 readWorkerHeartbeat 만 쓴다.
+//   queueStore 는 이 모듈에서 readWorkerHeartbeat + HEARTBEAT_TTL_SEC(=사망 나이 플로어 산출)를 쓴다.
 vi.mock("@/lib/server/ai/workerHeartbeat", () => ({
+  HEARTBEAT_TTL_SEC: 60,
   readWorkerHeartbeat: vi.fn(),
 }));
 
@@ -336,16 +337,37 @@ describe("analysis queue store — recoverStuck 워커별 하트비트 fast path
     heartbeatMock.mockReset();
   });
 
-  it("(a) 소유 워커 사망(하트비트 null)이면 방금(10초 전) claim 했어도 즉시 복구", async () => {
+  it("(a) 하트비트 null 이라도 방금(10초 전) claim 했으면 복구 안 함(60s 플로어 — 첫 beat 창 보호)", async () => {
+    // 키 부재가 '사망' 이 아니라 '방금 claim 한 라이브 워커의 첫 beat 전' 일 수 있다 → 60s 플로어로 차단.
+    heartbeatMock.mockResolvedValue(null);
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonRes([
+        stuckRow({
+          id: 20,
+          claimed_at: claimedSecondsAgo(10), // 60s 플로어 이내
+          worker_id: "worker-maybe-live",
+        }),
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(0);
+    // 조회만 — 복구 PATCH 없음(라이브 워커의 방금-claim 행 이중 처리 방지).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("(a2) 소유 워커 사망 + 행이 70초(≥60s 플로어) 됐으면 즉시 복구(20분 컷오프보다 훨씬 빠름)", async () => {
     heartbeatMock.mockResolvedValue(null); // 워커 사망
     const fetchMock = vi
       .fn()
-      // 1) processing 조회 → 방금 claim 된 dead-worker 행.
+      // 1) processing 조회 → 60s 플로어는 넘겼지만 20분 컷오프는 한참 이내인 dead-worker 행.
       .mockResolvedValueOnce(
         jsonRes([
           stuckRow({
-            id: 20,
-            claimed_at: claimedSecondsAgo(10),
+            id: 21,
+            claimed_at: claimedSecondsAgo(70),
             worker_id: "worker-dead",
           }),
         ]),
@@ -361,7 +383,7 @@ describe("analysis queue store — recoverStuck 워커별 하트비트 fast path
     const patchCall = fetchMock.mock.calls[1];
     expect(patchCall[1].body).toContain("\"status\":\"pending\"");
     expect(patchCall[1].body).toContain("[recovered:1]");
-    // 컷오프(20분) 훨씬 이내인데도 복구 → 시간 컷오프 우회(fast path) 확인.
+    // 70초는 20분 시간 컷오프 훨씬 이내 → 하트비트 fast path 로 복구된 것.
   });
 
   it("(b) 소유 워커 생존(하트비트 존재) + 컷오프 이내면 복구하지 않음", async () => {
@@ -480,7 +502,7 @@ describe("analysis queue store — recoverStuck 워커별 하트비트 fast path
           stuckRow({
             id: 26,
             error: "[recovered:1]",
-            claimed_at: claimedSecondsAgo(10),
+            claimed_at: claimedSecondsAgo(70), // 60s 플로어 초과 → fast-recover 자격
             worker_id: "worker-dead",
           }),
         ]),

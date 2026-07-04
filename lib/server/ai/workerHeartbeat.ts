@@ -81,6 +81,11 @@ export async function readWorkerHeartbeat(
 ): Promise<WorkerHeartbeat | null> {
   const store = getKisStore();
   const hb = await store.get<WorkerHeartbeat>(workerHeartbeatKey(workerId));
+  // ⚠️ 옵셔널 메서드 계약: `wasLastCallDegraded` 를 **구현하지 않은** store 는 `?.()` 가 undefined(falsy)라
+  //   throw 를 건너뛰고 null 을 그대로 돌려준다. degrade 를 **실제로 겪을 수 있는** store 가 이 메서드를
+  //   빠뜨리면 fail-safe 가 조용히 fail-open 으로 뒤집혀(KV 장애→'사망' 오판→라이브 행 이중 처리) 사고가 난다.
+  //   → degrade 가능 store(UpstashKisStore 등)는 이 메서드를 **절대 제거하면 안 된다**. 절대 degrade 하지
+  //   않는 store(MemoryKisStore)만 미구현 허용 — 그때 null 은 언제나 정당한 miss(=사망)다.
   if (hb === null && store.wasLastCallDegraded?.()) {
     throw new Error(`worker heartbeat 조회 degrade(생존 판정 불가) workerId=${workerId}`);
   }
