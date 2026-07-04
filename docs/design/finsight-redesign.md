@@ -278,6 +278,7 @@ spacing:
   disclosure-row-py: 12px
   orderbook-row-h: 30px
   orderbook-row-h-compact: 24px
+  strength-gauge-h: 10px
 rounded:
   sm: 8px
   md: 12px
