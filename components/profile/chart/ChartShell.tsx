@@ -5,7 +5,8 @@
  *   맨 오른쪽: [옵션 ▾] 단독. 기간 슬롯은 봉 단위에 따라 성격이 바뀐다 —
  *     · 일/주/월봉: 1개월/3개월/6개월/1년 등 범위(days) 선택
  *     · 분봉: 1분/3분/5분/15분 간격(timeframe) 선택 (당일 한 세션이라 범위 무의미)
- *   두 경우 모두 같은 마크업(모바일 `ChartRangeDropdown` / 데스크탑 버튼 목록)을 재사용하고 옵션 집합만 스왑.
+ *   봉 종류 선택기와 기간/간격 선택기 **모두** 같은 반응형 마크업(모바일 `ChartRangeDropdown` / 데스크탑
+ *   버튼 목록)을 재사용 — 봉 종류·기간·분봉 간격에 따라 옵션 집합만 스왑(사용자 요청: 인터벌도 기간처럼 드롭다운).
  *
  * 차트 컨트롤 상태는 상위(StockPageLayout)가 소유(controlled). 상수/기본값은 `../stockChartConfig` 단일 소스.
  */
@@ -116,24 +117,33 @@ export function ChartShell({
             <ChartTypeIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {chartTypeLabel}
           </button>
-          {/* 봉 종류: 분봉/일봉/주봉/월봉 */}
-          <div className="flex items-center gap-xs">
-            {INTERVALS.map((it) => (
-              <button
-                key={it.interval}
-                type="button"
-                onClick={() => onIntervalChange(it.interval)}
-                className={cn(
-                  "px-sm py-[3px] rounded-sm text-caption font-medium transition-colors cursor-pointer",
-                  interval === it.interval
-                    ? "bg-accent-vivid text-surface"
-                    : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
-                )}
-              >
-                {it.label}
-              </button>
-            ))}
-          </div>
+          {/* 봉 종류: 분봉/일봉/주봉/월봉 — 기간 선택기와 동일 패턴(모바일 드롭다운/데스크탑 버튼) */}
+          {isMobile ? (
+            <ChartRangeDropdown
+              options={INTERVALS.map((it) => ({ label: it.label, value: it.interval }))}
+              value={interval}
+              onChange={onIntervalChange}
+              ariaLabel="봉 종류 선택"
+            />
+          ) : (
+            <div className="flex items-center gap-xs">
+              {INTERVALS.map((it) => (
+                <button
+                  key={it.interval}
+                  type="button"
+                  onClick={() => onIntervalChange(it.interval)}
+                  className={cn(
+                    "px-sm py-[3px] rounded-sm text-caption font-medium transition-colors cursor-pointer",
+                    interval === it.interval
+                      ? "bg-accent-vivid text-surface"
+                      : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
+                  )}
+                >
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* 기간(또는 분봉 간격) — 모바일은 드롭다운(줄바꿈 방지), 데스크탑은 버튼 목록 */}
           {isMobile ? (
             <ChartRangeDropdown

@@ -3,7 +3,7 @@
  *
  * 좁은 화면에서 라인·캔들 / 봉 / 기간 버튼이 한 줄에 다 들어가지 못해 줄바꿈되는 문제를 피하려고,
  * 우측 선택기를 드롭다운으로 접는다. 데스크탑은 기존 버튼 목록 유지(ChartShell 에서 분기).
- * 옵션은 `{ label, value }` 중립 목록 — 일/주/월봉은 기간(days), 분봉은 간격(timeframe)을 실어 재사용.
+ * 옵션은 `{ label, value }` 중립 목록(value 타입 제네릭) — 봉 종류(interval 문자열)·기간(days)·분봉 간격(timeframe) 모두 재사용.
  *
  * 동작: 버튼(현재 값 + chevron) 탭 → `.dropdown-panel` 목록 펼침. 옵션 선택/외부 클릭 시 닫힘.
  *   외부 클릭 닫힘 패턴은 `components/home/StockSearchContainer.tsx` 와 동일(mousedown).
@@ -15,20 +15,20 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-export interface ChartRangeDropdownProps {
-  options: { label: string; value: number }[];
-  value: number;
-  onChange: (value: number) => void;
-  /** 접근성 라벨 — 기간 선택기면 "기간 선택", 분봉 간격이면 "봉 간격 선택". */
+export interface ChartRangeDropdownProps<T extends string | number> {
+  options: { label: string; value: T }[];
+  value: T;
+  onChange: (value: T) => void;
+  /** 접근성 라벨 — 기간="기간 선택", 분봉 간격="봉 간격 선택", 봉 종류="봉 종류 선택". */
   ariaLabel?: string;
 }
 
-export function ChartRangeDropdown({
+export function ChartRangeDropdown<T extends string | number>({
   options,
   value,
   onChange,
   ariaLabel = "기간 선택",
-}: ChartRangeDropdownProps) {
+}: ChartRangeDropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
