@@ -7,7 +7,10 @@
  * `lib/copy/profile/buttons.ts`.
  */
 
-import type { ProfileMenuItems } from "@/lib/types/profile/menuItems";
+import type {
+  ProfileMenuItem,
+  ProfileMenuItems,
+} from "@/lib/types/profile/menuItems";
 
 export const PROFILE_MENU_ITEMS_MOCK: ProfileMenuItems = [
   { key: "NOTIFICATIONS", iconName: "Bell", variant: "default" },
@@ -28,3 +31,15 @@ export const PROFILE_MENU_ITEMS_MOCK: ProfileMenuItems = [
   },
   { key: "LOGOUT", iconName: "LogOut", variant: "danger" },
 ];
+
+/**
+ * 관리자 전용 진입점 — 프로필 페이지(서버)가 세션 role==admin 일 때만 설정 메뉴에 주입한다.
+ * (user-login-auth §3.7 — nav/설정은 client 라 role 노출 불가 → 서버 조건부 주입으로 비관리자 노출·플래시 0.
+ *  role 위조는 readSession 의 HMAC 서명 검증이 차단, /admin 페이지도 자체 role 게이트로 이중 방어.)
+ */
+export const PROFILE_ADMIN_MENU_ITEM: ProfileMenuItem = {
+  key: "ADMIN",
+  iconName: "UserCheck",
+  variant: "default",
+  href: "/admin",
+};

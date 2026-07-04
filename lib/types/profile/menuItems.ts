@@ -13,12 +13,13 @@ export type ProfileMenuKey =
   | "THEME"
   | "SCORECARD"
   | "PAPER_TRADING"
+  | "ADMIN"
   | "LOGOUT";
 
 export type ProfileMenuItem = {
   key: ProfileMenuKey;
   /** lucide-react 아이콘 이름 — 컴포넌트 단 매핑. */
-  iconName: "Bell" | "Shield" | "CreditCard" | "Moon" | "Target" | "Bot" | "LogOut";
+  iconName: "Bell" | "Shield" | "CreditCard" | "Moon" | "Target" | "Bot" | "UserCheck" | "LogOut";
   /** 위험 톤 (로그아웃) 분기. */
   variant: "default" | "danger";
   /** 설정 화면이 아니라 다른 라우트로 이동하는 항목이면 경로(예: `/dashboard/scorecard`). */

@@ -10,6 +10,7 @@
  *   - 이동/설정 행 = 아이콘 + 라벨 + 우측 `ChevronRight`(도달성 어포던스). full-width hover.
  *   - THEME = client 3-state 세그먼트(ThemeMenuButton). LogoutMenuButton = danger 행(critical).
  *   - 행 스타일 단일 진실 원천 = `.profile-menu-row(-danger)`(app/components.css) — 3 컴포넌트 공유.
+ *   - ADMIN(user-login-auth) = role==admin 일 때만 프로필 페이지가 items 에 주입하는 `/admin` 이동 행.
  *
  * lucide-react 아이콘 매핑은 menuItems mock 의 `iconName` 키에서 도출 — 컴포넌트 단 record.
  */
@@ -24,6 +25,7 @@ import {
   Moon,
   Shield,
   Target,
+  UserCheck,
 } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
@@ -40,6 +42,7 @@ import {
   MENU_THEME,
   MENU_SCORECARD,
   MENU_PAPER_TRADING,
+  MENU_ADMIN,
   MENU_LOGOUT,
 } from "@/lib/copy/profile/labels";
 
@@ -54,6 +57,7 @@ const MENU_LABEL: Record<ProfileMenuKey, string> = {
   THEME: MENU_THEME,
   SCORECARD: MENU_SCORECARD,
   PAPER_TRADING: MENU_PAPER_TRADING,
+  ADMIN: MENU_ADMIN,
   LOGOUT: MENU_LOGOUT,
 };
 
@@ -64,6 +68,7 @@ const ICON_MAP = {
   Moon,
   Target,
   Bot,
+  UserCheck,
   LogOut,
 } as const;
 
