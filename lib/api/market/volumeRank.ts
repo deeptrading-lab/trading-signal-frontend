@@ -6,9 +6,17 @@
  */
 
 import { httpClient } from "@/lib/api/client";
-import type { VolumeRankResponse } from "@/lib/types/market/volumeRank";
+import type {
+  VolumeRankBy,
+  VolumeRankResponse,
+} from "@/lib/types/market/volumeRank";
 
-export async function getVolumeRank(): Promise<VolumeRankResponse> {
-  const response = await httpClient.get<VolumeRankResponse>("/market/volume-rank");
+export async function getVolumeRank(
+  by: VolumeRankBy = "volume",
+): Promise<VolumeRankResponse> {
+  const response = await httpClient.get<VolumeRankResponse>(
+    "/market/volume-rank",
+    { params: { by } },
+  );
   return response.data;
 }

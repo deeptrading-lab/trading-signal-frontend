@@ -166,10 +166,18 @@ export const queryConfig = {
       gcTime: 1 * HOUR,
     },
     /**
-     * 거래량 순위 상위 — 단타워치 후보 추천. 실전 전용 랭킹 TR 보호 위해 flow.top10 과 동일하게
-     * staleTime 60s + 재진입 갱신. 단일 진실 원천.
+     * 거래량/거래대금 순위 상위 — 단타워치 후보·실시간 랭킹. 실전 전용 랭킹 TR 보호 위해
+     * flow.top10 과 동일하게 staleTime 60s + 재진입 갱신. 단일 진실 원천.
      */
     volumeRank: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
+    /**
+     * 등락률 순위(급상승/급하락) — 실시간 랭킹 탭. 시세성 랭킹이라 volumeRank/flow.top10 과
+     * 동일 tier(staleTime 60s + 재진입 갱신). 실전 전용 TR 보호. 단일 진실 원천.
+     */
+    fluctuation: {
       staleTime: 60 * SECOND,
       gcTime: 5 * MINUTE,
     },

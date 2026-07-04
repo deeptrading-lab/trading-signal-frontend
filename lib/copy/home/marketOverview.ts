@@ -12,21 +12,24 @@ export const HOME_PAGE_TITLE = "시장 종합";
 /* ── 실시간 랭킹 섹션 ─────────────────────────────── */
 export const RANK_SECTION_TITLE = "실시간";
 
-/* 랭킹 기준 탭 — 거래량만 실배선(거래량 순위 KIS TR). 나머지는 held PR #212 대기. */
+/* 랭킹 기준 탭 — 4종 모두 실배선(거래량순·거래대금순 = volume-rank TR / 급상승·급하락 = fluctuation TR). */
 export const RANK_TAB_VOLUME = "거래량";
 export const RANK_TAB_TURNOVER = "거래대금";
 export const RANK_TAB_SURGE = "급상승";
 export const RANK_TAB_PLUNGE = "급하락";
-/** 미배선 탭 hover 안내(native title). */
-export const RANK_TAB_COMING_SOON = "준비 중";
+/** 직전 조회가 실패한 탭 hover 안내(native title) — 클릭하면 재조회로 자가 복구된다. */
+export const RANK_TAB_RETRY_HINT = "다시 불러오려면 선택";
 
 export const RANK_LOADING = "실시간 순위를 불러오는 중이에요.";
 export const RANK_ERROR =
   "실시간 순위를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
 export const RANK_EMPTY = "표시할 종목이 없어요.";
 export const RANK_RETRY = "다시 시도";
-/** 랭킹 기준 캡션(거래량 기준임을 명시). */
-export const RANK_CAPTION = "거래량 기준 상위 종목";
+/** 랭킹 기준 캡션 — 활성 탭별로 무엇을 기준으로 줄 세웠는지 명시. */
+export const RANK_CAPTION_VOLUME = "거래량 기준 상위 종목";
+export const RANK_CAPTION_TURNOVER = "거래대금 기준 상위 종목";
+export const RANK_CAPTION_SURGE = "상승률 기준 상위 종목";
+export const RANK_CAPTION_PLUNGE = "하락률 기준 상위 종목";
 
 /* 관심종목 하트 토글 aria. */
 export const RANK_FAVORITE_ADD = "관심종목 추가";
