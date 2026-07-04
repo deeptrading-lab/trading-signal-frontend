@@ -34,21 +34,23 @@ const MAX_RESULTS = 20;
  * 시드 누락 종목은 결과에 포함되지 않음 — UX 측에서 안내 메시지 제공.
  */
 export function searchSymbols(keyword: string): StockSearchResult[] {
-  const trimmed = keyword.trim();
-  if (trimmed === "") {
+  // 띄어쓰기 무시 — 앞뒤·중간 공백을 모두 제거해 "삼성 전자"→"삼성전자", "005 930"→"005930" 으로 매칭.
+  const compact = keyword.replace(/\s+/g, "");
+  if (compact === "") {
     return SYMBOLS.slice(0, MAX_RESULTS).map(toResult);
   }
 
   // 6자리 숫자 → ticker 정확 매칭 우선.
-  if (/^\d{6}$/.test(trimmed)) {
-    const exact = SYMBOLS.find((s) => s.ticker === trimmed);
+  if (/^\d{6}$/.test(compact)) {
+    const exact = SYMBOLS.find((s) => s.ticker === compact);
     return exact ? [toResult(exact)] : [];
   }
 
-  const needle = trimmed.toLowerCase();
+  const needle = compact.toLowerCase();
   const matched = SYMBOLS.filter((s) => {
+    // 후보 종목명도 공백 제거해 비교(양쪽 정규화) — 시드에 공백 포함 이름이 있어도 매칭되게.
     return (
-      s.name.toLowerCase().includes(needle) ||
+      s.name.toLowerCase().replace(/\s+/g, "").includes(needle) ||
       s.ticker.toLowerCase().includes(needle)
     );
   });

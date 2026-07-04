@@ -39,3 +39,19 @@ describe("resolveBenchCode — 종목 → 벤치마크 지수 코드", () => {
     expect(resolveBenchCode("999999")).toBe("0001");
   });
 });
+
+describe("searchSymbols — 띄어쓰기 무시 매칭", () => {
+  it("중간 공백이 있어도 매칭 — '삼성 전자' → 삼성전자(005930)", () => {
+    const r = searchSymbols("삼성 전자");
+    expect(r.some((s) => s.ticker === "005930")).toBe(true);
+  });
+  it("공백 없는 입력도 동일 매칭 — '삼성전자'", () => {
+    const r = searchSymbols("삼성전자");
+    expect(r.some((s) => s.ticker === "005930")).toBe(true);
+  });
+  it("ticker 중간 공백도 제거 후 정확 매칭 — '005 930' → 005930 단건", () => {
+    const r = searchSymbols("005 930");
+    expect(r).toHaveLength(1);
+    expect(r[0]!.ticker).toBe("005930");
+  });
+});

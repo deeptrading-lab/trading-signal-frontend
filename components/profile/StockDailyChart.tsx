@@ -195,7 +195,7 @@ export function StockDailyChart({
   if (isLoading) {
     return (
       <ChartShell {...shellProps}>
-        <div className="flex items-center justify-center h-[480px] text-text-muted" aria-busy="true">
+        <div className="flex items-center justify-center h-[520px] text-text-muted" aria-busy="true">
           {STOCK_DETAIL_LOADING}
         </div>
       </ChartShell>
@@ -247,9 +247,9 @@ export function StockDailyChart({
     <ChartShell {...shellProps}>
       {/* 이평선 색 범례 — 어느 색이 어느 기간인지 안내. showMA 일 때만, 가격 플롯 바로 위 */}
       {showMA && <MALegend />}
-      {/* ① 가격 — 라인 or 캔들 */}
+      {/* ① 가격 — 라인 or 캔들 (세로 높이 240→280, 사용자 요청 "약간 더 길게") */}
       <div className="w-full overflow-hidden">
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={280}>
           {chartType === "candle" ? (
             <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
