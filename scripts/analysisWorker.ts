@@ -28,7 +28,12 @@ import {
   recoverStuck,
 } from "@/lib/server/ai/queueStore";
 import { detectProviders } from "@/lib/server/ai/detectCli";
-import { writeHeartbeat, type WorkerStatus } from "@/lib/server/ai/workerHeartbeat";
+import {
+  deleteWorkerHeartbeat,
+  writeHeartbeat,
+  writeWorkerHeartbeat,
+  type WorkerStatus,
+} from "@/lib/server/ai/workerHeartbeat";
 import type { AnalysisQueueRow } from "@/lib/types/stock/analysisQueue";
 
 const BASE_URL =
@@ -106,7 +111,10 @@ async function runAnalysis(
 async function beat(): Promise<void> {
   const status: WorkerStatus = inFlight.size > 0 ? "busy" : "idle";
   const queueDepth = await getQueueDepth();
-  await writeHeartbeat({ ts: Date.now(), status, queueDepth });
+  const hb = { ts: Date.now(), status, queueDepth };
+  // 두 키를 함께 기록: 전역 키(UI '워커 온라인' 판정) + 워커별 키(recoverStuck 의 이 워커 생존 판정).
+  //   둘 다 fail-soft(store 가 에러·타임아웃 흡수)라 Promise.all 은 reject 하지 않는다.
+  await Promise.all([writeHeartbeat(hb), writeWorkerHeartbeat(WORKER_ID, hb)]);
 }
 
 /** 이미 claim 된 작업 1건을 종결까지 처리한다. **절대 throw 하지 않음**(항상 markDone/markFailed). */
@@ -189,15 +197,18 @@ const heartbeatTimer = setInterval(() => {
   beat().catch(() => undefined); // fail-soft
 }, HEARTBEAT_INTERVAL_MS);
 
-function shutdown(signal: string): void {
+async function shutdown(signal: string): Promise<void> {
   log(`${signal} 수신 — 종료`);
   running = false;
   clearInterval(heartbeatTimer);
+  // graceful shutdown — 워커별 하트비트를 즉시 삭제해, 정상 재기동 시 이 워커가 잡고 있던 processing
+  //   행을 TTL(≤60s) 만료를 기다리지 않고 recoverStuck 이 곧장 복구하게 한다. best-effort(실패는 흡수).
+  await deleteWorkerHeartbeat(WORKER_ID).catch(() => undefined);
   // 진행 중 분석은 핸들러 타임아웃에 맡기고 잠시 후 빠져나간다.
   setTimeout(() => process.exit(0), 500);
 }
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 loop().catch((err) => {
   log(`치명적 오류 — ${err instanceof Error ? err.stack : String(err)}`);

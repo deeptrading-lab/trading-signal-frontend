@@ -9,6 +9,38 @@ import {
   markFailed,
   recoverStuck,
 } from "@/lib/server/ai/queueStore";
+import { readWorkerHeartbeat } from "@/lib/server/ai/workerHeartbeat";
+
+// recoverStuck 의 워커별 하트비트 조회를 제어하기 위해 모듈을 목킹(생존/사망/조회실패 시나리오 주입).
+//   queueStore 는 이 모듈에서 readWorkerHeartbeat 만 쓴다.
+vi.mock("@/lib/server/ai/workerHeartbeat", () => ({
+  readWorkerHeartbeat: vi.fn(),
+}));
+
+const heartbeatMock = vi.mocked(readWorkerHeartbeat);
+
+/** processing stuck 조회 응답 1행 헬퍼 — recoverStuck SELECT 스키마(worker_id 포함)에 맞춘다. */
+function stuckRow(over: Partial<{
+  id: number;
+  error: string | null;
+  claimed_at: string | null;
+  source: "prod" | "local" | "bot";
+  worker_id: string | null;
+}>) {
+  return {
+    id: 1,
+    error: null,
+    claimed_at: new Date().toISOString(),
+    source: "prod" as const,
+    worker_id: null,
+    ...over,
+  };
+}
+
+/** now 기준 `secondsAgo` 초 전 ISO 시각(claimed_at 구성용). */
+function claimedSecondsAgo(secondsAgo: number): string {
+  return new Date(Date.now() - secondsAgo * 1000).toISOString();
+}
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -295,6 +327,192 @@ describe("analysis queue store — recoverStuck (1회 재투입 후 failed)", ()
     expect(patchCall[1].body).toContain("\"status\":\"failed\"");
     // 봇 행은 재투입(pending)이 아니라 failed 여야 한다.
     expect(patchCall[1].body).not.toContain("\"status\":\"pending\"");
+  });
+});
+
+describe("analysis queue store — recoverStuck 워커별 하트비트 fast path", () => {
+  beforeEach(() => {
+    configureEnv();
+    heartbeatMock.mockReset();
+  });
+
+  it("(a) 소유 워커 사망(하트비트 null)이면 방금(10초 전) claim 했어도 즉시 복구", async () => {
+    heartbeatMock.mockResolvedValue(null); // 워커 사망
+    const fetchMock = vi
+      .fn()
+      // 1) processing 조회 → 방금 claim 된 dead-worker 행.
+      .mockResolvedValueOnce(
+        jsonRes([
+          stuckRow({
+            id: 20,
+            claimed_at: claimedSecondsAgo(10),
+            worker_id: "worker-dead",
+          }),
+        ]),
+      )
+      // 2) patchById(pending 재투입).
+      .mockResolvedValueOnce(jsonRes([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(1);
+    expect(heartbeatMock).toHaveBeenCalledWith("worker-dead");
+    const patchCall = fetchMock.mock.calls[1];
+    expect(patchCall[1].body).toContain("\"status\":\"pending\"");
+    expect(patchCall[1].body).toContain("[recovered:1]");
+    // 컷오프(20분) 훨씬 이내인데도 복구 → 시간 컷오프 우회(fast path) 확인.
+  });
+
+  it("(b) 소유 워커 생존(하트비트 존재) + 컷오프 이내면 복구하지 않음", async () => {
+    heartbeatMock.mockResolvedValue({ ts: Date.now(), status: "busy", queueDepth: 1 });
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonRes([
+        stuckRow({
+          id: 21,
+          claimed_at: claimedSecondsAgo(10),
+          worker_id: "worker-live",
+        }),
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(0);
+    expect(heartbeatMock).toHaveBeenCalledWith("worker-live");
+    // 조회만 — 복구 PATCH 없음(라이브 워커 행 보호).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("(c) 소유 워커 생존이라도 컷오프 초과(hung CLI)면 시간 컷오프 폴백으로 복구", async () => {
+    heartbeatMock.mockResolvedValue({ ts: Date.now(), status: "busy", queueDepth: 0 });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonRes([
+          stuckRow({
+            id: 22,
+            claimed_at: claimedSecondsAgo(30 * 60), // 30분 전 → 20분 컷오프 초과
+            worker_id: "worker-live",
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(jsonRes([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(1);
+    const patchCall = fetchMock.mock.calls[1];
+    expect(patchCall[1].body).toContain("\"status\":\"pending\"");
+    expect(patchCall[1].body).toContain("[recovered:1]");
+  });
+
+  it("(d) 봇 행은 워커별 하트비트를 보지 않고 기존 55분 정책만 따른다(30분 전이면 유지)", async () => {
+    heartbeatMock.mockResolvedValue(null); // 사망이라도 봇 경로엔 영향 없어야 한다.
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonRes([
+        stuckRow({
+          id: 23,
+          claimed_at: claimedSecondsAgo(30 * 60), // 30분 < 55분 → 유지
+          source: "bot",
+          worker_id: "worker-x",
+        }),
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(0);
+    expect(heartbeatMock).not.toHaveBeenCalled(); // 봇 경로는 하트비트 미조회
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("(e) 하트비트 조회 throw(=store 장애)면 사망 오판 없이 fast-recover 안 함(컷오프 이내 유지)", async () => {
+    heartbeatMock.mockRejectedValue(new Error("KV timeout"));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonRes([
+        stuckRow({
+          id: 24,
+          claimed_at: claimedSecondsAgo(10), // 컷오프 이내
+          worker_id: "worker-unknown",
+        }),
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(0); // 판정 불가(indeterminate) → 즉시 복구 안 함(fail-safe)
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 복구 PATCH 없음
+  });
+
+  it("(e2) 하트비트 조회 throw + 컷오프 초과면 시간 컷오프 폴백으로는 복구(안전망 보존)", async () => {
+    heartbeatMock.mockRejectedValue(new Error("KV timeout"));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonRes([
+          stuckRow({
+            id: 25,
+            claimed_at: claimedSecondsAgo(30 * 60), // 컷오프 초과
+            worker_id: "worker-unknown",
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(jsonRes([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(1);
+    expect(fetchMock.mock.calls[1][1].body).toContain("\"status\":\"pending\"");
+  });
+
+  it("(f) 사망 워커 행이 이미 [recovered:1] 이면 fast path 도 failed 종결(1회 재투입 정책 보존)", async () => {
+    heartbeatMock.mockResolvedValue(null); // 사망 → fast path
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonRes([
+          stuckRow({
+            id: 26,
+            error: "[recovered:1]",
+            claimed_at: claimedSecondsAgo(10),
+            worker_id: "worker-dead",
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(jsonRes([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(1);
+    const patchCall = fetchMock.mock.calls[1];
+    expect(patchCall[1].body).toContain("\"status\":\"failed\"");
+    expect(patchCall[1].body).not.toContain("\"status\":\"pending\"");
+  });
+
+  it("(g) worker_id 부재(legacy) + 컷오프 이내면 하트비트 미조회로 유지(시간 컷오프 폴백만)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonRes([
+        stuckRow({
+          id: 27,
+          claimed_at: claimedSecondsAgo(10), // 컷오프 이내
+          worker_id: null,
+        }),
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const recovered = await recoverStuck(20 * 60 * 1000);
+
+    expect(recovered).toBe(0);
+    expect(heartbeatMock).not.toHaveBeenCalled(); // worker_id 없으면 하트비트 미조회
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

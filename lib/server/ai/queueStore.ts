@@ -13,6 +13,7 @@
  */
 
 import { createLogger } from "@/lib/server/logTag";
+import { readWorkerHeartbeat } from "@/lib/server/ai/workerHeartbeat";
 import type {
   AnalysisJobSource,
   AnalysisQueueRow,
@@ -438,25 +439,45 @@ async function patchById(
 }
 
 /**
- * processing 에 `timeoutMs` 초과 잔류한(워커가 죽은) row 를 복구한다(PRD AC-10/§9 q2).
+ * 소유 워커의 생존 판정(recoverStuck 내부). 워커별 하트비트로 결정한다.
+ * - `dead`      — 하트비트 부재/만료 → 워커 확실히 죽음 → **즉시** 복구(fast path, 나이 무관).
+ * - `alive`     — 하트비트 있음 → 워커 살아있음 → 사망 근거 복구 금지(시간 컷오프 폴백만).
+ * - `indeterminate` — 하트비트 조회가 store 장애로 실패(throw) → 사망으로 오판 금지(fail-safe).
+ *   `alive` 와 동일하게 취급(시간 컷오프 폴백만) — KV 오류로 라이브 행을 오복구하지 않는다.
+ */
+type WorkerLiveness = "dead" | "alive" | "indeterminate";
+
+/**
+ * processing 에 잔류한 stuck row 를 복구한다(PRD AC-10/§9 q2 + queue-per-worker-heartbeat).
  *
- * 정책: **pending 재투입 1회**, 2회째도 stuck 이면 **failed 종결**(무한 루프 방지).
- *   재투입 횟수는 error 텍스트의 `[recovered:N]` 마커로 추적한다.
+ * **판정(비-봇 행):**
+ *   1) 소유 워커가 죽었으면(워커별 하트비트 만료) → **즉시** 복구(claim 직후라도). ← fast·safe path
+ *   2) 워커가 살아있거나(하트비트 존재) 판정 불가(하트비트 조회 실패)면 → 사망 근거 복구를 하지 않고,
+ *      기존 **시간 컷오프**(`claimed_at < now-timeoutMs`)에 걸릴 때만 복구(hung CLI 안전망 보존).
+ *   3) worker_id 가 없으면(legacy 행) → 시간 컷오프 폴백.
  *
- * @returns 이번 사이클에 복구(pending 재투입)되거나 failed 종결된 row 수.
- * 미설정/오류 시 0(fail-soft).
+ * **정책(복구 시):** pending 재투입 1회, 2회째 stuck 이면 failed 종결(무한 루프 방지, `[recovered:N]` 마커).
+ * **봇 행:** 변경 없음 — 55분(BOT_STUCK_MS) 넘겨 연결 유실이 확실할 때만 failed.
+ *
+ * **안전 불변식:**
+ *   - 현재 워커의 건강한 in-progress 행은 (a) 자기 하트비트가 살아있어 사망 복구 대상이 아니고,
+ *     (b) 20분 내 완료되므로 컷오프에도 안 걸린다 → 이중 처리 없음.
+ *   - 하트비트 조회 실패는 `indeterminate` 로 흡수(사망 오판 금지, fail-safe).
+ *
+ * @returns 이번 사이클에 복구(재투입)되거나 failed 종결된 row 수. 미설정/오류 시 0(fail-soft).
  */
 export async function recoverStuck(timeoutMs: number): Promise<number> {
   const config = supabaseConfig();
   if (!config) return 0;
 
-  const cutoff = new Date(Date.now() - timeoutMs).toISOString();
+  const cutoffMs = Date.now() - timeoutMs;
 
-  // claimed_at 이 cutoff 이전인 processing row 들을 조회.
+  // ⚠️ 시간 컷오프를 **쿼리에서 빼고** processing 행을 넓게 조회한다 — fast path 는 죽은 워커의 행을
+  //   나이와 무관하게(방금 claim 됐어도) 복구해야 하는데, `claimed_at<cutoff` 필터를 걸면 그 행이 안 잡힌다.
+  //   컷오프는 아래 per-row 판정에서 라이브/판정불가 행에만 적용한다. limit 로 상한을 둔다.
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
-  url.searchParams.set("select", "id,error,claimed_at,source");
+  url.searchParams.set("select", "id,error,claimed_at,source,worker_id");
   url.searchParams.set("status", "eq.processing");
-  url.searchParams.set("claimed_at", `lt.${cutoff}`);
   url.searchParams.set("limit", "50");
 
   const res = await fetch(url, {
@@ -480,8 +501,26 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
     error: string | null;
     claimed_at: string | null;
     source: AnalysisJobSource | null;
+    worker_id: string | null;
   }[];
   if (!Array.isArray(rows) || rows.length === 0) return 0;
+
+  // 같은 워커가 여러 행을 소유할 수 있으니 하트비트 조회를 workerId 당 1회로 캐시(KV 부하·일관성).
+  const livenessCache = new Map<string, WorkerLiveness>();
+  const livenessOf = async (workerId: string): Promise<WorkerLiveness> => {
+    const cached = livenessCache.get(workerId);
+    if (cached) return cached;
+    let liveness: WorkerLiveness;
+    try {
+      const hb = await readWorkerHeartbeat(workerId);
+      liveness = hb === null ? "dead" : "alive";
+    } catch {
+      // store 장애(타임아웃·에러) → 사망 오판 금지. 시간 컷오프로만 폴백(fail-safe, not fail-open).
+      liveness = "indeterminate";
+    }
+    livenessCache.set(workerId, liveness);
+    return liveness;
+  };
 
   let recovered = 0;
   for (const row of rows) {
@@ -500,6 +539,22 @@ export async function recoverStuck(timeoutMs: number): Promise<number> {
       recovered += 1;
       continue;
     }
+
+    // 비-봇 행: 소유 워커 생존으로 복구 여부 결정.
+    const claimedMs = row.claimed_at ? Date.parse(row.claimed_at) : Number.NaN;
+    const pastCutoff = Number.isFinite(claimedMs) && claimedMs < cutoffMs;
+
+    let shouldRecover: boolean;
+    if (row.worker_id) {
+      const liveness = await livenessOf(row.worker_id);
+      // 사망 확정 → 즉시 복구(나이 무관). 살아있음/판정불가 → 시간 컷오프에 걸릴 때만(hung 안전망).
+      shouldRecover = liveness === "dead" ? true : pastCutoff;
+    } else {
+      // worker_id 부재(legacy/edge) → 기존 시간 컷오프 동작 유지.
+      shouldRecover = pastCutoff;
+    }
+    if (!shouldRecover) continue;
+
     const prevCount = recoverCountOf(row.error);
     if (prevCount >= 1) {
       // 이미 1회 재투입했는데 또 stuck → failed 종결(무한 루프 방지).
