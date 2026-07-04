@@ -17,8 +17,8 @@ export const RANK_TAB_VOLUME = "거래량";
 export const RANK_TAB_TURNOVER = "거래대금";
 export const RANK_TAB_SURGE = "급상승";
 export const RANK_TAB_PLUNGE = "급하락";
-/** 조회 실패로 일시 비활성된 탭 hover 안내(native title). */
-export const RANK_TAB_UNAVAILABLE = "지금은 불러올 수 없어요";
+/** 직전 조회가 실패한 탭 hover 안내(native title) — 클릭하면 재조회로 자가 복구된다. */
+export const RANK_TAB_RETRY_HINT = "다시 불러오려면 선택";
 
 export const RANK_LOADING = "실시간 순위를 불러오는 중이에요.";
 export const RANK_ERROR =

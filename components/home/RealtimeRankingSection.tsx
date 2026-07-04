@@ -14,9 +14,10 @@
  *   리스트/로딩/에러/스켈레톤을 구동한다.
  *
  * 탭별 우아한 실패 처리(KIS TR 장애 시): 활성 탭 조회가 실패하면 그 탭을 **failed 집합**에 넣는다.
- *   - failed + **비활성** 탭 → 탭바에서 회색 비활성(클릭 불가) 처리(`aria-disabled`).
+ *   - failed + **비활성** 탭 → 탭바에서 흐림(opacity) "직전 실패" 힌트만, 하지만 **클릭 가능**.
+ *     클릭하면 활성화 → `enabled` 재점화로 재조회 → 성공 시 자가 복구, 재실패 시 활성 탭으로서 에러 표시.
  *   - failed + **활성** 탭 → 리스트 영역에서 기존 에러 문구 + "다시 시도"(refetch) 노출(죽은 탭 방지).
- *   - 복구: 활성 실패 탭에서 "다시 시도" 성공 시 failed 집합에서 제거(회색 해제).
+ *   - 복구: 실패 탭을 (다시) 활성화하거나 활성 실패 탭에서 "다시 시도" 성공 시 failed 집합에서 제거.
  *   ★ 에러 시 탭 자동 전환은 하지 않는다 — 로컬(KIS down)에서 전 탭이 실패해도 스위치 루프로
  *     떨리지 않도록. 전환은 오직 사용자 클릭으로만.
  *
@@ -55,7 +56,7 @@ import {
   RANK_TAB_TURNOVER,
   RANK_TAB_SURGE,
   RANK_TAB_PLUNGE,
-  RANK_TAB_UNAVAILABLE,
+  RANK_TAB_RETRY_HINT,
   RANK_LOADING,
   RANK_ERROR,
   RANK_EMPTY,
@@ -129,15 +130,15 @@ export function RealtimeRankingSection() {
   const { hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
   // 활성 탭 결과가 리스트/로딩/에러/스켈레톤을 구동한다(switch 등가 — 탭 키로 선택).
-  const active = {
+  const activeQuery = {
     volume: volumeQuery,
     turnover: turnoverQuery,
     surge: surgeQuery,
     plunge: plungeQuery,
   }[tab];
 
-  const activeIsError = active.isError;
-  const activeIsSuccess = active.isSuccess;
+  const activeIsError = activeQuery.isError;
+  const activeIsSuccess = activeQuery.isSuccess;
 
   // 활성 탭 조회 결과만 failed 집합에 반영 — 실패면 추가, 성공이면 제거(복구). 비활성 탭은 손대지 않아
   // 떠난 실패 탭의 회색 상태가 유지된다. 자동 탭 전환은 하지 않으므로 스위치 루프가 없다.
@@ -159,7 +160,7 @@ export function RealtimeRankingSection() {
     }
   }, [activeIsError, activeIsSuccess, tab]);
 
-  const rows: RankableRow[] = active.data?.rows ?? [];
+  const rows: RankableRow[] = activeQuery.data?.rows ?? [];
   // 전 행이 산업 부재면 컬럼을 접는다(현재 랭킹은 sector 미제공 → 접힘).
   const hasSector = rows.some((row) => !!row.sector);
 
@@ -183,15 +184,15 @@ export function RealtimeRankingSection() {
         className="inline-flex self-start sm:hidden"
       />
 
-      {active.isLoading ? (
+      {activeQuery.isLoading ? (
         <RankSkeleton />
-      ) : active.isError ? (
+      ) : activeQuery.isError ? (
         <div className="flex flex-col items-start gap-md py-md" role="alert">
           <p className="text-body-sm text-text-muted">{RANK_ERROR}</p>
           <button
             type="button"
             className="button-secondary"
-            onClick={() => active.refetch()}
+            onClick={() => activeQuery.refetch()}
           >
             {RANK_RETRY}
           </button>
@@ -226,7 +227,11 @@ export function RealtimeRankingSection() {
 
 /**
  * 거래량/거래대금/급상승/급하락 세그먼트 — ModeToggle 과 동일 시각 언어(pill + 흰 활성).
- * 조회 실패 + 비활성 탭은 회색 비활성(클릭 불가) — 활성 탭은 실패해도 클릭 대상(리스트가 에러+재시도).
+ *
+ * 직전 조회가 실패한 **비활성** 탭은 흐리게(opacity) "직전 실패" 힌트만 준다 — 하지만 **클릭 가능**하다.
+ * 클릭하면 `setTab` 으로 활성화 → 해당 훅의 `enabled` 가 true 로 바뀌며 재조회 → 상위 effect 가
+ * 성공 시 실패 집합에서 자가 제거(복구), 재실패 시 활성 탭으로서 리스트에 에러+다시 시도를 보여준다.
+ * (탭 전환은 오직 사용자 클릭으로만 — 자동 전환 없음 → 스위치 루프/떨림 없음.)
  */
 function RankTabs({
   value,
@@ -249,29 +254,25 @@ function RankTabs({
       )}
     >
       {RANK_TABS.map((opt) => {
-        const active = value === opt.value;
-        // 실패 + 비활성 탭만 회색 비활성 — 활성 탭은 실패해도 리스트에서 에러+재시도를 보여준다.
-        const disabled = failedTabs.has(opt.value) && !active;
+        const isActive = value === opt.value;
+        // 직전 조회 실패한 비활성 탭 — 흐림 힌트만, 여전히 클릭해 재조회(자가 복구)할 수 있다.
+        const failedHint = failedTabs.has(opt.value) && !isActive;
         return (
           <button
             key={opt.value}
             type="button"
             role="tab"
-            aria-selected={active}
-            aria-disabled={disabled || undefined}
-            title={disabled ? RANK_TAB_UNAVAILABLE : undefined}
+            aria-selected={isActive}
+            title={failedHint ? RANK_TAB_RETRY_HINT : undefined}
             className={cn(
-              "h-button-sm-h rounded-pill px-md text-button-sm transition-colors",
-              active
+              "h-button-sm-h cursor-pointer rounded-pill px-md text-button-sm transition-colors",
+              isActive
                 ? "bg-surface text-text-strong shadow-sm"
-                : "text-text-muted",
-              disabled
-                ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:text-text-strong",
+                : failedHint
+                  ? "text-text-muted opacity-50 hover:text-text-strong hover:opacity-100"
+                  : "text-text-muted hover:text-text-strong",
             )}
-            onClick={() => {
-              if (!disabled) onChange(opt.value);
-            }}
+            onClick={() => onChange(opt.value)}
           >
             {opt.label}
           </button>
