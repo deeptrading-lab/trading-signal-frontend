@@ -332,6 +332,37 @@
     animation: wl-particle-8 1s ease-out;
   }
 
+  /* ---------- AI 맥박 마크 (components/stock/ai-analysis/AiPulseMark) ----------
+   * "AI 가 일하는 중" 을 심전도(ECG) 스윕으로 전하는 애니메이션 브랜드 마크. wl-star 와 동일하게
+   * SVG stroke 애니메이션이라 @apply 비대상 속성(stroke-dasharray/-offset·filter·animation)은 raw CSS.
+   * 트랙 색(border-line)은 컴포넌트 측 `stroke-border-line` 유틸이 담당(토큰). @keyframes ai-ecg 는
+   * 파일 하단 top-level(skeletonShimmer·wl-star 선례). */
+  .pulse-mark-track {
+    /* 옅은 트랙 — 밝은 라인이 지나갈 바탕 라인. */
+    opacity: 0.7;
+  }
+  .pulse-mark-spark {
+    /* 짧은 밝은 구간(7)만 보이고 나머지(47)는 빈 dash → 라인 위를 흐르는 한 점 효과.
+     * dash 7/47·offset -54 는 경로 기하값(토큰 아님). 글로우 rgba 는 효과값
+     * (.card-elevated/.drawer box-shadow rgba 선례) — 토스 블루 계열. */
+    stroke-dasharray: 7 47;
+    stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 2.5px rgba(49, 130, 246, 0.55));
+    animation: ai-ecg 1.7s linear infinite;
+  }
+  /* calm(완료·대기) — 느리고 살짝 옅게. */
+  .pulse-mark.is-calm .pulse-mark-spark {
+    animation-duration: 3s;
+    opacity: 0.9;
+  }
+  /* 모션 최소화 존중 — 스윕 정지 + 정적 전체 라인(스파크가 트랙 위에 그대로 얹힘). */
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-mark-spark {
+      animation: none;
+      stroke-dasharray: none;
+    }
+  }
+
   /* ---------- AI 분석 마크다운 본문 (ai-panel-reskin — CardDetailOverlay) ----------
    * react-markdown 결과의 prose 색 변수를 토큰으로 오버라이드 — dark: 없이 라이트/다크 자동 전환.
    * `.markdown-content.prose`(0,2,0)로 typography 플러그인의 `.prose`(0,1,0)를 확실히 이긴다.
@@ -954,4 +985,11 @@
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
   45% { transform: translate(0, -35px) scale(0.6); opacity: 0.6; }
   100% { transform: translate(0, 45px) scale(0); opacity: 0; }
+}
+
+/* AI 맥박 마크 스윕(AiPulseMark) — 짧은 밝은 dash 를 라인 좌→우로 흘린다.
+ * dashoffset -54 = 세그먼트(7)+빈칸(47) 한 주기. preflight·@apply 비대상 잔여물이라
+ * @layer 밖 top-level 에 둔다(skeletonShimmer·wl-star 선례). */
+@keyframes ai-ecg {
+  to { stroke-dashoffset: -54; }
 }

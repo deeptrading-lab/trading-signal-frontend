@@ -16,6 +16,7 @@ import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
+import { AiPulseMark } from "./ai-analysis/AiPulseMark";
 import { AnalystCard } from "./ai-analysis/AnalystCard";
 import { DebateSection } from "./ai-analysis/DebateSection";
 import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
@@ -369,8 +370,18 @@ export function AIAnalysisPanel({
             {/* ── 헤더 ──────────────────────────────────────────────────── */}
             <div className="flex-none flex items-center justify-between px-lg py-sm bg-surface border-b border-border-line">
               <div className="flex items-center gap-2.5 min-w-0">
-                {/* AI 시그니처 — 헤더 브랜드 아이콘은 gradient-ai 인디고 톤. */}
-                <Sparkles className="text-gradient-ai-from shrink-0" size={18} />
+                {/* AI 시그니처 — 살아있는 브랜드 맥박 마크(ECG 스윕)를 흰 배지에 담아 헤더 로고와 통일.
+                    분석 중 = active(정상 스윕) / 완료·대기 = calm(느리고 옅게). */}
+                <span
+                  className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-pill bg-surface border border-border-line shadow-sm"
+                  aria-hidden="true"
+                >
+                  <AiPulseMark
+                    className="h-5 w-5"
+                    gradientId="aiPanelPulse"
+                    state={isRunning ? "active" : "calm"}
+                  />
+                </span>
                 <h2 className="text-body-strong leading-tight text-text-strong shrink-0">{displayName}</h2>
                 {/* 분석에 사용 중인 공급자 표시(읽기 전용) — 공급자 선택은 진입 화면에서만. */}
                 {!isAllPending && (
