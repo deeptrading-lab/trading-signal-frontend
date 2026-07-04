@@ -12,16 +12,14 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { RefreshCw } from "lucide-react";
-import { AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils/cn";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQueryAIDecisions } from "@/hooks/stock/useQueryAIDecisions";
 import { useQueryStockNames } from "@/hooks/stock/useQueryStockNames";
+import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
 import { AIDecisionCard } from "./AIDecisionCard";
 import { InflightCard } from "./InflightCard";
-import { AIDecisionDetailSheet } from "./AIDecisionDetailSheet";
-import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import {
   RESULTS_EMPTY_BODY,
   RESULTS_EMPTY_TITLE,
@@ -44,7 +42,9 @@ interface AIDecisionListContainerProps {
 
 export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainerProps) {
   const { data, isLoading, isError, isFetching, refetch } = useQueryAIDecisions();
-  const [selected, setSelected] = useState<AIDecisionListItem | null>(null);
+  // 카드 클릭 → 우측 AI 패널 저장모드(openFor). 중앙 상세 팝업은 폐지 — 저장 결론은 이제 패널이
+  // verdict-forward 로 렌더하고, 케밥/재분석과 진입점이 하나로 통합된다(ai-analysis-redesign PR③).
+  const { openFor } = useAIAnalysisContext();
   const [query, setQuery] = useState("");
 
   // 종목명은 한 곳에서 해석 — 카드/시트 표시 + 검색 매칭에 공용. (hooks 순서 고정 위해 early return 위에서 호출)
@@ -167,21 +167,11 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
               key={item.ticker}
               item={item}
               name={nameOf(item.ticker)}
-              onSelect={setSelected}
+              onSelect={(it) => openFor(it.ticker, nameOf(it.ticker))}
             />
           ))}
         </div>
       )}
-
-      <AnimatePresence>
-        {selected && (
-          <AIDecisionDetailSheet
-            item={selected}
-            name={nameOf(selected.ticker)}
-            onClose={() => setSelected(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
