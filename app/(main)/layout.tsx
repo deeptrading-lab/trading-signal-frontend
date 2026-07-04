@@ -46,8 +46,12 @@ import { cn } from "@/lib/utils/cn";
  *   - `/analyze`     AI 분석(analyze-reskin) — 카드리스 플랫 결과 목록 + 플랫 토큰 대시보드
  *   - `/profile`     마이페이지(profile-reskin) — 카드리스 플랫(자산 히어로만 라이트 카드)
  *   - `/intraday`    단타 워치(intraday-reskin) — 카드리스 플랫 표(운영 도구, localOnly 노출)
+ *   - `/dashboard/paper-trading*`  페이퍼 트레이딩(paper-trading-reskin) — 목록 + 세션 상세(3-depth),
+ *                    카드리스 플랫(요약 KPI·자산곡선·포지션·체결·타임라인 모두 플랫).
  * `startsWith("/stock")` 는 `/stockfoo` 같은 유령 경로가 없어(라우트 트리상 `/stock` 세그먼트뿐) 새지 않고,
- * `/watchlist`·`/analyze`·`/profile`·`/intraday` 은 하위 라우트가 없어 exact match 로 좁힌다. `/dashboard` 는
+ * `/watchlist`·`/analyze`·`/profile`·`/intraday` 은 하위 라우트가 없어 exact match 로 좁힌다.
+ * `/dashboard/paper-trading` 만 목록(exact)+세션 상세(`/[sessionId]`) 두 라우트라 `startsWith` 로 함께 덮되,
+ * 형제 라우트 `/dashboard/scorecard` 는 접두가 달라 새지 않는다(회색 유지). `/dashboard` 자체는
  * `/profile` 로 영구 redirect 되므로(pathname 이 `/profile` 로 귀결) 별도 guard 불필요. 나머지 도메인
  * (`/market`)은 기존 회색+카드 유지. */
 function isWhiteSurfaceRoute(pathname: string): boolean {
@@ -57,7 +61,8 @@ function isWhiteSurfaceRoute(pathname: string): boolean {
     pathname === "/watchlist" ||
     pathname === "/analyze" ||
     pathname === "/profile" ||
-    pathname === "/intraday"
+    pathname === "/intraday" ||
+    pathname.startsWith("/dashboard/paper-trading")
   );
 }
 
