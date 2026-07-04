@@ -41,9 +41,6 @@ const PAGE_DELAY_MS = 150;
 const RETRY_BACKOFF_MS = 400;
 /** 페이지 1콜 최대 재시도 횟수 — KIS 분봉 차트는 간헐 5xx 가 잦다(일봉 백테스트 교훈 동일). */
 const MAX_PAGE_RETRIES = 3;
-/** priorDays 채우려고 거슬러 볼 최대 캘린더일(주말·휴장 흡수). */
-const MAX_CALENDAR_LOOKBACK = 20;
-
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -185,7 +182,7 @@ async function fetchMinuteCandlesForDateKis(
  * 분봉 히스토리 — 과거 `priorDays` 세션 + (옵션) 당일, 합산·리샘플·오름차순.
  *
  * warmup(전일 분봉 이어붙이기)·백테스트의 주 진입점. 휴장일은 KIS 가 빈 응답 →
- * 자동 skip 하며 `priorDays` 만큼의 **거래일**을 채운다(최대 `MAX_CALENDAR_LOOKBACK` 거슬러).
+ * 자동 skip 하며 `priorDays` 만큼의 **거래일**을 채운다(주말·휴장 흡수 위해 `priorDays×2+10` 캘린더일까지 거슬러).
  * ⚠️ 호출량이 큼(거래일당 ~13콜). 라이브 루프는 상위에서 캐시할 것.
  *
  * @param priorDays 당일 외에 거슬러 모을 거래일 수(warmup용, 기본 1).
@@ -214,8 +211,14 @@ async function fetchMinuteHistoryKis(
     oneMin.push(...today);
   }
 
+  // priorDays(=채울 거래일 수)를 실제로 채우려면 주말·휴장을 흡수할 캘린더 여유가 필요하다.
+  //   고정 20 캘린더일 상한은 priorDays 20(20 거래일 ≈ 28 캘린더일) 요청 시 ~14세션에서 조기 종료해
+  //   "1개월"이 조용히 ~3주로 잘렸다(F-1). priorDays 비례(×2 + 10)로 상한을 잡아 확실히 채운다
+  //   (sibling `intradayTickDecision` 관례 정합). 루프는 filled==priorDays 면 즉시 멈추므로 상향해도 무해.
+  const maxCalendarLookback = priorDays * 2 + 10;
+
   let filled = 0;
-  for (let back = 1; back <= MAX_CALENDAR_LOOKBACK && filled < priorDays; back++) {
+  for (let back = 1; back <= maxCalendarLookback && filled < priorDays; back++) {
     const date = nDaysAgoYyyymmdd(back);
     const day = await pageDayBackward((anchor) => fetchStockMinuteDaily(ticker, date, anchor));
     if (day.length > 0) {
