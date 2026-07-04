@@ -17,16 +17,40 @@
 import {
   SESSION_MAX_AGE_SECONDS,
   SESSION_TOKEN_VERSION,
+  SESSION_TOKEN_VERSION_IDENTITY,
 } from "@/lib/auth/constants";
+import type { ProfileRole } from "@/lib/types/auth/profile";
 
-/** 서명된 세션 payload. 시각은 epoch **초**(JWT 관례 정합). */
+/** 세션에 굽는 역할 — 프로필 역할과 동일 union(단일 진실). */
+export type SessionRole = ProfileRole;
+
+/**
+ * 서명된 세션 payload. 시각은 epoch **초**(JWT 관례 정합).
+ *
+ * 신원 필드(`sub`/`email`/`role`)는 **선택** — `v=1`(비밀번호) 토큰은 없고, `v=2`(Google 로그인)
+ * 토큰만 채운다. `verifySession` 은 이 필드를 보지 않으므로 두 버전 모두 유효하다(하위호환, AC-5).
+ */
 export type SessionPayload = {
-  /** payload 스키마 버전. */
+  /** payload 스키마 버전. 1=비밀번호, 2=신원(Google). */
   v: number;
   /** 발급 시각(epoch 초). */
   iat: number;
   /** 만료 시각(epoch 초). 만료의 단일 진실 — 서버가 항상 이 값을 본다. */
   exp: number;
+  /** Google 안정 식별자(신원 세션만). */
+  sub?: string;
+  /** 소문자 정규화 이메일(신원 세션만). */
+  email?: string;
+  /** 역할(신원 세션만) — role 방어 라우트가 `readSession` 으로 읽는다. */
+  role?: SessionRole;
+};
+
+/** 디코드된 신원 — `readSession` 반환. 서명·만료 검증 통과분만 반환된다. */
+export type SessionIdentity = {
+  v: number;
+  sub?: string;
+  email?: string;
+  role?: SessionRole;
 };
 
 const textEncoder = new TextEncoder();
@@ -74,40 +98,105 @@ export async function signSession(nowMs: number = Date.now()): Promise<string | 
 }
 
 /**
- * 세션 토큰 검증 — 위조 차단(HMAC) + 만료 차단(exp).
+ * 신원(Google 로그인) 세션 토큰 발급 — `v=2`, payload 에 `sub`/`email`/`role` 포함.
  *
- * 1. `<body>.<sig>` 분해. 형식 불량이면 false.
+ * 승인(`approved`)된 사용자에게만 발급한다(콜백 라우트가 분기). `verifySession` 시맨틱은 불변
+ * (유효 서명 + 미만료 = true) — 신원은 부가 payload 이고 게이트는 boolean 만 본다.
+ *
+ * @returns `<body>.<sig>` 토큰. `APP_AUTH_SECRET` 미설정 시 null(발급 거부).
+ */
+export async function signIdentitySession(
+  identity: { sub: string; email: string; role: SessionRole },
+  nowMs: number = Date.now(),
+): Promise<string | null> {
+  const key = await importHmacKey();
+  if (!key) return null;
+
+  const iat = Math.floor(nowMs / 1000);
+  const payload: SessionPayload = {
+    v: SESSION_TOKEN_VERSION_IDENTITY,
+    iat,
+    exp: iat + SESSION_MAX_AGE_SECONDS,
+    sub: identity.sub,
+    email: identity.email,
+    role: identity.role,
+  };
+  const body = bytesToBase64Url(textEncoder.encode(JSON.stringify(payload)));
+  const sig = await hmacSign(key, body);
+  return `${body}.${sig}`;
+}
+
+/**
+ * 토큰을 검증(HMAC + exp)하고 payload 를 반환한다. 실패(위조·만료·형식 불량·시크릿 부재·예외)면 null.
+ * `verifySession`(boolean)·`readSession`(신원) 공통 코어 — 검증 로직 단일화.
+ *
+ * 1. `<body>.<sig>` 분해. 형식 불량이면 null.
  * 2. body 재서명 결과와 sig 를 constant-time 비교(타이밍 누출 차단).
  * 3. body 디코드 → `exp > now` 확인.
- * 위 모두 통과해야 true. `APP_AUTH_SECRET` 미설정·예외 시 false(안전 실패).
  */
-export async function verifySession(
+async function verifyAndDecode(
   token: string | undefined | null,
-  nowMs: number = Date.now(),
-): Promise<boolean> {
-  if (!token) return false;
+  nowMs: number,
+): Promise<SessionPayload | null> {
+  if (!token) return null;
   const key = await importHmacKey();
-  if (!key) return false;
+  if (!key) return null;
 
   const dot = token.indexOf(".");
-  if (dot <= 0 || dot === token.length - 1) return false;
+  if (dot <= 0 || dot === token.length - 1) return null;
   const body = token.slice(0, dot);
   const sig = token.slice(dot + 1);
 
   try {
     const expected = await hmacSign(key, body);
     // 서명 비교는 constant-time — 길이 다르면 false 지만 누출은 없다(둘 다 base64url 고정폭).
-    if (!constantTimeEqual(sig, expected)) return false;
+    if (!constantTimeEqual(sig, expected)) return null;
 
     const payload = decodePayload(body);
-    if (!payload) return false;
+    if (!payload) return null;
 
     const now = Math.floor(nowMs / 1000);
-    return payload.exp > now;
+    if (payload.exp <= now) return null;
+    return payload;
   } catch {
     // 디코드·crypto 예외는 전부 invalid 로 안전 실패.
-    return false;
+    return null;
   }
+}
+
+/**
+ * 세션 토큰 검증 — 위조 차단(HMAC) + 만료 차단(exp). 모두 통과해야 true.
+ *
+ * `APP_AUTH_SECRET` 미설정·예외 시 false(안전 실패). **시맨틱 불변** — 게이트(`proxy.ts`)가
+ * 네트워크 I/O 없이 이 boolean 만으로 판정한다(role 조회 금지, AC-15). `v=1`(비밀번호)·`v=2`(신원)
+ * 토큰 모두 유효 서명 + 미만료면 통과(폴백 공존, AC-5).
+ */
+export async function verifySession(
+  token: string | undefined | null,
+  nowMs: number = Date.now(),
+): Promise<boolean> {
+  return (await verifyAndDecode(token, nowMs)) !== null;
+}
+
+/**
+ * 검증된 토큰의 신원(`sub`/`email`/`role`)을 반환한다. 위조·만료·형식 불량이면 null(안전 실패).
+ *
+ * role 방어가 필요한 라우트(예: `/api/admin/approvals`)가 `role === "admin"` 을 스스로 확인하는 용도.
+ * 서명을 반드시 검증한 뒤 신원을 돌려주므로, 위조된 `role=admin` 쿠키는 통과하지 못한다.
+ * 순수 함수(Web Crypto·JSON) — Edge·Node 공용. **단, `proxy.ts` 는 호출하지 않는다**(게이트는 boolean만).
+ */
+export async function readSession(
+  token: string | undefined | null,
+  nowMs: number = Date.now(),
+): Promise<SessionIdentity | null> {
+  const payload = await verifyAndDecode(token, nowMs);
+  if (!payload) return null;
+  return {
+    v: payload.v,
+    sub: payload.sub,
+    email: payload.email,
+    role: payload.role,
+  };
 }
 
 /** base64url(JSON) body 를 `SessionPayload` 로 디코드. 형식 불량이면 null. */

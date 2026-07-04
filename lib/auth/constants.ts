@@ -15,5 +15,22 @@ export const SESSION_COOKIE_NAME = "app_auth";
 /** 세션 수명 — 30일(초). 쿠키 `Max-Age` 와 토큰 `exp` 둘 다 동일 값. */
 export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 2_592_000 = 30일.
 
-/** 토큰 payload 버전 — 향후 스키마 변경 시 무효화 키로 사용. */
+/**
+ * 토큰 payload 버전.
+ *   - `1` = 공유 비밀번호 세션(`signSession`, 신원 없음). 하위호환으로 계속 유효(PRD user-login-auth AC-5).
+ *   - `2` = Google 로그인 신원 세션(`signIdentitySession`, `sub`/`email`/`role` 포함).
+ * `verifySession`/`readSession` 은 버전을 강제하지 않는다(둘 다 유효) — 향후 무효화 키로만 사용.
+ */
 export const SESSION_TOKEN_VERSION = 1;
+
+/** 신원(Google 로그인) 세션 payload 버전. */
+export const SESSION_TOKEN_VERSION_IDENTITY = 2;
+
+/**
+ * OAuth state(CSRF) 쿠키 이름 — `/api/auth/google/start` 가 발급, `callback` 이 대조.
+ * PRD user-login-auth §3.3 / AC-19: httpOnly + 콜백 쿼리 state 와 일치해야 통과(불일치 400).
+ */
+export const OAUTH_STATE_COOKIE_NAME = "oauth_state";
+
+/** OAuth state 쿠키 수명(초) — authorize 왕복 시간만. 10분이면 충분. */
+export const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60; // 600.

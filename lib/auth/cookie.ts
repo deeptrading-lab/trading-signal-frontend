@@ -11,6 +11,8 @@
  */
 
 import {
+  OAUTH_STATE_COOKIE_NAME,
+  OAUTH_STATE_MAX_AGE_SECONDS,
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
 } from "@/lib/auth/constants";
@@ -21,6 +23,12 @@ type SessionCookieOptions = {
   sameSite: "lax";
   path: "/";
   maxAge: number;
+};
+
+type CookieSpec = {
+  name: string;
+  value: string;
+  options: SessionCookieOptions;
 };
 
 /** 로컬 http 에서는 Secure 쿠키가 거부되므로 프로덕션에서만 Secure. */
@@ -55,6 +63,40 @@ export function buildClearedSessionCookie(): {
 } {
   return {
     name: SESSION_COOKIE_NAME,
+    value: "",
+    options: {
+      httpOnly: true,
+      secure: isSecure(),
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    },
+  };
+}
+
+/**
+ * OAuth state(CSRF) 쿠키 옵션 — `/api/auth/google/start` 발급.
+ * `sameSite=lax` 라 Google → 콜백 top-level 리다이렉트에서 쿠키가 함께 전송된다.
+ * maxAge 는 authorize 왕복 시간만(10분).
+ */
+export function buildOAuthStateCookie(value: string): CookieSpec {
+  return {
+    name: OAUTH_STATE_COOKIE_NAME,
+    value,
+    options: {
+      httpOnly: true,
+      secure: isSecure(),
+      sameSite: "lax",
+      path: "/",
+      maxAge: OAUTH_STATE_MAX_AGE_SECONDS,
+    },
+  };
+}
+
+/** OAuth state 쿠키 삭제(콜백 처리 후 1회성 정리). */
+export function buildClearedOAuthStateCookie(): CookieSpec {
+  return {
+    name: OAUTH_STATE_COOKIE_NAME,
     value: "",
     options: {
       httpOnly: true,
