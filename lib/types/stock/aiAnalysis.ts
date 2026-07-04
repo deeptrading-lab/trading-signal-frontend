@@ -155,7 +155,7 @@ export const AGENT_META: AgentMeta[] = [
   { key: "risk_risky",        label: "공격적 리스크",     description: "고수익 기회 옹호, 보수적 가정 반박" },
   { key: "risk_neutral",      label: "중립적 리스크",     description: "성장 vs 리스크 균형 분석" },
   { key: "risk_safe",         label: "보수적 리스크",     description: "자산 보호, 하방 리스크 집중" },
-  { key: "portfolio_manager", label: "포트폴리오 매니저", description: "최종 매매 결정" },
+  { key: "portfolio_manager", label: "최종 판정", description: "최종 매매 결정" },
 ];
 
 // ─── SSE 이벤트 ───────────────────────────────────────────────────────────────
