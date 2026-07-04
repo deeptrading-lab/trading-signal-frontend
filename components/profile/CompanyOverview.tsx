@@ -64,17 +64,33 @@ function marketLabel(market: CompanyProfile["market"]): string {
 }
 
 /**
- * 업종 라벨 합성 — 큰 업종(KRX 섹터, price.sector "전기·전자") · 상세 업종(KIS 표준산업분류,
- * company.industry "통신 및 방송 장비 제조업")를 " · " 로 병기. 둘 중 하나만 있으면 그것만,
- * 동일 문자열이면 중복 제거. 둘 다 없으면 undefined → OverviewRow 가 "-" 표시.
+ * 업종 값에서 사람이 읽을 수 있는 이름만 추출.
+ *   - "264 - 컴퓨터 및 주변장치 제조업" → "컴퓨터 및 주변장치 제조업" (코드 접두 제거)
+ *   - "2612" (순수 코드·이름 없음) → undefined (버림)
+ *   - "전기·전자" (이름) → 그대로
+ */
+function readableIndustry(raw: string | undefined): string | undefined {
+  const t = raw?.trim();
+  if (!t) return undefined;
+  // "코드 - 이름" 형태면 이름 부분만.
+  const name = t.match(/^\d[\d.]*\s*[-–—]\s*(.+)$/)?.[1]?.trim() ?? t;
+  // 한글/영문이 없는 순수 코드면 버림(예 "2612").
+  return /[가-힣A-Za-z]/.test(name) ? name : undefined;
+}
+
+/**
+ * 업종 라벨 합성 — 큰 업종(KRX 섹터, price.sector "전기·전자") · 상세 업종(company.industry)을
+ * " · " 로 병기하되, **순수 숫자 코드(예 "2612")는 버리고 읽을 수 있는 이름만** 남긴다.
+ * (사용자 피드백 I-1: 헤더 업종칩 제거 후 기업개황에 DART induty_code 가 코드로만 노출되던 문제.)
+ * 둘 중 하나만 있으면 그것만, 동일 문자열이면 중복 제거. 둘 다 없으면 undefined → OverviewRow "-".
  */
 function composeIndustry(
   sector: string | undefined,
   industry: string | undefined,
 ): string | undefined {
-  const parts = [sector, industry]
-    .map((p) => p?.trim())
-    .filter((p): p is string => Boolean(p));
+  const parts = [readableIndustry(sector), readableIndustry(industry)].filter(
+    (p): p is string => Boolean(p),
+  );
   const unique = [...new Set(parts)];
   return unique.length > 0 ? unique.join(" · ") : undefined;
 }
