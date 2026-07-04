@@ -62,6 +62,8 @@ export const MENU_THEME = "화면 테마 설정 (다크모드)";
 /* scorecard-nav-link — `/dashboard/scorecard`(판정 적중률 자가점검) 도달성 보조 메뉴 라벨. */
 export const MENU_SCORECARD = "신호 성적표 (적중률 자가점검)";
 export const MENU_PAPER_TRADING = "AI 모의투자";
+/* user-login-auth — role=admin 에게만 프로필 페이지가 서버에서 주입하는 가입 승인 진입점. */
+export const MENU_ADMIN = "가입 승인 관리";
 export const MENU_LOGOUT = "로그아웃";
 
 /* 테마 3-state 토글 (light/dark/system) — `components/theme/ThemeMenuButton.tsx`. */
