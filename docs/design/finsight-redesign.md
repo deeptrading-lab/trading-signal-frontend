@@ -60,6 +60,8 @@ colors:
   fng-extreme-greed: "#a83246"
   fng-extreme-greed-soft: "#fbe4e8"
   fng-track: "#eceff3"
+  market-open: "#166534"
+  market-open-soft: "#dcfce7"
 colors-dark:
   primary: "#cdd9e5"
   surface: "#161d26"
@@ -118,6 +120,8 @@ colors-dark:
   fng-extreme-greed: "#e8697f"
   fng-extreme-greed-soft: "#3a1f28"
   fng-track: "#2a333e"
+  market-open: "#4ade80"
+  market-open-soft: "#14321f"
 shadows:
   card: "0 1px 2px rgba(15, 23, 42, 0.05)"
   elevated: "0 10px 28px rgba(23, 32, 42, 0.08)"

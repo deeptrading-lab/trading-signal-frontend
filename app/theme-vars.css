@@ -58,6 +58,8 @@
   --fs-fng-extreme-greed: #a83246;
   --fs-fng-extreme-greed-soft: #fbe4e8;
   --fs-fng-track: #eceff3;
+  --fs-market-open: #166534;
+  --fs-market-open-soft: #dcfce7;
 }
 
 html.dark {
@@ -118,4 +120,6 @@ html.dark {
   --fs-fng-extreme-greed: #e8697f;
   --fs-fng-extreme-greed-soft: #3a1f28;
   --fs-fng-track: #2a333e;
+  --fs-market-open: #4ade80;
+  --fs-market-open-soft: #14321f;
 }
