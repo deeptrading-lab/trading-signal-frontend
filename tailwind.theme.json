@@ -279,7 +279,9 @@
         "donut-thickness": "22px",
         "table-row-h": "42px",
         "table-cell-px": "12px",
-        "disclosure-row-py": "12px"
+        "disclosure-row-py": "12px",
+        "orderbook-row-h": "30px",
+        "orderbook-row-h-compact": "24px"
       },
       "screens": {
         "sm": "640px",

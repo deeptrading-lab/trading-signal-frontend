@@ -272,6 +272,8 @@ spacing:
   table-row-h: 42px
   table-cell-px: 12px
   disclosure-row-py: 12px
+  orderbook-row-h: 30px
+  orderbook-row-h-compact: 24px
 rounded:
   sm: 8px
   md: 12px
