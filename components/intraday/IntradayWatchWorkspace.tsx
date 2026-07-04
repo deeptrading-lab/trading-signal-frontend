@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { Badge } from "@/components/ui/Badge";
+import { Divider } from "@/components/ui/Divider";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
@@ -153,7 +155,11 @@ export function IntradayWatchWorkspace() {
           <h1 className="text-h1 text-text-strong">{W.title}</h1>
           <p className="text-caption text-text-muted">{W.subtitle}</p>
         </div>
-        {autoActive ? <span className="ml-auto badge-info">{P.autoTicking}</span> : null}
+        {autoActive ? (
+          <Badge variant="info" className="ml-auto">
+            {P.autoTicking}
+          </Badge>
+        ) : null}
       </header>
 
       {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}
@@ -162,8 +168,8 @@ export function IntradayWatchWorkspace() {
         onSelect={(stock) => add({ ticker: stock.ticker, name: stock.name })}
       />
 
-      {/* 추천 후보 — 수급 상위 + 거래량 상위 */}
-      <section className="card flex flex-col gap-md" aria-label={W.recommendTitle}>
+      {/* 추천 후보 — 수급 상위 + 거래량 상위. 카드 박스 대신 흰 바탕 위 헤어라인 구분(카드리스). */}
+      <section className="flex flex-col gap-md" aria-label={W.recommendTitle}>
         <CandidateChips
           title={W.flowTitle}
           hint={W.flowHint}
@@ -173,6 +179,7 @@ export function IntradayWatchWorkspace() {
           warningsByTicker={warningsByTicker}
           onAdd={add}
         />
+        <Divider />
         <CandidateChips
           title={W.volumeTitle}
           hint={W.volumeHint}
@@ -186,10 +193,11 @@ export function IntradayWatchWorkspace() {
 
       {/* 워치 표 — 활성 세션 종목은 자동 상주(로컬 워치 초기화와 무관). 공통 안내는 표 위 한 곳에. */}
       {rows.length === 0 ? (
-        <div className="card-info text-body">{W.empty}</div>
+        <p className="py-md text-body-sm text-text-muted">{W.empty}</p>
       ) : (
         <>
-          <div className="flex flex-col gap-[2px] text-caption text-text-muted">
+          {/* 동작·매매 규칙·면책 — 카드 대신 은은한 surface-muted 노트(가벼운 캡션 톤). */}
+          <div className="flex flex-col gap-xs rounded-md bg-surface-muted px-md py-sm text-caption text-text-muted">
             {P.noticeLines.map((line) => (
               <p key={line}>{line}</p>
             ))}
@@ -230,7 +238,7 @@ function CandidateChips({
   return (
     <div className="flex flex-col gap-xs" aria-label={title}>
       <div className="flex items-baseline gap-sm">
-        <h2 className="text-body-strong text-text-strong">{title}</h2>
+        <h2 className="text-body-md font-bold text-text-strong">{title}</h2>
         <span className="text-caption text-text-muted">{hint}</span>
       </div>
       {isLoading ? (

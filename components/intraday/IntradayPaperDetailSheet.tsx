@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { Badge } from "@/components/ui/Badge";
 import { formatMoney } from "@/lib/utils/formatMoney";
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
 import { INTRADAY_PAPER_COPY as P } from "@/lib/copy/stock/intradayRead";
@@ -125,7 +126,7 @@ export function IntradayPaperDetailSheet({
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-x-sm gap-y-xs text-caption text-text-muted">
-            <span className="badge-info">{STATUS_LABEL[current.status]}</span>
+            <Badge variant="info">{STATUS_LABEL[current.status]}</Badge>
             <span>{current.name}</span>
             <span aria-hidden="true">·</span>
             <span>{P.disclaimer}</span>
@@ -308,7 +309,7 @@ function Metric({
       <p className="text-caption text-text-muted">{label}</p>
       <p
         className={cn(
-          "text-body-strong tabular-nums",
+          "text-body-md font-bold tabular-nums",
           tone === "up" ? "text-signal-up" : tone === "down" ? "text-signal-down" : "text-text-strong",
         )}
       >
