@@ -28,14 +28,22 @@ import {
   NAV_MENU_INTRADAY,
   NAV_MENU_WATCHLIST,
   NAV_MENU_PROFILE,
+  NAV_MENU_HOME_SHORT,
+  NAV_MENU_ANALYZE_SHORT,
+  NAV_MENU_STOCK_SHORT,
+  NAV_MENU_INTRADAY_SHORT,
+  NAV_MENU_WATCHLIST_SHORT,
+  NAV_MENU_PROFILE_SHORT,
 } from "@/lib/copy/layout/navCopy";
 import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 
 export interface NavItem {
   /** 라우트 path — Next.js App Router 기준. */
   path: string;
-  /** 한글 라벨 — 사이드바·바텀nav 텍스트. */
+  /** 한글 라벨 — 사이드바(펼침)·바텀nav 텍스트. */
   label: string;
+  /** 짧은 라벨 — 접힌 사이드바(아이콘 레일)에서 아이콘 아래 노출. */
+  shortLabel: string;
   /** lucide-react 아이콘 컴포넌트. */
   icon: LucideIcon;
   /**
@@ -46,13 +54,13 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { path: "/", label: NAV_MENU_HOME, icon: House },
-  { path: "/watchlist", label: NAV_MENU_WATCHLIST, icon: Star },
-  { path: "/stock", label: NAV_MENU_STOCK, icon: BarChart2 },
-  { path: "/analyze", label: NAV_MENU_ANALYZE, icon: Compass },
+  { path: "/", label: NAV_MENU_HOME, shortLabel: NAV_MENU_HOME_SHORT, icon: House },
+  { path: "/watchlist", label: NAV_MENU_WATCHLIST, shortLabel: NAV_MENU_WATCHLIST_SHORT, icon: Star },
+  { path: "/stock", label: NAV_MENU_STOCK, shortLabel: NAV_MENU_STOCK_SHORT, icon: BarChart2 },
+  { path: "/analyze", label: NAV_MENU_ANALYZE, shortLabel: NAV_MENU_ANALYZE_SHORT, icon: Compass },
   // 단타 워치 — 로컬 CLI 전용. 마이페이지 바로 위 고정.
-  { path: "/intraday", label: NAV_MENU_INTRADAY, icon: Zap, localOnly: true },
-  { path: "/profile", label: NAV_MENU_PROFILE, icon: User },
+  { path: "/intraday", label: NAV_MENU_INTRADAY, shortLabel: NAV_MENU_INTRADAY_SHORT, icon: Zap, localOnly: true },
+  { path: "/profile", label: NAV_MENU_PROFILE, shortLabel: NAV_MENU_PROFILE_SHORT, icon: User },
 ];
 
 /**
