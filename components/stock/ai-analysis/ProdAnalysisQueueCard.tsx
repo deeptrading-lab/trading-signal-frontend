@@ -5,7 +5,7 @@
  *
  * prod 에는 분석 CLI 가 없어 직접 실행할 수 없다(route handler 503). 대신 enqueue 로 Supabase 큐에
  * 요청을 적재하고, 로컬 워커가 처리해 저장한 결과를 "재방문"으로 확인하는 비동기 모델이다.
- * 따라서 실시간 진행 스트림·SlideToAnalyze 슬라이드를 그리지 않는다(prod 무회귀 — 로컬 전용).
+ * 따라서 실시간 진행 스트림·라이브 재분석 컨트롤을 그리지 않는다(prod 무회귀 — 로컬 전용).
  *
  * 상태 머신(useProdAnalysisRequest.phase):
  *   - idle       : 이전 결론 신선도에 따라 재요청/첫요청 CTA(또는 신선하면 CTA 숨김 — S1).

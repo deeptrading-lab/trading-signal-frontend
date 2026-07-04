@@ -18,7 +18,7 @@ import type { PeekTarget } from "@/hooks/stock/peekProvider";
 /**
  * StockPeekSheet — 모바일 롱프레스 미리보기(바텀시트).
  *
- * 기존 시트 패턴(`IntradayPaperDetailSheet`/`AIDecisionDetailSheet`)과 동형 — 포털 + backdrop +
+ * 기존 시트 패턴(`IntradayPaperDetailSheet`)과 동형 — 포털 + backdrop +
  * Escape 닫기 + 배경 스크롤 잠금. 큰 미니 차트(축 노출) + 상세 진입 CTA. 롱프레스는 정상 탭→
  * 내비게이션을 막지 않으므로(useStockPeek 이 유령 클릭 차단), 여기선 열림 상태만 렌더한다.
  *

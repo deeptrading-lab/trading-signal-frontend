@@ -1,7 +1,7 @@
 /**
  * IntradayPaperDetailSheet — 모의 단타 카드 클릭 시 뜨는 상세 모달. intraday-paper-watch.
  *
- * AIDecisionDetailSheet 와 동일 패턴(backdrop + 모바일 풀스크린/sm+ 중앙 모달 + Escape 닫기).
+ * 공용 모달 시트 패턴(backdrop + 모바일 풀스크린/sm+ 중앙 모달 + Escape 닫기).
  * 종목별 현황(수익률·평가·포지션) + **체결 내역 표(거래별 비용·실현손익 ±)** + 최근 판단 로그.
  * ⚠️ 가상 체결 기록 — 실제 주문 없음.
  */
@@ -71,7 +71,7 @@ export function IntradayPaperDetailSheet({
   const realizedSum = orders.reduce((sum, order) => sum + (order.realizedPnl ?? 0), 0);
   const recentDecisions = [...ticks].reverse().slice(0, 5);
 
-  // Escape 로 닫기 + 배경 스크롤 잠금(AIDecisionDetailSheet 동일).
+  // Escape 로 닫기 + 배경 스크롤 잠금(공용 모달 시트 패턴).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();

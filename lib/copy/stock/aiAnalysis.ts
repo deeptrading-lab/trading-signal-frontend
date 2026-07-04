@@ -1,4 +1,13 @@
 import type { AgentFailReason, SentimentBand, SentimentConfidence } from "@/lib/types/stock/aiAnalysis";
+import type { StaleReason } from "@/lib/stock/decisionStaleness";
+
+/** 저장 분석 재분석 권유 사유 → 한글 문구(앰버 배너). decisionStaleness 의 StaleReason 과 1:1. */
+const SAVED_STALE_REASON: Record<StaleReason, string> = {
+  "stop-near": "손절가 부근이에요",
+  "target-near": "목표가에 근접했어요",
+  "big-move": "분석 시점보다 가격이 크게 움직였어요",
+  aged: "분석한 지 시간이 지났어요",
+};
 
 export const COPY = {
   /** 종목 헤더의 AI 분석 진입 버튼 라벨. */
@@ -25,34 +34,36 @@ export const COPY = {
       codex: "빠르고 간결하게 핵심을 분석",
     },
   },
+  /**
+   * 저장모드(우측 패널 verdict-forward) — ai-analysis-redesign PR③.
+   * 저장된 결론을 그대로 보여주고, staleness(decisionStaleness) 에 따라 재분석을 권한다.
+   * ⚠️ 사용자 노출 뷰에는 provider/model 명을 쓰지 않는다("AI 분석"으로 총칭).
+   *    TODO(admin-role): 로그인 + 관리자 권한 도입 시에만 실제 분석 엔진/모델을 함께 노출.
+   */
+  savedMode: {
+    /** 재분석 권유 사유 라벨(배너 내부용·접근성). */
+    staleReason: SAVED_STALE_REASON,
+    /** 상단 앰버 배너 본문 — 라이브 현재가(있으면) + 사유 + 재분석 권유. */
+    staleBanner: (reason: StaleReason, price: string | null): string =>
+      `${price ? `현재가 ${price} · ` : ""}${SAVED_STALE_REASON[reason]} — 지금 기준으로 다시 분석해 보세요.`,
+    /** 앰버 배너 CTA. */
+    staleCta: "지금 기준 재분석",
+    /** 앰버 배너 접근성 라벨(role=status). */
+    staleAria: "저장된 분석 재분석 권장",
+    /** 유효(신선) 하단 재분석 행 — 시각 + "AI 분석"(provider/model 미표시). */
+    validFooter: (relative: string): string => `최근 분석 ${relative} · AI 분석`,
+    /** 하단 재분석 버튼. */
+    reanalyze: "재분석",
+    /** 저장모드 스크림 라벨(이전 분석임을 알리는 미니 태그) — stale 일 때 히어로 위. */
+    previousTag: "이전 분석 기준",
+  },
   previousDecision: {
     title: "저장된 이전 분석",
     loading: "저장된 이전 분석을 확인하는 중...",
     meta: (updatedAt: string, provider: string) =>
       `${updatedAt} · ${provider} 분석 결과`,
-    pmOnly:
-      "오늘 다시 분석하면 이 결론이 최종 판정에 참고 자료로 전달돼요.",
     analyze: "이전 결론 참고해 오늘 다시 분석",
     chooseProvider: "다른 AI 선택",
-    // 밀어서 분석 슬라이드 스위치(SlideToAnalyze) 전용 — 짧은 카피. 기존 키는 폴백/회귀용으로 유지.
-    slide: {
-      /** 노브 라벨 — provider 이름 주입. 예: "Claude로 분석" */
-      knob: (provider: string) => `${provider}로 분석`,
-      /** 노브 단축 라벨(슬라이드 핸들). */
-      short: "재분석",
-      /** 트랙 idle 힌트 */
-      hint: "→ 밀어서 다시 분석",
-      /** 임계(85%) 도달 시 */
-      release: "놓으면 시작",
-      /** 진행 중(committing) aria-live 안내 */
-      starting: "분석을 시작했어요",
-      /** 키보드/클릭 보조 안내(헬퍼) */
-      helper: "밀거나 눌러서 시작하세요",
-      /** 분석 시작 컨트롤 aria-label — provider 이름 주입. */
-      ariaStart: (provider: string) => `${provider}로 분석 시작`,
-      /** 다중 AI 토글 그룹 aria-label */
-      pickProvider: "분석할 AI 선택",
-    },
   },
   panel: {
     title: "AI 종합분석",

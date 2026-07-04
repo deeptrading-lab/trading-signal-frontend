@@ -3,7 +3,7 @@
 /**
  * prod 분석 요청 CTA 버튼(DESIGN.md `request-cta`).
  *
- * prod 는 가용 CLI 0 전제라 슬라이드 스위치(SlideToAnalyze) 대신 버튼 1개로 단순화한다(R1).
+ * prod 는 가용 CLI 0 전제라 슬라이드 스위치 대신 버튼 1개로 단순화한다(R1).
  * 누르면 enqueue → 상태 배너로 전이. 응답 대기 중(isPending)에는 disabled + 스피너 + "요청 보내는 중…".
  *
  * 토큰: bg-accent-vivid text-surface(앱 공통 primary 파랑) + rounded-lg + h-button-primary-h(40px,

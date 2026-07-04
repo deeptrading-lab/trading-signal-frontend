@@ -12,21 +12,16 @@ import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
-import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
 import { useSignalResult } from "@/hooks/stock/useSignalResult";
-import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
+import { formatNumber } from "@/lib/utils/formatMoney";
+import { formatPct } from "@/lib/utils/formatPct";
 import { AiPulseMark } from "./ai-analysis/AiPulseMark";
 import { VerdictHero } from "./ai-analysis/VerdictHero";
 import { PhaseTimeline } from "./ai-analysis/PhaseTimeline";
-import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
 import { ProviderChooser } from "./ai-analysis/ProviderChooser";
-import { SlideToAnalyze } from "./ai-analysis/SlideToAnalyze";
 import { ProdAnalysisQueueCard } from "./ai-analysis/ProdAnalysisQueueCard";
-import type {
-  AIAnalysisDecisionSnapshot,
-  AIAnalysisProvider,
-} from "@/lib/types/stock/aiAnalysis";
+import { SavedDecisionView } from "./ai-analysis/SavedDecisionView";
 
 /**
  * prod(Vercel) 판별 — 클라이언트. Vercel 이 `NEXT_PUBLIC_VERCEL_ENV` 를 빌드타임 인라인하므로
@@ -38,91 +33,11 @@ interface AIAnalysisPanelProps extends AIAnalysisContextValue {
   ticker: string;
 }
 
-function formatUpdatedAt(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function PreviousDecisionIntro({
-  snapshot,
-  onAnalyze,
-  onChooseProvider,
-}: {
-  snapshot: AIAnalysisDecisionSnapshot;
-  onAnalyze: (provider: AIAnalysisProvider) => void;
-  onChooseProvider: () => void;
-}) {
-  // 가용 provider 로 슬라이드 스위치를 그릴지 결정. 0개·조회 중·Vercel·실패는 슬라이드 대신 폴백.
-  const { data: providerData, isLoading: isProvidersLoading } = useQueryAIProviders();
-  const available = providerData?.available ?? [];
-  const canSlide =
-    !isProvidersLoading && !providerData?.vercel && available.length >= 1;
-  // 보정된 신뢰도(scorecard-feedback (가)) — 이전 결론 카드에도 곁들인다(표시 전용·무회귀).
-  const { getCalibration, minSampleN } = useConfidenceCalibration();
-
-  return (
-    // 라이브 분석 뷰(풀 width)와 동일하게 패널 폭을 꽉 채운다 — 데스크탑에서 좌우 여백 제거.
-    // 배치: 안내 박스 → 슬라이드 스위치 → 이전 결론 카드.
-    <div className="w-full space-y-3">
-      {/* 안내 박스 — 좌측 안내 텍스트 + 우측 슬라이드 스위치. 탈-카드: 테두리 제거, 옅은 info 배경으로만 묶음. */}
-      <div className="rounded-md bg-info-soft px-md py-md">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-caption font-bold text-info">
-              {COPY.previousDecision.title}
-              <span className="ml-1.5 font-normal text-text-muted">
-                · {COPY.previousDecision.meta(
-                  formatUpdatedAt(snapshot.updatedAt),
-                  COPY.provider[snapshot.provider],
-                )}
-              </span>
-            </p>
-            <p className="mt-0.5 text-caption text-text-muted leading-relaxed">
-              {COPY.previousDecision.pmOnly}
-            </p>
-          </div>
-
-          {/* 우측 슬라이드 스위치 — 드래그/클릭/키보드 동일하게 onAnalyze(provider) 실행(시안 A). */}
-          <div className="w-full shrink-0 sm:w-auto">
-            {canSlide ? (
-              <SlideToAnalyze
-                available={available}
-                defaultProvider={snapshot.provider}
-                onStart={onAnalyze}
-              />
-            ) : isProvidersLoading ? (
-              // 조회 중 — 활성 스위치 대신 스켈레톤(스펙 §S5).
-              <div
-                className="h-11 w-full sm:w-[22rem] animate-pulse rounded-pill bg-surface-muted"
-                role="status"
-                aria-live="polite"
-                aria-label={COPY.chooser.loading}
-              />
-            ) : (
-              // 가용 0개/Vercel/실패 — 슬라이드 전제가 안 됨. 기존 공급자 선택 화면으로 폴백.
-              <button
-                type="button"
-                onClick={onChooseProvider}
-                className="button-secondary w-full sm:w-auto"
-              >
-                {COPY.previousDecision.chooseProvider}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <FinalVerdictCard
-        data={snapshot.decision}
-        calibration={getCalibration(snapshot.decision.confidence)}
-        calibrationMinSampleN={minSampleN}
-      />
-    </div>
-  );
+/** 등락 방향 → KR 색 토큰(상승=빨강 signal-up / 하락=파랑 signal-down / 보합=muted). */
+function priceChangeColor(direction: "up" | "down" | "flat"): string {
+  if (direction === "up") return "text-signal-up";
+  if (direction === "down") return "text-signal-down";
+  return "text-text-muted";
 }
 
 export function AIAnalysisPanel({
@@ -176,6 +91,9 @@ export function AIAnalysisPanel({
     isLoading: isPreviousDecisionLoading,
   } = useQueryAIDecision(ticker, shouldLoadPreviousDecision);
   const previousDecision = previousDecisionData?.decision ?? null;
+  // 저장모드(저장 스냅샷 표시 중, 로컬 SavedDecisionView / prod ProdAnalysisQueueCard 공통) —
+  // 헤더에 라이브 현재가+등락을 곁들인다(분석 시점가가 아닌 "지금" 가격). 공급자 선택 중엔 숨김.
+  const isSavedSnapshot = isIdle && previousDecision != null && !showProviderChooser;
 
   // 분석 중 헤더 상태 — 현재 진행 중인 에이전트 기준 한 줄 메시지.
   // 토론 중에는 running 에이전트(bull로 고정)보다 실제 발언 측(debatingSide)을 우선한다.
@@ -363,6 +281,17 @@ export function AIAnalysisPanel({
                   />
                 </span>
                 <h2 className="text-body-strong leading-tight text-text-strong shrink-0">{displayName}</h2>
+                {/* 저장모드 — 라이브 현재가 + 등락(분석 시점가 아닌 "지금" 값). KR 색: 상승=빨강/하락=파랑. */}
+                {isSavedSnapshot && stockData && (
+                  <span className="flex shrink-0 items-baseline gap-1">
+                    <span className="text-body-sm-strong tabular-nums text-text-strong">
+                      {formatNumber(stockData.price)}
+                    </span>
+                    <span className={cn("text-caption font-medium tabular-nums", priceChangeColor(stockData.direction))}>
+                      {formatPct(stockData.changePercent, { sign: true })}
+                    </span>
+                  </span>
+                )}
                 {/* 분석에 사용 중인 공급자 표시(읽기 전용) — 공급자 선택은 진입 화면에서만. */}
                 {!isAllPending && (
                   <span
@@ -513,7 +442,7 @@ export function AIAnalysisPanel({
                         </div>
                       ) : IS_PROD ? (
                         // prod 한정 — enqueue 비동기 모델(이전 결론 신선도/접수/오프라인/중복).
-                        // 실시간 스트림·SlideToAnalyze 없음(로컬 전용 무회귀).
+                        // 실시간 스트림·라이브 재분석 없음(로컬 전용 무회귀).
                         <ProdAnalysisQueueCard
                           ticker={ticker}
                           name={stockData?.name ?? null}
@@ -521,10 +450,12 @@ export function AIAnalysisPanel({
                           activeJob={previousDecisionData?.active ?? null}
                         />
                       ) : previousDecision && !showProviderChooser ? (
-                        <PreviousDecisionIntro
+                        // 로컬 저장모드 — verdict-forward(히어로+전체 카드) + staleness 재분석 권유.
+                        //   [재분석]/[지금 기준 재분석] → 공급자 선택 화면(기존 start 경로)으로.
+                        <SavedDecisionView
                           snapshot={previousDecision}
-                          onAnalyze={start}
-                          onChooseProvider={() => setShowProviderChooser(true)}
+                          livePrice={stockData?.price ?? null}
+                          onReanalyze={() => setShowProviderChooser(true)}
                         />
                       ) : (
                         <ProviderChooser onSelect={start} />
