@@ -23,6 +23,7 @@ import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
 import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
+import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
@@ -237,6 +238,8 @@ export function IntradayWatchWorkspace() {
                 </p>
               ) : null}
               <OrderbookPanel ticker={selectedTicker} variant="compact" />
+              {/* 선택 종목 체결강도 + 체결 테이프(단일·compact) — 촘촘한 폴링. 호가 바로 아래. */}
+              <TradeStrengthPanel ticker={selectedTicker} variant="compact" />
             </section>
           ) : null}
         </>

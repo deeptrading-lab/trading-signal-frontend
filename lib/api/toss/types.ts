@@ -95,6 +95,22 @@ export type TossOrderbook = {
 };
 
 /**
+ * `GET /api/v1/trades?symbol=` 체결 1건 — 최근 체결 배열의 원소(최신순 추정).
+ * PRD `toss-trades` §6 (2026-07-05 실측 확정). ⚠️ **매수/매도 방향(side) 필드 없음** —
+ * 체결강도는 틱룰(`tradeStrength.ts`)로 파생하는 근사치다. `symbols=`(복수)는 400, 단수만 유효.
+ * price·volume 은 문자열(KIS 관례와 동일, Number 파싱). 주말/장마감은 직전 세션 스냅샷(동일 timestamp 다수).
+ */
+export type TossTrade = {
+  /** 체결가(문자열, 예 "288500"). */
+  price?: string;
+  /** 체결량(문자열, 주). */
+  volume?: string;
+  /** ISO 8601 (+09:00). 체결 시각. */
+  timestamp?: string;
+  currency?: string;
+};
+
+/**
  * `GET /api/v1/market-calendar/KR` 세션 1구간 — 모든 시각 ISO 8601(+09:00).
  * 동시호가 시각은 세션별 존재 필드가 다르다(pre·regular=start auction, after=end auction) → 옵셔널.
  * PRD `toss-market-calendar` §3-2 (2026-07-05 실측 확정).
