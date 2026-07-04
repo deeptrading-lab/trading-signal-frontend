@@ -155,12 +155,24 @@ export function jsonWithDataSource(
   source: string,
   extraHeaders?: Record<string, string>,
 ): NextResponse {
-  return NextResponse.json(data, {
-    status: 200,
-    headers: {
-      "X-Data-Source": source,
-      "Cache-Control": "no-store",
-      ...(extraHeaders ?? {}),
-    },
-  });
+  const headers: Record<string, string> = {
+    "X-Data-Source": source,
+    "Cache-Control": "no-store",
+    ...(extraHeaders ?? {}),
+  };
+  // ★ HTTP 헤더 값은 ByteString(Latin-1, 0~255)만 허용 — X-Error 등에 한글 폴백 메시지가 섞이면
+  //   NextResponse.json 이 "Cannot convert argument to a ByteString" TypeError 로 크래시해
+  //   200 graceful 폴백이 오히려 500 이 된다(flow/top10 타임아웃 사례). headerSafe 로 감싸 안전 인코딩한다.
+  for (const key of Object.keys(headers)) {
+    headers[key] = headerSafe(headers[key]);
+  }
+  return NextResponse.json(data, { status: 200, headers });
+}
+
+/**
+ * HTTP 헤더 값을 Latin-1(ByteString) 안전하게 — 범위 초과 문자(한글 등)는 %-encode.
+ * X-Error 는 진단용·클라 미소비라 %-encoded 보존으로 충분(dev 툴에서 디코드 가능).
+ */
+export function headerSafe(value: string): string {
+  return /[^\u0000-\u00ff]/.test(value) ? encodeURIComponent(value) : value;
 }
