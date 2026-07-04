@@ -31,7 +31,7 @@ export const COPY = {
     meta: (updatedAt: string, provider: string) =>
       `${updatedAt} · ${provider} 분석 결과`,
     pmOnly:
-      "오늘 다시 분석하면 이 결론은 포트폴리오 매니저에게만 참고 자료로 전달돼요.",
+      "오늘 다시 분석하면 이 결론이 최종 판정에 참고 자료로 전달돼요.",
     analyze: "이전 결론 참고해 오늘 다시 분석",
     chooseProvider: "다른 AI 선택",
     // 밀어서 분석 슬라이드 스위치(SlideToAnalyze) 전용 — 짧은 카피. 기존 키는 폴백/회귀용으로 유지.
@@ -89,6 +89,58 @@ export const COPY = {
     /** 트레이더 카드 위 '심층 추론' 배지. */
     deepReasoning: "🧠 심층 추론",
   },
+  /**
+   * 4-페이즈 타임라인(분석가 → 토론 → 종합 → 최종 판정) 라벨·상태·접근성 카피.
+   * 회색 12-칩 스트립을 대체하는 페이즈 노드/행이 소비한다.
+   */
+  phase: {
+    /** 페이즈 헤딩 라벨. verdict = "최종 판정"(PM/매니저 표기 미노출). */
+    label: {
+      analysts: "분석가",
+      debate: "강세 vs 약세 토론",
+      synthesis: "종합",
+      verdict: "최종 판정",
+    } as Record<"analysts" | "debate" | "synthesis" | "verdict", string>,
+    /** 페이즈 보조 설명(접힘 요약 좌측). */
+    desc: {
+      analysts: "시장·뉴스·재무·심리",
+      debate: "강세·약세 논거 공방",
+      synthesis: "리서치·트레이더·리스크",
+      verdict: "종합 결론 도출",
+    } as Record<"analysts" | "debate" | "synthesis" | "verdict", string>,
+    /** 상태 텍스트(요약·접근성). */
+    status: {
+      pending: "대기",
+      running: "진행 중",
+      done: "완료",
+      error: "오류",
+    } as Record<"pending" | "running" | "done" | "error", string>,
+    /** 상태 노드 aria-label — "분석가 진행 중" 등. */
+    nodeAria: (label: string, statusText: string) => `${label} ${statusText}`,
+    /** 페이즈 내 완료 카운터 — "3/4". */
+    progress: (done: number, total: number) => `${done}/${total}`,
+    /** 펼침 토글 aria(aria-expanded 와 병기). */
+    toggleExpand: (label: string) => `${label} 상세 펼치기`,
+    toggleCollapse: (label: string) => `${label} 상세 접기`,
+    /** 오류 페이즈 재개 버튼 라벨. */
+    resume: "여기서부터 다시",
+  },
+  /**
+   * verdict-forward 히어로(T4 항시-글랜스) — 스트리밍 중 도출-대기 + 완료 시 판정 글랜스.
+   * 스트리밍 중엔 가격 기반 결정론 시그널을 채워 12분 대기 동안 빈 화면을 막는다.
+   */
+  hero: {
+    /** 스트리밍/대기 중 헤딩. */
+    pendingTitle: "판정 대기 중",
+    /** 대기 부제 — AI가 종합 판정을 준비 중. */
+    pendingCaption: "AI가 종합 판정을 준비하고 있어요",
+    /** 전체 진행 카운터 — "7/12 에이전트". */
+    progress: (done: number, total: number) => `${done}/${total} 에이전트`,
+    /** 대기 중 채우는 결정론 시그널 설명(오해 방지 — AI 판정과 구분). */
+    signalNote: "가격 기반 기술 시그널 · 최종 판정은 분석 완료 후 표시",
+    /** 시그널 미산출(데이터 부족·로딩) 시 대기 보조 문구. */
+    signalUnavailable: "분석이 끝나면 종합 판정을 여기에 보여드려요",
+  },
   /** 동시 분석 상한(최대 3개) 안내. */
   limit: {
     atCapacity: (max: number) =>
@@ -135,7 +187,7 @@ export const COPY = {
   },
   verdict: {
     badge: "최종 결정",
-    /** 포트폴리오 매니저 진행/실패 상태(최종 결론). */
+    /** 최종 판정 에이전트 진행/실패 상태(최종 결론). */
     pmLoading: "최종 결론 도출 중…",
     pmFailed: "최종 결론 도출 실패",
     /** 헤더 우측 강조 박스 라벨(신호 강도 / 확신도). */
@@ -154,6 +206,17 @@ export const COPY = {
     signalStrengthBasis: "가격 기반 결정론 시그널(추세·모멘텀·거래량·변동성) 종합점수",
     /** verdict 유효 기간 라벨 prefix */
     horizon: (h: "단기" | "중기" | "장기") => `유효 기간: ${h}`,
+    /** 히어로 글랜스용 예상 기간 라벨. */
+    horizonLabel: "예상 기간",
+    /**
+     * time_horizon enum → 구체 기간 텍스트(히어로 글랜스). 프롬프트가 이미 함의하는 범위를 UI 에서만 풀어 표기.
+     * 단기 = 수일~수주 / 중기 = 1~3개월 / 장기 = 3개월+.
+     */
+    horizonConcrete: {
+      단기: "수일~수주",
+      중기: "1~3개월",
+      장기: "3개월+",
+    } as Record<"단기" | "중기" | "장기", string>,
     strengths: "핵심 강점",
     risks: "핵심 리스크",
     portfolioSummary: "아래에서 전체 결과 확인 ↓",

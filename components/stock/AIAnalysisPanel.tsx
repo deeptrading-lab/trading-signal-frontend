@@ -3,23 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  X, Sparkles, Check, RefreshCw, Square,
-  AlertCircle, Loader2,
+  X, Sparkles, RefreshCw, Square, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 import { AGENT_META } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import type { AgentKey } from "@/lib/types/stock/aiAnalysis";
 import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { useQueryAIProviders } from "@/hooks/stock/useQueryAIProviders";
+import { useSignalResult } from "@/hooks/stock/useSignalResult";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
 import { AiPulseMark } from "./ai-analysis/AiPulseMark";
-import { AnalystCard } from "./ai-analysis/AnalystCard";
-import { DebateSection } from "./ai-analysis/DebateSection";
-import { PMLoadingCard } from "./ai-analysis/PMLoadingCard";
+import { VerdictHero } from "./ai-analysis/VerdictHero";
+import { PhaseTimeline } from "./ai-analysis/PhaseTimeline";
 import { FinalVerdictCard } from "./ai-analysis/FinalVerdictCard";
 import { CardDetailOverlay } from "./ai-analysis/CardDetailOverlay";
 import { ProviderChooser } from "./ai-analysis/ProviderChooser";
@@ -155,15 +153,21 @@ export function AIAnalysisPanel({
   dismissReanalysisPrompt,
 }: AIAnalysisPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const chipsRef = useRef<HTMLDivElement>(null);
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string; highlight?: string } | null>(null);
   const [showProviderChooser, setShowProviderChooser] = useState(false);
   const { data: stockData } = useQueryStockPrice(ticker);
   const displayName = stockData?.name ?? ticker;
-  // 보정된 신뢰도(scorecard-feedback (가)) — 라이브 최종 결론 카드에 곁들인다(표시 전용·무회귀).
-  const { getCalibration, minSampleN } = useConfidenceCalibration();
+  // verdict-forward 히어로용 결정론 시그널 — 대기 중 4축 채움 + 완료 시 신호강도. warmup 미충족(HOLD
+  // 안전폴백)이면 오해 방지로 null 처리(히어로가 확신도/대기 문구로 폴백). SignalSummary 와 동일 데이터.
+  const { result: signalResult } = useSignalResult(ticker);
+  const heroSignal = signalResult && signalResult.warmupOk ? signalResult : null;
 
   const isAllPending = agents.every((a) => a.status === "pending");
+  const doneCount = agents.filter((a) => a.status === "done").length;
+  // 시작 화면(대기) vs 라이브(히어로+타임라인) 분기. 즉시 오류(활동 전)면 오류 배너만.
+  const isIdle = isAllPending && !error && !isRunning;
+  const showHeroTimeline =
+    isRunning || final != null || agents.some((a) => a.status !== "pending");
   // 재열기 트레이 헤더 배지 — 진행 중(running) 슬롯 수.
   const runningTabCount = tabs.filter((t) => t.isRunning).length;
   const shouldLoadPreviousDecision = isOpen && isAllPending && !isRunning && !error;
@@ -172,8 +176,6 @@ export function AIAnalysisPanel({
     isLoading: isPreviousDecisionLoading,
   } = useQueryAIDecision(ticker, shouldLoadPreviousDecision);
   const previousDecision = previousDecisionData?.decision ?? null;
-  const hasDebate = debate.length > 0
-    || agents.some(a => (a.key === "bull" || a.key === "bear") && a.status !== "pending");
 
   // 분석 중 헤더 상태 — 현재 진행 중인 에이전트 기준 한 줄 메시지.
   // 토론 중에는 running 에이전트(bull로 고정)보다 실제 발언 측(debatingSide)을 우선한다.
@@ -182,17 +184,6 @@ export function AIAnalysisPanel({
   const runningStatus = runningStatusKey
     ? (COPY.panel.runningStatus[runningStatusKey] ?? COPY.panel.runningFallback)
     : COPY.panel.runningFallback;
-
-  // 진행 중인 분석가 칩을 칩 캐러셀 맨 왼쪽으로 자동 스크롤(모바일 한 줄 스크롤 대응).
-  useEffect(() => {
-    const container = chipsRef.current;
-    if (!container) return;
-    const chip = container.querySelector<HTMLElement>('[data-running="true"]');
-    if (!chip) return;
-    const cRect = container.getBoundingClientRect();
-    const chipRect = chip.getBoundingClientRect();
-    container.scrollTo({ left: container.scrollLeft + (chipRect.left - cRect.left) - 16, behavior: "smooth" });
-  }, [runningAgent?.key, isOpen]);
 
   // 배경 스크롤 잠금
   useEffect(() => {
@@ -216,32 +207,21 @@ export function AIAnalysisPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, close, expandedCard]);
 
-  // 새 에이전트 시작 / 토론 진행 시 자동 스크롤
+  // 자동 스크롤 — 진행 중(또는 결과 도착) 페이즈 행을 뷰로. 새 에이전트/페이즈 전환/최종 도착 시
+  // PhaseTimeline 이 붙인 data-phase-active 행을 nearest 로 스크롤(칩 캐러셀·바닥 고정 대체).
   useEffect(() => {
-    if (!scrollRef.current || final) return;
-    const hasRunning = agents.some((a) => a.status === "running");
-    if (!hasRunning && debate.length === 0) return;
     const el = scrollRef.current;
+    if (!el) return;
+    const target = el.querySelector<HTMLElement>('[data-phase-active="true"]');
+    if (!target) return;
     const id = requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      target.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
     return () => cancelAnimationFrame(id);
-  }, [agents, debate.length, final]);
-
-  // 최종 결론 도착 시 맨 아래로 — DOM 렌더 후 스크롤
-  useEffect(() => {
-    if (!final || !scrollRef.current) return;
-    const el = scrollRef.current;
-    const id = setTimeout(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }, 120);
-    return () => clearTimeout(id);
-  }, [final]);
+  }, [runningAgent?.key, final]);
 
   const handleExpand = (title: string, content: string, highlight?: string) =>
     setExpandedCard({ title, content, highlight });
-
-  const analystKeys: AgentKey[] = ["market", "news", "fundamentals", "social"];
 
   return (
     <>
@@ -480,54 +460,8 @@ export function AIAnalysisPanel({
                   </div>
                 )}
 
-                {/* ── 에이전트 진행 바 ──────────────────────────────────
-                    탈-카드: 상태칩 테두리 제거. 진행/오류만 색으로(accent/critical soft), 대기·완료는 muted.
-                    완료(초록 없음)는 muted 칩 + 체크로 표시(진행=파랑칩+스피너와 구분). */}
-                <div className="flex-none px-lg py-sm bg-surface border-b border-border-line">
-                  <div
-                    ref={chipsRef}
-                    className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide-mobile -mx-lg px-lg md:mx-0 md:px-0 md:flex-wrap md:overflow-x-visible"
-                  >
-                    {AGENT_META.map((meta) => {
-                      const agentStatus = agents.find((a) => a.key === meta.key)?.status ?? "pending";
-                      const isError = agentStatus === "error";
-                      const isClickable = isError && !isRunning;
-                      return (
-                        <div
-                          key={meta.key}
-                          data-running={agentStatus === "running" ? "true" : undefined}
-                          role={isClickable ? "button" : undefined}
-                          tabIndex={isClickable ? 0 : undefined}
-                          onClick={isClickable ? () => resume(meta.key) : undefined}
-                          onKeyDown={isClickable ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              resume(meta.key);
-                            }
-                          } : undefined}
-                          title={isClickable ? COPY.card.resumeTitle(meta.label) : undefined}
-                          className={cn(
-                            "flex items-center gap-1 shrink-0 px-sm py-1 rounded-pill text-caption font-bold transition",
-                            agentStatus === "pending" && "bg-surface-muted text-text-muted",
-                            agentStatus === "running" && "bg-accent-vivid-soft text-accent-vivid",
-                            agentStatus === "done" && "bg-surface-muted text-text-strong",
-                            isError && "bg-critical-soft text-critical",
-                            isClickable && "cursor-pointer hover:brightness-105",
-                          )}
-                        >
-                          {agentStatus === "done" && <Check size={10} />}
-                          {agentStatus === "running" && <RefreshCw size={10} className="animate-spin" />}
-                          {agentStatus === "pending" && <div className="w-1.5 h-1.5 rounded-full bg-current opacity-30" />}
-                          {isError && <RefreshCw size={10} />}
-                          {meta.label}
-                          {isClickable && <span className="opacity-70">{COPY.card.retry}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* ── 스크롤 영역 ───────────────────────────────────── */}
+                {/* ── 스크롤 영역 ─────────────────────────────────────
+                    회색 12-칩 스트립 제거 → verdict-forward 히어로 + 4-페이즈 타임라인(아래). */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto">
                   <div className="p-4 space-y-4">
                     {/* 동시 분석 상한 안내(최대 3개) */}
@@ -570,8 +504,8 @@ export function AIAnalysisPanel({
                       )}
                     </AnimatePresence>
 
-                    {/* 시작 전 — prod 는 비동기 "요청 접수" 큐 카드, 로컬은 공급자 선택/슬라이드(라이브). */}
-                    {isAllPending && !error && !isRunning && (
+                    {isIdle ? (
+                      /* 시작 전(대기) — prod 는 비동기 "요청 접수" 큐 카드, 로컬은 공급자 선택/슬라이드(라이브). */
                       isPreviousDecisionLoading ? (
                         <div className="mx-auto w-full max-w-[22rem] px-6 py-16 text-center" role="status" aria-live="polite">
                           <Loader2 className="mx-auto mb-3 w-7 h-7 animate-spin text-text-muted" />
@@ -595,180 +529,44 @@ export function AIAnalysisPanel({
                       ) : (
                         <ProviderChooser onSelect={start} />
                       )
-                    )}
-
-                    {/* 오류 */}
-                    {error && (
-                      <div className="card-critical">
-                        <p className="text-body-sm font-medium text-critical mb-md">{error}</p>
-                        <button type="button" onClick={run} className="px-md py-2 bg-accent-vivid text-surface text-caption font-bold rounded-sm hover:brightness-110 transition cursor-pointer">
-                          {COPY.errorState.retry}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* ── Row 1: 분석가 4개 카드 ─────────────────────── */}
-                    {analystKeys.some(k => agents.find(a => a.key === k)?.status !== "pending") && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {analystKeys.map((key) => {
-                          const meta = AGENT_META.find(m => m.key === key)!;
-                          const agentState = agents.find(a => a.key === key)!;
-                          if (agentState.status === "pending") {
-                            return (
-                              <div key={key} className="bg-surface-muted rounded-md border border-dashed border-border-line min-h-[120px]" />
-                            );
-                          }
-                          return (
-                            <AnalystCard
-                              key={key}
-                              meta={meta}
-                              status={agentState.status}
-                              content={reports[key]}
-                              streamingChunk={agentState.streamingChunk}
-                              isRunning={isRunning}
-                              onExpand={handleExpand}
-                              onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                              failReason={agentState.failReason}
-                              sentiment={key === "social" ? sentiment : undefined}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* ── Row 2: 강세 vs 약세 토론 ────────────────────── */}
-                    {hasDebate && (
-                      <DebateSection
-                        debate={debate}
-                        debatingSide={debatingSide}
-                        bullAgent={agents.find(a => a.key === "bull")!}
-                        bearAgent={agents.find(a => a.key === "bear")!}
-                        onExpand={handleExpand}
-                      />
-                    )}
-
-                    {/* ── Row 3+4: 리서치 매니저 + 트레이더 (2-col) ──────── */}
-                    {(["research_manager", "trader"] as AgentKey[]).some(
-                      k => agents.find(a => a.key === k)?.status !== "pending"
-                    ) && (
-                      <div className="grid grid-cols-2 gap-3 pt-2">
-                        {(["research_manager", "trader"] as AgentKey[]).map((key) => {
-                          const meta = AGENT_META.find(m => m.key === key)!;
-                          const agentState = agents.find(a => a.key === key)!;
-                          if (agentState.status === "pending") {
-                            return <div key={key} className="bg-surface-muted rounded-md border border-dashed border-border-line min-h-[120px]" />;
-                          }
-                          if (key === "trader") {
-                            return (
-                              <div key={key} className="relative">
-                                {/* AI 시그니처 — 심층 추론 배지는 gradient-ai 인디고 톤(브랜드 강조). */}
-                                <span className="absolute -top-3.5 right-3 z-10 text-caption font-bold px-2 py-0.5 rounded-pill bg-gradient-ai-soft text-gradient-ai-from">
-                                  {COPY.panel.deepReasoning}
-                                </span>
-                                <AnalystCard
-                                  meta={meta}
-                                  status={agentState.status}
-                                  content={reports[key]}
-                                  streamingChunk={agentState.streamingChunk}
-                                  isRunning={isRunning}
-                                  onExpand={handleExpand}
-                                  onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                                  failReason={agentState.failReason}
-                                />
-                              </div>
-                            );
-                          }
-                          return (
-                            <AnalystCard
-                              key={key}
-                              meta={meta}
-                              status={agentState.status}
-                              content={reports[key]}
-                              streamingChunk={agentState.streamingChunk}
-                              isRunning={isRunning}
-                              onExpand={handleExpand}
-                              onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                              failReason={agentState.failReason}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* ── Row 5: 리스크 3개 병렬 ─────────────────────────────
-                        모바일: 가로 스냅 캐러셀(다음 카드 peek) — 3개 스트림을 모두 살려둠.
-                        md+: 3-col grid. */}
-                    {(["risk_risky", "risk_neutral", "risk_safe"] as AgentKey[]).some(
-                      k => agents.find(a => a.key === k)?.status !== "pending"
-                    ) && (
-                      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide-mobile md:grid md:grid-cols-3 md:overflow-visible">
-                        {(["risk_risky", "risk_neutral", "risk_safe"] as AgentKey[]).map((key) => {
-                          const meta = AGENT_META.find(m => m.key === key)!;
-                          const agentState = agents.find(a => a.key === key)!;
-                          return (
-                            <div key={key} className="snap-start shrink-0 w-[78%] sm:w-[46%] md:w-auto">
-                              {agentState.status === "pending" ? (
-                                <div className="bg-surface-muted rounded-md border border-dashed border-border-line min-h-[120px] h-full" />
-                              ) : (
-                                <AnalystCard
-                                  meta={meta}
-                                  status={agentState.status}
-                                  content={reports[key]}
-                                  streamingChunk={agentState.streamingChunk}
-                                  isRunning={isRunning}
-                                  onExpand={handleExpand}
-                                  onRetry={agentState.status === "error" ? () => resume(key) : undefined}
-                                  failReason={agentState.failReason}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* ── Row 6: 최종 결론 (portfolio_manager 결과) ──────── */}
-                    {(() => {
-                      const pmAgent = agents.find(a => a.key === "portfolio_manager")!;
-                      if (final)
-                        return (
-                          <FinalVerdictCard
-                            data={final}
-                            calibration={getCalibration(final.confidence)}
-                            calibrationMinSampleN={minSampleN}
+                    ) : (
+                      /* 라이브(진행·완료·오류) — verdict-forward 히어로 + 4-페이즈 타임라인. */
+                      <>
+                        {showHeroTimeline && (
+                          <VerdictHero
+                            final={final}
+                            signal={heroSignal}
+                            doneCount={doneCount}
+                            totalCount={agents.length}
                           />
-                        );
-                      if (pmAgent.status === "running") {
-                        return (
-                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                            <PMLoadingCard streamingChunk={pmAgent.streamingChunk} />
-                          </motion.div>
-                        );
-                      }
-                      if (pmAgent.status === "error") {
-                        return (
-                          <div className="card-critical flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-md">
-                              <AlertCircle size={18} className="text-critical flex-shrink-0" />
-                              <p className="text-body-sm font-medium text-critical">
-                                {COPY.verdict.pmFailed}
-                                {pmAgent.failReason ? ` · ${COPY.card.failReason[pmAgent.failReason]}` : ""}
-                              </p>
-                            </div>
-                            {!isRunning && (
-                              <button
-                                type="button"
-                                onClick={() => resume("portfolio_manager")}
-                                className="text-caption font-bold text-critical flex items-center gap-1 cursor-pointer hover:opacity-70"
-                              >
-                                <RefreshCw size={11} /> {COPY.card.retry}
-                              </button>
-                            )}
+                        )}
+
+                        {/* 전체 스트림 오류 — 전체 재실행(run). 페이즈별 재개는 타임라인 행 어포던스가 담당. */}
+                        {error && (
+                          <div className="card-critical">
+                            <p className="text-body-sm font-medium text-critical mb-md">{error}</p>
+                            <button type="button" onClick={run} className="px-md py-2 bg-accent-vivid text-surface text-caption font-bold rounded-sm hover:brightness-110 transition cursor-pointer">
+                              {COPY.errorState.retry}
+                            </button>
                           </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                        )}
+
+                        {showHeroTimeline && (
+                          <PhaseTimeline
+                            key={ticker}
+                            agents={agents}
+                            reports={reports}
+                            debate={debate}
+                            debatingSide={debatingSide}
+                            sentiment={sentiment}
+                            final={final}
+                            isRunning={isRunning}
+                            onExpand={handleExpand}
+                            resume={resume}
+                          />
+                        )}
+                      </>
+                    )}
 
                   </div>
                 </div>
