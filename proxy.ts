@@ -4,10 +4,12 @@
  * Next 16: `middleware` 파일 컨벤션이 `proxy` 로 리네임됨(동작·Edge 런타임 동일).
  * 파일명 `proxy.ts` + named export `proxy` + `config` matcher 유지.
  *
- * PRD `app-password-gate` §3.1 / AC-1~4 / AC-13:
- *   - 게이트 활성 조건: `process.env.APP_PASSWORD` truthy 일 때만. 미설정이면 통과(앱 공개).
- *     `NODE_ENV==="production"` + 미설정이면 경고 로그 1회(모듈 로드 시점, 요청마다 스팸 금지).
+ * PRD `app-password-gate` §3.1 / AC-1~4 / AC-13, `user-login-auth` §3.6 / AC-4·5·15:
+ *   - 게이트 활성 조건: **(OAuth 구성) 또는 (APP_PASSWORD 설정)**. 둘 다 미설정이면 통과(앱 공개, dev 무마찰).
+ *     `NODE_ENV==="production"` + 둘 다 미설정이면 경고 로그 1회(모듈 로드 시점, 요청마다 스팸 금지).
  *   - 세션 쿠키(`app_auth`) 를 `verifySession`(HMAC + exp) 으로 검증. 유효하면 통과.
+ *     ⚠️ 판정은 boolean `verifySession` 만 — **네트워크 I/O·role 조회 0**(AC-15). 신원 세션(v=2)도
+ *     비밀번호 세션(v=1)도 유효 서명+미만료면 통과(폴백 공존, AC-5). role 방어는 각 라우트가 담당.
  *   - 미인증 분기:
  *       · 페이지 → `/login?next=<원경로>` 307 리다이렉트(next 는 same-origin 절대경로만, open-redirect 차단).
  *       · `/api/*`(인증 API 제외) → 401 JSON `{ error: "unauthorized" }`(리다이렉트 X, axios 친화).
@@ -64,6 +66,7 @@ function isCrawlerUserAgent(request: NextRequest): boolean {
  */
 const PUBLIC_EXACT_PATHS = new Set<string>([
   "/login", // 로그인 화면 자체 — 루프 가드의 핵심
+  "/pending", // 승인 대기 화면 — 미인증(쿠키 없음)에서 도달 가능(user-login-auth §3.5)
   "/favicon.ico",
   "/icon", // 파비콘 (app/icon.tsx)
   "/icon-pwa", // PWA manifest 아이콘 (app/icon-pwa) — `?size=192|512` 쿼리는 pathname 과 무관
@@ -109,9 +112,28 @@ function safeNextPath(pathname: string, search: string): string {
   return candidate;
 }
 
+/**
+ * OAuth 구성 여부 — env 3종의 **존재만** truthy 검사한다(값을 읽거나 전달하지 않음 → 비밀 비노출).
+ * ⚠️ `lib/server/auth/googleOAuth` 를 **import 하지 않는다**(client_secret 교환 그래프의 Edge 오염 금지,
+ * user-login-auth §8.4). 게이트는 판정에만 관여하고, 실제 교환은 Node 콜백 라우트가 담당한다.
+ * 3종을 모두 요구해 half-configured(교환 실패) 상태로 게이트가 켜져 락아웃되는 것을 피한다.
+ */
+function isOAuthConfigured(): boolean {
+  return Boolean(
+    process.env.GOOGLE_OAUTH_CLIENT_ID &&
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      process.env.GOOGLE_OAUTH_REDIRECT_URI,
+  );
+}
+
+/** 게이트 활성 = (OAuth 구성) 또는 (APP_PASSWORD 설정). 둘 다 미설정이면 비활성(앱 공개). */
+function isGateActive(): boolean {
+  return isOAuthConfigured() || Boolean(process.env.APP_PASSWORD);
+}
+
 export async function proxy(request: NextRequest) {
-  // 게이트 비활성(비밀번호 미설정) → 즉시 통과(앱 공개). 로컬/CI 마찰 0.
-  if (!process.env.APP_PASSWORD) {
+  // 게이트 비활성(OAuth·비밀번호 둘 다 미설정) → 즉시 통과(앱 공개). 로컬/CI 마찰 0.
+  if (!isGateActive()) {
     return NextResponse.next();
   }
 
@@ -177,9 +199,9 @@ export const config = {
   matcher: ["/((?!_next/static|_next/image|api/stock/ai-analysis$).*)"],
 };
 
-/* 프로덕션 + 비밀번호 미설정 경고 — 모듈 로드 시 1회(요청마다 스팸 금지, AC-13). */
-if (process.env.NODE_ENV === "production" && !process.env.APP_PASSWORD) {
+/* 프로덕션 + 게이트 비활성(OAuth·비밀번호 둘 다 미설정) 경고 — 모듈 로드 시 1회(요청마다 스팸 금지). */
+if (process.env.NODE_ENV === "production" && !isGateActive()) {
   console.warn(
-    "[auth] APP_PASSWORD 미설정 — 프로덕션에서 앱 게이트가 비활성입니다(앱 공개). Vercel 환경변수에 APP_PASSWORD/APP_AUTH_SECRET 를 설정하세요.",
+    "[auth] 게이트 비활성 — 프로덕션에서 앱이 공개됩니다. Google OAuth(GOOGLE_OAUTH_*) 또는 APP_PASSWORD/APP_AUTH_SECRET 를 Vercel 환경변수에 설정하세요.",
   );
 }
