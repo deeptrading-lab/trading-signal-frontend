@@ -2,10 +2,12 @@
 
 import { useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { StockPeekContent } from "@/components/stock/StockPeekContent";
 import { DURATION, EASE } from "@/lib/motion/tokens";
 import { PEEK_HINT_DESKTOP } from "@/lib/copy/stock/peek";
+import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import type { PeekTarget } from "@/hooks/stock/peekProvider";
 
 /**
@@ -26,9 +28,13 @@ import type { PeekTarget } from "@/hooks/stock/peekProvider";
  * 최소(≈248px)이지만 초광폭(2560px 등)에선 넓혀 더 큰 차트를 준다("좀 더 크게"). 콘텐츠와 겹치지
  * 않도록 여백에서 우측 갭·최소 간격을 뺀 만큼만, `[MIN, MAX]` 로 클램프. 차트 높이도 폭에 비례.
  *
- * ## a11y·상호작용
- * `pointer-events-none` — 팝오버와 동일 시맨틱(아래 행 클릭/hover 통과, 보조적 시각 미리보기).
- * 행 aria-label 이 시맨틱을 담당하므로 `aria-hidden`. `prefers-reduced-motion` 시 진입 트랜지션 생략.
+ * ## a11y·상호작용(인터랙티브 — 차트 툴팁)
+ * 팝오버(`pointer-events-none`)와 달리 도크는 `pointer-events-auto` 라 **차트를 hover 해 툴팁**을 볼 수
+ * 있다(고정 배치라 커서를 안 쫓아 안정적). 행에서 도크로 커서가 건너가는 동안 닫히지 않도록,
+ * 도크 `onMouseEnter` 는 `onKeepAlive`(provider `cancelHide`)로 대기 hide 를 취소하고, `onMouseLeave`
+ * 는 `onLeave`(`hidePopover`)로 닫는다. 도크 모드 hide 유예는 provider 가 소유(#268 가변 폭으로
+ * 행↔도크 간격이 작아 유예로 충분). 포커스 가능 자식이 없어 `aria-hidden` 유지(행 aria-label 이
+ * 시맨틱 담당, 키보드/SR 은 행·상세로 접근). `prefers-reduced-motion` 시 진입 트랜지션 생략.
  * 폭·우측 여백은 runtime-positioned 치수라 JS 상수(팝오버 PEEK_WIDTH 관례 동일 — Tailwind 토큰 대상 아님).
  */
 
@@ -61,12 +67,21 @@ function measureDockWidth(): number {
 
 export interface StockPeekDockProps {
   target: PeekTarget;
+  /** 도크 hover 진입 — 대기 중 hide 취소(행→도크 건너감 유지). */
+  onKeepAlive: () => void;
+  /** 도크 hover 종료 — 닫기(provider `hidePopover`). */
+  onLeave: () => void;
 }
 
-// 도크는 고정 배치라 팝오버와 달리 scroll/resize 숨김이 필요 없다 — 숨김은 행 mouseleave →
-// provider `hidePopover` 로 처리되므로 onHide prop 을 받지 않는다(팝오버와 시그니처가 다른 이유).
-export function StockPeekDock({ target }: StockPeekDockProps) {
+// 도크는 고정 배치라 팝오버와 달리 scroll/resize 숨김이 필요 없다 — 숨김은 행/도크 mouseleave →
+// provider `hidePopover`(도크 모드 grace 지연) 로 처리된다.
+export function StockPeekDock({
+  target,
+  onKeepAlive,
+  onLeave,
+}: StockPeekDockProps) {
   const reduced = useReducedMotion();
+  const router = useRouter();
   const [dockWidth, setDockWidth] = useState(DOCK_MIN_WIDTH);
 
   // 마운트·리사이즈 시 우측 여백 실측 → 폭 갱신. 페인트 전 layout effect 로 깜빡임 없이.
@@ -86,7 +101,12 @@ export function StockPeekDock({ target }: StockPeekDockProps) {
     <motion.aside
       // 보조적 시각 미리보기 — 행 aria-label 이 시맨틱을 담당하므로 SR 에서 숨긴다(중복 낭독 방지).
       aria-hidden="true"
-      className="pointer-events-none fixed top-1/2 z-[60] -translate-y-1/2 rounded-lg border border-border-line bg-surface-elevated p-md shadow-overlay"
+      // 인터랙티브 — 차트 툴팁 hover 가능. 행→도크 건너감 유지(enter=cancelHide, leave=hide).
+      //   클릭 시 상세 이동(힌트 "클릭하면 상세로 이동" 과 일치 — 팝오버는 통과 클릭이라 행이 처리).
+      onMouseEnter={onKeepAlive}
+      onMouseLeave={onLeave}
+      onClick={() => router.push(stockDetailPath(target.ticker, target.name))}
+      className="pointer-events-auto fixed top-1/2 z-[60] -translate-y-1/2 cursor-pointer rounded-lg border border-border-line bg-surface-elevated p-md shadow-overlay"
       style={{ right: DOCK_RIGHT_GAP, width: dockWidth }}
       initial={reduced ? false : { opacity: 0, x: 8, scale: 0.98 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}

@@ -3,6 +3,7 @@
 import {
   useStockPeekActions,
   useStockPeekState,
+  PEEK_DOCK_QUERY,
 } from "@/hooks/stock/peekProvider";
 import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import {
@@ -12,14 +13,11 @@ import {
 } from "@/components/stock/peekDynamic";
 
 /**
- * 우측 도킹 게이트 — 홈 콘텐츠(1152px) 우측에 도크 패널(≈248px)이 겹침 없이 들어갈 만큼 여백이
- * 생기는 초광폭에서만 매칭. 사이드바 확장(208px) 최악 기준으로 잡아 이 폭 아래에선 팝오버를 쓴다:
- *   여백 = (vw − 208 − 1152) / 2 ≥ 248 + 여유  →  vw ≳ 1920.
- * 접힌 사이드바(76)면 더 좁은 폭에서도 여유가 있으나, 단일 임계로 예측 가능하게 고정한다.
- */
-const PEEK_DOCK_QUERY = "(min-width: 1920px)";
-
-/**
+ * 우측 도킹 게이트(`PEEK_DOCK_QUERY`, peekProvider 공용) — 홈 콘텐츠(1152px) 우측에 도크가 겹침 없이
+ * 들어갈 초광폭(사이드바 확장 208 최악 기준 `vw ≳ 1920`)에서만 도크, 아니면 팝오버.
+ *
+ * @remarks 프로바이더도 같은 쿼리로 도크 모드에서만 hover-hold(hide grace)를 적용한다.
+ *
  * GlobalStockPeek — Peek 오버레이의 전역 호스트. `(main)` 레이아웃에 1회 mount.
  *
  * 활성 Peek(단일)을 받아 hover(팝오버 또는 초광폭 우측 도크) 또는 롱프레스(시트)를 렌더한다.
@@ -45,7 +43,11 @@ export function GlobalStockPeek() {
 
   if (peek.mode === "popover") {
     return canDock ? (
-      <StockPeekDock target={peek} />
+      <StockPeekDock
+        target={peek}
+        onKeepAlive={actions.cancelHide}
+        onLeave={actions.hidePopover}
+      />
     ) : (
       <StockPeekPopover target={peek} onHide={actions.hidePopover} />
     );

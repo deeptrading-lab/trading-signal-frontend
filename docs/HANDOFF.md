@@ -6398,3 +6398,36 @@
   - 도크 인터랙티브화(hover 툴팁 — mouseleave race 처리 필요).
   - 기간별 랭킹·⑥ DART 확장·US 주식.
   - (검색 결과 배경 프리패치는 드롭다운 churn·낮은 hover 가치로 보류 권장.)
+
+### 2026-07-05 — feat(peek): 우측 도크 인터랙티브화 (차트 툴팁 + 클릭 이동) (#269)
+
+- **slug**: `peek-dock-interactive` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/269
+- **요약**: feat(peek): 우측 도크 인터랙티브화 (차트 툴팁 + 클릭 이동)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > #260/#268 우측 도크는 `pointer-events-none` 라 큰 차트를 hover 해 툴팁을 볼 수 없었다(팝오버와 동일 제약). 도크는 커서를 안 쫓는 고정 배치라, 인터랙티브하게 만들기 가장 적합하다.
+  > 
+  > ## 변경 (경량 UX 폴리시)
+  > 도크를 **`pointer-events-auto`** 로 바꿔 차트 툴팁 hover + 클릭 상세 이동을 지원. 핵심 난점(행 mouseleave 가 도크를 닫는 race)은 **도크 모드에서만 hide 를 grace 지연**해 해결:
+  > 
+  > - **provider(peekProvider)**: `canDock`(ref 로 읽음) 일 때만 `hidePopover` 를 `300ms` 지연하고, 도크 `onMouseEnter`→`cancelHide`(신규 액션)로 대기 hide 취소. **팝오버 모드(비-초광폭)는 기존대로 즉시 hide → 무회귀.** 콜백 식별자 안정 유지(ref 로 canDock 읽어 30행 리렌더 불변), 타이머는 라우트 변경·언마운트·새 표시 요청 시 정리.
+  > - **도크**: `onMouseEnter=cancelHide`·`onMouseLeave=hidePopover`, **클릭 시 상세 이동**(힌트 "클릭하면 상세로 이동" 과 일치 — 팝오버는 통과 클릭이라 행이 처리했지만 도크는 gutter 위라 직접 처리).
+  > - `PEEK_DOCK_QUERY` 를 provider 로 이관(호스트·프로바이더 공용, 단일 출처).
+  > 
+  > ## 왜 300ms 로 충분한가
+  > #268 가변 폭으로 도크가 우측 여백을 채워 **행↔도크 간격이 작다**(1920px≈16px, 2560px≈184px). 커서가 그 틈을 건너는 데 300ms 면 충분(간격이 dock 폭에 반비례).
+  > 
+  > ## 무회귀·안전
+  > - <1920px 팝오버·모바일 시트 무변경(즉시 hide 유지). 단일 활성 Peek·rate-limit 설계 무영향.
+  > - 포커스 가능 자식 없어 `aria-hidden` 유지(키보드/SR 은 행·상세로 접근). 신규 Tailwind 클래스 0(`cursor-pointer` 기존 사용).
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean(렌더 중 ref 쓰기 → effect 동기화로 수정). `peekChartPrefetch.test` 2/2.
+  > - 격리 worktree(node_modules exclude 가드).
+  > 
+  > ## 다음 작업
+  > - 기간별 랭킹·⑥ DART 확장·US 주식(모두 큰 건).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 기간별 랭킹·⑥ DART 확장·US 주식(모두 큰 건).
