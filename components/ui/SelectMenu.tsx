@@ -1,12 +1,9 @@
 /**
- * ChartRangeDropdown — 모바일 차트 봉·기간 선택 드롭다운(기간 1개월/3개월… 또는 분봉 간격 1분/3분…).
+ * SelectMenu — 값 선택형 드롭다운(제네릭 `{ label, value }`). **아래로 펼침**(top-full) + 외부클릭 닫힘.
  *
- * 좁은 화면에서 라인·캔들 / 봉 / 기간 버튼이 한 줄에 다 들어가지 못해 줄바꿈되는 문제를 피하려고,
- * 우측 선택기를 드롭다운으로 접는다. 데스크탑은 기존 버튼 목록 유지(ChartShell 에서 분기).
- * 옵션은 `{ label, value }` 중립 목록(value 타입 제네릭) — 봉 종류(interval 문자열)·기간(days)·분봉 간격(timeframe) 모두 재사용.
- *
- * 동작: 버튼(현재 값 + chevron) 탭 → `.dropdown-panel` 목록 펼침. 옵션 선택/외부 클릭 시 닫힘.
- *   외부 클릭 닫힘 패턴은 `components/home/StockSearchContainer.tsx` 와 동일(mousedown).
+ * 네이티브 `<select>` 는 팝업 위치를 제어할 수 없어(선택 옵션 위치에 따라 위로 겹쳐 뜸) 위치·스타일을
+ * 통제해야 하는 선택기에 쓴다. 차트 봉·기간(모바일)·유저 등급 등 재사용(구 `ChartRangeDropdown` 승격).
+ * `.dropdown-panel` 공용 클래스. 동작: 버튼(현재 값 + chevron) 탭 → 목록 펼침. 옵션 선택/외부 클릭 닫힘(mousedown).
  */
 
 "use client";
@@ -15,20 +12,26 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-export interface ChartRangeDropdownProps<T extends string | number> {
+export interface SelectMenuProps<T extends string | number> {
   options: { label: string; value: T }[];
   value: T;
   onChange: (value: T) => void;
-  /** 접근성 라벨 — 기간="기간 선택", 분봉 간격="봉 간격 선택", 봉 종류="봉 종류 선택". */
+  /** 접근성 라벨. */
   ariaLabel?: string;
+  /** 패널 정렬 — left(트리거 좌측 정렬·우측 펼침, 기본) / right(우측 정렬·좌측 펼침). */
+  align?: "left" | "right";
+  /** 비활성(처리 중 등) — 트리거 비활성 + 펼침 불가. */
+  disabled?: boolean;
 }
 
-export function ChartRangeDropdown<T extends string | number>({
+export function SelectMenu<T extends string | number>({
   options,
   value,
   onChange,
-  ariaLabel = "기간 선택",
-}: ChartRangeDropdownProps<T>) {
+  ariaLabel = "선택",
+  align = "left",
+  disabled = false,
+}: SelectMenuProps<T>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +39,10 @@ export function ChartRangeDropdown<T extends string | number>({
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -48,7 +54,8 @@ export function ChartRangeDropdown<T extends string | number>({
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        className="flex items-center gap-xs px-sm py-[3px] rounded-sm text-caption font-medium bg-surface-muted text-text-strong border border-border-line cursor-pointer"
+        disabled={disabled}
+        className="flex items-center gap-xs px-sm py-[3px] rounded-sm text-caption font-medium bg-surface-muted text-text-strong border border-border-line cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -65,7 +72,10 @@ export function ChartRangeDropdown<T extends string | number>({
 
       {open && (
         <div
-          className="dropdown-panel absolute left-0 top-full z-[40] mt-xs min-w-[112px]"
+          className={cn(
+            "dropdown-panel absolute top-full z-[40] mt-xs min-w-[112px]",
+            align === "right" ? "right-0" : "left-0",
+          )}
           role="listbox"
           aria-label={ariaLabel}
         >

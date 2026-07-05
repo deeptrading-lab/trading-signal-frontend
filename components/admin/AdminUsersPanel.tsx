@@ -12,6 +12,7 @@
 
 import { useAdminUsers } from "@/hooks/admin/useAdminUsers";
 import { Button } from "@/components/ui/Button";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { ALL_ROLES } from "@/lib/auth/roles";
 import type { ProfileRole } from "@/lib/types/auth/profile";
@@ -36,6 +37,11 @@ export interface AdminUsersPanelProps {
   /** 등급 드롭다운 노출 — superadmin 만 true. admin 은 등급 읽기 전용. */
   canChangeRole: boolean;
 }
+
+/** 등급 드롭다운 옵션(낮은→높은) — SelectMenu 제네릭 `{ label, value }`. */
+const ROLE_OPTIONS: { label: string; value: ProfileRole }[] = ALL_ROLES.map(
+  (role) => ({ label: ADMIN_ROLE_LABEL[role], value: role }),
+);
 
 export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
   const {
@@ -100,24 +106,14 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
                   </span>
 
                   {canChangeRole ? (
-                    <>
-                      <label className="sr-only" htmlFor={`role-${u.sub}`}>
-                        {ADMIN_ROLE_SELECT_LABEL}
-                      </label>
-                      <select
-                        id={`role-${u.sub}`}
-                        value={u.role}
-                        disabled={busy}
-                        onChange={(e) => changeRole(u.sub, e.target.value as ProfileRole)}
-                        className="cursor-pointer rounded-sm border border-border-line bg-surface px-sm py-xs text-caption text-text-strong disabled:opacity-60"
-                      >
-                        {ALL_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {ADMIN_ROLE_LABEL[r]}
-                          </option>
-                        ))}
-                      </select>
-                    </>
+                    <SelectMenu
+                      options={ROLE_OPTIONS}
+                      value={u.role}
+                      onChange={(role) => changeRole(u.sub, role)}
+                      ariaLabel={ADMIN_ROLE_SELECT_LABEL}
+                      align="right"
+                      disabled={busy}
+                    />
                   ) : (
                     // admin — 등급 읽기 전용(superadmin 만 변경).
                     <span className="text-caption text-text-strong">

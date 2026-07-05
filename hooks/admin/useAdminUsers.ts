@@ -2,14 +2,14 @@
  * 유저 관리(admin 이상) 도메인 훅 — 전체 목록 + 등급/승인 액션을 화면에 추상화.
  *
  * PRD user-login-auth Phase 2 / frontend.md §2(커스텀훅 의무화):
- *   화면은 본 훅만 import — TanStack 내부 인터페이스 미노출. 성공/실패는 **토스트**로 피드백
- *   (`useToast`) — 마지막 최고관리자 강등(409)은 전용 메시지. `mutatingSub`(행 로딩)만 상태 노출.
+ *   화면은 본 훅만 import — TanStack 내부 인터페이스 미노출. 성공/실패는 **토스트**로 피드백(`useToast`).
+ *   ★마지막 최고관리자 강등은 **클라에서 선제 감지**해 즉시 토스트(서버 왕복 없음) — 서버 409 가드도 유지.
  *   목록 조회는 admin 이상, 등급 변경은 superadmin 전용(라우트 재방어 · 패널이 canChangeRole 로 게이트).
  */
 
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQueryAllUsers } from "@/hooks/query/useQueryAllUsers";
 import { useMutationSetUserRole } from "@/hooks/query/useMutationSetUserRole";
 import { useMutationSetUserStatus } from "@/hooks/query/useMutationSetUserStatus";
@@ -33,11 +33,29 @@ export function useAdminUsers() {
   const roleMutation = useMutationSetUserRole();
   const statusMutation = useMutationSetUserStatus();
   const toast = useToast();
+  const users = useMemo<Profile[]>(
+    () => (query.data ?? []) as Profile[],
+    [query.data],
+  );
   const busy = roleMutation.isPending || statusMutation.isPending;
 
   const changeRole = useCallback(
     (sub: string, role: ProfileRole) => {
       if (!sub || busy) return;
+      // 클라 선제 감지 — 마지막 superadmin 강등이면 서버 왕복(≈2s) 없이 즉시 토스트.
+      // 서버 라우트도 409로 재방어(클라 목록 stale 대비)하므로 이중 안전.
+      const target = users.find((u) => u.sub === sub);
+      const superadminCount = users.filter(
+        (u) => u.role === "superadmin",
+      ).length;
+      if (
+        target?.role === "superadmin" &&
+        role !== "superadmin" &&
+        superadminCount <= 1
+      ) {
+        toast.error(ADMIN_LAST_SUPERADMIN_ERROR);
+        return;
+      }
       roleMutation.mutate(
         { sub, role },
         {
@@ -51,7 +69,7 @@ export function useAdminUsers() {
         },
       );
     },
-    [busy, roleMutation, toast],
+    [busy, users, roleMutation, toast],
   );
 
   const setStatus = useCallback(
@@ -85,7 +103,7 @@ export function useAdminUsers() {
 
   return {
     /** 전체 사용자(최신 가입 순). 로딩·에러 시 빈 배열. */
-    users: (query.data ?? []) as Profile[],
+    users,
     isLoading: query.isLoading,
     isError: query.isError,
     refetch,

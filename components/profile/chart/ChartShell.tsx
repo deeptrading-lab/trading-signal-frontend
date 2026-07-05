@@ -7,7 +7,7 @@
  *   - 분봉: 봉 종류 + [간격](1/3/5/10/15분 timeframe) + [기간](당일/1주/1개월 priorDays) 세 선택기.
  *     분봉도 일/주/월봉처럼 "기간"을 고르되, 추가로 "간격"을 별도 슬롯에서 고른다(과거 회귀:
  *     예전엔 분봉이 기간 슬롯을 간격으로 대체해 개념이 뒤섞였음 — minute-chart-interval-period 로 분리).
- *   봉 종류·간격·기간 세 선택기는 모두 같은 반응형 마크업(`SegmentedSelector`: 모바일 `ChartRangeDropdown` /
+ *   봉 종류·간격·기간 세 선택기는 모두 같은 반응형 마크업(`SegmentedSelector`: 모바일 `SelectMenu` /
  *   데스크탑 버튼 목록)을 재사용 — 옵션 집합·값·핸들러·스타일 variant 만 스왑.
  *
  * 차트 컨트롤 상태는 상위(StockPageLayout)가 소유(controlled). 상수/기본값은 `../stockChartConfig` 단일 소스.
@@ -19,7 +19,7 @@ import { Maximize2, Minimize2, ChartCandlestick, ChartLine } from "lucide-react"
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { cn } from "@/lib/utils/cn";
 import { STOCK_DETAIL_PRICE_CHART_TITLE } from "@/lib/copy/profile/stockDetail";
-import { ChartRangeDropdown } from "@/components/profile/ChartRangeDropdown";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { ChartOptionsDropdown } from "@/components/profile/chart/ChartOptionsDropdown";
 import {
   CHART_TYPES,
@@ -33,7 +33,7 @@ import {
 import type { ChartOptions } from "@/lib/store/chart/chartOptions";
 
 /**
- * 봉 종류·간격·기간 공용 선택기 — 모바일은 `ChartRangeDropdown`(줄바꿈 방지), 데스크탑은 버튼 목록.
+ * 봉 종류·간격·기간 공용 선택기 — 모바일은 `SelectMenu`(줄바꿈 방지), 데스크탑은 버튼 목록.
  *   variant: `primary`=봉 종류(활성 accent), `secondary`=간격·기간(활성 surface-muted).
  */
 function SegmentedSelector<T extends string | number>({
@@ -53,7 +53,7 @@ function SegmentedSelector<T extends string | number>({
 }) {
   if (isMobile) {
     return (
-      <ChartRangeDropdown options={options} value={value} onChange={onChange} ariaLabel={ariaLabel} />
+      <SelectMenu options={options} value={value} onChange={onChange} ariaLabel={ariaLabel} />
     );
   }
   return (
