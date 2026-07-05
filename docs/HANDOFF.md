@@ -6013,3 +6013,46 @@
   - **prod 야간점검 실검증**: 평일 21:50~23시대 KIS 전 TR 500 시각에 홈 진입 → 4탭 전부 unavailable → `MaintenanceNotice` 노출 + 관리자 "다시 시도" 동작 확인(로컬은 KIS 설정돼 available 만 관측됨). 주간(정상)·야간(점검) 양쪽 EGW00201 레이트리밋 실측(§8 q2 — staleTime 캐시가 4탭 프로브를 흡수하는지).
   - **QA 재검증 필요**: 초판 대비 방향 전면 개정(시각 게이팅 폐기·가용성 기반). 기존 `qa-passed` 무효 → AC-1~AC-14 재실행(특히 부분 탭 숨김·자동 이동·관리자 재시도·dev mock 정상 표시).
   - 관련 slug: `toss-market-calendar`(②, `isRegularOpen` 원천 — 폴링에서만 소비).
+
+### 2026-07-05 — feat(home): 지금 뜨는 산업 — 업종 등락 랭킹 + 구성종목 모달 (#250)
+
+- **slug**: `trending-sectors` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/250
+- **요약**: feat(home): 지금 뜨는 산업 — 업종 등락 랭킹 + 구성종목 모달
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 토스 홈의 "지금 뜨는 산업"을 마켓 홈에 이식한다. 업종을 등락률로 정렬한 랭킹 리스트(순번·업종명·등락률·"N개 중 M개 상승")를 실시간 순위·수급과 형제로 렌더하고, 업종 행을 누르면 구성종목 모달(수익률/시가총액 세그먼트 + 현재가·등락·미니차트)이 열린다.
+  > 
+  > - **업종 랭킹** = 단일 콜 `FHPUP02140000`(카테고리별 지수) → `[5,30]` 산업 화이트리스트 필터 → 등락률 내림차순 상위 13.
+  > - **breadth** = 상위 N 업종만 `FHPUP02100000` fan-out(동시성 캡·순차 딜레이·fail-soft).
+  > - **구성종목** = `FHPST01700000` + `fid_input_iscd=<업종코드>` top-30 movers + 토스 마스터 시총 best-effort.
+  > - **prod 전용 이중 게이트**(`isKisConfigured && prod`) + `withTimeout` + transient 재시도 + never-throw mock 폴백, `X-Data-Source`(kis/mock/mock-*). 실패는 공용 `MaintenanceNotice`.
+  > 
+  > ## AC 대응 (로컬 라이브 KIS prod 검증)
+  > 
+  > 로컬 `.env.local` 이 KIS prod + 토스 구성이라 mock 이 아닌 **실데이터로 자가검증**했다(포트 3099, 게이트만 로컬 무력화).
+  > 
+  > | AC | 결과 |
+  > |---|---|
+  > | AC-1/2 업종 랭킹+breadth | `GET /api/market/sectors` → `x-data-source: kis`, 13건. 예: `전기·전자 +8.15% · 81개 중 35개 상승`, `운송장비·부품 +2.07% · 60개 중 52개 상승`. 등락률 내림차순, 규모티어(0002~4)·테마(0163/2180…) 제외 |
+  > | AC-3 dev mock | 비-prod/무키 시 `x-data-source: mock`(never-throw) — mock 랭킹/구성종목 정상 |
+  > | AC-4/5 구성종목+정렬 | `GET /api/market/sectors/0013/constituents` → 30건, 종목명·현재가·등락률·marketCap(토스 shares×price) 채워짐. 세그먼트 수익률(등락률 desc)/시가총액(desc, null 후순위) 클라 재정렬 |
+  > | AC-6 종목 상세 이동 | 구성종목 행 클릭 → `stockDetailPath(ticker)` |
+  > | AC-7 점검 | never-throw → mock-timeout/mock-error → `unavailable` → `MaintenanceNotice` |
+  > | AC-8 빈/미지원 업종 | `/sectors/0099/constituents` → 200 kis, count=0 → 빈 상태. 잘못된 코드 `abc` → 400 |
+  > | AC-11 반응형 | 데스크탑 중앙 다이얼로그 / 모바일 바텀시트(`useBreakpoint`), 행 우열 세로 스택 |
+  > | AC-12 컨벤션 | 신규 컴포넌트 hex/px 0, 카피 `lib/copy/market/sectors.ts` 단일, queryKey `queryKeys.market.sectorRanking/sectorConstituents` 단일, 클라 `fetch(` 0, `useQuery` 직접 import 0 |
+  > 
+  > ## 게이트 수치
+  > 
+  > - `npm run design:sync` → `tailwind.theme.json` `sector-row-h: 56px` 1줄만 추가(SSOT=finsight-redesign.md).
+  > - `npx tsc --noEmit` 0, `npm run lint` 0(warning 0), `npm run build` 성공(`/api/market/sectors`·`/api/market/sectors/[code]/constituents` 등록).
+  > - `npx vitest run lib/api/kis lib/market` → 24 파일 215 통과(신규 매핑/화이트리스트/정렬 11 포함).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 매출·영업이익률 세그먼트(토스 4탭 중 2탭 축소분) — DART 재무 의존, 후속 PRD.
+  - KOSDAQ 업종(`FID_INPUT_ISCD=1001`)·해외 섹터 확장(현재 KOSPI 국내 1열, grid 2열 확장 대비 완료).
+  - 기간수익률 카드(어제/1개월/3개월/1년, 업종지수 시계열) — DESIGN R9 조건부, 시계열 확보 시.
+  - breadth fan-out 최적화(웹소켓/캐시 공유) + prod 장중 KIS 실검증(평일 09~15:30).
