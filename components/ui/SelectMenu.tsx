@@ -20,6 +20,8 @@ export interface SelectMenuProps<T extends string | number> {
   ariaLabel?: string;
   /** 패널 정렬 — left(트리거 좌측 정렬·우측 펼침, 기본) / right(우측 정렬·좌측 펼침). */
   align?: "left" | "right";
+  /** 옵션 항목 크기 — md(기본, 터치 타깃) / sm(컴팩트, 트리거 스케일 정합). */
+  size?: "sm" | "md";
   /** 비활성(처리 중 등) — 트리거 비활성 + 펼침 불가. */
   disabled?: boolean;
   /** 처리 중 — chevron 대신 스피너 + 비활성. */
@@ -32,6 +34,7 @@ export function SelectMenu<T extends string | number>({
   onChange,
   ariaLabel = "선택",
   align = "left",
+  size = "md",
   disabled = false,
   loading = false,
 }: SelectMenuProps<T>) {
@@ -101,7 +104,10 @@ export function SelectMenu<T extends string | number>({
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full items-center px-md py-sm rounded-sm text-body-sm-strong cursor-pointer text-left",
+                "flex w-full items-center rounded-sm cursor-pointer text-left",
+                size === "sm"
+                  ? "px-sm py-xs text-caption"
+                  : "px-md py-sm text-body-sm-strong",
                 o.value === value
                   ? "bg-surface-muted text-text-strong"
                   : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
