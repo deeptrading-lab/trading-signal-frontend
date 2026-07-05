@@ -19,6 +19,7 @@
 
 import { useState } from "react";
 import { Section } from "@/components/ui/Section";
+import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
 import { SectorConstituentsModal } from "@/components/market/SectorConstituentsModal";
@@ -96,7 +97,12 @@ export function TrendingSectorsSection() {
   );
 }
 
-/** 업종 랭킹 1행 — 좌: 순번+업종명, 우: 등락률+breadth 요약(세로). 클릭 → 구성종목 모달. */
+/**
+ * 업종 랭킹 1행 — 실시간 순위표(`RealtimeRankingSection`)와 동일 밀도의 카드리스 플랫 행(`ListRow`
+ * 헤어라인 + `py-md`). 좌: 순번+업종명, 우: 등락률+breadth 요약(세로). 클릭 → 구성종목 모달.
+ *   폰트도 순위표 정합(업종명·등락률 `text-body-sm-strong`, breadth `text-caption`) — 이전엔 56px 고정
+ *   높이 + `text-body-strong`/무크기 등락률로 형제 순위표보다 과하게 커 보였다(사용자 지적).
+ */
 function SectorRow({
   sector,
   rank,
@@ -107,33 +113,37 @@ function SectorRow({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <ListRow
       role="listitem"
+      tabIndex={0}
       aria-label={sectorRowAria(sector.name)}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={cn(
-        "flex h-sector-row-h w-full items-center justify-between gap-md rounded-md px-sm",
-        "cursor-pointer text-left transition-colors hover:bg-surface-muted",
-        "focus-visible:bg-surface-muted focus-visible:outline-none",
+        "-mx-sm cursor-pointer rounded-sm px-sm transition-colors",
+        "hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none",
       )}
     >
-      {/* 좌 — 순번 배지 + 업종명 */}
-      <div className="flex min-w-0 items-center gap-sm">
-        <span
-          className="inline-grid h-6 w-6 shrink-0 place-items-center rounded-sm bg-surface-muted text-label-sm text-text-muted"
-          aria-hidden="true"
-        >
-          {rank}
-        </span>
-        <span className="truncate text-body-strong text-text-strong">
-          {sector.name}
-        </span>
-      </div>
+      {/* 순번 — 순위표와 동일한 plain 넘버(회색 배지 제거) */}
+      <span className="w-5 shrink-0 text-center text-caption font-bold tabular-nums text-text-muted">
+        {rank}
+      </span>
 
-      {/* 우 — 등락률 + breadth(세로 우정렬) */}
+      {/* 업종명 */}
+      <span className="min-w-0 flex-1 truncate text-body-sm-strong text-text-strong">
+        {sector.name}
+      </span>
+
+      {/* 등락률 + breadth(세로 우정렬) */}
       <div className="flex shrink-0 flex-col items-end">
-        <span className={cn("text-mono-numeric", changeClass(sector.direction))}>
+        <span
+          className={cn("text-body-sm-strong", changeClass(sector.direction))}
+        >
           {formatPct(sector.changePct, { sign: true })}
         </span>
         {sector.total > 0 && (
@@ -142,18 +152,21 @@ function SectorRow({
           </span>
         )}
       </div>
-    </button>
+    </ListRow>
   );
 }
 
-/** 로딩 — 섹션 헤더 아래 스켈레톤 행 반복. */
+/** 로딩 — 순위표 정합 플랫 스켈레톤 행(헤어라인). */
 function SectorSkeleton() {
   return (
     <div aria-busy="true" aria-label={SECTORS_LOADING}>
       <span className="sr-only">{SECTORS_LOADING}</span>
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex h-sector-row-h items-center gap-sm px-sm">
-          <Skeleton variant="line" className="mb-0 h-6 w-6 rounded-sm" />
+        <div
+          key={i}
+          className="flex items-center gap-md border-b border-border-line py-md last:border-b-0"
+        >
+          <Skeleton variant="line" className="mb-0 h-4 w-5" />
           <Skeleton variant="line" className="mb-0 h-4 w-1/3" />
           <Skeleton variant="line" className="mb-0 ml-auto h-4 w-20" />
         </div>
