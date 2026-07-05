@@ -1,14 +1,21 @@
 /**
- * `/api/auth/me` 클라이언트 어댑터 — 현재 세션 role 조회(표시용).
+ * 현재 세션 신원 조회 BFF 클라이언트 — `GET /api/auth/me`.
  *
- * PRD `market-status-aware-home` §3-5. axios 인스턴스(same-origin `/api`) 경유. `hooks/query/useQueryAuthMe`
- * 안에서만 호출한다. 라우트가 항상 200(미인증도 `role: null`)이라 401 리다이렉트 인터셉터를 건드리지 않는다.
+ * 공용 axios(`httpClient`, baseURL `/api`) 경유. role-aware UI(관리자 전용 표시 등)가
+ * 도메인 훅(`hooks/auth/useMe`)을 통해 소비한다. (user-login-auth Phase 2)
  */
 
 import { httpClient } from "@/lib/api/client";
-import type { AuthMeResponse } from "@/lib/types/auth/me";
+import type { ProfileRole } from "@/lib/types/auth/profile";
 
-export async function getAuthMe(): Promise<AuthMeResponse> {
-  const response = await httpClient.get<AuthMeResponse>("/auth/me");
-  return response.data;
+/** `GET /api/auth/me` 응답 — 비밀번호(v=1) 세션은 role/email null. */
+export interface MeResponse {
+  authenticated: boolean;
+  role: ProfileRole | null;
+  email: string | null;
+}
+
+export async function fetchMe(signal?: AbortSignal): Promise<MeResponse> {
+  const res = await httpClient.get<MeResponse>("/auth/me", { signal });
+  return res.data;
 }

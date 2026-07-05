@@ -25,7 +25,7 @@ import { Section } from "@/components/ui/Section";
 import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
 import { useQueryFlowTop10 } from "@/hooks/flow/useQueryFlowTop10";
-import { useIsAdmin } from "@/hooks/auth/useIsAdmin";
+import { useMe } from "@/hooks/auth/useMe";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { resolveAvailability } from "@/lib/market/availability";
 import { cn } from "@/lib/utils/cn";
@@ -314,7 +314,7 @@ export function InvestorFlowTop10Card() {
   const [mode, setMode] = useState<FlowMode>("today");
 
   // 관리자만 점검 안내에서 "다시 시도"를 본다(표시용).
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useMe();
 
   const changeMode = (next: FlowMode) => setMode(next);
 

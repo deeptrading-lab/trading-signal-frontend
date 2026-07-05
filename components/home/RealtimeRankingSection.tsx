@@ -40,7 +40,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryFluctuation } from "@/hooks/market/useQueryFluctuation";
-import { useIsAdmin } from "@/hooks/auth/useIsAdmin";
+import { useMe } from "@/hooks/auth/useMe";
 import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { resolveAvailability, type Availability } from "@/lib/market/availability";
@@ -126,7 +126,7 @@ export function RealtimeRankingSection() {
   const { hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
   // 관리자만 점검 안내에서 "다시 시도"를 본다(표시용 — 재시도는 공개 refetch).
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useMe();
 
   const queryByTab = {
     volume: volumeQuery,

@@ -210,6 +210,12 @@ export interface FinalDecision {
   risk_reward_ratio: number | null;
   /** 분석 시점 현재가(원) — target_pct·stop_loss_pct(%) 의 기준가. 절대가격 표기용. 이 필드 추가 이전 legacy 행은 undefined → %만 표기. */
   base_price?: number | null;
+  /**
+   * 분석 엔진 모델(예: `claude-sonnet-5`) — 저장 시 provider 별 base env(`CLAUDE_CLI_MODEL`/`CODEX_CLI_MODEL`)
+   * 를 캡처해 decision JSONB 에 실는다(무마이그레이션). 이 필드 추가 이전 legacy 행·env 미설정은 undefined/null.
+   * **관리자에게만** 노출(user-login-auth Phase 2) — 일반 사용자에겐 "AI 분석"으로 총칭한다.
+   */
+  model?: string | null;
   /** 1~2주 단기 전망 1~2문장 */
   short_term_outlook: string;
   /** 1~3개월 중기 전망 1~2문장 */

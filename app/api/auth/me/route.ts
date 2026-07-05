@@ -1,24 +1,29 @@
 /**
- * `/api/auth/me` — 현재 세션 신원(role) 읽기전용 조회(BFF, Node 런타임).
+ * `GET /api/auth/me` — 현재 세션 신원(role·email) 반환 (BFF).
  *
- * PRD `market-status-aware-home` §3-5 / AC-9·AC-10. 관리자 전용 "다시 시도" 버튼 게이트의 서버측 진실.
- *   - 쿠키에서 `readSession`(HMAC 검증 후 role)만 읽는다 — **읽기전용**(로그인/세션 발급 로직 무접촉).
- *   - 위조 `role=admin` 쿠키는 서명 검증 실패로 걸러져 `role: null`(AC-10).
- *   - 미인증/시크릿 부재도 200 `{ role: null, isAdmin: false }` — **401 아님**. 이미 게이트를 통과한
- *     세션의 role 조회이므로 401 을 주면 axios 인터셉터가 `/login` 무한 리다이렉트를 유발한다(§8).
+ * user-login-auth Phase 2 — 클라이언트가 **role-aware UI**(관리자 전용 표시 등)를 그리도록
+ * 현재 사용자의 role/email 을 노출한다. 세션 쿠키(`app_auth`)를 `readSession`(HMAC 서명검증)으로
+ * 읽어 반환하며, 위조·만료·미인증·시크릿 미설정은 `authenticated:false`.
+ *
+ * ⚠️ `/api/auth/*` 공개경로(게이트 예외)라 미인증에서도 호출 가능 — 반환 데이터는 **쿠키 소유자
+ *    자신의 신원(role/email)뿐**이라 정보 누출 0. 비밀번호(v=1) 세션은 신원이 없어 role/email null.
  */
 
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { readSession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import type { AuthMeResponse } from "@/lib/types/auth/me";
-
-export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const identity = await readSession(token);
-  const role = identity?.role ?? null;
-  const body: AuthMeResponse = { role, isAdmin: role === "admin" };
-  return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    identity
+      ? {
+          authenticated: true,
+          role: identity.role ?? null,
+          email: identity.email ?? null,
+        }
+      : { authenticated: false, role: null, email: null },
+    { status: 200, headers: { "Cache-Control": "no-store" } },
+  );
 }

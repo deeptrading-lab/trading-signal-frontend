@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 프로필 upsert — 인증은 fail-soft 아님. 스토어 오류 시 500, 접근 안 열림(AC-16).
-  let outcome: { role: "user" | "admin"; status: "pending" | "approved" };
+  let outcome: Awaited<ReturnType<typeof upsertProfileOnLogin>>;
   try {
     outcome = await upsertProfileOnLogin({
       sub: identity.identity.sub,
