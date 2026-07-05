@@ -23,6 +23,12 @@ export type FluctuationRow = {
   /** 등락 방향 — changePercent 부호 기준(급상승=up / 급하락=down). */
   direction: FlowDirection;
   /**
+   * 누적 거래대금(원) — 급상승/급하락 랭킹 TR 은 거래대금을 안 주므로 KIS `inquire-price`
+   * (`loadKisPriceMeta`) 서버 best-effort enrich 로 채운다(거래대금 값 컬럼용, 4탭 통일).
+   * 미조회·실패·예산초과 시 null(fail-soft → UI "-").
+   */
+  tradingValue?: number | null;
+  /**
    * 시가총액(원) — 토스 마스터 `sharesOutstanding × price`(서버 best-effort enrich, PRD `ranking-columns`).
    * 토스 미설정·실패·예산초과 시 null(fail-soft → UI "-"). NaN 없음.
    */

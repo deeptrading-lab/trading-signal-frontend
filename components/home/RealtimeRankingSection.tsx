@@ -162,10 +162,10 @@ type RankableRow = {
 };
 
 /**
- * 활성 탭의 "값" 컬럼 정의 — 탭이 정렬 기준으로 삼는 값을 md+ 에 노출.
+ * 활성 탭의 "값" 컬럼 정의 — 탭 성격에 맞는 값을 md+ 에 노출(4탭 통일 → 탭 전환 시 컬럼 안정).
  *   - 거래량 탭   → 거래량(주)
- *   - 거래대금 탭 → 거래대금(원)
- *   - 급상승/급하락 → null(정렬 기준인 등락률이 이미 본체 컬럼 → 값 컬럼 없음)
+ *   - 거래대금 탭 → 거래대금(원, 랭킹 TR 값)
+ *   - 급상승/급하락 → 거래대금(원, KIS enrich best-effort → 미확보 "-"). 얇은 거래 급등 구분용 유동성 맥락.
  */
 type ValueColumn = { label: string; format: (row: RankableRow) => string };
 
@@ -173,7 +173,7 @@ function valueColumnForTab(tab: RankTab | undefined): ValueColumn | null {
   if (tab === "volume") {
     return { label: RANK_COL_VOLUME, format: (r) => formatShareVolume(r.volume) };
   }
-  if (tab === "turnover") {
+  if (tab === "turnover" || tab === "surge" || tab === "plunge") {
     return {
       label: RANK_COL_TURNOVER,
       format: (r) => formatWonCompact(r.tradingValue),

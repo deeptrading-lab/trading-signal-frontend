@@ -74,7 +74,12 @@ export const loadKisPriceMeta = createKisMetaLoader({
   budgetMs: 1_200,
   fetcher: async (ticker: string) => {
     const kis = await fetchStockPriceKis(ticker);
-    return { sector: kis.sector, foreignRatio: kis.foreignRatio };
+    // tradeAmount(거래대금) — 순위 enrich 가 급상승/급하락 행 거래대금 컬럼에 재사용(추가 호출 없음).
+    return {
+      sector: kis.sector,
+      foreignRatio: kis.foreignRatio,
+      tradeAmount: kis.tradeAmount,
+    };
   },
 });
 

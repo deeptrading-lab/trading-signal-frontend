@@ -29,13 +29,20 @@ export type RankingEnrichRow = { ticker: string; price: number };
 type Enrichment = {
   marketCap: Map<string, number>;
   sector: Map<string, string>;
+  tradeAmount: Map<string, number>;
 };
 
-/** 티커별 업종명 맵 — dedup fan-out + 동시성 캡. 미조회·실패는 생략(호출측 빈칸). */
-async function loadSectors(
-  rows: readonly RankingEnrichRow[],
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+/**
+ * 티커별 KIS 메타(업종명 + 거래대금) 맵 — dedup fan-out + 동시성 캡. 미조회·실패는 생략(호출측 빈칸).
+ *   `loadKisPriceMeta`(inquire-price) 한 번에 sector·tradeAmount 를 함께 얻어 추가 호출이 없다
+ *   (거래대금은 급상승/급하락 행에만 필요 — 거래량/거래대금 탭은 랭킹 TR 값을 그대로 유지).
+ */
+async function loadKisMeta(rows: readonly RankingEnrichRow[]): Promise<{
+  sector: Map<string, string>;
+  tradeAmount: Map<string, number>;
+}> {
+  const sector = new Map<string, string>();
+  const tradeAmount = new Map<string, number>();
   const tickers = [...new Set(rows.map((r) => r.ticker))]; // 탭 내 중복 티커 제거.
   for (let i = 0; i < tickers.length; i += SECTOR_CONCURRENCY) {
     const batch = tickers.slice(i, i + SECTOR_CONCURRENCY);
@@ -43,45 +50,71 @@ async function loadSectors(
       batch.map((t) => loadKisPriceMeta(t)),
     );
     results.forEach((result, j) => {
-      if (result.status === "fulfilled" && result.value?.sector) {
-        out.set(batch[j], result.value.sector);
+      if (result.status !== "fulfilled" || !result.value) return;
+      if (result.value.sector) sector.set(batch[j], result.value.sector);
+      if (typeof result.value.tradeAmount === "number") {
+        tradeAmount.set(batch[j], result.value.tradeAmount);
       }
     });
   }
-  return out;
+  return { sector, tradeAmount };
 }
 
-/** 시총·산업 enrich 를 예산 내 병렬 수집(never-throw·never-block). */
+/** 시총·산업·거래대금 enrich 를 예산 내 병렬 수집(never-throw·never-block). */
 async function collectEnrichment(
   rows: readonly RankingEnrichRow[],
 ): Promise<Enrichment> {
+  const empty = (): Enrichment => ({
+    marketCap: new Map(),
+    sector: new Map(),
+    tradeAmount: new Map(),
+  });
   const work = Promise.all([
     loadMarketCaps(rows).catch(() => new Map<string, number>()),
-    loadSectors(rows).catch(() => new Map<string, string>()),
-  ]).then(([marketCap, sector]) => ({ marketCap, sector }));
+    loadKisMeta(rows).catch(() => ({
+      sector: new Map<string, string>(),
+      tradeAmount: new Map<string, number>(),
+    })),
+  ]).then(([marketCap, meta]) => ({
+    marketCap,
+    sector: meta.sector,
+    tradeAmount: meta.tradeAmount,
+  }));
 
-  return Promise.race([
-    work,
-    delay(ENRICH_BUDGET_MS).then(
-      (): Enrichment => ({ marketCap: new Map(), sector: new Map() }),
-    ),
-  ]);
+  return Promise.race([work, delay(ENRICH_BUDGET_MS).then(empty)]);
 }
 
 /**
- * 랭킹 행에 `marketCap`·`sector` 를 best-effort 로 얹어 반환한다.
+ * 랭킹 행에 `marketCap`·`sector`·`tradingValue`(거래대금) 를 best-effort 로 얹어 반환한다.
  *
- * 미확보 값은 `marketCap=null`·`sector=undefined`(fail-soft). 원본 순서 보존. 절대 throw 안 함 —
- * enrich 실패가 랭킹 응답을 죽이지 않는다(호출 route 의 정상 200 유지).
+ * 미확보 값은 `marketCap=null`·`sector=undefined`·`tradingValue=null`(fail-soft). 원본 순서 보존.
+ * `tradingValue` 는 **행이 이미 가진 값(거래량/거래대금 탭의 랭킹 TR 값)을 우선**하고, 없을 때만
+ * enrich 거래대금으로 채운다(급상승/급하락 행). 절대 throw 안 함 — enrich 실패가 랭킹 응답을 죽이지
+ * 않는다(호출 route 의 정상 200 유지).
  */
 export async function enrichRankingRows<
   T extends { ticker: string; price: number },
->(rows: T[]): Promise<(T & { marketCap: number | null; sector?: string })[]> {
+>(
+  rows: T[],
+): Promise<
+  (Omit<T, "tradingValue"> & {
+    marketCap: number | null;
+    sector?: string;
+    tradingValue: number | null;
+  })[]
+> {
   const enrich =
     rows.length === 0 ? null : await collectEnrichment(rows).catch(() => null);
-  return rows.map((row) => ({
-    ...row,
-    marketCap: enrich?.marketCap.get(row.ticker) ?? null,
-    sector: enrich?.sector.get(row.ticker) ?? undefined,
-  }));
+  return rows.map((row) => {
+    // 행 자체가 거래대금을 가지면(거래량/거래대금 탭 TR 값) 그것을 우선 — enrich 보다 정확·최신.
+    const ownTradingValue = (row as { tradingValue?: number | null })
+      .tradingValue;
+    return {
+      ...row,
+      marketCap: enrich?.marketCap.get(row.ticker) ?? null,
+      sector: enrich?.sector.get(row.ticker) ?? undefined,
+      tradingValue:
+        ownTradingValue ?? enrich?.tradeAmount.get(row.ticker) ?? null,
+    };
+  });
 }
