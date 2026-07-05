@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
-import { preloadPeekChunk } from "@/components/stock/peekDynamic";
+import {
+  preloadPeekChunk,
+  preloadPeekDockChunk,
+} from "@/components/stock/peekDynamic";
 import {
   useStockPeekActions,
   type PeekSeed,
@@ -64,9 +67,16 @@ function schedulePeekChunkWarm(): void {
   // hover peek 이 없는 터치 전용 기기는 recharts 를 미리 받지 않는다.
   if (!window.matchMedia?.("(pointer: fine)").matches) return;
   peekChunkWarmScheduled = true;
+  // 초광폭(도크 모드)에선 도크 청크(PeekChart 4패널)도 워밍 — 도크는 팝오버와 별도 청크라
+  //   이걸 안 데우면 첫 도크가 청크 다운로드를 기다린다. 좁은 화면은 팝오버 청크만.
+  const wide = window.matchMedia?.("(min-width: 1920px)").matches;
+  const warm = () => {
+    preloadPeekChunk();
+    if (wide) preloadPeekDockChunk();
+  };
   const ric = window.requestIdleCallback;
-  if (typeof ric === "function") ric(() => preloadPeekChunk(), { timeout: 2000 });
-  else window.setTimeout(() => preloadPeekChunk(), 800);
+  if (typeof ric === "function") ric(warm, { timeout: 2000 });
+  else window.setTimeout(warm, 800);
 }
 
 export interface UseStockPeekArgs {
