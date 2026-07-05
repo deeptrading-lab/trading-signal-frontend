@@ -21,6 +21,11 @@ export const StockPeekSheet = dynamic(
   () => import("./StockPeekSheet").then((m) => m.StockPeekSheet),
   { ssr: false },
 );
+/** 초광폭 우측 도킹 패널(hover 팝오버 대체). recharts 는 팝오버와 동일 공유 청크. */
+export const StockPeekDock = dynamic(
+  () => import("./StockPeekDock").then((m) => m.StockPeekDock),
+  { ssr: false },
+);
 
 /** 팝오버 청크(→ recharts)를 미리 데운다. dynamic 과 동일 import 지정자라 같은 청크를 공유. */
 export function preloadPeekChunk(): void {
