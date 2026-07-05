@@ -58,3 +58,9 @@ export const WATCHLIST_STAR_REMOVE = "관심종목에서 제거";
 /** 상한(soft cap) 초과로 추가가 막힐 때의 토스트. 상한값은 훅의 MAX_TICKERS 를 보간. */
 export const WATCHLIST_LIMIT_MSG = (max: number) =>
   `관심종목은 최대 ${max}개까지 담을 수 있어요.`;
+/** 담기 성공 확인 토스트(토스 패리티). 종목명 있으면 이름으로(코드 미노출). */
+export const WATCHLIST_ADDED = (name?: string) =>
+  name ? `${name} 관심종목에 담았어요` : "관심종목에 담았어요";
+/** 빼기 확인 토스트. */
+export const WATCHLIST_REMOVED = (name?: string) =>
+  name ? `${name} 관심종목에서 뺐어요` : "관심종목에서 뺐어요";
