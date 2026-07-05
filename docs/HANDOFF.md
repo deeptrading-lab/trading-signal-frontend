@@ -6292,3 +6292,40 @@
   - 값 컬럼 정렬 옵션·기간별 랭킹(1일~1년).
   - 도크 인터랙티브화(hover 툴팁)·가변 폭(#260 후속).
   - ⑥ 확장(매출/영업이익률 DART)·US 주식 지원.
+
+### 2026-07-05 — perf(peek): 보이는 순위 상위 행 차트 배경 선반입 (#266)
+
+- **slug**: `peek-visible-prefetch` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/266
+- **요약**: perf(peek): 보이는 순위 상위 행 차트 배경 선반입
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > #253(hover 의도 선반입 + recharts 청크 워밍) 이후에도 **미캐시 종목은 첫 hover 에 네트워크 왕복**을 기다린다(120ms 헤드스타트만). 사용자 원래 불만(peek 1~2초)을 완전히 없애려면 미리 데워야 한다.
+  > 
+  > ## 변경 (경량 perf)
+  > 리스트가 뜬 뒤 **유휴 시점**에 활성 탭 **상위 6행**의 일봉 차트를 배경 선반입 → hover 시 팝오버/도크가 캐시 히트로 **거의 항상 즉시**.
+  > 
+  > - **`useVisibleChartPrefetch`**(신규) — `requestIdleCallback`(폴백 setTimeout) 트리거, 상위 6, 한 건씩 **400ms 스태거**(초당 ~2.5), `(pointer: fine)` 마우스 기기만, 세션 dedupe(`warmed` Set), `prefetchQuery` fresh no-op.
+  > - 키는 `warmupFetchDays("D", MINI_CHART_DEFAULT_DAYS)` 단일 출처(=#253·`useChartData` 요청과 정확히 동일) → peek 그대로 캐시 히트.
+  > - 랭킹 **리스트 뷰에서만**(로딩·점검 미실행). 탭 전환 시 새 상위 6 스케줄, 이미 데운 건 skip.
+  > 
+  > ## 레이트리밋 안전 (KIS EGW00201)
+  > 유휴·상위6·스태거400ms·마우스만·세션1회 → 최대 6건을 ~2.4초에 걸쳐, 초기 렌더 버스트가 가라앉은 뒤 발사. 서버 enrich 팬아웃과 시간 분리.
+  > 
+  > ## 무회귀
+  > - 터치/모바일·<pointer:fine> 무영향(배경 프리패치 skip). #253 hover 프리패치·#260 도크와 정합(같은 캐시 키).
+  > - 신규 Tailwind 클래스·토큰 0(순수 로직 훅).
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean. 키 정합은 #253 `peekChartPrefetch.test.ts`(warmupFetchDays)로 이미 고정.
+  > - 격리 worktree 작업(node_modules exclude 선제 가드).
+  > 
+  > ## 다음 작업
+  > - 배경 프리패치를 관심종목·검색 지면으로 확장(현재 랭킹 한정).
+  > - 도크 인터랙티브화(hover 툴팁)·가변 폭(#260 후속).
+  > - 기간별 랭킹·⑥ DART 확장·US 주식.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배경 프리패치를 관심종목·검색 지면으로 확장(현재 랭킹 한정).
+  - 도크 인터랙티브화(hover 툴팁)·가변 폭(#260 후속).
+  - 기간별 랭킹·⑥ DART 확장·US 주식.
