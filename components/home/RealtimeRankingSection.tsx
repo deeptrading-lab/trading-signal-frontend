@@ -2,7 +2,7 @@
  * RealtimeRankingSection — 홈 "실시간" 랭킹(카드리스 플랫 표), **가용성 기반** 렌더.
  *
  * home-reskin 신규 · `market-status-aware-home` 가용성 개정 · `ranking-columns` 컬럼/옵션 확장.
- * 박스 없는 흰 바탕 표 + 헤더 컬럼 행: [♥][순위][로고닷+종목명+경고배지][산업][현재가][등락률][시총].
+ * 박스 없는 흰 바탕 표 + 헤더 컬럼 행: [★][순위][로고닷+종목명+경고배지][산업][현재가][등락률][시총].
  * 산업·시총은 md+ 에서만(모바일 숨김). 경고 배지·위험숨기기 토글은 클라 warnings 배치 재사용. 행 헤어라인만.
  *
  * 탭(거래량/거래대금/급상승/급하락) **4종 모두 실배선 + 항상 프로브**:
@@ -34,7 +34,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Heart } from "lucide-react";
+import { Star } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -91,7 +91,7 @@ import {
 
 /**
  * 헤더-바디 공유 grid 트랙 — 컬럼 폭 토큰(col-sector·col-value·col-marketcap)으로 정합 고정(hex/px 직타 없음).
- *   - 모바일(< md): ♥·순위·종목·현재가·등락률(5트랙). 산업·값·시총 셀은 `hidden md:*` → 트랙 미점유.
+ *   - 모바일(< md): ★·순위·종목·현재가·등락률(5트랙). 산업·값·시총 셀은 `hidden md:*` → 트랙 미점유.
  *   - md+: 종목 뒤 산업, 등락률 뒤 [값(탭별)]·시총 add.
  * 순위 셀 폭(1.25rem)·등락률 폭(4rem)·현재가 폭(5.5rem)은 구조 rem(토큰 대상 아님, 기존 관례).
  *
@@ -416,7 +416,7 @@ function RankHeaderRow({ valueColumn }: { valueColumn: ValueColumn | null }) {
         rankGridClass(valueColumn !== null),
       )}
     >
-      {/* ♥ + 순위 트랙 묶어 라벨(♥ 트랙은 라벨 없음). */}
+      {/* ★ + 순위 트랙 묶어 라벨(★ 트랙은 라벨 없음). */}
       <span className={cn(COL_HEADER, "col-span-2 text-center")}>
         {RANK_COL_RANK}
       </span>
@@ -570,17 +570,17 @@ function RankRow({
       }}
       {...peekProps}
     >
-      {/* ♥ 관심종목 토글 */}
+      {/* ★ 관심종목 토글 — 사이드바·관심종목 페이지와 동일한 별(앰버/골드 chart-signal). */}
       <button
         type="button"
         aria-pressed={favorited}
         aria-label={favorited ? RANK_FAVORITE_REMOVE : RANK_FAVORITE_ADD}
-        className="inline-grid h-6 w-6 place-items-center rounded-sm text-text-muted transition-colors hover:text-signal-up"
+        className="inline-grid h-6 w-6 place-items-center rounded-sm text-text-muted transition-colors hover:text-chart-signal"
         onClick={toggleFavorite}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <Heart
-          className={cn("h-4 w-4", favorited && "fill-current text-signal-up")}
+        <Star
+          className={cn("h-4 w-4", favorited && "fill-current text-chart-signal")}
           aria-hidden="true"
         />
       </button>

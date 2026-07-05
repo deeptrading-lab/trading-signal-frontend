@@ -318,8 +318,13 @@ export const COPY = {
     emptyDesc: "요청하면 잠시 뒤 이 화면에서 결과를 볼 수 있어요.",
     /** 신선도 낮은 이전 결론 위 재요청 안내(S2) */
     staleTitle: "더 최신 분석이 필요하면 다시 요청할 수 있어요",
-    /** 이전 결론 메타 한 줄 앞에 붙이는 라벨 — "최근 분석 날짜: 2026... · Claude 분석 결과" */
-    recentMetaLabel: "최근 분석 날짜",
+    /**
+     * 이전 결론 메타 한 줄 — "얼마나 지났는지"(상대 경과) · 공급자. 예: "최근 분석 3일 전 · Claude".
+     * formatRelativeTime 이 3일 초과 시 절대날짜(YYYY.MM.DD)로 강등하므로 오래된 분석은 날짜가 보인다.
+     * 로컬 SavedDecisionView.validFooter("최근 분석 {relative} · AI 분석") 의 상대시간 표기와 정합.
+     */
+    recentMeta: (relative: string, provider: string): string =>
+      `최근 분석 ${relative} · ${provider}`,
     /** 요청 CTA(S2·S3) */
     request: "이 종목 분석 요청",
     /** CTA 누른 직후(enqueue 대기) */

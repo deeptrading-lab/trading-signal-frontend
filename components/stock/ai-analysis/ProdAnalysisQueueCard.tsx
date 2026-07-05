@@ -19,6 +19,7 @@
  */
 
 import { cn } from "@/lib/utils/cn";
+import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { REANALYSIS_PROMPT_MIN_AGE_MS } from "@/hooks/stock/aiAnalysisProvider";
 import {
@@ -26,6 +27,7 @@ import {
   type ProdRequestPhase,
 } from "@/hooks/stock/useProdAnalysisRequest";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
+import { VerdictHero } from "./VerdictHero";
 import { FinalVerdictCard } from "./FinalVerdictCard";
 import { ProdQueueBanner, type ProdQueueBannerTone } from "./ProdQueueBanner";
 import { ProdRequestCta } from "./ProdRequestCta";
@@ -43,15 +45,6 @@ interface ProdAnalysisQueueCardProps {
   snapshot: AIAnalysisDecisionSnapshot | null;
   /** 이 종목이 분석 큐에서 진행 중(pending/processing)이면 — "분석 중" 선제 표시 + 요청 CTA 숨김. */
   activeJob?: { status: "pending" | "processing" } | null;
-}
-
-function formatUpdatedAt(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }
 
 /** 마지막 분석이 30분 이내면 신선(S1) — 재요청 CTA 숨김. 로컬 재분석 프롬프트와 동일 임계. */
@@ -95,7 +88,7 @@ function bannerOf(
   }
 }
 
-/** 이전 결론 메타 한 줄(날짜 · provider). */
+/** 이전 결론 메타 한 줄 — 상대 경과시간(얼마나 지났는지) · provider. formatRelativeTime 이 3일 초과 시 절대날짜로 강등. */
 function PreviousMeta({
   updatedAt,
   provider,
@@ -105,9 +98,8 @@ function PreviousMeta({
 }) {
   return (
     <p className="text-caption text-text-muted break-keep">
-      {COPY.prodQueue.recentMetaLabel}:{" "}
-      {COPY.previousDecision.meta(
-        formatUpdatedAt(updatedAt),
+      {COPY.prodQueue.recentMeta(
+        formatRelativeTime(updatedAt),
         COPY.provider[provider],
       )}
     </p>
@@ -210,9 +202,17 @@ export function ProdAnalysisQueueCard({
             </div>
           )}
 
-          {/* 이전 결론 — 기존 FinalVerdictCard 재사용(신규 결과 UI 0). */}
+          {/* 이전 결론 — 로컬 SavedDecisionView 와 동일 verdict-forward(글랜스 히어로 + 전체 카드).
+              저장 스냅샷은 verdict-only(과정 미저장)이므로 doneCount/totalCount=0 으로 완료 히어로만 그린다. */}
+          <VerdictHero
+            final={snapshot.decision}
+            signal={snapshot.signal}
+            doneCount={0}
+            totalCount={0}
+          />
           <FinalVerdictCard
             data={snapshot.decision}
+            signal={snapshot.signal}
             calibration={getCalibration(snapshot.decision.confidence)}
             calibrationMinSampleN={minSampleN}
           />
