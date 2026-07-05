@@ -18,7 +18,7 @@
  *    선택(ProviderChooser→start) 경로로 위임한다. prod(enqueue) 저장모드는 ProdAnalysisQueueCard 담당.
  */
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
@@ -61,7 +61,13 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
           className="card-warn flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex min-w-0 items-start gap-2">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            {/* 노스스타 `.sb-ic` — 앰버 채움 원 + 흰 "!"(경고 아이콘). */}
+            <span
+              className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-warn text-caption font-extrabold text-surface"
+              aria-hidden="true"
+            >
+              !
+            </span>
             <p className="text-body-sm font-medium leading-relaxed break-keep">
               {COPY.savedMode.staleBanner(
                 reason,
@@ -69,28 +75,33 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
               )}
             </p>
           </div>
+          {/* 노스스타 `.sb-b` — 앰버 채움 pill 버튼. */}
           <button
             type="button"
             onClick={onReanalyze}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-sm bg-warn px-md py-1.5 text-caption font-bold text-surface transition hover:brightness-110 cursor-pointer"
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-pill bg-warn px-lg py-1.5 text-caption font-bold text-surface transition hover:brightness-110 cursor-pointer"
           >
             <RefreshCw size={13} aria-hidden="true" /> {COPY.savedMode.staleCta}
           </button>
         </div>
       )}
 
-      {/* 노스스타 `.fv-stack` — 히어로(글랜스) + 상세(플랫 스택). stale 이면 살짝 낮춰 "이전 분석" 전달. */}
-      <div className={cn("space-y-3 transition-opacity", stale && "opacity-90")}>
-        <VerdictHero
-          final={snapshot.decision}
-          signal={snapshot.signal}
-          doneCount={0}
-          totalCount={0}
-          mode="saved"
-          stale={stale}
-          calibration={getCalibration(snapshot.decision.confidence)}
-          calibrationMinSampleN={minSampleN}
-        />
+      {/* 노스스타 `.fv-stack` — 히어로(글랜스) + 상세(플랫 스택). stale 이면 **히어로만** opacity .66 으로
+          낮춰(`#saved-body[data-state="stale"] #saved-verdict{opacity:.66}`) "이전 분석"을 전달하고,
+          상세(근거·전략)는 가독성을 위해 풀 opacity 로 유지한다. */}
+      <div className="space-y-3">
+        <div className={cn("transition-opacity", stale && "opacity-[.66]")}>
+          <VerdictHero
+            final={snapshot.decision}
+            signal={snapshot.signal}
+            doneCount={0}
+            totalCount={0}
+            mode="saved"
+            stale={stale}
+            calibration={getCalibration(snapshot.decision.confidence)}
+            calibrationMinSampleN={minSampleN}
+          />
+        </div>
         <VerdictDetails data={snapshot.decision} />
       </div>
 
@@ -100,10 +111,11 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
           <p className="text-caption text-text-muted">
             {COPY.savedMode.validFooter(formatRelativeTime(snapshot.updatedAt))}
           </p>
+          {/* 노스스타 `.sf-btn` — accent 아웃라인 pill(accent-soft 배경·accent 텍스트, hover 시 채움). */}
           <button
             type="button"
             onClick={onReanalyze}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-surface-muted px-md py-1.5 text-caption font-medium text-text-muted transition-colors hover:bg-border-line cursor-pointer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-pill border border-accent-vivid bg-accent-vivid-soft px-lg py-1.5 text-caption font-bold text-accent-vivid transition-colors hover:bg-accent-vivid hover:text-surface cursor-pointer"
           >
             <RefreshCw size={13} aria-hidden="true" /> {COPY.savedMode.reanalyze}
           </button>

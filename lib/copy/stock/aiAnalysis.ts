@@ -50,8 +50,8 @@ export const COPY = {
     staleCta: "지금 기준 재분석",
     /** 앰버 배너 접근성 라벨(role=status). */
     staleAria: "저장된 분석 재분석 권장",
-    /** 유효(신선) 하단 재분석 행 — 시각 + "AI 분석"(provider/model 미표시). */
-    validFooter: (relative: string): string => `최근 분석 ${relative} · AI 분석`,
+    /** 유효(신선) 하단 재분석 행 — 노스스타 `.sf-info`("최근 분석 방금 · 가격 유효 범위 · AI 분석") 정합. */
+    validFooter: (relative: string): string => `최근 분석 ${relative} · 가격 유효 범위 · AI 분석`,
     /** 하단 재분석 버튼. */
     reanalyze: "재분석",
     /** 저장모드 스크림 라벨(이전 분석임을 알리는 미니 태그) — stale 일 때 히어로 위. */
@@ -225,15 +225,15 @@ export const COPY = {
     /** 최종 판정 에이전트 진행/실패 상태(최종 결론). */
     pmLoading: "최종 결론 도출 중…",
     pmFailed: "최종 결론 도출 실패",
-    /** 헤더 우측 강조 박스 라벨(신호 강도 / 확신도). */
+    /** 헤더 우측 강조 박스 라벨(신호 강도 / 신뢰도). */
     signalStrengthShort: "신호 강도",
-    confidenceShort: "확신도",
-    /** 확신도 값만(높음/보통/낮음) — 강조 박스 숫자 자리. */
+    confidenceShort: "신뢰도",
+    /** 신뢰도 값만(상/중/하) — 강조 박스 숫자 자리. 노스스타 `.v-chip`("신뢰도 중") 정합. */
     confidenceValue: (level: "HIGH" | "MEDIUM" | "LOW") =>
-      level === "HIGH" ? "높음" : level === "MEDIUM" ? "보통" : "낮음",
+      level === "HIGH" ? "상" : level === "MEDIUM" ? "중" : "하",
     confidence: (level: "HIGH" | "MEDIUM" | "LOW") =>
-      `확신도: ${level === "HIGH" ? "높음" : level === "MEDIUM" ? "보통" : "낮음"}`,
-    /** 확신도 산출 근거 — 무엇 기준인지 보조 설명 */
+      `신뢰도: ${level === "HIGH" ? "상" : level === "MEDIUM" ? "중" : "하"}`,
+    /** 신뢰도 산출 근거 — 무엇 기준인지 보조 설명 */
     confidenceBasis: "분석가 합의·데이터 명확성 기준",
     /** 결정론 시그널 강도 칩 — score(0~100) 표시. LLM 자기평가 확신도를 대체한다. */
     signalStrength: (score: number) => `신호 강도 ${Math.round(score)}`,
@@ -258,12 +258,12 @@ export const COPY = {
     disclaimer:
       "본 AI 분석 결과는 투자 참고용이며, 최종 투자 결정과 책임은 투자자 본인에게 있습니다.",
     executionGuide: "매매 실행 가이드",
-    /** 신규 진입자 / 기존 보유자 가이드 블록 헤더 */
-    newEntryLabel: "🆕 신규 진입 시",
-    holderLabel: "📊 이미 보유 중이면",
+    /** 신규 진입자 / 기존 보유자 가이드 블록 헤더 — 노스스타 `.g-tag`(이모지 없는 짧은 라벨) 정합. */
+    newEntryLabel: "신규 진입",
+    holderLabel: "보유 중",
     targetLabel: "목표가",
     reentryLabel: "재진입 구간",
-    stopLossLabel: "손절선",
+    stopLossLabel: "손절가",
     rrLabel: "손익비",
     targetHint: "현재가 대비",
     shortTermLabel: "단기 전망 (1~2주)",
