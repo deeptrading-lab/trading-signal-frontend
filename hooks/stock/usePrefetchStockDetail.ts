@@ -13,6 +13,13 @@
  *
  * price 는 zustand stock-meta 즉시 페인트가 이미 덮지만(목록 시세 보유 종목), 시세 미보유 종목
  * (검색 신규)·실값 갱신·company(스토어 미보유, 1d) 선반입에 의미가 있다.
+ *
+ * ## Peek 미니 차트 선반입(opt-in `warmDailyChart`)
+ * Peek 팝오버가 마운트되면 `MiniStockChart`(→ 일봉 차트 쿼리)가 그때서야 페치를 시작해 hover 후
+ * 1~2초 공백이 생긴다. 이 옵션을 켜면 **hover 의도 시점(팝오버 마운트보다 앞)** 에 같은 일봉 쿼리를
+ * 미리 데워, 팝오버가 뜰 땐 캐시 히트로 즉시 그린다. 프리패치 키는 `MiniStockChart` 기본 구간
+ * (`MINI_CHART_DEFAULT_DAYS`)을 `warmupFetchDays` 로 환산해 **useChartData 와 정확히 동일**하게 맞춘다.
+ * 기본값 false — 상세 이동 전용 선반입 지면(검색·최근 종목)은 차트를 열지 않으므로 과페치하지 않는다.
  */
 
 "use client";
@@ -23,8 +30,19 @@ import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import { fetchStockPriceClient } from "@/lib/api/stock/price";
 import { fetchDisclosureCompanyClient } from "@/lib/api/disclosure/company";
+import { fetchStockChart } from "@/lib/api/stock/chart";
+import { warmupFetchDays } from "@/hooks/stock/useChartData";
+import { MINI_CHART_DEFAULT_DAYS } from "@/components/stock/MiniStockChart";
 
 const INTENT_MS = 120;
+
+/** Peek 미니 차트가 요청하는 것과 동일한 일봉 fetch 봉 수(useChartData 와 단일 출처 공유). */
+const PEEK_CHART_FETCH_DAYS = warmupFetchDays("D", MINI_CHART_DEFAULT_DAYS);
+
+export interface UsePrefetchStockDetailOptions {
+  /** Peek 미니 차트(일봉) 쿼리도 함께 데운다. 기본 false(상세 이동 전용 지면은 차트 미사용). */
+  warmDailyChart?: boolean;
+}
 
 export type PrefetchStockDetail = {
   /** 확정 의도(click) — 지연 없이 즉시 선반입. */
@@ -35,7 +53,9 @@ export type PrefetchStockDetail = {
   cancelIntent: () => void;
 };
 
-export function usePrefetchStockDetail(): PrefetchStockDetail {
+export function usePrefetchStockDetail(
+  { warmDailyChart = false }: UsePrefetchStockDetailOptions = {},
+): PrefetchStockDetail {
   const qc = useQueryClient();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -60,8 +80,17 @@ export function usePrefetchStockDetail(): PrefetchStockDetail {
         queryFn: () => fetchDisclosureCompanyClient(ticker),
         staleTime: queryConfig.disclosure.company.staleTime,
       });
+      // Peek 지면만: 팝오버가 그릴 일봉 차트를 미리 데운다(마운트 시 캐시 히트 → hover 후 공백 제거).
+      if (warmDailyChart) {
+        void qc.prefetchQuery({
+          queryKey: queryKeys.stock.chart(ticker, "D", PEEK_CHART_FETCH_DAYS),
+          queryFn: () => fetchStockChart(ticker, PEEK_CHART_FETCH_DAYS, "D"),
+          staleTime: queryConfig.stock.daily.staleTime,
+          gcTime: queryConfig.stock.daily.gcTime,
+        });
+      }
     },
-    [qc],
+    [qc, warmDailyChart],
   );
 
   const onIntent = useCallback(

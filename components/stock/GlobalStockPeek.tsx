@@ -1,10 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import {
   useStockPeekActions,
   useStockPeekState,
 } from "@/hooks/stock/peekProvider";
+import { StockPeekPopover, StockPeekSheet } from "@/components/stock/peekDynamic";
 
 /**
  * GlobalStockPeek — Peek 오버레이의 전역 호스트. `(main)` 레이아웃에 1회 mount.
@@ -14,17 +14,9 @@ import {
  *
  * ## 코드 스플리팅(mobile-perf 정합)
  * 팝오버/시트는 `MiniStockChart`(→ recharts)를 끌어오므로, Peek 이 실제로 열릴 때만 필요하다.
- * `next/dynamic({ssr:false})` 로 지연 로드해 recharts 가 셸 청크에서 빠지고, Peek 을 한 번도
- * 소환하지 않은 라우트에서는 로드되지 않는다.
+ * 지연 로드 정의는 `peekDynamic` 에 두어 recharts 가 셸 청크에서 빠지고, Peek 을 한 번도 소환하지
+ * 않은 라우트에서는 로드되지 않는다(첫 hover 지연은 `preloadPeekChunk` 유휴 워밍으로 흡수).
  */
-const StockPeekPopover = dynamic(
-  () => import("./StockPeekPopover").then((m) => m.StockPeekPopover),
-  { ssr: false },
-);
-const StockPeekSheet = dynamic(
-  () => import("./StockPeekSheet").then((m) => m.StockPeekSheet),
-  { ssr: false },
-);
 
 export function GlobalStockPeek() {
   const peek = useStockPeekState();
