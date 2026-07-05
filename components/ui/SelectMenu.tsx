@@ -109,8 +109,8 @@ export function SelectMenu<T extends string | number>({
                   ? "px-sm py-xs text-caption"
                   : "px-md py-sm text-body-sm-strong",
                 o.value === value
-                  ? "bg-surface-muted text-text-strong"
-                  : "text-text-muted hover:text-text-strong hover:bg-surface-muted",
+                  ? "bg-accent-vivid-soft text-accent-vivid" // 선택됨 — accent(앱 표준 선택 패턴)
+                  : "text-text-muted hover:text-text-strong hover:bg-surface-muted", // hover — 회색(선택과 구분)
               )}
             >
               {o.label}
