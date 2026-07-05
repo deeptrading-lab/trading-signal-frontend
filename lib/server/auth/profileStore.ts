@@ -217,6 +217,69 @@ export async function setProfileStatus(
   });
 }
 
+/** 전체 사용자 목록 — 최신 가입 순(superadmin 유저 관리 화면용). 미설정·오류는 throw. */
+export async function listAllProfiles(): Promise<Profile[]> {
+  const config = requireConfig();
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", SELECT_COLS);
+  url.searchParams.set("order", "created_at.desc");
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { ...headers(config.key), Accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new ProfileStoreError(`전체 목록 조회 네트워크 오류: ${errMessage(error)}`);
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ProfileStoreError(`전체 목록 조회 실패 status=${res.status} ${text}`);
+  }
+
+  const rows = (await res.json().catch(() => [])) as ProfileRow[];
+  return Array.isArray(rows) ? rows.map(toProfile) : [];
+}
+
+/** 역할 변경(등급 조정) — superadmin 전용(라우트에서 게이트). 미설정·오류는 throw. */
+export async function setProfileRole(sub: string, role: ProfileRole): Promise<void> {
+  const config = requireConfig();
+  await patchBySub(config, sub, {
+    role,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+/** superadmin 수 — **마지막 superadmin 강등(락아웃) 가드**용. 미설정·오류는 throw. */
+export async function countSuperadmins(): Promise<number> {
+  const config = requireConfig();
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("select", "sub");
+  url.searchParams.set("role", "eq.superadmin");
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { ...headers(config.key), Accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new ProfileStoreError(`superadmin 카운트 네트워크 오류: ${errMessage(error)}`);
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ProfileStoreError(`superadmin 카운트 실패 status=${res.status} ${text}`);
+  }
+
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
 /** insert — 성공 true, unique 충돌(409/경합) false, 그 외 오류 throw. */
 async function insertProfile(
   config: SupabaseConfig,

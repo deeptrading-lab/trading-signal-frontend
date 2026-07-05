@@ -11,9 +11,10 @@
  *     **상단 앰버 배너 + [지금 기준 재분석]** 로 재분석 권유 + verdict 살짝 낮춤(이전 분석). 유효하면 배너 없이
  *     **하단 subtle 재분석 행**.
  *
- * ⚠️ SNS 감정 배지·토큰/비용 요약·provider(엔진/모델) 명은 노출하지 않는다 — verdict-forward·오해 방지.
- *    재분석 액션은 상위(패널)의 공급자 선택(ProviderChooser→start) 경로로 위임한다(라이브 재분석).
- *    prod(enqueue) 저장모드는 ProdAnalysisQueueCard 가 별도 담당(AIAnalysisPanel 분기).
+ * ⚠️ SNS 감정 배지·토큰/비용 요약은 노출하지 않는다 — verdict-forward·오해 방지.
+ *    provider(엔진)/모델명은 **일반 사용자에겐 미노출**("AI 분석" 총칭)하되, **관리자에게만** 하단 subtle
+ *    캡션으로 표기한다(user-login-auth Phase 2 — `useMe().isAdmin`). 재분석 액션은 상위(패널)의 공급자
+ *    선택(ProviderChooser→start) 경로로 위임한다. prod(enqueue) 저장모드는 ProdAnalysisQueueCard 담당.
  */
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -22,6 +23,7 @@ import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
+import { useMe } from "@/hooks/auth/useMe";
 import { evaluateDecisionStaleness } from "@/lib/stock/decisionStaleness";
 import { VerdictHero } from "./VerdictHero";
 import { FinalVerdictCard } from "./FinalVerdictCard";
@@ -38,6 +40,8 @@ interface SavedDecisionViewProps {
 export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDecisionViewProps) {
   // 보정된 신뢰도(scorecard-feedback (가)) — 저장 카드에도 곁들인다(표시 전용·무회귀).
   const { getCalibration, minSampleN } = useConfidenceCalibration();
+  // 관리자에게만 분석 엔진/모델을 노출(user-login-auth Phase 2). 로딩·미인증·일반유저는 isAdmin=false.
+  const { isAdmin } = useMe();
   const { stale, reason } = evaluateDecisionStaleness({
     decision: snapshot.decision,
     livePrice,
@@ -93,7 +97,7 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
         />
       </div>
 
-      {/* valid(신선) — 하단 subtle 재분석 행. "AI 분석"만(provider/model 미표시 — TODO(admin-role)). */}
+      {/* valid(신선) — 하단 subtle 재분석 행. 일반 사용자엔 "AI 분석" 총칭(엔진/모델은 아래 관리자 전용 캡션). */}
       {!stale && (
         <div className="flex items-center justify-between gap-3 px-1 pt-1">
           <p className="text-caption text-text-muted">
@@ -107,6 +111,13 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
             <RefreshCw size={13} aria-hidden="true" /> {COPY.savedMode.reanalyze}
           </button>
         </div>
+      )}
+
+      {/* 관리자 전용 — 분석 엔진/모델(일반 사용자 미노출). stale/valid 무관 하단 subtle 캡션. */}
+      {isAdmin && (
+        <p className="px-1 text-caption text-text-muted">
+          {COPY.savedMode.adminEngine(snapshot.provider, snapshot.decision.model)}
+        </p>
       )}
     </div>
   );

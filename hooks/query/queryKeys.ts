@@ -113,8 +113,14 @@ export const queryKeys = {
     /** AI 모의투자 세션 상세 — 세션별 tick/포지션/자산곡선. */
     session: (sessionId: string) => ["paper-trading", "session", sessionId] as const,
   },
+  auth: {
+    /** 현재 세션 신원(role/email) — role-aware UI(관리자 전용 표시). 인자 없는 단일 키. */
+    me: ["auth", "me"] as const,
+  },
   admin: {
     /** 가입 승인 대기(`pending`) 목록 — Supabase profiles BFF(user-login-auth §3.7). 인자 없는 단일 키. */
     pendingApprovals: ["admin", "pending-approvals"] as const,
+    /** 전체 사용자 목록(superadmin 유저 관리, Phase 2). 인자 없는 단일 키. */
+    allUsers: ["admin", "all-users"] as const,
   },
 } as const;
