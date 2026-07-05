@@ -115,7 +115,8 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
                       value={u.role}
                       onChange={(role) => changeRole(u.sub, role)}
                       ariaLabel={ADMIN_ROLE_SELECT_LABEL}
-                      align="right"
+                      align="left"
+                      size="sm"
                       disabled={anyMutating}
                       loading={roleLoading}
                     />
