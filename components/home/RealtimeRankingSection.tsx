@@ -43,6 +43,7 @@ import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryFluctuation } from "@/hooks/market/useQueryFluctuation";
 import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
+import { useVisibleChartPrefetch } from "@/hooks/stock/useVisibleChartPrefetch";
 import { useMe } from "@/hooks/auth/useMe";
 import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
@@ -237,6 +238,13 @@ export function RealtimeRankingSection() {
     activeRows.map((row) => row.ticker),
   );
   const warningsByTicker = warningsQuery.data?.warnings ?? {};
+
+  // 활성 탭 상위 행의 일봉 차트를 유휴 시점에 배경 선반입 → hover peek 이 거의 항상 즉시(#253 후속).
+  //   리스트 뷰일 때만, 마우스 기기·상위 소수·스태거로 레이트리밋 안전(훅 내부 가드).
+  useVisibleChartPrefetch(
+    activeRows.map((row) => row.ticker),
+    view === "list",
+  );
 
   // 활성 탭이 available 목록에서 빠지면(초기·소실) 첫 available 로 이동(빈 콘텐츠 방지). 그 외 클릭 존중.
   useEffect(() => {
