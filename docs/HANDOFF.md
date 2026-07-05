@@ -6219,3 +6219,42 @@
   - 도크 인터랙티브화(hover 툴팁) — 현재 pointer-events-none(안전 우선). 원하면 hide 지연+close 어포던스로 확장.
   - 도크 폭/차트 크기를 여백에 따라 가변(초광폭일수록 크게) — 현재 고정 248px.
   - 모바일 값 컬럼 노출, 급상승/급하락 거래대금 enrich (⑤ 후속).
+
+### 2026-07-05 — feat(home): 급상승/급하락 값 컬럼 거래대금 (4탭 통일) (#261)
+
+- **slug**: `ranking-value-column-unify` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/261
+- **요약**: feat(home): 급상승/급하락 값 컬럼 거래대금 (4탭 통일)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > ⑤ 값 컬럼(#256)에서 거래량/거래대금 탭은 값이 보이지만, **급상승/급하락 탭은 값 컬럼이 비어** 있었다. 급등락률만 보면 얇은 거래로 튄 종목과 실수급 종목을 구분 못 한다 → 거래대금(유동성)을 함께 보여주면 유용.
+  > 
+  > ## 핵심: 신규 네트워크 0
+  > 급상승/급하락 랭킹 TR(`FHPST01700000`)은 거래대금을 안 준다. 하지만 **enrich 가 이미 그 탭 행마다 `loadKisPriceMeta`(inquire-price)를 산업(sector) 위해 호출**하고 있다. 그 응답의 `acml_tr_pbmn`(누적 거래대금)을 함께 뽑으면 **추가 호출 없이** 거래대금을 채운다.
+  > 
+  > ## 변경
+  > - `inquire-price` 응답 `acml_tr_pbmn` → `StockPrice.tradeAmount` 매핑(타입+매퍼).
+  > - `loadKisPriceMeta` 가 `tradeAmount` 노출 → `rankingEnrich` 가 `tradingValue` 채움:
+  >   - **행 자체 값 우선**(거래량/거래대금 탭은 랭킹 TR 값 = 더 정확·최신), 없으면 enrich 거래대금, 미확보 `null`(fail-soft).
+  >   - `loadSectors` → `loadKisMeta`(sector+tradeAmount 한 번에), `enrichRankingRows` 반환 `tradingValue: number | null` 추가.
+  > - `FluctuationRow.tradingValue` 추가, `VolumeRankRow.tradingValue` 를 `number | null` 로 정렬(marketCap 계약과 동일).
+  > - 컴포넌트: 급상승/급하락도 거래대금 값 컬럼 반환 → **4탭 모두 값 컬럼**(탭 전환 시 컬럼 안정, 레이아웃 시프트 제거).
+  > 
+  > ## 무회귀
+  > - **두 라우트(volume-rank·fluctuation) 코드 무변경** — 둘 다 이미 `enrichRankingRows` 호출, `tradingValue` 가 자동 채워짐.
+  > - 거래량/거래대금 탭 값은 랭킹 TR 값 그대로(enrich 로 덮지 않음). never-block·예산캡·60s캐시 그대로.
+  > - distinct 필드(`tradeAmount`)로 volume-rank 기존 `tradingValue` 충돌 없음(`Omit` 반환 타입).
+  > 
+  > ## 테스트
+  > - `rankingEnrich.test.ts` +2 케이스(자체값 우선 vs enrich 채움, tradingValue fail-soft null). 총 6.
+  > - `tsc` clean · `eslint` clean · `npm run build` 통과. fluctuation mock 에 tradingValue 추가(dev 렌더).
+  > 
+  > ## 다음 작업
+  > - 모바일 값 노출(현재 md+ only) — 좁은 폭 UX 판단.
+  > - 값 컬럼 정렬 옵션·기간별 랭킹(1일~1년).
+  > - 도크 인터랙티브화/가변 폭(#260 후속).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 모바일 값 노출(현재 md+ only) — 좁은 폭 UX 판단.
+  - 값 컬럼 정렬 옵션·기간별 랭킹(1일~1년).
+  - 도크 인터랙티브화/가변 폭(#260 후속).
