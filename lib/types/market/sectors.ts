@@ -70,3 +70,13 @@ export type SectorConstituentsResponse = {
 
 /** 구성종목 정렬 세그먼트 — 수익률(등락률) / 시가총액. */
 export type SectorConstituentSort = "return" | "marketCap";
+
+/**
+ * 구성종목 스파크라인 배치 응답 — 티커별 최근 종가 시리즈(오래된→최신).
+ *   행마다 개별 차트 API 를 부르는 대신 **한 번의 배치 요청**으로 전 종목을 모아 받아, 모달 차트 열이
+ *   빈 네모·순차 렌더 없이 **일괄** 그려지게 한다(서버가 KIS 동시성·캐시 관리). 미확보 티커는 키 생략
+ *   (fail-soft → 해당 행 스파크라인 없음). 2점 미만은 그리지 않는다.
+ */
+export type SectorSparklinesResponse = {
+  sparklines: Record<string, number[]>;
+};

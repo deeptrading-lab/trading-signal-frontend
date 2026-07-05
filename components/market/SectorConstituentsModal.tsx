@@ -19,10 +19,11 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { MiniStockChart } from "@/components/stock/MiniStockChart";
+import { Sparkline } from "@/components/ui/Sparkline";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
 import { useQuerySectorConstituents } from "@/hooks/market/useQuerySectorConstituents";
+import { useQuerySectorSparklines } from "@/hooks/market/useQuerySectorSparklines";
 import { useMe } from "@/hooks/auth/useMe";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { resolveAvailability } from "@/lib/market/availability";
@@ -106,9 +107,21 @@ export function SectorConstituentsModal({
     dataSource: query.dataSource,
   });
 
+  const constituents = useMemo(
+    () => query.data?.constituents ?? [],
+    [query.data?.constituents],
+  );
+
+  // 스파크라인 배치 — 구성종목 티커를 한 번에 조회해 차트 열을 일괄 렌더(행마다 개별 콜 아님).
+  const sparkQuery = useQuerySectorSparklines(constituents.map((c) => c.ticker));
+  const sparklines = sparkQuery.data?.sparklines ?? {};
+
+  // 시가총액 정렬은 marketCap 이 있을 때만 의미 — 전부 null(토스 미설정 등)이면 탭을 숨긴다(죽은 탭 방지).
+  const hasMarketCap = constituents.some((c) => c.marketCap != null);
+
   const sorted = useMemo(
-    () => sortConstituents(query.data?.constituents ?? [], sort),
-    [query.data?.constituents, sort],
+    () => sortConstituents(constituents, sort),
+    [constituents, sort],
   );
 
   const goDetail = (ticker: string, name: string) => {
@@ -133,7 +146,8 @@ export function SectorConstituentsModal({
 
       <div
         className={cn(
-          "relative flex max-h-[85vh] w-full flex-col bg-surface shadow-overlay",
+          // overflow-hidden — 스크롤 본문/스크롤바가 둥근 모서리를 뚫어 우하단이 직각으로 보이던 것 클립.
+          "relative flex max-h-[85vh] w-full flex-col overflow-hidden bg-surface shadow-overlay",
           isMobile
             ? "rounded-t-xl pb-[env(safe-area-inset-bottom)]"
             : "w-[34rem] max-w-full rounded-xl",
@@ -168,25 +182,27 @@ export function SectorConstituentsModal({
           </button>
         </div>
 
-        {/* 세그먼트 — 수익률 / 시가총액 */}
-        <div className="px-card-px pt-md">
-          <div
-            role="tablist"
-            aria-label={SECTORS_SORT_ARIA}
-            className="inline-flex items-center gap-xs rounded-sm bg-surface-muted p-xs"
-          >
-            <SortTab
-              label={SECTORS_SORT_RETURN}
-              active={sort === "return"}
-              onClick={() => setSort("return")}
-            />
-            <SortTab
-              label={SECTORS_SORT_MARKETCAP}
-              active={sort === "marketCap"}
-              onClick={() => setSort("marketCap")}
-            />
+        {/* 세그먼트 — 수익률 / 시가총액. 시가총액은 marketCap 데이터가 있을 때만(전부 null 이면 죽은 탭). */}
+        {hasMarketCap && (
+          <div className="px-card-px pt-md">
+            <div
+              role="tablist"
+              aria-label={SECTORS_SORT_ARIA}
+              className="inline-flex items-center gap-xs rounded-sm bg-surface-muted p-xs"
+            >
+              <SortTab
+                label={SECTORS_SORT_RETURN}
+                active={sort === "return"}
+                onClick={() => setSort("return")}
+              />
+              <SortTab
+                label={SECTORS_SORT_MARKETCAP}
+                active={sort === "marketCap"}
+                onClick={() => setSort("marketCap")}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 본문 — 구성종목 리스트(스크롤) */}
         <div className="min-h-0 flex-1 overflow-y-auto px-card-px py-md">
@@ -211,6 +227,8 @@ export function SectorConstituentsModal({
                 <ConstituentRow
                   key={c.ticker}
                   constituent={c}
+                  sparkline={sparklines[c.ticker]}
+                  sparkLoading={sparkQuery.isLoading}
                   onClick={() => goDetail(c.ticker, c.name)}
                 />
               ))}
@@ -251,12 +269,20 @@ function SortTab({
   );
 }
 
-/** 구성종목 1행 — 종목명 · 미니차트 · 현재가 · 등락. 클릭 → 종목 상세. */
+/**
+ * 구성종목 1행 — 종목명 · 스파크라인 · 현재가 · 등락. 클릭 → 종목 상세.
+ *   폰트·헤어라인은 실시간 순위표 정합(`text-body-sm-strong`, 행 구분선) — 이전엔 크기 미지정으로
+ *   숫자만 크게 튀었다(사용자 지적). 스파크라인은 **배치 로드**라 개별 콜 없음, 로딩 중엔 스켈레톤.
+ */
 function ConstituentRow({
   constituent,
+  sparkline,
+  sparkLoading,
   onClick,
 }: {
   constituent: SectorConstituent;
+  sparkline: number[] | undefined;
+  sparkLoading: boolean;
   onClick: () => void;
 }) {
   return (
@@ -266,23 +292,29 @@ function ConstituentRow({
       aria-label={constituentRowAria(constituent.name)}
       onClick={onClick}
       className={cn(
-        "flex h-table-row-h items-center gap-md rounded-md px-sm",
-        "cursor-pointer text-left transition-colors hover:bg-surface-muted",
+        "-mx-sm flex items-center gap-md rounded-sm px-sm py-md text-left",
+        "border-b border-border-line last:border-b-0",
+        "cursor-pointer transition-colors hover:bg-surface-muted",
         "focus-visible:bg-surface-muted focus-visible:outline-none",
       )}
     >
-      <span className="min-w-0 flex-1 truncate text-body-sm text-text-strong">
+      <span className="min-w-0 flex-1 truncate text-body-sm-strong text-text-strong">
         {constituent.name}
       </span>
-      <span className="hidden h-8 w-20 shrink-0 sm:block" aria-hidden="true">
-        <MiniStockChart ticker={constituent.ticker} days={60} height={32} />
+      {/* 스파크라인 — 배치 로드(개별 콜 없음). 로딩 중 스켈레톤 → 데이터 도착 시 전 행 일괄 표시. */}
+      <span className="hidden h-6 w-16 shrink-0 items-center sm:flex" aria-hidden="true">
+        {sparkLoading ? (
+          <Skeleton variant="line" className="mb-0 h-4 w-full rounded-sm" />
+        ) : (
+          <Sparkline data={sparkline} />
+        )}
       </span>
-      <span className="w-20 shrink-0 text-right text-mono-numeric text-text-strong">
+      <span className="w-20 shrink-0 text-right text-body-sm-strong tabular-nums text-text-strong">
         {formatNumber(constituent.price)}
       </span>
       <span
         className={cn(
-          "w-16 shrink-0 text-right text-mono-numeric",
+          "w-16 shrink-0 text-right text-body-sm-strong",
           changeClass(constituent.direction),
         )}
       >

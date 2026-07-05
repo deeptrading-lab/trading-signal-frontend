@@ -12,6 +12,7 @@ import type { DataSource } from "@/lib/types/market/dataSource";
 import type {
   SectorConstituentsResponse,
   SectorRankingResponse,
+  SectorSparklinesResponse,
 } from "@/lib/types/market/sectors";
 
 /** 업종 랭킹 어댑터 반환 — 화면 데이터 + 표면화된 출처(가용성 판정 근거). */
@@ -38,4 +39,15 @@ export async function getSectorConstituents(
     `/market/sectors/${code}/constituents`,
   );
   return { data: response.data, dataSource: readDataSource(response.headers) };
+}
+
+/** 스파크라인 배치 — 구성종목 티커 집합의 최근 종가 시리즈를 한 번에(모달 차트 열 일괄 렌더). */
+export async function getSparklines(
+  tickers: readonly string[],
+): Promise<SectorSparklinesResponse> {
+  const response = await httpClient.get<SectorSparklinesResponse>(
+    "/market/sparklines",
+    { params: { tickers: tickers.join(",") } },
+  );
+  return response.data;
 }
