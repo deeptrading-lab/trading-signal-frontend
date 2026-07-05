@@ -30,8 +30,9 @@ export type VolumeRankRow = {
   /**
    * 누적 거래대금 — KIS `acml_tr_pbmn` 원값 그대로(단위 환산은 프론트 포맷터 책임).
    * 거래대금순(`by=value`) 응답에서 채워진다. 거래량순에서도 응답에 있으면 함께 매핑.
+   * enrich 통과 시 `number | null`(랭킹 TR 값 우선, `marketCap` 과 동일 fail-soft 계약).
    */
-  tradingValue?: number;
+  tradingValue?: number | null;
   /**
    * 시가총액(원) — 토스 마스터 `sharesOutstanding × price`(서버 best-effort enrich, PRD `ranking-columns`).
    * 토스 미설정·실패·예산초과 시 null(fail-soft → UI "-"). NaN 없음.

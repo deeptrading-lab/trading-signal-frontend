@@ -73,6 +73,8 @@ export type KisInquirePriceOutput = {
   prdy_vrss_sign: string;
   /** 누적 거래량. */
   acml_vol: string;
+  /** 누적 거래대금(원). 순위 enrich 의 거래대금 컬럼 소스(급상승/급하락 행 보강). */
+  acml_tr_pbmn?: string;
   /** 시가. */
   stck_oprc?: string;
   /** 고가. */
@@ -134,6 +136,8 @@ export type StockPrice = {
   direction: "up" | "down" | "flat";
   /** 누적 거래량. */
   volume: number;
+  /** 누적 거래대금(원) — `acml_tr_pbmn`. 순위 enrich 거래대금 컬럼 소스. 없으면 undefined. */
+  tradeAmount?: number;
   /** 시가·고가·저가 (가능 시). */
   open?: number;
   high?: number;

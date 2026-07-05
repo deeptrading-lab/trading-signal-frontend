@@ -92,6 +92,7 @@ export function mapStockPrice(
     changePercent: toNumber(output.prdy_ctrt),
     direction: mapDirection(output.prdy_vrss_sign),
     volume: toNumber(output.acml_vol),
+    tradeAmount: output.acml_tr_pbmn ? toNumber(output.acml_tr_pbmn) : undefined,
     open: output.stck_oprc ? toNumber(output.stck_oprc) : undefined,
     high: output.stck_hgpr ? toNumber(output.stck_hgpr) : undefined,
     low: output.stck_lwpr ? toNumber(output.stck_lwpr) : undefined,
