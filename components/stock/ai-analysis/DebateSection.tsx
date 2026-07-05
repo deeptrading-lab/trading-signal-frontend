@@ -83,7 +83,8 @@ export function DebateSection({
                   {isBullThisRound && !bullMsg && <DebateLoadingCard side="bull" />}
                 </div>
                 <div className="flex flex-col items-center gap-1 py-1">
-                  <span className="text-caption font-black text-text-muted">R{round}</span>
+                  {/* 노스스타 `.rn` — surface 배경 boxed 라운드 라벨(10.5px w800 muted). */}
+                  <span className="rounded-sm bg-surface-muted px-1.5 py-0.5 text-caption font-black text-text-muted">R{round}</span>
                   <div className="flex-1 w-px bg-border-line min-h-[20px]" />
                 </div>
                 <div>

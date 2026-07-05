@@ -60,6 +60,8 @@
   --fs-fng-track: #eceff3;
   --fs-market-open: #166534;
   --fs-market-open-soft: #dcfce7;
+  --fs-signal-done: #12b76a;
+  --fs-signal-done-soft: #e6f6ee;
 }
 
 html.dark {
@@ -122,4 +124,6 @@ html.dark {
   --fs-fng-track: #2a333e;
   --fs-market-open: #4ade80;
   --fs-market-open-soft: #14321f;
+  --fs-signal-done: #3fcf6a;
+  --fs-signal-done-soft: #14321f;
 }

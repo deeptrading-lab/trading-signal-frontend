@@ -54,7 +54,8 @@ function Pip({ status }: { status: AgentStatus }) {
   return (
     <span className="flex h-3 w-3 items-center justify-center">
       {status === "done" ? (
-        <Check size={12} className="text-accent-vivid" />
+        // 노스스타 `.sa.done` — 완료 서브 에이전트는 done 초록.
+        <Check size={12} className="text-signal-done" />
       ) : (
         <span
           className={cn(
