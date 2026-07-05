@@ -27,7 +27,6 @@ import {
   type ProdRequestPhase,
 } from "@/hooks/stock/useProdAnalysisRequest";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
-import { VerdictHero } from "./VerdictHero";
 import { FinalVerdictCard } from "./FinalVerdictCard";
 import { ProdQueueBanner, type ProdQueueBannerTone } from "./ProdQueueBanner";
 import { ProdRequestCta } from "./ProdRequestCta";
@@ -202,14 +201,8 @@ export function ProdAnalysisQueueCard({
             </div>
           )}
 
-          {/* 이전 결론 — 로컬 SavedDecisionView 와 동일 verdict-forward(글랜스 히어로 + 전체 카드).
-              저장 스냅샷은 verdict-only(과정 미저장)이므로 doneCount/totalCount=0 으로 완료 히어로만 그린다. */}
-          <VerdictHero
-            final={snapshot.decision}
-            signal={snapshot.signal}
-            doneCount={0}
-            totalCount={0}
-          />
+          {/* 이전 결론 — 로컬 SavedDecisionView 와 동일 단일 카드. FinalVerdictCard 가 판정 헤더+
+              목표가/손절/손익비+상세 전부라 별도 VerdictHero 는 두지 않는다(헤더 중복). */}
           <FinalVerdictCard
             data={snapshot.decision}
             signal={snapshot.signal}

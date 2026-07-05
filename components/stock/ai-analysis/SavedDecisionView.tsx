@@ -6,7 +6,8 @@
  * /analyze 저장 결론 클릭·종목 상세 재열기 등으로 패널이 저장 스냅샷을 열 때(로컬, 슬롯 all-pending)의 뷰.
  * 과정(분석가/토론/리스크 대화)은 **저장되지 않으므로**(verdict-only) 회색 12-칩·페이즈 노드를 그리지 않고,
  * 저장된 FinalDecision 전체를 verdict-forward 로 보여준다:
- *   - VerdictHero(글랜스, 라이브 패널과 동일 재사용) + FinalVerdictCard(근거·전략·전망·강점/리스크 전체).
+ *   - FinalVerdictCard 단일 카드 — 판정 헤더·목표가/손절/손익비·근거·전략·전망·강점/리스크 전부 포함.
+ *     별도 VerdictHero 는 두지 않는다(헤더 중복 — 노스스타 결과뷰 = 단일 카드). 라이브 뷰만 히어로+타임라인.
  *   - staleness(decisionStaleness): 분석 시점가(base_price) 대비 라이브 현재가가 목표/손절/큰이동/오래됨이면
  *     **상단 앰버 배너 + [지금 기준 재분석]** 로 재분석 권유 + verdict 살짝 낮춤(이전 분석). 유효하면 배너 없이
  *     **하단 subtle 재분석 행**.
@@ -25,7 +26,6 @@ import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
 import { useMe } from "@/hooks/auth/useMe";
 import { evaluateDecisionStaleness } from "@/lib/stock/decisionStaleness";
-import { VerdictHero } from "./VerdictHero";
 import { FinalVerdictCard } from "./FinalVerdictCard";
 import type { AIAnalysisDecisionSnapshot } from "@/lib/types/stock/aiAnalysis";
 
@@ -78,17 +78,12 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
         </div>
       )}
 
-      {/* verdict 히어로 + 전체 카드. stale 이면 살짝 낮춰 "이전 분석"임을 전달(배너가 최신 메시지). */}
+      {/* 단일 결과 카드(노스스타). FinalVerdictCard 가 판정 헤더+목표가/손절/손익비+상세 전부 →
+          별도 VerdictHero 는 두지 않는다(헤더 중복). stale 이면 살짝 낮춰 "이전 분석" 전달. */}
       <div className={cn("space-y-3 transition-opacity", stale && "opacity-90")}>
         {stale && (
           <p className="text-caption font-medium text-text-muted">{COPY.savedMode.previousTag}</p>
         )}
-        <VerdictHero
-          final={snapshot.decision}
-          signal={snapshot.signal}
-          doneCount={0}
-          totalCount={0}
-        />
         <FinalVerdictCard
           data={snapshot.decision}
           signal={snapshot.signal}
