@@ -51,8 +51,9 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
     refetch,
     changeRole,
     setStatus,
-    mutatingSub,
+    mutating,
   } = useAdminUsers();
+  const anyMutating = mutating !== null;
 
   return (
     <section className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg px-lg py-xl">
@@ -75,8 +76,11 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
       ) : (
         <ul className="flex flex-col divide-y divide-border-line">
           {users.map((u) => {
-            const busy = mutatingSub === u.sub;
             const approved = u.status === "approved";
+            const roleLoading =
+              mutating?.sub === u.sub && mutating.kind === "role";
+            const statusLoading =
+              mutating?.sub === u.sub && mutating.kind === "status";
             return (
               <li
                 key={u.sub}
@@ -112,7 +116,8 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
                       onChange={(role) => changeRole(u.sub, role)}
                       ariaLabel={ADMIN_ROLE_SELECT_LABEL}
                       align="right"
-                      disabled={busy}
+                      disabled={anyMutating}
+                      loading={roleLoading}
                     />
                   ) : (
                     // admin — 등급 읽기 전용(superadmin 만 변경).
@@ -124,8 +129,8 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
                   <Button
                     variant={approved ? "secondary" : "primary"}
                     onClick={() => setStatus(u.sub, approved ? "pending" : "approved")}
-                    disabled={busy}
-                    aria-busy={busy}
+                    disabled={anyMutating}
+                    loading={statusLoading}
                     className="whitespace-nowrap"
                   >
                     {approved ? ADMIN_USERS_REVOKE_CTA : ADMIN_USERS_APPROVE_CTA}
