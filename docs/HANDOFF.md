@@ -6136,3 +6136,45 @@
   - Peek 배치 실험(팝업 vs 순위표 우측 도킹 패널) — 디자이너 레이아웃 판단 선행 (`project_realtime-ranking-followups`).
   - 보이는 상위 9~14행 배경 프리패치(requestIdleCallback 스태거) — 더 공격적 옵션, 이번엔 hover 의도 프리패치만 도입.
   - 실시간 순위 값 컬럼(거래대금 순 원값)·기간별 랭킹.
+
+### 2026-07-05 — feat(home): 실시간 순위 값 컬럼 (거래량/거래대금) (#256)
+
+- **slug**: `ranking-value-column` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/256
+- **요약**: feat(home): 실시간 순위 값 컬럼 (거래량/거래대금)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 실시간 순위표가 종목·현재가·등락률·산업·시총은 보여주지만, **정작 그 탭이 무엇으로 줄 세운 값**(거래량 탭의 거래량, 거래대금 탭의 거래대금)은 안 보였다. 토스는 이 정렬 기준 값을 컬럼으로 노출한다.
+  > 
+  > ## 변경
+  > 경량 UX 폴리시(PRD 없음). 활성 탭의 정렬 기준 값을 **md+ 값 컬럼**으로 추가(등락률과 시총 사이):
+  > 
+  > | 탭 | 값 컬럼 |
+  > |---|---|
+  > | 거래량 | 거래량(주) — `formatShareVolume` 억/만/주 컴팩트 |
+  > | 거래대금 | 거래대금(원) — `formatWonCompact` 조/억 컴팩트 |
+  > | 급상승/급하락 | **없음** — 정렬 기준인 등락률이 이미 본체 컬럼 |
+  > 
+  > - 값은 `VolumeRankRow`(volume·tradingValue)에 **이미 실려 온다** → 신규 API/enrich/페치 0.
+  > - 급상승/급하락은 `FluctuationRow`에 거래량/거래대금 필드가 없어(해당 TR 미제공) 값 컬럼을 두지 않는다 — 헤더도 그 탭에선 미표시.
+  > - 그리드는 탭별로 적응(값 컬럼 유무). **Tailwind JIT 안전**: 두 그리드 변형을 각각 완전한 리터럴 상수로 두고 `hasValue` 로 선택(런타임 `grid-cols-[${x}]` 조합 금지 — CSS 미방출 함정 회피). 빌드 CSS에 두 트랙(`…4rem 96px` / `…4rem 104px 96px`) 방출 확인.
+  > 
+  > ### 토큰/포맷터
+  > - 신규 spacing `col-value: 104px`(DESIGN.md → `design:sync` → theme.json). hex/px 직타 없음.
+  > - `formatMarketCap` 을 `formatWonCompact` 로 일반화(원 금액 컴팩트 단위 규칙 SSOT 1곳). `formatMarketCap` 은 시총 의미 별칭으로 유지 → 기존 호출부 무변경.
+  > - `formatShareVolume` 신규(억/만/주, NaN·0·음수 → "-").
+  > 
+  > ## 영향 범위
+  > - `RealtimeRankingSection` — 값 컬럼 셀/헤더 추가(md+), 그리드 분기. 모바일 레이아웃 무변경(값은 산업·시총과 동일하게 md+ only).
+  > - 4번(가용성)·경고배지·위험숨기기 무회귀(같은 컴포넌트 내 가산 변경).
+  > 
+  > ## 테스트
+  > - `formatShareVolume.test.ts`(신규) 억/만/주 경계·fail-soft, `formatMarketCap.test.ts` 유지.
+  > - `tsc` clean · `eslint` clean · `npm run build` 통과(그리드 두 변형 CSS 방출 확인).
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 모바일 값 노출(현재 md+ only) — 좁은 폭에서 거래대금/거래량을 어떻게 보일지(예: 시총 대체 토글) 디자이너 판단.
+  - 급상승/급하락 값 컬럼 — 거래대금을 enrich(`loadKisPriceMeta`에 tradeAmount 노출)로 실으면 4탭 통일 가능(별도 티켓).
+  - 값 컬럼 정렬/기간별 랭킹(1일~1년).

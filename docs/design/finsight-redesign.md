@@ -283,6 +283,7 @@ spacing:
   header-row-h: 30px
   col-sector: 128px
   col-marketcap: 96px
+  col-value: 104px
 rounded:
   sm: 8px
   md: 12px
