@@ -6497,3 +6497,37 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (옵션) 이평선 색 범례 도크에도 추가 검토.
   - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).
+
+### 2026-07-05 — fix(peek): 도크 차트 로딩 스피너 + 프리패치 커버리지·타이밍 강화 (#273)
+
+- **slug**: `peek-dock-loading` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/273
+- **요약**: fix(peek): 도크 차트 로딩 스피너 + 프리패치 커버리지·타이밍 강화
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자: 넓은 화면 도크 차트가 **간헐적으로 몇 초 걸리는 종목**이 있다. + 로딩 스피너를 넣어달라 + 프리패치 점검.
+  > 
+  > ## 진단 (프리패치 점검 결과)
+  > 프리패치 **키는 정확히 일치**해 동작은 정상: `PeekChart` 의 `useChartData(ticker,"D",90)` → `stock.chart(ticker,"D",280)` = 배경 선반입 키. **문제는 커버리지·타이밍**:
+  > - 배경 프리패치가 **상위 6행만** 데움 → 7행 이하 hover 는 콜드 페치(KIS 일봉 수 초).
+  > - `requestIdleCallback` **timeout 3000ms** → 데이터 많은 홈이 바쁘면 프리패치 시작이 최대 3초 지연 → 조기 hover 콜드.
+  > - 도크는 팝오버와 **별도 청크**인데 청크 워밍은 팝오버만 → 첫 도크가 청크(+PeekChart) 다운로드 대기.
+  > 
+  > ## 변경
+  > 1. **프리패치 커버리지·타이밍** (`useVisibleChartPrefetch`): `MAX_PREFETCH` 6→**14**(랭킹 TOP_N 전부 커버)·`STAGGER` 400→300ms·idle timeout 3000→**1200**·폴백 1200→800. 초당 ~3.3건으로 KIS 한도 안전 유지, 사용자 hover 전에 데움.
+  > 2. **로딩 스피너** (`PeekChart`): Skeleton → 중앙 `Loader2` 스피너(수 초 대기 명시, `aria-busy`+sr-only).
+  > 3. **도크 청크 워밍** (`peekDynamic`+`useStockPeek`): `preloadPeekDockChunk()` 신설, 초광폭(`≥1920`)에서 도크 청크(PeekChart 4패널)도 유휴 워밍 → 첫 도크 청크 대기 제거. 좁은 화면은 팝오버 청크만(무낭비).
+  > 
+  > ## 무회귀·안전
+  > - 레이트리밋: 14행 300ms 스태거 = 3.3/s(KIS EGW00201 안전), 세션 dedupe·pointer:fine 유지.
+  > - 팝오버/시트/모바일·<1920px 무변경. `animate-spin`·`Loader2` 기존 사용(신규 Tailwind 0).
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean. 격리 worktree.
+  > - ⚠️ **QA 빌드 검증 요망**(worktree 심볼릭 node_modules → Turbopack 미실행). 신규 컴포넌트 없음·저위험.
+  > 
+  > ## 다음 작업
+  > - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).
