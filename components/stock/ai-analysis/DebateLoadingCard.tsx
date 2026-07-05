@@ -15,8 +15,9 @@ export function DebateLoadingCard({ side }: { side: "bull" | "bear" }) {
 
   return (
     <div className={cn(
-      "rounded-md px-md py-md",
-      isBull ? "bg-signal-up-soft" : "bg-signal-down-soft",
+      // 노스스타 `.bub`(radius8·border1) 정합 — 로딩 버블도 방향 톤 테두리를 공유.
+      "rounded-sm border px-md py-md",
+      isBull ? "border-signal-up/20 bg-signal-up-soft" : "border-signal-down/20 bg-signal-down-soft",
     )}>
       <p className={cn(
         "text-caption flex items-center gap-sm",

@@ -60,7 +60,9 @@
         "fng-extreme-greed-soft": "#fbe4e8",
         "fng-track": "#eceff3",
         "market-open": "#166534",
-        "market-open-soft": "#dcfce7"
+        "market-open-soft": "#dcfce7",
+        "signal-done": "#12b76a",
+        "signal-done-soft": "#e6f6ee"
       },
       "fontFamily": {
         "display": [

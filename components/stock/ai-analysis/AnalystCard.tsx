@@ -60,9 +60,9 @@ export const AnalystCard = memo(function AnalystCard({
       className="bg-surface rounded-md border border-border-line overflow-hidden flex flex-col min-h-[120px]"
     >
       <div className="flex items-center gap-sm px-md pt-md pb-1 flex-none">
-        {/* 완료 시 점 → 체크 */}
+        {/* 완료 시 점 → 체크(노스스타 done 초록). */}
         {isDone ? (
-          <Check size={13} className="text-accent-vivid flex-none" />
+          <Check size={13} className="text-signal-done flex-none" />
         ) : (
           <div className={cn(
             "w-1.5 h-1.5 rounded-full flex-none",

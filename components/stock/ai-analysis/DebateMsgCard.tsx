@@ -23,8 +23,9 @@ export function DebateMsgCard({ msg, debatingSide, onExpand }: DebateMsgCardProp
 
   return (
     <div className={cn(
-      "rounded-md overflow-hidden",
-      isBull ? "bg-signal-up-soft" : "bg-signal-down-soft",
+      // 노스스타 `.bub`(radius8·border1) + `.bub.bull/.bear`(방향 soft 배경 + 방향 톤 테두리).
+      "overflow-hidden rounded-sm border",
+      isBull ? "border-signal-up/20 bg-signal-up-soft" : "border-signal-down/20 bg-signal-down-soft",
       isStreaming && (isBull ? "ring-1 ring-inset ring-signal-up/40" : "ring-1 ring-inset ring-signal-down/40"),
     )}>
       <div className="flex items-center gap-sm px-md pt-md pb-1">

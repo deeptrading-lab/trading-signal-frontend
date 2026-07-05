@@ -15,8 +15,8 @@ import type { PhaseStatus } from "@/lib/types/stock/aiPhases";
  * 오류(경고)를 그리고 role="img"+aria-label 로 상태를 노출한다. 헤더는 aria-expanded 토글이며,
  * ★ **에러 재개 어포던스**(칩 클릭 → resume 대체)를 오류 행에 재배치한다(누락 시 회귀).
  *
- * 완료 색은 accent-vivid(파랑) — 이 디자인 시스템에 초록 성공 토큰이 없어 기존 완료 컨벤션
- * (AnalystCard 의 accent-vivid 체크)을 승계한다.
+ * 완료 색은 노스스타 done 초록(`signal-done` / `signal-done-soft`) — 노드·연결선·상태 pill 이
+ * 초록 성공 톤을 공유한다(진행=accent 파랑과 시각 대비).
  */
 
 interface PhaseRowProps {
@@ -48,20 +48,20 @@ function PhaseStatusNode({ status, ariaLabel }: { status: PhaseStatus; ariaLabel
       role="img"
       aria-label={ariaLabel}
       className={cn(
-        "relative z-10 flex h-6 w-6 flex-none items-center justify-center rounded-full",
-        status === "pending" && "border-2 border-border-line bg-surface",
-        status === "running" && "bg-accent-vivid",
-        status === "done" && "bg-accent-vivid",
+        // 노스스타 `.node` — 24px 원. 대기(빈 링+점)/진행(accent+soft 링+blink 점)/완료(done-soft+초록 체크)/오류(critical).
+        "relative z-10 flex h-6 w-6 flex-none items-center justify-center rounded-full transition-all",
+        status === "pending" && "border-2 border-text-muted/20 bg-surface",
+        status === "running" && "bg-accent-vivid ring-4 ring-accent-vivid-soft",
+        status === "done" && "bg-signal-done-soft",
         status === "error" && "bg-critical",
       )}
     >
-      {status === "running" && (
-        <>
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-vivid opacity-60" />
-          <span className="relative h-2 w-2 rounded-full bg-surface" />
-        </>
-      )}
-      {status === "done" && <Check size={14} className="text-surface" />}
+      {/* `.node.wait::after` — 대기 6px 점. */}
+      {status === "pending" && <span className="h-1.5 w-1.5 rounded-full bg-text-muted/20" />}
+      {/* `.node.run::after` — 진행 8px 흰 점(blink). soft 링은 ring 유틸이 담당. */}
+      {status === "running" && <span className="h-2 w-2 animate-pulse rounded-full bg-surface" />}
+      {/* `.node.done::after` — 완료 체크(done 초록). */}
+      {status === "done" && <Check size={14} className="text-signal-done" />}
       {status === "error" && <AlertCircle size={14} className="text-surface" />}
     </span>
   );
@@ -86,44 +86,75 @@ export function PhaseRow({
     status === "pending" ? "text-text-muted" : "text-text-strong",
   );
 
+  // 노스스타 `.p-status` — 상태 pill(11px w700). done=done/done-soft · run=accent/accent-soft · wait=muted/surface.
+  const statusPill = (
+    <span
+      className={cn(
+        "flex-none rounded-pill px-2 py-0.5 text-caption font-bold",
+        status === "done" && "bg-signal-done-soft text-signal-done",
+        status === "running" && "bg-accent-vivid-soft text-accent-vivid",
+        status === "pending" && "bg-surface-muted text-text-muted",
+        status === "error" && "bg-critical-soft text-critical",
+      )}
+    >
+      {statusText}
+    </span>
+  );
+
   const headerInner = (
     <>
       <span className={labelClass}>{label}</span>
       {summary && <span className="min-w-0 truncate text-caption text-text-muted">{summary}</span>}
-      <span className="ml-auto flex flex-none items-center gap-sm" aria-hidden="true">
+      {statusPill}
+      <span className="ml-auto flex flex-none items-center gap-2" aria-hidden="true">
         {pips}
         {canExpand && (
-          <ChevronDown
-            size={18}
-            className={cn("text-text-muted transition-transform", isExpanded && "rotate-180")}
-          />
+          // 노스스타 `.chev` — 24px 히트박스(radius6·hover surface) + open 시 180° 회전.
+          <span className="grid h-6 w-6 flex-none place-items-center rounded-sm text-text-muted transition-colors group-hover:bg-surface-muted">
+            <ChevronDown size={18} className={cn("transition-transform", isExpanded && "rotate-180")} />
+          </span>
         )}
       </span>
     </>
   );
 
   return (
-    <div data-phase-active={isActive || undefined} className="flex gap-md">
+    <div
+      data-phase-active={isActive || undefined}
+      className={cn(
+        // 노스스타 `.phase`(gap13) + `.phase.is-wait{opacity:.5}` — 대기 페이즈 전체를 흐리게.
+        "flex gap-lg transition-opacity",
+        status === "pending" && "opacity-50",
+      )}
+    >
       {/* 레일 컬럼 — 노드 + (마지막 아니면) 세로 연결선. */}
       <div className="relative flex w-6 flex-none flex-col items-center">
         <PhaseStatusNode status={status} ariaLabel={COPY.phase.nodeAria(label, statusText)} />
-        {!isLast && <div className="mt-1 w-px flex-1 bg-border-line" />}
+        {/* `.line`(2px) + `.line.done`(done 초록 opacity .35). */}
+        {!isLast && (
+          <div
+            className={cn(
+              "mt-1 w-0.5 flex-1",
+              status === "done" ? "bg-signal-done/35" : "bg-border-line",
+            )}
+          />
+        )}
       </div>
 
-      {/* 콘텐츠 컬럼 */}
-      <div className={cn("min-w-0 flex-1", !isLast && "pb-lg")}>
+      {/* 콘텐츠 컬럼 — `.p-body{padding-bottom:18px}`. */}
+      <div className={cn("min-w-0 flex-1", !isLast && "pb-xl")}>
         {canExpand ? (
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={isExpanded}
             aria-label={isExpanded ? COPY.phase.toggleCollapse(label) : COPY.phase.toggleExpand(label)}
-            className="group flex min-h-6 w-full cursor-pointer items-center gap-sm text-left"
+            className="group flex min-h-6 w-full cursor-pointer items-center gap-2 text-left"
           >
             {headerInner}
           </button>
         ) : (
-          <div className="flex min-h-6 w-full items-center gap-sm">{headerInner}</div>
+          <div className="flex min-h-6 w-full items-center gap-2">{headerInner}</div>
         )}
 
         {/* ★ 오류 재개 어포던스 — 실패 사유 + resume(칩 스트립 제거 대체). */}

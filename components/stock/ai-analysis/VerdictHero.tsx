@@ -62,26 +62,28 @@ interface VerdictHeroProps {
 
 const clampPct = (n: number) => Math.max(0, Math.min(100, n));
 
-/** 축 점수(0~100, 50=중립) → 미니바 색 토큰. SignalSummary 와 동일 규칙(카드리스 컴팩트 버전). */
-function axisTone(score: number): { text: string; fill: string } {
-  if (score > 52) return { text: "text-signal-up", fill: "bg-signal-up" };
-  if (score < 48) return { text: "text-signal-down", fill: "bg-signal-down" };
-  return { text: "text-text-muted", fill: "bg-text-muted" };
-}
-
+/**
+ * 대기 게이지 한 축 — 노스스타 `.sig .axis`. 라벨(muted) + 값(muted bold) + 진행바.
+ * 대기 상태의 결정론 시그널은 '방향'이 아닌 '강도' 프리뷰라 노스스타처럼 바를 accent 그라데이션으로
+ * 통일하고(방향 색 분기 없음), 실제 방향·매수/매도 색은 완료 후 `DoneHero` 가 담당한다.
+ */
 function AxisMini({ axis, score }: { axis: AxisKey; score: number }) {
-  const tone = axisTone(score);
   return (
     <div className="min-w-0">
+      {/* `.a-lab` — 라벨 + 값. */}
       <div className="mb-xs flex items-center justify-between gap-xs">
         <span className="truncate text-caption text-text-muted">{AXIS_LABEL[axis]}</span>
-        <span className={cn("text-caption font-bold tabular-nums", tone.text)}>
+        <span className="text-caption font-bold tabular-nums text-text-muted">
           {score.toFixed(0)}
         </span>
       </div>
+      {/* `.bar`(h5 surface) + `>i`(그라데이션 #9db8e6→accent 근사 = accent-vivid/40→accent-vivid). */}
       <div className="h-1.5 overflow-hidden rounded-pill bg-surface-muted">
         {/* 채움 폭은 점수(0~100) 동적 계산 — 인라인 style 허용 범위(토큰 hex/px 직타 아님). */}
-        <div className={cn("h-full rounded-pill", tone.fill)} style={{ width: `${clampPct(score)}%` }} />
+        <div
+          className="h-full rounded-pill bg-gradient-to-r from-accent-vivid/40 to-accent-vivid"
+          style={{ width: `${clampPct(score)}%` }}
+        />
       </div>
     </div>
   );
