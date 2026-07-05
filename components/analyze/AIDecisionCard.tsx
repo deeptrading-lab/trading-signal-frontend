@@ -10,7 +10,7 @@
  *
  * 행 클릭 → 우측 AI 패널 저장모드(onSelect→openFor, 중앙 팝업 폐지). ★ a11y — 행이 클릭 가능한 div 이므로 케밥 버튼은 자체적으로
  *   `stopPropagation`(AIDecisionCardMenu.toggleMenu)으로 행 클릭과 분리한다(home-reskin 동일 패턴).
- * 색 규칙(강세=빨강/약세=파랑)은 FinalVerdictCard·SentimentBadge 팔레트와 동일(한국 시장 관례).
+ * 색 규칙(강세=빨강/약세=파랑)은 VerdictHero·SentimentBadge 팔레트와 동일(한국 시장 관례).
  */
 
 "use client";
@@ -26,7 +26,7 @@ import {
   VERDICT_LABEL,
   isBullishVerdict,
   isBearishVerdict,
-} from "@/components/stock/ai-analysis/FinalVerdictCard";
+} from "@/components/stock/ai-analysis/verdictLabels";
 import type { FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { AIDecisionCardMenu } from "./AIDecisionCardMenu";

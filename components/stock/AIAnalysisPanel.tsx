@@ -13,6 +13,7 @@ import type { AIAnalysisContextValue } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { useSignalResult } from "@/hooks/stock/useSignalResult";
+import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
 import { AiPulseMark } from "./ai-analysis/AiPulseMark";
@@ -76,6 +77,9 @@ export function AIAnalysisPanel({
   // 안전폴백)이면 오해 방지로 null 처리(히어로가 확신도/대기 문구로 폴백). SignalSummary 와 동일 데이터.
   const { result: signalResult } = useSignalResult(ticker);
   const heroSignal = signalResult && signalResult.warmupOk ? signalResult : null;
+  // 보정된 신뢰도(scorecard-feedback (가)) — 완료 히어로 v-meta 실측 적중률 배지(표시 전용·무회귀).
+  // FinalVerdictCard 분해 후 confidence 축이 히어로로 이동해, 라이브 경로도 여기서 주입한다.
+  const { getCalibration, minSampleN } = useConfidenceCalibration();
 
   const isAllPending = agents.every((a) => a.status === "pending");
   const doneCount = agents.filter((a) => a.status === "done").length;
@@ -469,6 +473,10 @@ export function AIAnalysisPanel({
                             signal={heroSignal}
                             doneCount={doneCount}
                             totalCount={agents.length}
+                            mode="live"
+                            livePrice={stockData?.price ?? null}
+                            calibration={final ? getCalibration(final.confidence) : null}
+                            calibrationMinSampleN={minSampleN}
                           />
                         )}
 

@@ -157,6 +157,16 @@ export const COPY = {
     signalNote: "가격 기반 기술 시그널 · 최종 판정은 분석 완료 후 표시",
     /** 시그널 미산출(데이터 부족·로딩) 시 대기 보조 문구. */
     signalUnavailable: "분석이 끝나면 종합 판정을 여기에 보여드려요",
+    /** 완료 히어로 v-meta 라벨 — 예상 기간. */
+    metaPeriod: "기간",
+    /** 완료 히어로 v-meta 라벨 — 라이브 현재가(live 모드). */
+    metaLivePrice: "현재가",
+    /** 완료 히어로 v-meta 라벨 — 분석 시점가(saved 모드, base_price). */
+    metaBasePrice: "분석 시점가",
+    /** 라이브 완료 히어로 v-meta 힌트 — 근거·전략은 아래 최종 판정 페이즈에서. */
+    detailHint: "근거·전략은 아래 최종 판정에서",
+    /** 저장모드(과거) 히어로 배지 — 이전 분석임을 알리는 미니 태그. */
+    previousTag: "이전 분석",
   },
   /** 동시 분석 상한(최대 3개) 안내. */
   limit: {
