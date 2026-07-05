@@ -9,7 +9,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export interface SelectMenuProps<T extends string | number> {
@@ -22,6 +22,8 @@ export interface SelectMenuProps<T extends string | number> {
   align?: "left" | "right";
   /** 비활성(처리 중 등) — 트리거 비활성 + 펼침 불가. */
   disabled?: boolean;
+  /** 처리 중 — chevron 대신 스피너 + 비활성. */
+  loading?: boolean;
 }
 
 export function SelectMenu<T extends string | number>({
@@ -31,6 +33,7 @@ export function SelectMenu<T extends string | number>({
   ariaLabel = "선택",
   align = "left",
   disabled = false,
+  loading = false,
 }: SelectMenuProps<T>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,20 +57,28 @@ export function SelectMenu<T extends string | number>({
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        disabled={disabled}
+        disabled={disabled || loading}
         className="flex items-center gap-xs px-sm py-[3px] rounded-sm text-caption font-medium bg-surface-muted text-text-strong border border-border-line cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-busy={loading || undefined}
         onClick={() => setOpen((v) => !v)}
       >
         {current.label}
-        <ChevronDown
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 text-text-muted transition-transform duration-200",
-            open && "rotate-180",
-          )}
-          aria-hidden="true"
-        />
+        {loading ? (
+          <Loader2
+            className="h-3.5 w-3.5 shrink-0 animate-spin text-text-muted"
+            aria-hidden="true"
+          />
+        ) : (
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-text-muted transition-transform duration-200",
+              open && "rotate-180",
+            )}
+            aria-hidden="true"
+          />
+        )}
       </button>
 
       {open && (

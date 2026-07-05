@@ -95,11 +95,13 @@ export function useAdminUsers() {
     void query.refetch();
   }, [query]);
 
-  const mutatingSub = roleMutation.isPending
-    ? (roleMutation.variables?.sub ?? null)
-    : statusMutation.isPending
-      ? (statusMutation.variables?.sub ?? null)
-      : null;
+  // 현재 처리 중인 액션(스피너·비활성 판정용) — role/status 중 어느 것이 어느 사용자에게 pending인지.
+  const mutating: { sub: string; kind: "role" | "status" } | null =
+    roleMutation.isPending && roleMutation.variables
+      ? { sub: roleMutation.variables.sub, kind: "role" }
+      : statusMutation.isPending && statusMutation.variables
+        ? { sub: statusMutation.variables.sub, kind: "status" }
+        : null;
 
   return {
     /** 전체 사용자(최신 가입 순). 로딩·에러 시 빈 배열. */
@@ -111,7 +113,7 @@ export function useAdminUsers() {
     changeRole,
     /** 승인/취소(status = approved/pending). 성공/실패 토스트. */
     setStatus,
-    /** 현재 변경 처리 중인 사용자 sub — 없으면 null(행 컨트롤 비활성). */
-    mutatingSub,
+    /** 현재 처리 중인 액션 { sub, kind } — 없으면 null(스피너·비활성 판정). */
+    mutating,
   };
 }
