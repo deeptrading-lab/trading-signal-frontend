@@ -11,10 +11,11 @@
 "use client";
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { getFluctuation } from "@/lib/api/market/fluctuation";
+import { getFluctuation, type FluctuationResult } from "@/lib/api/market/fluctuation";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
+import type { DataSource } from "@/lib/types/market/dataSource";
 import type {
   FluctuationDirection,
   FluctuationResponse,
@@ -24,15 +25,33 @@ export type UseQueryFluctuationOptions = {
   enabled?: boolean;
 };
 
+/**
+ * useQuery 결과에서 `data` 를 화면 데이터로 되돌리고 `dataSource`(표면화된 출처)를 함께 노출한다.
+ * fluctuation 은 never-throw 라 `dataSource`(mock-empty/mock-error/mock-timeout)가 점검 판정의 유일 근거(§6).
+ */
+export type UseQueryFluctuationResult = Omit<
+  UseQueryResult<FluctuationResult, ApiError>,
+  "data"
+> & {
+  data: FluctuationResponse | undefined;
+  /** 표면화된 `X-Data-Source` — 가용성 판정 근거(§3-0). */
+  dataSource: DataSource | undefined;
+};
+
 export function useQueryFluctuation(
   direction: FluctuationDirection = "up",
   options?: UseQueryFluctuationOptions,
-): UseQueryResult<FluctuationResponse, ApiError> {
-  return useQuery({
+): UseQueryFluctuationResult {
+  const query = useQuery<FluctuationResult, ApiError>({
     queryKey: queryKeys.market.fluctuation(direction),
     queryFn: () => getFluctuation(direction),
     enabled: options?.enabled ?? true,
     staleTime: queryConfig.market.fluctuation.staleTime,
     gcTime: queryConfig.market.fluctuation.gcTime,
   });
+  return {
+    ...query,
+    data: query.data?.data,
+    dataSource: query.data?.dataSource,
+  } as UseQueryFluctuationResult;
 }
