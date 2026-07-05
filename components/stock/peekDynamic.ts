@@ -31,3 +31,12 @@ export const StockPeekDock = dynamic(
 export function preloadPeekChunk(): void {
   void import("./StockPeekPopover");
 }
+
+/**
+ * 도크 청크(→ `PeekChart` 4패널 + recharts)를 미리 데운다. 도크는 팝오버와 **별도 청크**라, 초광폭
+ * (도크 모드)에서는 이걸 워밍해야 첫 도크가 청크 다운로드를 안 기다린다. 호출 측이 `≥1920` 게이트로
+ * 넓은 화면에서만 호출(좁은 화면은 도크 미사용이라 4패널 차트 코드를 미리 받지 않음).
+ */
+export function preloadPeekDockChunk(): void {
+  void import("./StockPeekDock");
+}

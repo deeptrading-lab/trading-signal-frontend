@@ -13,13 +13,13 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import { Loader2 } from "lucide-react";
 import { useChartData } from "@/hooks/stock/useChartData";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "@/components/profile/chart/ChartThemeContext";
 import { CandleBar } from "@/components/profile/chart/CandleBar";
 import { CandleTooltip } from "@/components/profile/chart/CandleTooltip";
 import { SubLabel } from "@/components/profile/chart/SubLabel";
-import { Skeleton } from "@/components/ui/Skeleton";
 import {
   fmtYAxis,
   fmtVolAxis,
@@ -69,7 +69,17 @@ export function PeekChart({ ticker, priceHeight }: PeekChartProps) {
 
   const totalHeight = priceHeight + VOL_H + MACD_H + RSI_H + 48;
   if (isLoading) {
-    return <Skeleton className="w-full" style={{ height: totalHeight }} />;
+    // 미캐시 종목은 KIS 일봉 조회에 수 초 걸릴 수 있어(간헐적) 스켈레톤 대신 스피너로 로딩을 명시.
+    return (
+      <div
+        className="flex items-center justify-center text-text-muted"
+        style={{ height: totalHeight }}
+        aria-busy="true"
+      >
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <span className="sr-only">차트를 불러오는 중</span>
+      </div>
+    );
   }
   if (isError || candleSeries.length === 0) {
     return (
