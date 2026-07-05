@@ -120,5 +120,7 @@ export const queryKeys = {
   admin: {
     /** 가입 승인 대기(`pending`) 목록 — Supabase profiles BFF(user-login-auth §3.7). 인자 없는 단일 키. */
     pendingApprovals: ["admin", "pending-approvals"] as const,
+    /** 전체 사용자 목록(superadmin 유저 관리, Phase 2). 인자 없는 단일 키. */
+    allUsers: ["admin", "all-users"] as const,
   },
 } as const;

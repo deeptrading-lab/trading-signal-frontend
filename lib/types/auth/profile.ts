@@ -5,8 +5,11 @@
  * 스토어(`lib/server/auth/profileStore.ts`)가 snake_case 행 → 본 camelCase 타입으로 매핑한다.
  */
 
-/** 역할 — `user`(기본) / `admin`(승인 권한). 세션 payload 의 role 과 동일 union. */
-export type ProfileRole = "user" | "admin";
+/**
+ * 역할 위계(낮은→높은) — `user`(기본) / `admin`(가입 승인 권한) / `superadmin`(유저·등급 관리).
+ * 세션 payload 의 role 과 동일 union. 비교는 `lib/auth/roles.ts` 의 `isAtLeast`.
+ */
+export type ProfileRole = "user" | "admin" | "superadmin";
 
 /** 승인 상태 — `pending`(대기) / `approved`(접근 허용). */
 export type ProfileStatus = "pending" | "approved";

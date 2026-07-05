@@ -14,14 +14,18 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { readSession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
+import { isAtLeast } from "@/lib/auth/roles";
 import { AdminApprovalsPanel } from "@/components/admin/AdminApprovalsPanel";
+import { SuperadminUsersPanel } from "@/components/admin/SuperadminUsersPanel";
 
 export default async function AdminPage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const identity = await readSession(token);
-  if (!identity || identity.role !== "admin") {
+  // admin 이상(admin·superadmin)만 접근. 위조 role 은 readSession HMAC 검증이 차단.
+  if (!isAtLeast(identity?.role, "admin")) {
     notFound();
   }
 
-  return <AdminApprovalsPanel />;
+  // superadmin → 전체 유저 관리(등급 조정), admin → 대기 승인. (route 도 각 등급 자체 방어)
+  return identity?.role === "superadmin" ? <SuperadminUsersPanel /> : <AdminApprovalsPanel />;
 }
