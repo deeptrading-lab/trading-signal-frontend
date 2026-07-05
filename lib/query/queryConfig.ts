@@ -207,6 +207,21 @@ export const queryConfig = {
       staleTime: 60 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * 업종 등락 랭킹("지금 뜨는 산업") — 카테고리 단건 + 상위 N breadth fan-out. 실전 전용 TR 보호 +
+     * fan-out 콜 억제 위해 volumeRank/fluctuation 과 동일 tier(staleTime 60s + 재진입 갱신, 폴링 없음).
+     */
+    sectorRanking: {
+      staleTime: 60 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
+    /**
+     * 업종 구성종목 — 모달 열릴 때만 조회(훅 enabled). 열람 신선도로 충분해 staleTime 30s + 폴링 없음.
+     */
+    sectorConstituents: {
+      staleTime: 30 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   watchlist: {
     /**
