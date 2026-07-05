@@ -288,7 +288,8 @@
         "strength-gauge-h": "10px",
         "header-row-h": "30px",
         "col-sector": "128px",
-        "col-marketcap": "96px"
+        "col-marketcap": "96px",
+        "col-value": "104px"
       },
       "screens": {
         "sm": "640px",

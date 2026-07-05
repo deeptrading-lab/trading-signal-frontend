@@ -43,6 +43,9 @@ export const RANK_COL_SECTOR = "산업";
 export const RANK_COL_PRICE = "현재가";
 export const RANK_COL_CHANGE = "등락률";
 export const RANK_COL_MARKETCAP = "시총";
+/** 값 컬럼 헤더 — 활성 탭의 정렬 기준 값(거래량 탭=거래량 / 거래대금 탭=거래대금). md+ 노출. */
+export const RANK_COL_VOLUME = "거래량";
+export const RANK_COL_TURNOVER = "거래대금";
 
 /* 위험종목 숨기기 토글 — 기본 off(opt-in). severity critical+warn 필터. */
 export const RANK_RISK_HIDE_LABEL = "위험종목 숨기기";

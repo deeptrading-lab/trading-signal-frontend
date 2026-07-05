@@ -54,7 +54,8 @@ import {
 } from "@/lib/market/rankingView";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
-import { formatMarketCap } from "@/lib/utils/formatMarketCap";
+import { formatMarketCap, formatWonCompact } from "@/lib/utils/formatMarketCap";
+import { formatShareVolume } from "@/lib/utils/formatShareVolume";
 import { formatPct } from "@/lib/utils/formatPct";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import { rankLogoDotClass, rankLogoInitial } from "@/lib/utils/rankLogoDot";
@@ -81,18 +82,31 @@ import {
   RANK_COL_PRICE,
   RANK_COL_CHANGE,
   RANK_COL_MARKETCAP,
+  RANK_COL_VOLUME,
+  RANK_COL_TURNOVER,
   RANK_RISK_HIDE_LABEL,
   RANK_RISK_ALL_HIDDEN,
 } from "@/lib/copy/home/marketOverview";
 
 /**
- * 헤더-바디 공유 grid 트랙 — 컬럼 폭 토큰(col-sector·col-marketcap)으로 정합 고정(hex/px 직타 없음).
- *   - 모바일(< md): ♥·순위·종목·현재가·등락률(5트랙). 산업·시총 셀은 `hidden md:*` → 트랙 미점유.
- *   - md+: 종목 뒤 산업, 등락률 뒤 시총 add(7트랙).
+ * 헤더-바디 공유 grid 트랙 — 컬럼 폭 토큰(col-sector·col-value·col-marketcap)으로 정합 고정(hex/px 직타 없음).
+ *   - 모바일(< md): ♥·순위·종목·현재가·등락률(5트랙). 산업·값·시총 셀은 `hidden md:*` → 트랙 미점유.
+ *   - md+: 종목 뒤 산업, 등락률 뒤 [값(탭별)]·시총 add.
  * 순위 셀 폭(1.25rem)·등락률 폭(4rem)·현재가 폭(5.5rem)은 구조 rem(토큰 대상 아님, 기존 관례).
+ *
+ * ★ 두 변형을 **완전한 리터럴**로 둔다 — Tailwind JIT 는 소스에서 통짜 클래스 문자열만 생성하므로
+ *   런타임 조합(`grid-cols-[${x}]`)은 CSS 미방출로 깨진다. `hasValue` 로 리터럴을 고른다(동적 조합 금지).
  */
-const RANK_GRID =
+const RANK_GRID_BASE =
   "grid items-center gap-md grid-cols-[1.5rem_1.25rem_1fr_5.5rem_4rem] md:grid-cols-[1.5rem_1.25rem_1fr_theme(spacing.col-sector)_5.5rem_4rem_theme(spacing.col-marketcap)]";
+/** 값 컬럼(거래량/거래대금 탭)이 있는 md+ 변형 — 등락률과 시총 사이 col-value 트랙 삽입. */
+const RANK_GRID_WITH_VALUE =
+  "grid items-center gap-md grid-cols-[1.5rem_1.25rem_1fr_5.5rem_4rem] md:grid-cols-[1.5rem_1.25rem_1fr_theme(spacing.col-sector)_5.5rem_4rem_theme(spacing.col-value)_theme(spacing.col-marketcap)]";
+
+/** 활성 탭에 값 컬럼이 있으면 그 트랙 포함 grid, 아니면 기본 grid. */
+function rankGridClass(hasValue: boolean): string {
+  return hasValue ? RANK_GRID_WITH_VALUE : RANK_GRID_BASE;
+}
 
 /** 컬럼 헤더 라벨 톤 — 토스톤 muted 캡션(col-header 12px/600). */
 const COL_HEADER = "truncate text-caption font-semibold text-text-muted";
@@ -141,7 +155,32 @@ type RankableRow = {
   direction: FlowDirection;
   sector?: string;
   marketCap?: number | null;
+  /** 누적 거래량(주) — 거래량/거래대금 탭(`VolumeRankRow`)만 보유. 급상승/급하락은 미보유. */
+  volume?: number;
+  /** 누적 거래대금(원) — 거래량/거래대금 탭만 보유(응답에 있으면 매핑). */
+  tradingValue?: number | null;
 };
+
+/**
+ * 활성 탭의 "값" 컬럼 정의 — 탭이 정렬 기준으로 삼는 값을 md+ 에 노출.
+ *   - 거래량 탭   → 거래량(주)
+ *   - 거래대금 탭 → 거래대금(원)
+ *   - 급상승/급하락 → null(정렬 기준인 등락률이 이미 본체 컬럼 → 값 컬럼 없음)
+ */
+type ValueColumn = { label: string; format: (row: RankableRow) => string };
+
+function valueColumnForTab(tab: RankTab | undefined): ValueColumn | null {
+  if (tab === "volume") {
+    return { label: RANK_COL_VOLUME, format: (r) => formatShareVolume(r.volume) };
+  }
+  if (tab === "turnover") {
+    return {
+      label: RANK_COL_TURNOVER,
+      format: (r) => formatWonCompact(r.tradingValue),
+    };
+  }
+  return null;
+}
 
 /** 등락 방향 → 등락률 색 토큰(합성 클래스라 cn 사이즈 override 시에도 색 유지). */
 function changeClass(direction: FlowDirection): string {
@@ -262,6 +301,7 @@ export function RealtimeRankingSection() {
         view={view}
         activeQuery={effectiveTab ? queryByTab[effectiveTab] : null}
         activeTab={effectiveTab}
+        valueColumn={valueColumnForTab(effectiveTab)}
         isAdmin={isAdmin}
         onRetry={retryAll}
         hasTicker={hasTicker}
@@ -279,6 +319,7 @@ function RankingContent({
   view,
   activeQuery,
   activeTab,
+  valueColumn,
   isAdmin,
   onRetry,
   hasTicker,
@@ -292,6 +333,7 @@ function RankingContent({
     | { data?: { rows: RankableRow[] } | undefined; isLoading: boolean }
     | null;
   activeTab: RankTab | undefined;
+  valueColumn: ValueColumn | null;
   isAdmin: boolean;
   onRetry: () => void;
   hasTicker: (ticker: string) => boolean;
@@ -323,7 +365,7 @@ function RankingContent({
 
   return (
     <>
-      <RankHeaderRow />
+      <RankHeaderRow valueColumn={valueColumn} />
       {visibleRows.length === 0 ? (
         // 전량 위험군 필터 → 빈 상태(헤더·토글 유지, off 로 복원). 원래 순번을 위해 rows index 사용.
         <p className="py-lg text-center text-body-sm text-text-muted">
@@ -336,6 +378,7 @@ function RankingContent({
               key={row.ticker}
               row={row}
               rank={rows.indexOf(row) + 1}
+              valueColumn={valueColumn}
               warnings={warningsByTicker[row.ticker]}
               badgeMax={isMobile ? 1 : 2}
               favorited={hasTicker(row.ticker)}
@@ -356,13 +399,13 @@ function RankingContent({
   );
 }
 
-/** 헤더 컬럼 행 — 바디 행과 동일 grid 트랙 공유(정렬 강제). 산업·시총 라벨은 md+ 에서만. */
-function RankHeaderRow() {
+/** 헤더 컬럼 행 — 바디 행과 동일 grid 트랙 공유(정렬 강제). 산업·값·시총 라벨은 md+ 에서만. */
+function RankHeaderRow({ valueColumn }: { valueColumn: ValueColumn | null }) {
   return (
     <div
       className={cn(
         "-mx-sm border-b border-border-line px-sm h-header-row-h",
-        RANK_GRID,
+        rankGridClass(valueColumn !== null),
       )}
     >
       {/* ♥ + 순위 트랙 묶어 라벨(♥ 트랙은 라벨 없음). */}
@@ -373,6 +416,12 @@ function RankHeaderRow() {
       <span className={cn(COL_HEADER, "hidden md:block")}>{RANK_COL_SECTOR}</span>
       <span className={cn(COL_HEADER, "text-right")}>{RANK_COL_PRICE}</span>
       <span className={cn(COL_HEADER, "text-right")}>{RANK_COL_CHANGE}</span>
+      {/* 값(거래량/거래대금) — 값 컬럼 있는 탭만, md+. 트랙 순서상 등락률과 시총 사이. */}
+      {valueColumn && (
+        <span className={cn(COL_HEADER, "hidden text-right md:block")}>
+          {valueColumn.label}
+        </span>
+      )}
       <span className={cn(COL_HEADER, "hidden text-right md:block")}>
         {RANK_COL_MARKETCAP}
       </span>
@@ -457,6 +506,7 @@ function RankTabs({
 function RankRow({
   row,
   rank,
+  valueColumn,
   warnings,
   badgeMax,
   favorited,
@@ -464,6 +514,7 @@ function RankRow({
 }: {
   row: RankableRow;
   rank: number;
+  valueColumn: ValueColumn | null;
   warnings: StockWarningItem[] | undefined;
   /** 배지 상한 — md=2 / 모바일=1(최상위 심각도). */
   badgeMax: number;
@@ -500,7 +551,7 @@ function RankRow({
       aria-label={`${row.name} 상세 보기`}
       className={cn(
         "-mx-sm cursor-pointer rounded-sm px-sm transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none",
-        RANK_GRID,
+        rankGridClass(valueColumn !== null),
       )}
       onClick={go}
       onKeyDown={(e) => {
@@ -570,6 +621,13 @@ function RankRow({
       >
         {formatPct(row.changePercent, { sign: true })}
       </span>
+
+      {/* 값(거래량/거래대금) — 값 컬럼 있는 탭만, md 이상. 미보유 값은 "-"(포맷터 fail-soft). */}
+      {valueColumn && (
+        <span className="hidden text-right text-body-sm tabular-nums text-text-muted md:block">
+          {valueColumn.format(row)}
+        </span>
+      )}
 
       {/* 시가총액 — md 이상. enrich 실패/미설정은 "-". */}
       <span className="hidden text-right text-body-sm-strong tabular-nums text-text-muted md:block">
