@@ -8,6 +8,8 @@ export function useMutationRunPaperTradingTick(sessionId: string) {
   return useMutation({
     mutationFn: (payload: RunPaperTradingTickRequest = {}) =>
       runPaperTradingTick(sessionId, payload),
+    // 실패는 usePaperTradingSession 의 .catch 토스트로 처리 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
     onSuccess: async (data) => {
       queryClient.setQueryData(queryKeys.paperTrading.session(sessionId), data);
       await queryClient.invalidateQueries({ queryKey: queryKeys.paperTrading.sessions });

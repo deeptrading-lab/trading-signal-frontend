@@ -9,6 +9,7 @@
 
 import { useState, type ReactNode } from "react";
 import {
+  MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
@@ -17,6 +18,8 @@ import {
 import { useStockMetaStore } from "@/lib/store/stockMetaStore";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toast/ToastProvider";
+import { toast } from "@/components/ui/toast/toastEmitter";
+import { GENERIC_MUTATION_ERROR } from "@/lib/copy/common/toast";
 import type { StockPrice, WatchlistQuote } from "@/lib/api/kis/types";
 
 /**
@@ -46,6 +49,14 @@ export function Providers({ children }: { children: ReactNode }) {
     () =>
       new QueryClient({
         queryCache: new QueryCache({ onSuccess: routeQuoteToStore }),
+        // 전역 mutation 실패 안전망 — 어떤 mutation 이든 에러 시 총칭 토스트 1회.
+        // 자체 에러 피드백(인라인/배너/전용 토스트)을 가진 훅은 `meta.skipGlobalErrorToast` 로 opt-out(중복 방지).
+        mutationCache: new MutationCache({
+          onError: (_error, _variables, _context, mutation) => {
+            if (mutation.meta?.skipGlobalErrorToast === true) return;
+            toast.error(GENERIC_MUTATION_ERROR);
+          },
+        }),
         defaultOptions: {
           queries: {
             staleTime: 30_000,

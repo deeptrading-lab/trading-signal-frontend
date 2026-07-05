@@ -11,6 +11,7 @@
 import {
   createContext,
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -18,6 +19,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { setToastListener } from "./toastEmitter";
 
 export type ToastVariant = "error" | "success" | "info";
 
@@ -79,6 +81,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     },
     [dismiss],
   );
+
+  // 훅 밖(QueryClient `mutationCache.onError` 등)에서 부른 imperative `toast.*` 를 이 provider 의
+  // `show` 로 라우팅 — 동일 UI 로 표시. 언마운트 시 해제(유령 리스너·중복 등록 방지).
+  useEffect(() => {
+    setToastListener(show);
+    return () => setToastListener(null);
+  }, [show]);
 
   return (
     <ToastContext.Provider value={{ show }}>
