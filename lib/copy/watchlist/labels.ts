@@ -54,3 +54,7 @@ export const WATCHLIST_SEARCH_HINT =
 /** 검색 결과 별 버튼 aria — 추가/제거 토글. */
 export const WATCHLIST_STAR_ADD = "관심종목에 추가";
 export const WATCHLIST_STAR_REMOVE = "관심종목에서 제거";
+
+/** 상한(soft cap) 초과로 추가가 막힐 때의 토스트. 상한값은 훅의 MAX_TICKERS 를 보간. */
+export const WATCHLIST_LIMIT_MSG = (max: number) =>
+  `관심종목은 최대 ${max}개까지 담을 수 있어요.`;

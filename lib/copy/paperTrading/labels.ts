@@ -20,6 +20,13 @@ export const PAPER_TRADING_RUNNING_TICK = "재판단 중";
 export const PAPER_TRADING_PAUSE = "일시정지";
 export const PAPER_TRADING_RESUME = "재개";
 export const PAPER_TRADING_COMPLETE = "완료 처리";
+
+/** 세션 상태 변경(일시정지·재개·완료) 실패 토스트 — 성공은 배지로 보이므로 실패만 알림. */
+export const PAPER_STATUS_CHANGE_ERROR =
+  "세션 상태를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.";
+/** 수동 재판단(tick) 실패 토스트. */
+export const PAPER_TICK_ERROR =
+  "재판단을 실행하지 못했어요. 잠시 후 다시 시도해 주세요.";
 export const PAPER_TRADING_MOCK_NOTICE =
   "AI 모의투자는 로컬 Codex 또는 Claude CLI가 있을 때만 진행돼요. CLI가 없으면 세션 생성과 재판단을 실행하지 않습니다.";
 export const PAPER_TRADING_LIVE_PRICE_NOTICE =
