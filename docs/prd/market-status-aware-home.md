@@ -1,142 +1,178 @@
-# PRD — market-status-aware-home (시장상태 인지형 마켓 홈: 장 마감 우아한 대체 + 폴링 게이팅 통합)
+# PRD — market-status-aware-home (가용성 인지형 마켓 홈: KIS 점검/실패 우아한 대체 + 관리자 재시도)
 
 - 슬러그: `market-status-aware-home`
-- 상태: 기획 (impl 전)
-- 작성: 2026-07-05 (PM 역할)
-- 브랜치: `feature/market-status-aware-home`
+- 상태: 기획 개정 (impl 재작업 중 — #247 전제 오류 정정)
+- 작성: 2026-07-05 (PM) · **개정: 2026-07-05 (근본 원인 재진단 반영)**
+- 브랜치: `feature/market-status-aware-home` (#247 진행 중 — 코드는 재작업, 본 PRD 는 방향 정정)
 - 시리즈: 토스 Open API 배선의 **소비처(consumer) PR**. ②(`toss-market-calendar`, `useMarketStatus` 원천)·①(`toss-orderbook`)·③(`toss-trades`) 머지 완료 후속.
 - 관련:
-  - `docs/prd/toss-market-calendar.md` — ②. 본 PRD 가 소비하는 `useMarketStatus`·`MarketStatus`·`isRegularOpen`(fail-open)·`MarketStatusBadge`·`marketClock` 의 원천. 형식·톤·"fail-soft·fail-open·add-only" 규율을 그대로 답습.
-  - `docs/prd/toss-orderbook.md` / `docs/prd/toss-trades.md` — ①/③. 호가·체결 폴링 게이트(`isKstMarketHoursWithCloseGrace()` 휴리스틱)를 심었고 "캘린더 통합은 후속 일괄" 로 남겨둔 §4 Out 항목을 본 PRD 가 **회수(§3-3)**.
+  - `app/api/market/volume-rank/route.ts`·`app/api/market/fluctuation/route.ts`·`app/api/flow/top10/route.ts` — 가용성 판정의 근거(X-Data-Source·HTTP 상태). §6 에 실동작 명세.
+  - `lib/auth/session.ts` — `readSession`(HMAC 검증 후 role). 관리자 재시도 게이트의 서버측 진실. `lib/types/auth/profile.ts`(`ProfileRole`).
+  - `docs/prd/toss-market-calendar.md` — ②. `useMarketStatus`·`isRegularOpen`(fail-open)·`marketClock` 의 원천. **본 PRD 에서 실시간 순위/순매수 섹션은 더 이상 이걸로 게이팅하지 않는다**(§1 방향 전환). 폴링(호가·체결)만 소비.
+  - `docs/prd/toss-orderbook.md` / `docs/prd/toss-trades.md` — ①/③. 호가·체결 폴링 게이트.
   - `docs/rules/frontend.md` — FE 컨벤션 8개 절(도메인 훅만 소비·`cn`·카피 단일 위치·queryKey 단일·반응형).
-- **UI 포함: yes** (장 마감 공용 상태 UI — 신규 컴포넌트 vs empty-state 확장은 §9 q4 로 UX/UI 디자이너 결정. 합류 트리거)
+- **UI 포함: yes** ("점검 중" 안내 UI + 탭 숨김/노출 · 관리자 전용 재시도 버튼. UX/UI 디자이너 합류 트리거 — §9 q6)
 
-## 1. 배경 / 문제
+---
 
-마켓 홈(`app/(main)/market/page.tsx` → `components/home/MarketOverviewPage.tsx`)을 **장 마감·주말·공휴일**에 열면 두 섹션이 빨간/회색 에러 카드로 깨진다(실제 스크린샷 근거):
+## 1. 배경 / 문제 (방향 전환 — 근본 원인 재진단)
 
-- **실시간 순위**(`components/home/RealtimeRankingSection.tsx` — 탭: 거래량/거래대금/급상승/급하락) → "실시간 순위를 불러오지 못했어요"(`RANK_ERROR`) + "다시 시도" 에러 블록.
-- **외국인·기관 순매수 Top10**(`components/flow/InvestorFlowTop10Card.tsx` — 토글: 당일/7일 누적) → "수급 정보를 불러오지 못했어요"(`FLOW_TOP10_ERROR`) 빨간 `card-critical` 카드.
+기존 PRD(초판, 2026-07-05 오전)는 마켓 홈 "실시간 순위"·"순매수 당일"의 에러 카드 원인을 **장 마감**으로 진단하고, `useMarketStatus().isRegularOpen`(정규장 여부)으로 **KIS 호출을 하드 게이팅**해 마감이면 조회 자체를 막는 설계였다. **이 전제가 틀렸다.**
 
-원인은 명확하다. 둘 다 **KIS 실시간 랭킹 TR** 을 원천으로 한다:
-- 실시간 순위 = `app/api/market/volume-rank/route.ts`(FHPST01710000)·`app/api/market/fluctuation/route.ts`.
-- 순매수 당일 = `app/api/flow/top10/route.ts`(KIS 주체별 순매수 TR).
+**사용자 실측(2026-07-05):**
+- 에러 카드는 **장 마감이 아니라 KIS 야간점검**(~21:50~23시대, 전 TR 500) 때문이었다.
+- 점검이 끝나면 KIS 는 **장중이 아니어도(주말 포함) 랭킹을 정상 제공**한다 — 일요일 12:41 에 거래량/거래대금/급상승/급하락 랭킹이 정상 표시됨을 확인.
 
-이 TR 들은 **장 마감 후 라이브 데이터가 없어** 빈 응답/실패로 떨어진다. 반면 상단 지수 스트립은 종가 스냅샷이라 정상이고, 순매수 **"7일 누적"** 탭은 KV 스냅샷(`readCumulativeSnapshots`) 기반 과거 데이터라 마감에도 정상이다. 즉 **"장이 열렸을 때만 라이브 섹션을 조회"** 하면 에러 카드 자체가 사라진다 — 사용자가 정확히 지적한 지점이다: "장 시작·마감 시간을 아는데 그때만 실시간 데이터를 보여주면 되잖아."
+**따라서 "정규장일 때만 표시" 하드 게이팅은 역효과다.** 멀쩡히 나오는 주말·장외 랭킹을 숨긴다. 올바른 축은 **"장이 열렸나"가 아니라 "데이터를 실제로 받을 수 있나(가용성)"** 다.
 
-방금 머지된 ②(`toss-market-calendar`)가 이걸 정확히 가능케 한다. `useMarketStatus().isRegularOpen`(공휴일 인지, fail-open)으로 **KIS 호출 자체를 게이트**하고, 마감이면 에러 대신 "장 마감 · 다음 개장 안내" 로 우아하게 대체한다. 동시에 ①/③이 후속으로 남겨둔 호가·체결 폴링 게이트의 휴리스틱(`isKstMarketHoursWithCloseGrace()`, 공휴일 미인지)을 같은 `isRegularOpen` 로 얇게 스왑해 **공휴일 인지 게이팅을 한 소비처 PR 로 수렴**한다.
+새 원칙:
+- **가용성 기반 렌더** — 각 실시간 섹션/탭을 "데이터를 받을 수 있으면 표시, 못 받으면 숨김/점검 안내"로 전환. 시장 시각(`isRegularOpen`)에 의존하지 않는다.
+- 판정 근거는 라우트가 이미 내려주는 **`X-Data-Source` 헤더 + HTTP 상태**(§6). 라우트는 실패 시 200+mock 으로 graceful degrade 하거나 502 를 준다 — 이 소스 값으로 "실 KIS 데이터(available)" vs "KIS 시도 후 실패(unavailable)"를 구분한다.
+- **dev 함정 방지**: 로컬(KIS 미설정)은 이중 게이트 미통과로 **항상 `mock`(200)** 이다. 이건 "점검 중"이 아니라 개발 편의 mock 이므로 **정상 표시**해야 한다. `mock`(미설정) 과 `mock-timeout`/`mock-error`/`mock-empty`/502(KIS 시도 후 실패)를 구분하는 것이 설계의 핵심(§6, q1).
+
+`useMarketStatus`(②)·KST 폴백·호가/체결 폴링 최적화 스왑은 **유지**하되, 이제 실시간 순위·순매수 섹션은 여기에 의존하지 않는다. `isRegularOpen` 은 **호가·체결 폴링(§3-4)** 에서만 쓰인다.
 
 ## 2. 목표 (측정 가능)
 
-1. 장 마감/주말/공휴일(`!isRegularOpen`)에 마켓 홈을 열면 실시간 순위·순매수(당일) 섹션이 **빨간/회색 에러 카드 0** 으로, "장 마감 · 다음 개장 안내" 우아한 상태로 렌더된다.
-2. 마감 상태에서 실시간 순위·순매수(당일)는 **KIS 랭킹 TR 을 호출하지 않는다**(네트워크 탭·유닛으로 검증) — 조회 게이트가 `isRegularOpen=false` 에서 `enabled` 를 끈다.
-3. 순매수 **"7일 누적"** 탭은 마감에도 **정상 표시**(게이팅 안 함) — 과거 KV 스냅샷 데이터라 장 상태와 무관.
-4. `useMarketStatus().isRegularOpen`(캘린더 기반, 공휴일 인지, fail-open)이 실시간 순위·순매수 게이트를 구동하고, **호가·체결 폴링 게이트가 휴리스틱에서 이 값으로 스왑**된다(§3-3).
-5. **fail-open 무회귀**: 캘린더 실패/키 없음(`phase="unknown"` → `isRegularOpen=true`)에서 기존 동작(장중 취급, 조회·폴링 정상)을 그대로 유지 — 캘린더 백드 상태가 "장중 오정지" 새 실패모드를 만들지 않는다.
-6. 정규장 개장 중(`isRegularOpen=true`) 마켓 홈 동작 **무회귀**: 실시간 순위 4탭·순매수 당일/누적 모두 기존과 동일하게 조회·표시.
+1. **가용성 기반 탭 렌더** — 실시간 순위 4탭(거래량·거래대금·급상승·급하락) 중 **실 데이터를 받은 탭(available)만 노출**, 못 받은 탭(unavailable)은 **탭 버튼 자체를 숨긴다**. (장 시각 무관.)
+2. **전탭 실패 시 점검 안내** — 4탭 모두 unavailable 이면 리스트 대신 **"현재 점검 중이에요" 안내**. 일반 사용자에겐 **재시도 버튼 비노출**.
+3. **관리자 전용 재시도** — 세션 role 이 `admin` 인 경우에만 점검 안내에 "다시 시도" 노출(에러/점검 구분·수동 복구용). 위조 불가(서버 HMAC 검증).
+4. **dev mock 정상 표시** — 로컬(KIS 미설정, `X-Data-Source: mock`)에서는 4탭 모두 mock 데이터를 **정상 표시**(영구 "점검중" 회귀 없음).
+5. **순매수 당일 일관 적용** — 순매수 "당일"도 시각 게이팅 폐기. 데이터 받아지면(장외여도) 표시, 못 받으면 실시간 순위와 동일 원칙(점검 안내·관리자만 재시도). **"7일 누적"(KV 스냅샷)은 항상 정상**(무변경).
+6. **주말·장외 정상 랭킹 노출(회귀 정정)** — KIS 가 랭킹을 주는 주말/장외 시각에 랭킹이 **에러/숨김 없이 표시**된다(기존 하드 게이팅이 숨기던 것을 회복).
+7. **prod 점검 시각 에러 카드 0** — KIS 야간점검 중 홈 진입 시 빨간/회색 에러 카드 대신 "점검 중" 안내로 우아하게 대체.
 
 ## 3. 범위 (In scope)
 
-### 3-1. 실시간 순위 섹션 마감 게이팅 — `components/home/RealtimeRankingSection.tsx`
+### 3-0. 데이터 소스 표면화 (인프라 — 판정의 전제)
 
-- `useMarketStatus()` 소비(도메인 훅 — `docs/rules/frontend.md` §1: `useQuery` 직접 import 금지, 이미 준수 중). `isRegularOpen` 을 4개 랭킹 훅의 `enabled` 에 **AND 로 곱한다**:
-  - 예: `useQueryVolumeRank("volume", { enabled: tab === "volume" && isRegularOpen })`. 급상승/급하락/거래대금 동일.
-  - 결과: `!isRegularOpen` 이면 어떤 탭도 KIS TR 을 호출하지 않는다(마운트/탭전환 무발). `isRegularOpen` 이 `true`(정규장) 또는 `unknown→true`(fail-open)면 기존과 동일.
-- 마감 시 리스트/로딩/에러 분기 **앞에** "장 마감" 상태 분기를 추가한다: `!isRegularOpen && !isLoading` 이면 리스트/스켈레톤/에러 대신 **공용 마감 안내 UI**(§3-4)를 렌더. 기존 `RANK_ERROR` 에러 블록은 마감 경로에서 도달 불가(호출 자체를 안 하므로 `isError` 안 뜸).
-- **탭 UI 자체는 유지**(마감이어도 탭바 노출). 마감 상태 안내는 리스트 영역만 대체.
-- `failedTabs` 로직·자동 전환 금지·관심종목 단일 소유 등 기존 구조 **무변경**.
-- **q1 결정 반영 지점**: 마감 시 (a) 단순 안내만 vs (b) 직전 세션 스냅샷 표시. **본 PRD 는 (a) 단순 안내로 구현**(§9 q1 권고). 스냅샷은 데이터 가용성 불확실(volume-rank·fluctuation 은 라이브 TR, 종가 랭킹 스냅샷 소스 없음) → 후속.
+- 현재 클라 어댑터(`lib/api/market/volumeRank.ts`·`fluctuation.ts`·`lib/api/flow/top10.ts`)는 `response.data` 만 반환하고 **`X-Data-Source` 헤더를 버린다**. 가용성 판정을 위해 **헤더를 표면화**한다.
+  - 어댑터 반환을 소스 포함 형태로(예: `{ data, source }` envelope, 또는 훅이 `response.headers["x-data-source"]` 를 읽어 `dataSource` 로 노출). 형태는 구현 재량, **AC 는 훅이 `dataSource` 를 노출한다는 결과만 고정**.
+  - `lib/types/` 에 소스 union 타입 신설(예: `"kis" | "mock" | "mock-timeout" | "mock-empty" | "mock-error" | "kv"`). 라우트가 내리는 값과 정합(§6 표 근거).
+- **라우트 핸들러(`app/api/market/**`·`app/api/flow/top10`)는 무변경**(mock 폴백·시그니처·소스 헤더 값 보존). 소스 값이 이미 충분히 세분(§6, q1 결론) → **본 PR 은 라우트를 건드리지 않는다**. (선택적 일관성 정리는 q1 참조, 비필수.)
 
-### 3-2. 순매수 Top10 마감 게이팅(당일만) — `components/flow/InvestorFlowTop10Card.tsx`
+### 3-1. 실시간 순위 섹션 가용성 전환 — `components/home/RealtimeRankingSection.tsx`
 
-- **뉘앙스(핵심)**: "당일"(`mode==="today"`)만 KIS 라이브 TR → 마감 시 게이팅. "7일 누적"(`mode==="cumulative"`)은 KV 스냅샷 과거 데이터 → **게이팅 안 함, 마감에도 정상**.
-- `useMarketStatus()` 소비. `useQueryFlowTop10(mode, { enabled })` 의 `enabled` 를 모드 조건부로:
-  - `today` → `isRegularOpen`(마감이면 false → KIS 무호출).
-  - `cumulative` → `true`(항상, 장 상태 무관).
-- 마감 + `today` 탭이면 로딩/에러/empty 분기 앞에 "장 마감" 안내(§3-4). 기존 `FLOW_TOP10_ERROR` 빨간 `card-critical` 카드는 마감 당일 경로에서 도달 불가.
-- **q2 결정 반영 지점** — 마감 시 당일 탭 처리 3안((a) 안내 / (b) 직전거래일 폴백 / (c) 7일누적 자동전환) 중 **PM 권고 = (a) 안내 + 소프트 넛지**:
-  - 기본: 마감 시 당일 탭은 "장 마감 · 실시간 순매수는 장중에 제공 · 다음 개장 M/D(요일) HH:mm" 안내. KIS 무호출. (실시간 순위와 톤·컴포넌트 공유 — §3-4.)
-  - 소프트 넛지(권장, UX 확인): **마운트 시 `!isRegularOpen` 이면 토글 초기값을 `cumulative` 로** 설정 → 사용자가 데이터가 있는 누적 탭에 착지. **자동 강제 전환 아님**(초기 state 만; 사용자가 당일 탭 클릭 시 위 안내 노출). 세션 중 사용자가 고른 모드를 마감이 됐다고 임의로 바꾸지 않는다.
-  - (b) 폴백 기각: 직전거래일 순매수 데이터 소스가 현재 없음(당일 TR 은 asof=오늘만). BE 신규 필요 → 후속.
-  - (c) 강제 자동전환 기각: 사용자가 명시 선택한 모드를 마감이 되었다고 몰래 바꾸면 놀람. 지표 성격도 다름(당일 vs 7일 누적).
-- 관심 사항: `cumulativeCollecting`·`buildHeaderMeta`·모바일 Top5 절단 등 기존 구조 **무변경**.
+- **`useMarketStatus`/`isRegularOpen` 게이팅 제거.** `!isRegularOpen ? <MarketClosedNotice/>` 분기와 `enabled: … && isRegularOpen` 곱을 **모두 걷어낸다**.
+- **4탭 모두 프로브** — 가용성을 알려면 활성 탭만이 아니라 **4탭 전부 조회**해야 한다(현재는 활성 탭만 `enabled`). 4개 훅을 `enabled` 로 켠다. 레이트리밋 전략은 §8·q2(순차/딜레이 or staleTime 캐시).
+- **탭별 가용성 판정**(§6 규칙): 각 탭 결과에서
+  - `available` = `isError=false` **AND** `dataSource ∈ {kis, mock}`.
+  - `unavailable` = `isError=true`(502 등) **OR** `dataSource ∈ {mock-timeout, mock-empty, mock-error}`.
+- **탭 노출/숨김** — `RANK_TABS` 를 available 탭만으로 필터해 탭바 렌더. unavailable 탭 버튼은 **숨긴다**(기존 `failedTabs` opacity 흐림 로직을 대체). 활성 탭 기본값 = **첫 available 탭**(현재 활성 탭이 unavailable 로 바뀌면 첫 available 로 이동).
+- **전탭 unavailable** → 리스트/탭바 대신 **"점검 중" 안내**(§3-3). 일반 사용자 재시도 버튼 비노출, 관리자만 노출.
+- **로딩/부분 가용** — 프로브 진행 중(4탭 중 일부 `isLoading`)에는 스켈레톤. 일부만 available 이면 available 탭만 노출(점검 안내는 전탭 실패에서만).
+- 기존 유지: `useWatchlistTickers` 단일 소유·행 렌더·`useStockPeek`·산업 컬럼 graceful omit·자동 탭 전환 금지(사용자 클릭 존중, 단 초기 활성 탭 선택은 available 기준).
 
-### 3-3. 폴링 게이팅 통합 — 호가·체결 훅 얇은 스왑 (①/③ 후속 회수)
+### 3-2. 순매수 Top10 가용성 전환(당일만) — `components/flow/InvestorFlowTop10Card.tsx`
 
-- **대상 2곳만**(①/③ 산출물): `hooks/stock/useQueryStockOrderbook.ts`·`hooks/stock/useQueryStockTrades.ts` 의 `refetchInterval` 게이트.
-  - 현재: `refetchIntervalMs != null && isKstMarketHoursWithCloseGrace()`(휴리스틱, 공휴일 미인지).
-  - 스왑: `useMarketStatus().isRegularOpen` 기반으로. 훅은 `useQuery` 만 쓰므로 `isRegularOpen` 을 **인자로 주입**하거나 훅 내부에서 `useMarketStatus()` 를 호출(도메인 훅 소비 — 규칙 준수). 구현 형태(주입 vs 내부 호출)는 구현자 재량, AC 는 결과(공휴일에 폴링 정지·fail-open)만 고정.
-- **패널 "closed" 라벨 정합**: `components/stock/OrderbookPanel.tsx`·`components/stock/TradeStrengthPanel.tsx` 의 `const closed = !isKstMarketHoursWithCloseGrace()` 도 같은 `!isRegularOpen` 기준으로 스왑(폴링 게이트와 UI 마감 표시가 어긋나지 않게).
-- **fail-open 필수**: `isRegularOpen` 은 `unknown → true`(캘린더 실패/키 없음). 따라서 캘린더가 죽어도 장중 폴링이 멈추지 않는다(새 실패모드 차단). AC-8 로 고정.
-- **grace 윈도우 뉘앙스(§8·§9 q5)**: 기존 휴리스틱은 15:30~15:40 마감 유예 10분을 포함(`WithCloseGrace`). `isRegularOpen` 은 엄격 정규장(09:00~15:30). 스왑 시 이 10분 유예가 사라진다 — 마감동시호가 잔량 변동을 10분 덜 폴링. **PM 판단: 수용**(경미, 마감 후 호가는 곧 정지가 정상). grace 보존이 필요하면 §9 q5 대안 참조.
+- **당일 시각 게이팅 폐기.** `enabled: mode === "cumulative" || isRegularOpen` → **`enabled: true`**(당일도 항상 조회). `!isRegularOpen` 초기 넛지(`settledRef`)·`MarketClosedNotice` 마감 분기 제거.
+- **당일 가용성 판정**(§6): today 쿼리의 `isError`(502) 또는 `dataSource ∈ {mock-timeout, mock-error}` 면 unavailable.
+  - available(`kis`/`mock`) → 기존대로 외국인|기관 Top10 표시.
+  - unavailable → **"점검 중" 안내**(§3-3, 실시간 순위와 공유) + **7일 누적 넛지**(항상 데이터 있는 탭으로 유도). 일반 사용자 재시도 비노출, 관리자만.
+- **"7일 누적"(cumulative) 무변경** — KV 스냅샷(`dataSource: kv`, 실패해도 mock degrade). 항상 조회·표시. `cumulativeCollecting`("모으는 중") 분기 유지.
+- 기존 유지: `ModeToggle`·`buildHeaderMeta`·모바일 Top5 절단·`FlowColumn` 컬럼 단위 재시도.
 
-### 3-4. 공용 "장 마감" 상태 UI (§9 q4 — UX 결정)
+### 3-3. 공용 "점검 중" 상태 UI + 관리자 재시도 (§9 q6 — UX 결정)
 
-- 실시간 순위(§3-1)·순매수 당일(§3-2)이 **공유**할 마감 안내 표현. ②의 `MarketStatusBadge` 톤과 정합.
-- 내용: "장 마감" + `nextOpen`(있으면) "다음 개장 M/D(요일) HH:mm" 안내. 휴장(주말·공휴일)도 동일 카피로 다음 개장 안내. `useMarketStatus()` 의 `nextOpen` 을 그대로 소비.
-- **형태 결정은 UX**(§9 q4): (A) 신규 공용 컴포넌트(예 `components/market/MarketClosedNotice.tsx`, `useMarketStatus` 자족 소비) vs (B) 기존 섹션 empty-state 확장. **PM 권고: (A) 신규 공용 컴포넌트** — 두 섹션(+향후 다른 라이브 섹션)이 재사용, ②의 배지와 카피·톤 일원화.
-- 한글 카피는 `lib/copy/market/marketStatus.ts`(②가 이미 생성) 확장 또는 신규 `lib/copy/` 단일 위치. hex/px 직타 금지(디자인 토큰만), `cn` 헬퍼, 반응형은 Tailwind prefix + `useBreakpoint`.
+- 실시간 순위(§3-1)·순매수 당일(§3-2)이 **공유**할 점검 안내. **장 마감이 아니라 데이터 점검/일시 장애** 톤(기존 `MarketClosedNotice` 의 "장 마감·다음 개장" 카피는 **폐기·대체**).
+- 내용: "현재 점검 중이에요 · 잠시 후 다시 확인해 주세요" 류 중립 안내(한글, `lib/copy/` 단일 위치). 다음 개장 시각 안내는 **하지 않는다**(마감이 아니므로).
+- **관리자 재시도**: `useIsAdmin()`(§3-5) 가 true 일 때만 "다시 시도"(전 프로브 refetch) 버튼 노출. 일반 사용자는 안내만.
+- 순매수 당일 버전은 하단에 **"7일 누적 보기" 넛지** 링크 부착(실시간 순위 버전은 넛지 없음).
+- 형태(신규 컴포넌트 vs 기존 확장)는 q6. **PM 권고: 신규 공용 `MaintenanceNotice`**(예 `components/market/MaintenanceNotice.tsx`) — 두 섹션 재사용, `isAdmin`·`onRetry`·`nudge` props. 기존 `MarketClosedNotice`(#247 산출)는 시각 게이팅 폐기로 **소비처가 사라지므로 제거**(또는 이 컴포넌트로 대체).
+
+### 3-4. 호가·체결 폴링 게이팅 — **유지(무변경, 커밋3 기존)**
+
+- `hooks/stock/useQueryStockOrderbook.ts`·`useQueryStockTrades.ts` 의 `refetchInterval` 게이트 + `OrderbookPanel`·`TradeStrengthPanel` 의 `closed` 라벨을 `useMarketStatus().isRegularOpen` 기준으로 스왑한 **커밋3 는 유지**. 폴링은 실제로 "장중에만 갱신"이 맞으므로 시각 게이팅이 적절(랭킹과 성격 다름).
+- **본 개정에서 신규 변경 없음.** `useMarketStatus` 는 이제 **폴링에서만** 소비된다(랭킹/순매수는 §3-1·§3-2 로 가용성 기반 전환). fail-open(`unknown→true`) 무회귀 유지.
+
+### 3-5. 관리자 감지 인프라 (신설 — §9 q3)
+
+- **현황**: `hooks/auth` 에 `useLogin`/`useLogout` 만 있고 **클라에 role/isAdmin 노출 없음**. #246 은 role 을 HMAC 세션 쿠키(`readSession`, 서버측)만 담았다. `app/(main)/profile/page.tsx` 는 서버 컴포넌트로 `identity.role` 직접 읽음(클라 훅 아님).
+- **신설**:
+  - `GET /api/auth/me` route handler — 쿠키에서 `readSession`(HMAC 검증 후 role) → **읽기전용** `{ role }`(또는 `{ isAdmin }`) 반환. 위조 role 쿠키는 서명 검증에서 걸러짐. 미인증/시크릿 부재 → `{ role: null }`(안전 실패), 401 아님(무한 리다이렉트 회피 — 게이트는 이미 통과한 세션).
+  - `useMe()` (또는 `useIsAdmin()`) 도메인 훅 — TanStack Query, `/api/auth/me` 소비. `queryKeys.auth.me()` 단일 위치. staleTime 길게(role 변동 드묾). **표시용 전용** — 특권 동작 없음.
+- **보안(§8)**: role 판정은 **서버(HMAC 검증)에서만**. 클라 `isAdmin` 은 "다시 시도" 버튼 표시 여부만 결정 — 재시도는 **공개 랭킹 refetch**(특권 아님)라 위조돼도 실질 위험 0. `/api/auth/me` 는 role 을 **읽기만**(변경 불가).
+- **In/Out 판단(q3)**: **PM 권고 = 본 PR In(포함)**. "관리자만 재시도" AC 가 이 인프라 없이는 성립 불가 + 한 브랜치 한 PR 룰. 표면 최소(읽기전용 1 라우트 + 훅 1). 리뷰어가 인증 인프라 격리를 강하게 원하면 선행 PR 로 분리 가능(그 경우 본 PR 은 인프라 머지 전제로 대기).
 
 ## 4. 비범위 (Out of scope)
 
-- **미국 장(해외) 상태 처리·`market-calendar/US`** — 국내(`/KR`) `isRegularOpen` 만. 지수 스트립의 해외 지수는 무관.
-- **지수 스트립**(`HeaderMarketTicker`·상단 지수) — 이미 종가 스냅샷으로 정상. 손대지 않음.
-- **실시간 랭킹의 대체 데이터소스 신규 구축**(종가 랭킹 스냅샷·직전세션 캐시) — q1 스냅샷 안. 데이터 가용성 불확실 → 후속.
-- **순매수 당일 직전거래일 폴백**(q2 (b)안) — BE 신규 필요. 후속.
-- **나머지 폴링 소비처 스윕**: `useQueryStockWarnings`·`useQueryStockWarningsBatch`·`useQueryMinuteChart`·단타(`useIntradayPaperRefresh`)·서버 스케줄러(`tickScheduler`·`refreshScheduler`)도 `isKstMarketHoursWithCloseGrace()`/`isKstMarketHours()` 를 쓰지만 **본 PR 은 ①/③ 산출물(호가·체결)만 스왑**한다. 나머지는 회귀면적(warnings 배치·분봉·서버 스케줄러 grace/야간 로직)이 커 별도 후속 일괄. (본 PR 은 그 패턴의 레퍼런스가 된다.)
-- **스케줄러 휴장가드**(`tickScheduler`·`refreshScheduler`) — 로컬 CLI 전용·defer 상태. 후속.
-- **`kstMarketHours.ts` 자체 철거** — 여러 소비처가 아직 사용. 진실원천 스왑은 소비처별 점진. 본 PR 은 걷어내지 않는다.
+- **시장 시각으로 랭킹/순매수를 숨기는 로직(폐기)** — 초판의 `isRegularOpen` 하드 게이팅. 완전 제거.
+- **미국 장(해외)·`market-calendar/US`** — 무관.
+- **서버 스케줄러 휴장 가드**(`tickScheduler`·`refreshScheduler`) — 로컬 CLI 전용·defer.
+- **지수 스트립**(`HeaderMarketTicker`·상단 지수) — 종가 스냅샷, 정상. 손대지 않음.
+- **호가·체결 폴링 게이트 신규 변경** — 커밋3 로 이미 완료(§3-4 유지, 무변경).
+- **라우트 핸들러 로직 변경** — 소스 값 표면화는 클라 어댑터/훅 레벨. 라우트 무변경(q1 선택적 정리는 비채택 권고).
+- **관리자 인증 강화·per-role UI 확장** — `/api/auth/me` 는 role 읽기 최소만. 다른 관리자 기능은 별도.
+- **"점검 중" 실시간 헬스체크/모니터링** — 프론트 가용성 판정만(요청별 결과). 별도 헬스 엔드포인트 없음.
 
 ## 5. 수용 기준 (AC)
 
-QA 가 표로 검증. 장 상태(정규장/마감/휴장/unknown)·뷰포트별 재현. `useMarketStatus` 는 시각 주입 가능(marketClock 순수함수) 또는 `useQueryMarketCalendar` 모킹으로 상태 고정.
+QA 가 표로 검증. **소스별 시나리오**는 라우트 응답을 모킹(또는 로컬 무키=mock / prod 야간점검=실패)해 고정. 관리자 시나리오는 세션 role 모킹(`/api/auth/me` 응답).
 
 | # | 시나리오 | 재현 | 기대 |
 |---|---|---|---|
-| AC-1 | 실시간 순위 마감 | `isRegularOpen=false`(마감/주말/공휴일)에서 홈 진입 | 실시간 순위: 에러 카드 0, "장 마감 · 다음 개장 …" 안내(§3-4). 4탭 KIS TR **무호출**(네트워크/유닛). 탭바는 노출 |
-| AC-2 | 실시간 순위 정규장 무회귀 | `isRegularOpen=true`(장중) | 4탭 기존대로 조회·리스트·스켈레톤·failedTabs 동작. 안내 미노출 |
-| AC-3 | 순매수 당일 마감 | 마감 + `today` 탭 | 에러 카드 0, "장 마감 · 실시간 순매수는 장중 제공 · 다음 개장 …" 안내. KIS 순매수 TR 무호출 |
-| AC-4 | 순매수 7일 누적 마감(게이팅 안 함) | 마감 + `cumulative` 탭 | **정상 표시**(KV 스냅샷 데이터). `enabled` 항상 true, 안내 미노출. `cumulativeCollecting` 분기 무회귀 |
-| AC-5 | 순매수 소프트 넛지 | 마감 상태로 카드 마운트 | 토글 초기값 `cumulative`(데이터 착지). 사용자가 `today` 클릭 시 AC-3 안내. 세션 중 강제 전환 없음 |
-| AC-6 | 순매수 정규장 무회귀 | 장중 | 당일/누적 모두 기존대로. 넛지 미발동(당일 기본 유지) |
-| AC-7 | 호가·체결 폴링 공휴일 정지 | 평일 공휴일(`todayIsBusinessDay=false`, `isRegularOpen=false`) | `useQueryStockOrderbook`·`useQueryStockTrades` `refetchInterval=false`(폴링 정지). 패널 `closed=true` 라벨 |
-| AC-8 | 폴링 fail-open 무회귀 | 장중 + 캘린더 실패(`phase="unknown"`→`isRegularOpen=true`) | 폴링 **정상 지속**(오정지 없음). 캘린더 백드 상태에 폴링 커플링 안 됨 |
-| AC-9 | 폴링 정규장 무회귀 | 장중 영업일 | 호가·체결 기존 주기(단타 3s·상세 10s) 폴링. 패널 `closed=false` |
-| AC-10 | unknown fail-open (홈) | 토스 키 없음/캘린더 실패 | 실시간 순위·순매수 당일 **조회 정상**(기존 동작). 마감 안내 미노출(장중 취급). 에러 로그 0 |
-| AC-11 | 반응형 두 뷰포트 | 모바일·PC 마감 안내 | 양 뷰포트 마감 안내 정렬·줄바꿈 깨짐 없음(`md:`/`lg:` + `useBreakpoint`) |
-| AC-12 | 컨벤션 정합 | `git grep` | 마감 안내 hex/px 직타 0, 한글 카피 `lib/copy/` 단일 위치, `useQuery` 직접 import 0(도메인 훅만), 클라 `fetch(` 0 |
-| AC-13 | 라우트 무회귀 | `volume-rank`·`fluctuation`·`flow/top10` route | 시그니처·mock 폴백 무변경(게이팅은 클라 훅/컴포넌트 레벨). `git diff app/api/market app/api/flow` = 무변경 |
+| AC-1 | 전탭 available(prod KIS 정상) | 4탭 모두 `dataSource=kis` | 4탭 모두 노출, 리스트 정상. 점검 안내 미노출 |
+| AC-2 | dev mock 정상 표시 | 로컬 무키(`isKisConfigured=false`) → 4탭 `dataSource=mock` | **4탭 모두 노출 + mock 데이터 표시**. 점검 안내 미노출("영구 점검중" 회귀 없음) |
+| AC-3 | 일부 탭 unavailable | 예: fluctuation up/down `mock-error`, volume/value `kis` | 급상승·급하락 **탭 버튼 숨김**, 거래량·거래대금만 노출. 활성 탭이 숨겨지면 첫 available 로 이동. 점검 안내 미노출 |
+| AC-4 | 전탭 unavailable — 일반 사용자 | 4탭 모두 실패(volume-rank 502, fluctuation `mock-timeout`/`mock-error`) + role≠admin | 리스트/탭바 대신 **"점검 중" 안내**. **"다시 시도" 버튼 비노출** |
+| AC-5 | 전탭 unavailable — 관리자 | 위 + role=admin(`/api/auth/me` → admin) | "점검 중" 안내 + **"다시 시도" 버튼 노출**. 클릭 시 4탭 refetch |
+| AC-6 | 순매수 당일 available | today `dataSource=kis`(또는 dev `mock`) | 외국인\|기관 Top10 정상 표시(장외여도). 점검 안내 미노출 |
+| AC-7 | 순매수 당일 unavailable | today 502 또는 `mock-timeout`/`mock-error` | "점검 중" 안내 + **"7일 누적 보기" 넛지**. 재시도 관리자만. KIS 무한재조회 없음 |
+| AC-8 | 순매수 7일 누적 무변경 | cumulative 탭 | **항상 정상 표시**(`dataSource=kv`, 실패 시 mock degrade). `cumulativeCollecting` 분기 유지. 점검 안내 미노출 |
+| AC-9 | 관리자 감지 훅 | `/api/auth/me` role=admin / user / null | `useIsAdmin()` 각각 true / false / false. 재시도 버튼 노출은 admin 만 |
+| AC-10 | 세션 role 위조 방어 | 위조 `role=admin` 쿠키(서명 불일치) | `/api/auth/me` → role null(`readSession` HMAC 검증 실패). 재시도 버튼 미노출 |
+| AC-11 | 호가·체결 폴링 무회귀 | 장중/공휴일/unknown | 커밋3 동작 그대로(공휴일 정지·fail-open 지속·패널 `closed` 라벨). 본 PR 무변경 |
+| AC-12 | 데이터 소스 표면화 | 훅 반환 | `useQueryVolumeRank`/`useQueryFluctuation`/`useQueryFlowTop10` 가 `dataSource` 를 노출. 라우트 `git diff app/api/market app/api/flow` = **무변경** |
+| AC-13 | 반응형 두 뷰포트 | 모바일·PC — 부분 탭 숨김/점검 안내 | 양 뷰포트 탭바 정렬·점검 안내 줄바꿈 깨짐 없음(`md:`/`lg:` + `useBreakpoint`) |
+| AC-14 | 컨벤션 정합 | `git grep` | 점검 안내 hex/px 직타 0, 한글 카피 `lib/copy/` 단일 위치, `useQuery` 직접 import 0(도메인 훅만), 클라 `fetch(` 0(route handler 안 예외), queryKey 단일 위치(`queryKeys.auth.me`) |
 
-## 6. 데이터 / 게이팅 규칙
+## 6. 데이터 / 가용성 판정 규칙 (라우트 실동작 근거)
 
-- 게이트 원천: `useMarketStatus()`(②) → `isRegularOpen`(= `phase==="regular"`, `unknown→true` fail-open).
-- 라이브(게이팅 대상): 실시간 순위 4탭(volume·value·up·down), 순매수 **당일**, 호가 폴링, 체결 폴링.
-- 비-라이브(게이팅 안 함): 순매수 **7일 누적**(KV 스냅샷), 지수 스트립(종가), 상세 정적 필드.
-- 게이팅 레벨: **클라 훅/컴포넌트 `enabled`·`refetchInterval`**(호출 자체를 안 하게)이 1차. route handler 는 무변경(mock 폴백·시그니처 보존, AC-13).
-- 마감 안내 데이터: `nextOpen: {date, time}|null`(②). null(unknown)이면 안내 최소화(장중 취급이라 애초에 안내 경로 미도달).
+라우트를 실제로 읽어 확정한 소스 매트릭스(q5·q4·q1 의 근거):
+
+| 라우트 | 미설정/비-prod (dev) | KIS 성공 | 빈결과 | 타임아웃 | 기타 오류 |
+|---|---|---|---|---|---|
+| `volume-rank` | 200 `mock` | 200 `kis` | **502**(throw) | 200 `mock-timeout` | **502**(apiError/generic) |
+| `fluctuation` | 200 `mock` | 200 `kis` | 200 `mock-empty` | 200 `mock-timeout` | 200 `mock-error` (never-throw) |
+| `flow/top10` today | 200 `mock` | 200 `kis` | **502**(`__ALL_FAILED__`) | 200 `mock-timeout` | **502**(apiError/generic) |
+| `flow/top10` cumulative | 200 `mock` | 200 `kv` | (행 0 → `cumulativeDays=0`, 200 `kv`) | — | 200 `mock`(KV degrade) |
+
+**핵심(q5 확정): 세 라우트 구조가 다르다.** `fluctuation` 은 never-throw(실패도 200+mock-* 소스), `volume-rank`·`flow today` 는 빈결과/오류에 **502 throw**. 따라서 판정은 **HTTP 상태 + X-Data-Source 둘 다** 봐야 한다(q4 확정):
+
+- **available** = `isError=false` **AND** `dataSource ∈ {kis, mock}`
+- **unavailable** = `isError=true`(502 → axios throw → `isError`) **OR** `dataSource ∈ {mock-timeout, mock-empty, mock-error}`
+
+**dev vs prod 점검 구분(q1 확정):** 라우트가 내리는 소스 값이 **이미 세분돼 있어 라우트 수정 불필요**. 미설정 dev 는 plain `mock`(200) → available 로 처리(정상 표시). KIS 시도 후 실패는 `mock-timeout`/`mock-empty`/`mock-error`/502 → unavailable. 두 mock 계열이 라우트에서 이미 구분되므로 소스 세분 추가 불필요.
+
+- cumulative(`kv`)는 판정 대상 아님 — 항상 표시(KV 스냅샷, 마감·점검 무관).
+- 게이팅 레벨: **클라 훅/컴포넌트**(`dataSource` 표면화 + 컴포넌트 분기). 라우트 무변경(AC-12).
 
 ## 7. 가정 · 제약 · 참고
 
-- 선행: ②(`toss-market-calendar`) 머지 완료 — `useMarketStatus`·`MarketStatus`·`isRegularOpen`(fail-open)·`marketClock`·`MarketStatusBadge`·`lib/copy/market/marketStatus.ts` 가 이미 main 에 존재(확인: `hooks/market/useMarketStatus.ts`·`lib/types/market/marketStatus.ts`·`lib/market/marketClock.ts`). ①/③(호가·체결) 머지 완료(폴링 게이트가 휴리스틱으로 동작 중).
-- prod 는 TOSS env 미설정 → 캘린더 `phase="unknown"` → `isRegularOpen=true`(fail-open). **prod 배포 즉시엔 마감 게이팅이 동작 안 하고 기존 에러 카드 유지**(무회귀). 활성화는 TOSS 키 등록만으로(마감 게이팅 자동 발동) — `MARKET_DATA_SOURCE` 와 독립(`isTossConfigured` 게이트).
-  - → **본 기능의 실제 효과(에러 카드 제거)는 TOSS 키 등록 후 발현**. 키 전엔 fail-open 으로 현행 유지 = 안전. 이 점을 PR 본문·HANDOFF 에 명시.
-- fail-open 규약(핵심): `isRegularOpen` 은 캘린더 실패 시 `true`. 게이트를 여기 커플링해도 "캘린더 실패 → 장중 오정지" 가 발생하지 않는다. 반대로 마감 안내는 `!isRegularOpen`(명시적 false, 즉 캘린더 성공 + 실제 마감)에서만 노출되므로 unknown 에선 안 뜬다 — 의도된 비대칭(안내는 확신할 때만, 폴링은 의심스러우면 계속).
-- grace 윈도우: 호가·체결 폴링을 `isRegularOpen`(엄격 15:30)로 스왑하면 기존 `WithCloseGrace`(15:40)의 10분이 사라짐. §3-3·§9 q5 참조(수용 or 대안).
-- 참고 파일: `components/home/RealtimeRankingSection.tsx`·`components/flow/InvestorFlowTop10Card.tsx`(마감 게이팅 대상), `hooks/market/useQueryVolumeRank.ts`·`useQueryFluctuation.ts`·`hooks/flow/useQueryFlowTop10.ts`(`enabled` 옵션 이미 존재 — 배선만), `hooks/stock/useQueryStockOrderbook.ts`·`useQueryStockTrades.ts`·`components/stock/OrderbookPanel.tsx`·`TradeStrengthPanel.tsx`(폴링 스왑), `hooks/market/useMarketStatus.ts`·`lib/types/market/marketStatus.ts`(원천), `lib/copy/home/marketOverview.ts`·`lib/copy/flow/labels.ts`·`lib/copy/market/marketStatus.ts`(카피), `docs/rules/frontend.md`.
+- 선행: ②(`toss-market-calendar`) 머지 완료(`useMarketStatus` 등 main 존재). #246(신원 세션·`readSession`·role) 머지 완료 — `lib/auth/session.ts` 에 `readSession`/`ProfileRole` 존재.
+- **prod KIS 는 라이브 설정**(메모리) → `volume-rank`/`fluctuation`/`flow today` 가 실 KIS 경로. 야간점검(~21:50~23시대, 전 TR 500) 시 502/mock-* → unavailable → 점검 안내. 점검 외 시각(주말·장외 포함)엔 `kis` → available → 정상 표시.
+- **dev(로컬 무키)**: 이중 게이트 미통과 → 항상 `mock` → available → mock 정상 표시. **로컬에서 "점검 중" 을 보려면** 라우트 응답 소스를 모킹하거나 강제 실패 주입 필요(QA 노트).
+- 보안: `/api/auth/me` 의 role 은 `readSession`(HMAC 검증) 결과만. 클라 `isAdmin` 은 표시용. 재시도는 공개 랭킹 refetch(특권 아님)라 위조 시 실질 위험 없음. role 판정 서버 단일.
+- 참고 파일: `components/home/RealtimeRankingSection.tsx`·`components/flow/InvestorFlowTop10Card.tsx`(가용성 전환), `hooks/market/useQueryVolumeRank.ts`·`useQueryFluctuation.ts`·`hooks/flow/useQueryFlowTop10.ts`(`dataSource` 표면화), `lib/api/market/volumeRank.ts`·`fluctuation.ts`·`lib/api/flow/top10.ts`(어댑터 헤더 표면화), `app/api/market/volume-rank/route.ts`·`fluctuation/route.ts`·`app/api/flow/top10/route.ts`(소스 값 근거, 무변경), `lib/auth/session.ts`(`readSession`), `hooks/auth/`(신설 `useMe`/`useIsAdmin`), `docs/rules/frontend.md`.
 
 ## 8. 영향 분석
 
-- **변경 라인 추정**: 컴포넌트 2(순위·순매수) 게이팅 배선 + 폴링 훅 2 + 패널 2 스왑 + 공용 마감 UI 1(+카피). 대략 120~220 라인. 대부분 `enabled`/`refetchInterval` 한 줄 배선 + 안내 UI 1개 → 회귀면적 작음. route handler 무변경(AC-13).
-- **커밋 분할 권고**: (a) 마감 게이팅 로직 — 실시간 순위·순매수 당일 `enabled` 배선 + 넛지, (b) 공용 마감 상태 UI + 카피(디자이너 DESIGN.md 커밋은 색 신규 시 이 앞에 선행; 재사용 토큰이면 무변경), (c) 호가·체결 폴링 스왑 + 패널 라벨 정합. 각 커밋 독립 검증 가능.
-- **폴링 게이팅 In 결정(q3)**: ②/③ PM 은 "후속 일괄" 로 뒀으나, 본 PR 이 이미 `useMarketStatus` 소비처를 여는 소비처 PR 이라 **같은 맥락에서 얇게 회수(In)** 가 응집도 높다. 회귀 위험은 **fail-open 이 흡수**(AC-8). 대상을 ①/③ 산출물 2훅 + 2패널로 **한정**해 회귀면 최소화(warnings·분봉·스케줄러는 Out). 근거: (1) fail-open 으로 "캘린더 실패 → 오정지" 새 실패모드 차단, (2) 방금 머지된 훅이지만 변경이 게이트 한 줄이라 표면 작음, (3) 패널 `closed` 라벨과 폴링 게이트를 같은 기준으로 묶어 어긋남 방지.
-- **grace 윈도우 회귀(경미)**: §3-3. 15:30~15:40 10분 폴링 손실. 마감 후 호가 정지는 정상 동작이라 수용. 대안(§9 q5)은 복잡도 대비 이득 낮음.
-- **prod dormant(무회귀)**: TOSS 키 전엔 fail-open 으로 현행 유지 → prod 즉시 무변화. 실효는 키 등록 후. → 배포 리스크 낮음(회귀 없이 dormant), QA 는 로컬에서 캘린더 모킹으로 마감 경로 검증.
-- **회귀 위험 낮음**: 라우트·타입·mock 무변경, 순수 클라 게이팅. 유일 실질 편집 = 컴포넌트 2 + 훅 2 + 패널 2 + 안내 UI 1. `enabled` 옵션은 세 훅 모두 이미 존재(배선만).
+- **변경 라인 추정**: (a) 소스 표면화 — 어댑터 3 + 훅 3 + 타입 1(~60~90 라인), (b) 실시간 순위 가용성 로직 — 컴포넌트 1(탭 필터·판정·전탭 점검, ~80~130 라인), (c) 순매수 당일 가용성 — 컴포넌트 1(~40~60), (d) 점검 안내 UI + 카피(~40~70), (e) 관리자 인프라 — 라우트 1 + 훅 1 + queryKey(~50~80). 대략 **270~430 라인**. 초판(120~220)보다 큼 — 소스 표면화·관리자 인프라 신설 때문.
+- **커밋 분할 권고**:
+  1. `feat(auth)`: `/api/auth/me` + `useMe`/`useIsAdmin` + queryKey (관리자 감지 인프라, 독립 검증 가능).
+  2. `feat(market)`: 데이터 소스 표면화(어댑터·훅·타입) — 라우트 무변경.
+  3. `feat(home)`: 실시간 순위 가용성 전환 + 순매수 당일 전환 + 점검 안내 UI + 카피(디자이너 DESIGN.md 색 신규 시 선행).
+  4. `refactor`: `MarketClosedNotice`(#247) 제거/대체 정리(시각 게이팅 폐기 잔여).
+- **레이트리밋(q2)**: 4탭 전부 프로브 = KIS TR 4콜(volume/value=FHPST01710000 2콜, up/down=FHPST01700000 2콜) + 순매수 2콜(순차)이 홈 진입에 몰린다 → EGW00201(초당 건수) 위험. **PM 권고**: (1) 각 라우트가 이미 `fetchWithTransientRetry`(EGW00201 backoff 1회)를 함 + (2) 훅 `staleTime`(volumeRank/fluctuation queryConfig) 로 재프로브 억제 + (3) 필요 시 **탭 프로브를 순차 활성화**(flow/top10 의 `delay(150ms)` 순차 2콜 선례). 초판은 활성 탭만 켰으나 가용성 판정에 4탭 필요 → **staleTime 캐시 우선, EGW00201 실측 시 순차 활성화 폴백**. 실측 검증은 주간(KIS 정상) + 야간(점검 502) 양쪽.
+- **판정 상관성**: KIS 야간점검은 전 TR 동시 500 → 실무상 4탭이 함께 unavailable. per-탭 숨김은 "일부 TR 만 장애"(드묾)에 대응. 상관 높아도 per-탭 설계가 안전(과숨김 없음).
+- **보안 영향(관리자)**: role 서버 판정(HMAC). 클라 위조 무의미(공개 refetch). `/api/auth/me` 읽기전용. 게이트 401 리다이렉트와 무관(이미 통과한 세션의 role 조회) — `readSession` 실패 시 role null 반환(401 아님)으로 `client.ts` 리다이렉트 인터셉터 오발동 회피.
+- **회귀 위험**: 초판 대비 표면 크나 라우트·타입 무변경(소스는 표면화만), 순수 클라 판정 + 신규 읽기전용 라우트. 최대 리스크 = (1) dev mock 을 unavailable 로 오판(→ AC-2 로 방어), (2) 4탭 프로브 EGW00201(→ §8 q2 전략). prod dormant 아님(즉시 발현) — 배포 후 야간점검 시각 실검증 필요.
 
 ## 9. OPEN QUESTION
 
-- **[OPEN QUESTION] q1. 실시간 순위 마감 시 — 단순 안내 vs 직전 세션 스냅샷.** **PM 권고: 단순 안내로 시작(§3-1 (a)).** 근거: `volume-rank`·`fluctuation` 은 라이브 TR 이라 "장 종료 기준 종가 랭킹 스냅샷" 데이터 소스가 현재 없다(신규 KV 적재·집계 필요 = 별 PRD). 단순 "장 마감 · 다음 개장" 안내가 즉시 에러 카드를 제거하고 정보 정직성도 유지. 스냅샷은 데이터 가용성 확인 후 후속.
-- **[OPEN QUESTION] q2. 순매수 당일 마감 시 — (a) 안내 / (b) 직전거래일 폴백 / (c) 7일누적 자동전환.** **PM 권고: (a) 안내 + 소프트 넛지(§3-2).** 마감 시 당일 탭은 "장 마감 · 실시간 순매수는 장중 제공 · 다음 개장 …" 안내(KIS 무호출), 실시간 순위와 톤·컴포넌트 공유. 추가로 **마운트 시 마감이면 토글 초기값을 `cumulative` 로**(자동 강제 전환 아님 — 사용자 선택 존중, 데이터 있는 탭 착지). (b) 기각 = 직전거래일 순매수 소스 없음(BE 신규 필요). (c) 강제 전환 기각 = 명시 선택 몰래 변경은 놀람·지표 성격 상이. → **넛지의 UX 수용 여부만 디자이너 확인**(초기 state 만 바꾸는 저위험).
-- **[OPEN QUESTION] q3. 호가·체결 폴링 게이팅을 본 PR 에 포함할지 + fail-open 정책.** **PM 권고: In(포함) + fail-open 유지(§3-3·§8).** 대상은 ①/③ 산출물(`useQueryStockOrderbook`·`useQueryStockTrades`)과 패널 2(`OrderbookPanel`·`TradeStrengthPanel`)로 한정. 휴리스틱 → `isRegularOpen`(공휴일 인지) 스왑, `unknown→true` fail-open 으로 "캘린더 실패 → 장중 오정지" 차단(AC-8). warnings·분봉·스케줄러는 Out(회귀면 큼, 후속). — 사용자가 "호가·체결도 이번엔 건드리지 말고 순수 홈만" 을 원하면 §3-3 을 Out 으로 빼고 순위·순매수 게이팅만 In 으로 축소 가능(close call, 이 경우 커밋 (c) 삭제).
-- **[OPEN QUESTION] q4. 공용 "장 마감" 상태 UI — 신규 컴포넌트 vs 기존 empty-state 확장.** **PM 권고: 신규 공용 컴포넌트(§3-4 (A), 예 `MarketClosedNotice`).** 실시간 순위·순매수 당일(+향후 라이브 섹션)이 재사용, ②의 `MarketStatusBadge`·`nextOpen` 카피와 톤 일원화. empty-state 확장(B)은 섹션별 중복·톤 분산 우려. **UX 디자이너 최종 결정**(형태·아이콘·다음 개장 표기 밀도) — 결정 전까지 데이터 배선(`useMarketStatus().nextOpen` 소비)까지 만들고 최종 시각은 확정 후 같은 브랜치 커밋.
-- **[OPEN QUESTION] q5. phase 세분(장전 pre·시간외 after) 노출 + grace 윈도우.** **PM 권고: `isRegularOpen`(정규장) 기준 단순화 — 장전·시간외도 "마감" 취급.** 근거: 실시간 순위·순매수 라이브 TR 이 장전/시간외에 유효 데이터를 주는지 미확인(실측 필요) → 정규장만 라이브로 간주가 안전. grace 윈도우(15:30~15:40 10분)는 폴링 스왑 시 사라지나 **수용**(마감 후 호가 정지는 정상). grace 보존이 꼭 필요하면 대안 = 폴링 게이트를 `isRegularOpen || phase==="after"` 로 열되 after 를 15:40 까지만 제한하는 헬퍼 추가 — **복잡도 대비 이득 낮아 비권장**. 장전/시간외 랭킹 데이터 유무는 실측 후 별도 판단(백로그).
+- **[RESOLVED] q1. dev mock vs prod 점검 구분 — 라우트 수정 필요?** **결론: 라우트 수정 불필요.** 라우트가 내리는 `X-Data-Source` 가 이미 `mock`(미설정 dev) 과 `mock-timeout`/`mock-empty`/`mock-error`(KIS 시도 후 실패)를 구분(§6). 클라가 헤더를 **표면화**(§3-0)해 `{kis, mock}`=available, `{mock-timeout, mock-empty, mock-error}`+502=unavailable 로 판정하면 됨. (선택: `volume-rank` 빈결과 502 vs `fluctuation` mock-empty 의 표기 비대칭을 통일하는 라우트 정리는 **비필수·비채택 권고** — 판정이 HTTP+헤더 조합으로 이미 견고.)
+- **[OPEN QUESTION] q2. 4탭 전체 프로브 레이트리밋 전략(순차 vs 캐시).** **PM 권고: staleTime 캐시 우선 + EGW00201 실측 시 순차 활성화 폴백.** 4탭 동시 프로브가 홈 진입 KIS 콜 폭주(§8)를 유발할 수 있음. 각 라우트 transient 재시도 + 훅 staleTime 으로 1차 흡수, 실측(주간 정상 + 야간 점검)에서 EGW00201 관측되면 flow/top10 의 `delay` 순차 패턴을 탭 프로브에 적용. → **구현 후 실측 필요(주간+야간).**
+- **[OPEN QUESTION] q3. `/api/auth/me` + `useMe`/`useIsAdmin` 를 본 PR In vs 선행 PR.** **PM 권고: 본 PR In.** "관리자만 재시도" AC(AC-5/9/10)가 이 인프라 없이 성립 불가 + 한 브랜치 한 PR 룰. 표면 최소(읽기전용 라우트 1 + 훅 1). 위조 위험 실질 0(공개 refetch). — 리뷰어가 인증 인프라 격리를 원하면 선행 PR 로 분리(그 경우 본 PR 은 머지 전제로 대기, close call).
+- **[RESOLVED] q4. "점검중" 판정을 X-Data-Source 로만 vs HTTP 상태도.** **결론: 둘 다 본다.** `fluctuation` 은 never-throw(실패도 200+mock-*) → 헤더 필수. `volume-rank`·`flow today` 는 빈결과/오류에 502 throw → `isError` 필수. 한쪽만으론 불충분(§6). available = `!isError && dataSource∈{kis,mock}`.
+- **[RESOLVED] q5. 급상승/급하락 라우트가 volume-rank 와 동일 구조인지 실측.** **결론: 다르다.** `fluctuation`(up/down)=never-throw(`mock-empty`/`mock-error`/`mock-timeout`), `volume-rank`=빈결과/오류에 502 throw(§6 표). 판정 로직이 이 차이를 흡수(q4). 라우트 실독으로 확정.
+- **[OPEN QUESTION] q6. 공용 "점검 중" UI — 신규 컴포넌트 vs 기존 확장 + 카피 톤.** **PM 권고: 신규 공용 `MaintenanceNotice`**(`isAdmin`·`onRetry`·`nudge` props). 기존 `MarketClosedNotice`(#247, 시각 게이팅 폐기로 소비처 소멸)는 제거/대체. 카피 톤 = "점검 중 · 잠시 후 다시 확인"(마감 아님 → 다음 개장 시각 표기 안 함). **UX 디자이너 최종 결정**(형태·아이콘·관리자 재시도 버튼 위계·순매수 넛지 배치) — 데이터 배선(`isAdmin`·refetch·nudge)까지 만들고 최종 시각은 확정 후 같은 브랜치 커밋.
