@@ -20,5 +20,7 @@ export function useMutationLogin(): UseMutationResult<
 > {
   return useMutation<LoginResponse, ApiError, string>({
     mutationFn: (password) => login(password),
+    // 로그인 실패는 필드 인라인 에러로 처리 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
   });
 }

@@ -16,6 +16,8 @@ export function useMutationSetUserStatus() {
   const queryClient = useQueryClient();
   return useMutation<void, ApiError, { sub: string; status: ProfileStatus }>({
     mutationFn: ({ sub, status }) => setUserStatus(sub, status),
+    // 실패는 useAdminUsers 의 per-call onError 토스트로 처리 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.allUsers });
     },

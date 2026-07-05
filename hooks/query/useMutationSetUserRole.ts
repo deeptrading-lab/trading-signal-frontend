@@ -17,6 +17,8 @@ export function useMutationSetUserRole() {
   const queryClient = useQueryClient();
   return useMutation<void, ApiError, { sub: string; role: ProfileRole }>({
     mutationFn: ({ sub, role }) => setUserRole(sub, role),
+    // 실패는 useAdminUsers 의 per-call onError 토스트로 처리 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.allUsers });
     },

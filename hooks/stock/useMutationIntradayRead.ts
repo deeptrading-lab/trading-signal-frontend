@@ -22,5 +22,7 @@ export function useMutationIntradayRead(): UseMutationResult<
 > {
   return useMutation<IntradayReadResponse, ApiError, IntradayReadInput>({
     mutationFn: ({ ticker, provider }) => fetchIntradayRead(ticker, provider),
+    // 실패는 IntradayReadSection 의 인라인 섹션으로 처리 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
   });
 }

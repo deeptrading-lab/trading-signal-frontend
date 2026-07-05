@@ -22,6 +22,8 @@ export function useMutationEnqueueAIAnalysis() {
     { ticker: string; force?: boolean; name?: string | null }
   >({
     mutationFn: ({ ticker, force, name }) => enqueueAIAnalysis(ticker, force, name),
+    // 실패는 aria-live 배너로 표면화 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
     onSuccess: () => {
       // 접수 직후 워커 상태 뱃지를 즉시 갱신(다음 폴링까지 안 기다림). 뱃지 미마운트면 무해.
       void queryClient.invalidateQueries({

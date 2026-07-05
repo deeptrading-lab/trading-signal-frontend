@@ -8,6 +8,8 @@ export function useMutationCreatePaperTradingSession() {
   return useMutation({
     mutationFn: (payload: CreatePaperTradingSessionRequest) =>
       createPaperTradingSession(payload),
+    // 실패는 화면 인라인 처리 — 전역 토스트 opt-out(중복 방지).
+    meta: { skipGlobalErrorToast: true },
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.paperTrading.sessions });
       queryClient.setQueryData(queryKeys.paperTrading.session(data.session.id), data);
