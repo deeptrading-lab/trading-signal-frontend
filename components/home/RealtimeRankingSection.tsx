@@ -603,6 +603,13 @@ function RankRow({
             <StockWarningBadges warnings={warnings} size="sm" max={badgeMax} />
           </div>
         )}
+        {/* 값(거래량/거래대금) — 모바일 전용 muted 캡션. md+ 는 우측 전용 컬럼이 담당하므로 숨김.
+            좁은 폭에서도 활성 탭의 정렬 기준 값을 노출(현재가·등락률만으론 무엇으로 줄 세운지 불명확). */}
+        {valueColumn && (
+          <span className="text-caption tabular-nums text-text-muted md:hidden">
+            {valueColumn.label} {valueColumn.format(row)}
+          </span>
+        )}
       </div>
 
       {/* 산업(업종명) — md 이상. 미조회는 빈칸(graceful omit). */}
