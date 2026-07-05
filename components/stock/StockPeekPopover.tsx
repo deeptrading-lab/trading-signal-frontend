@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "motion/react";
 import { StockPeekContent } from "@/components/stock/StockPeekContent";
+import { MiniStockChart } from "@/components/stock/MiniStockChart";
 import { computePeekPosition } from "@/lib/utils/peekPosition";
 import { DURATION, EASE } from "@/lib/motion/tokens";
 import { PEEK_HINT_DESKTOP } from "@/lib/copy/stock/peek";
@@ -90,7 +91,7 @@ export function StockPeekPopover({ target, onHide }: StockPeekPopoverProps) {
       <StockPeekContent
         ticker={target.ticker}
         seed={target.seed}
-        chartHeight={CHART_HEIGHT}
+        chart={<MiniStockChart ticker={target.ticker} height={CHART_HEIGHT} />}
       />
 
       {/* 상세 진입 안내 */}

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { StockPeekContent } from "@/components/stock/StockPeekContent";
+import { PeekChart } from "@/components/stock/PeekChart";
 import { DURATION, EASE } from "@/lib/motion/tokens";
 import { PEEK_HINT_DESKTOP } from "@/lib/copy/stock/peek";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
@@ -23,10 +24,11 @@ import type { PeekTarget } from "@/hooks/stock/peekProvider";
  * 중앙에 고정되고 행을 옮겨도 위치가 그대로다(내용만 교체). 뷰포트 가장자리가 아니라 표 옆이라
  * 시선 이동이 짧다. 커서 앵커가 아니라 스크롤로 좌표가 stale 해지지 않아 scroll 숨김 로직도 불필요.
  *
- * ## 더 큰 차트 + 축 + 여백에 맞춘 가변 폭
- * 팝오버(96px, 축 없음)보다 큰 차트 + 축. 좌측은 콘텐츠 우측 끝 + 간격에 앵커하고, 폭은 거기서
- * 뷰포트 우측 여백 전까지 `[MIN, MAX]` 클램프 — 1920px 은 최소(≈248px), 초광폭은 넓혀("좀 더 크게")
- * 표 옆에 붙고 far-right 는 빈다. 차트 높이도 폭에 비례.
+ * ## 다중 패널 차트 + 여백에 맞춘 가변 폭
+ * 팝오버(96px 캔들만)와 달리 도크는 `PeekChart`(가격+이동평균선·거래량·MACD·RSI)를 주입해 상세에
+ * 가까운 미리보기를 준다(사용자 요청). 좌측은 콘텐츠 우측 끝 + 간격에 앵커하고, 폭은 거기서 뷰포트
+ * 우측 여백 전까지 `[MIN, MAX]` 클램프 — 1920px 은 최소(≈248px), 초광폭은 넓혀("좀 더 크게") 표
+ * 옆에 붙고 far-right 는 빈다. 가격 패널 높이도 폭에 비례(서브플롯은 그 아래 고정 높이로 누적).
  *
  * ## a11y·상호작용(인터랙티브 — 차트 툴팁)
  * 팝오버(`pointer-events-none`)와 달리 도크는 `pointer-events-auto` 라 **차트를 hover 해 툴팁**을 볼 수
@@ -135,8 +137,7 @@ export function StockPeekDock({
       <StockPeekContent
         ticker={target.ticker}
         seed={target.seed}
-        chartHeight={chartHeight}
-        showAxis
+        chart={<PeekChart ticker={target.ticker} priceHeight={chartHeight} />}
       />
 
       {/* 상세 진입 안내 */}
