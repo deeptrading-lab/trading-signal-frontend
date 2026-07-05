@@ -1,8 +1,9 @@
 /**
  * RealtimeRankingSection — 홈 "실시간" 랭킹(카드리스 플랫 표), **가용성 기반** 렌더.
  *
- * home-reskin 신규 · `market-status-aware-home` 가용성 개정. 노스스타 `#homeScreen .sec(실시간)` 정합 —
- * 박스 없는 흰 바탕 표: [♥ 관심] [순위] [로고닷+종목명] [(산업)] [현재가] [등락률]. 행 헤어라인만.
+ * home-reskin 신규 · `market-status-aware-home` 가용성 개정 · `ranking-columns` 컬럼/옵션 확장.
+ * 박스 없는 흰 바탕 표 + 헤더 컬럼 행: [♥][순위][로고닷+종목명+경고배지][산업][현재가][등락률][시총].
+ * 산업·시총은 md+ 에서만(모바일 숨김). 경고 배지·위험숨기기 토글은 클라 warnings 배치 재사용. 행 헤어라인만.
  *
  * 탭(거래량/거래대금/급상승/급하락) **4종 모두 실배선 + 항상 프로브**:
  *   - 거래량   → `useQueryVolumeRank("volume")`
@@ -23,7 +24,7 @@
  *   - 전탭 unavailable(0개) → `MaintenanceNotice`(중립 점검 안내, 관리자만 "다시 시도").
  *   ★ 시각(장 열림/닫힘) 게이팅은 폐기(초판 `isRegularOpen` 하드 게이팅 정정) — 주말·장외 정상 랭킹 노출.
  *
- * 데이터: 랭킹 행은 산업(sector) 부재 → 컬럼 graceful omit. 색은 부호(상승=빨강/하락=파랑).
+ * 데이터: 시총·산업은 서버 enrich(best-effort, 미확보 시 fail-soft 빈칸). 색은 부호(상승=빨강/하락=파랑).
  * 행 클릭 → `/stock/[ticker]`. hover/focus·롱프레스 시 `useStockPeek` 로 상세 선반입 + 차트 Peek.
  *
  * 컨벤션(`docs/rules/frontend.md` §1·§2): useQuery 직접 import 금지 → 도메인 훅만 소비.
@@ -38,11 +39,14 @@ import { Section } from "@/components/ui/Section";
 import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
+import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryFluctuation } from "@/hooks/market/useQueryFluctuation";
+import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
 import { useMe } from "@/hooks/auth/useMe";
 import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
+import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { resolveAvailability, type Availability } from "@/lib/market/availability";
 import {
   deriveRankingView,
@@ -50,10 +54,13 @@ import {
 } from "@/lib/market/rankingView";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
+import { formatMarketCap } from "@/lib/utils/formatMarketCap";
 import { formatPct } from "@/lib/utils/formatPct";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import { rankLogoDotClass, rankLogoInitial } from "@/lib/utils/rankLogoDot";
+import { warningSeverity } from "@/lib/copy/stock/warnings";
 import type { FlowDirection } from "@/lib/types/flow/top10";
+import type { StockWarningItem } from "@/lib/types/stock/warnings";
 import {
   RANK_SECTION_TITLE,
   RANK_TAB_VOLUME,
@@ -68,7 +75,36 @@ import {
   RANK_CAPTION_PLUNGE,
   RANK_FAVORITE_ADD,
   RANK_FAVORITE_REMOVE,
+  RANK_COL_RANK,
+  RANK_COL_STOCK,
+  RANK_COL_SECTOR,
+  RANK_COL_PRICE,
+  RANK_COL_CHANGE,
+  RANK_COL_MARKETCAP,
+  RANK_RISK_HIDE_LABEL,
+  RANK_RISK_ALL_HIDDEN,
 } from "@/lib/copy/home/marketOverview";
+
+/**
+ * 헤더-바디 공유 grid 트랙 — 컬럼 폭 토큰(col-sector·col-marketcap)으로 정합 고정(hex/px 직타 없음).
+ *   - 모바일(< md): ♥·순위·종목·현재가·등락률(5트랙). 산업·시총 셀은 `hidden md:*` → 트랙 미점유.
+ *   - md+: 종목 뒤 산업, 등락률 뒤 시총 add(7트랙).
+ * 순위 셀 폭(1.25rem)·등락률 폭(4rem)·현재가 폭(5.5rem)은 구조 rem(토큰 대상 아님, 기존 관례).
+ */
+const RANK_GRID =
+  "grid items-center gap-md grid-cols-[1.5rem_1.25rem_1fr_5.5rem_4rem] md:grid-cols-[1.5rem_1.25rem_1fr_theme(spacing.col-sector)_5.5rem_4rem_theme(spacing.col-marketcap)]";
+
+/** 컬럼 헤더 라벨 톤 — 토스톤 muted 캡션(col-header 12px/600). */
+const COL_HEADER = "truncate text-caption font-semibold text-text-muted";
+
+/** 위험군 판정 — severity critical(정리매매·투자위험) + warn(투자경고·단기과열). PRD §6-3. */
+function isRiskWarnings(items: readonly StockWarningItem[] | undefined): boolean {
+  if (!items || items.length === 0) return false;
+  return items.some((w) => {
+    const s = warningSeverity(w.warningType);
+    return s === "critical" || s === "warn";
+  });
+}
 
 /** 랭킹 기준 탭 — 4종 모두 실배선. */
 type RankTab = "volume" | "turnover" | "surge" | "plunge";
@@ -95,7 +131,7 @@ const RANK_CAPTIONS: Record<RankTab, string> = {
 
 /**
  * 네 탭 공통 표시 골격 — 거래량/거래대금(`VolumeRankRow`)·급상승/급하락(`FluctuationRow`) 교집합.
- * 어느 랭킹도 산업(sector)을 싣지 않지만, 향후 확장 대비 옵셔널로 좁혀 읽어 컬럼 자동 부활.
+ * 시총·산업은 서버 enrich(`ranking-columns`)로 실려 온다 — 미확보 시 null/미설정(fail-soft).
  */
 type RankableRow = {
   ticker: string;
@@ -104,6 +140,7 @@ type RankableRow = {
   changePercent: number;
   direction: FlowDirection;
   sector?: string;
+  marketCap?: number | null;
 };
 
 /** 등락 방향 → 등락률 색 토큰(합성 클래스라 cn 사이즈 override 시에도 색 유지). */
@@ -115,6 +152,8 @@ function changeClass(direction: FlowDirection): string {
 
 export function RealtimeRankingSection() {
   const [tab, setTab] = useState<RankTab>("volume");
+  // 위험종목 숨기기 — 기본 off(opt-in). 켜면 severity critical+warn 행을 리스트에서 필터(추가 fetch 0).
+  const [riskHidden, setRiskHidden] = useState(false);
 
   // 4개 랭킹 훅을 **모두 프로브**(가용성 판정에 전 탭 필요). staleTime 60s 캐시가 반복 마운트/레이트리밋 흡수.
   const volumeQuery = useQueryVolumeRank("volume");
@@ -151,6 +190,15 @@ export function RealtimeRankingSection() {
     (t) => availabilityByTab[t.value] === "available",
   );
 
+  // ★ 경고 배치 — 활성(effective) 탭 가시 행 티커 union 을 섹션 단일 인스턴스로 1회 조회(행마다 호출 금지).
+  //   fail-soft 빈 맵(토스 미설정/실패)·장중 60s 갱신. 위험숨기기 필터도 이 데이터를 재사용(추가 fetch 0).
+  const activeQuery = effectiveTab ? queryByTab[effectiveTab] : null;
+  const activeRows: RankableRow[] = activeQuery?.data?.rows ?? [];
+  const warningsQuery = useQueryStockWarningsBatch(
+    activeRows.map((row) => row.ticker),
+  );
+  const warningsByTicker = warningsQuery.data?.warnings ?? {};
+
   // 활성 탭이 available 목록에서 빠지면(초기·소실) 첫 available 로 이동(빈 콘텐츠 방지). 그 외 클릭 존중.
   useEffect(() => {
     if (effectiveTab && effectiveTab !== tab) setTab(effectiveTab);
@@ -166,29 +214,41 @@ export function RealtimeRankingSection() {
   const hasTabBar = availableTabDefs.length >= 2;
   const singleLabel =
     availableTabDefs.length === 1 ? availableTabDefs[0].label : null;
+  const toggleRisk = () => setRiskHidden((v) => !v);
 
   return (
     <Section
       title={RANK_SECTION_TITLE}
       action={
-        hasTabBar ? (
-          <RankTabs
-            tabs={availableTabDefs}
-            value={effectiveTab ?? availableTabDefs[0].value}
-            onChange={setTab}
-            className="hidden sm:inline-flex"
-          />
+        view === "list" ? (
+          <div className="hidden items-center gap-sm sm:flex">
+            {hasTabBar && (
+              <RankTabs
+                tabs={availableTabDefs}
+                value={effectiveTab ?? availableTabDefs[0].value}
+                onChange={setTab}
+              />
+            )}
+            <RiskHideToggle active={riskHidden} onToggle={toggleRisk} />
+          </div>
         ) : undefined
       }
     >
-      {/* 모바일 — 탭을 제목줄 아래 분리 배치(액션 슬롯이 좁음). */}
-      {hasTabBar && (
-        <RankTabs
-          tabs={availableTabDefs}
-          value={effectiveTab ?? availableTabDefs[0].value}
-          onChange={setTab}
-          className="inline-flex self-start sm:hidden"
-        />
+      {/* 모바일 — 탭 + 위험숨기기 토글을 제목줄 아래 한 줄에(액션 슬롯이 좁음). */}
+      {view === "list" && (
+        <div className="flex items-center justify-between gap-sm sm:hidden">
+          {hasTabBar ? (
+            <RankTabs
+              tabs={availableTabDefs}
+              value={effectiveTab ?? availableTabDefs[0].value}
+              onChange={setTab}
+              className="inline-flex"
+            />
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <RiskHideToggle active={riskHidden} onToggle={toggleRisk} />
+        </div>
       )}
 
       {/* available 탭이 1개뿐 — 정적 소제목 라벨로 강등(비인터랙티브). */}
@@ -207,6 +267,8 @@ export function RealtimeRankingSection() {
         hasTicker={hasTicker}
         addTicker={addTicker}
         removeTicker={removeTicker}
+        warningsByTicker={warningsByTicker}
+        riskHidden={riskHidden}
       />
     </Section>
   );
@@ -222,6 +284,8 @@ function RankingContent({
   hasTicker,
   addTicker,
   removeTicker,
+  warningsByTicker,
+  riskHidden,
 }: {
   view: RankingViewState;
   activeQuery:
@@ -233,7 +297,12 @@ function RankingContent({
   hasTicker: (ticker: string) => boolean;
   addTicker: (ticker: string, name: string) => void;
   removeTicker: (ticker: string) => void;
+  warningsByTicker: Record<string, StockWarningItem[]>;
+  riskHidden: boolean;
 }) {
+  // 배지 max 분기(md=2/모바일=1)만 JS 반응형. 컬럼 표시/숨김은 Tailwind `md:` 유틸.
+  const { isMobile } = useBreakpoint();
+
   if (view === "loading") return <RankSkeleton />;
   if (view === "maintenance") {
     return <MaintenanceNotice isAdmin={isAdmin} onRetry={onRetry} />;
@@ -246,31 +315,93 @@ function RankingContent({
   if (rows.length === 0) {
     return <p className="py-md text-body-sm text-text-muted">{RANK_EMPTY}</p>;
   }
-  const hasSector = rows.some((row) => !!row.sector);
+
+  // 위험숨기기 on → 위험군(critical+warn) 행 필터(경고 배치 데이터 재사용, 추가 fetch 0).
+  const visibleRows = riskHidden
+    ? rows.filter((row) => !isRiskWarnings(warningsByTicker[row.ticker]))
+    : rows;
 
   return (
     <>
-      <div role="list">
-        {rows.map((row, i) => (
-          <RankRow
-            key={row.ticker}
-            row={row}
-            rank={i + 1}
-            showSector={hasSector}
-            favorited={hasTicker(row.ticker)}
-            onToggleFavorite={() =>
-              hasTicker(row.ticker)
-                ? removeTicker(row.ticker)
-                : addTicker(row.ticker, row.name)
-            }
-          />
-        ))}
-      </div>
+      <RankHeaderRow />
+      {visibleRows.length === 0 ? (
+        // 전량 위험군 필터 → 빈 상태(헤더·토글 유지, off 로 복원). 원래 순번을 위해 rows index 사용.
+        <p className="py-lg text-center text-body-sm text-text-muted">
+          {RANK_RISK_ALL_HIDDEN}
+        </p>
+      ) : (
+        <div role="list">
+          {visibleRows.map((row) => (
+            <RankRow
+              key={row.ticker}
+              row={row}
+              rank={rows.indexOf(row) + 1}
+              warnings={warningsByTicker[row.ticker]}
+              badgeMax={isMobile ? 1 : 2}
+              favorited={hasTicker(row.ticker)}
+              onToggleFavorite={() =>
+                hasTicker(row.ticker)
+                  ? removeTicker(row.ticker)
+                  : addTicker(row.ticker, row.name)
+              }
+            />
+          ))}
+        </div>
+      )}
       {/* 기준 각주 — 활성 탭 기준을 명시. */}
       {activeTab && (
         <p className="text-caption text-text-muted">{RANK_CAPTIONS[activeTab]}</p>
       )}
     </>
+  );
+}
+
+/** 헤더 컬럼 행 — 바디 행과 동일 grid 트랙 공유(정렬 강제). 산업·시총 라벨은 md+ 에서만. */
+function RankHeaderRow() {
+  return (
+    <div
+      className={cn(
+        "-mx-sm border-b border-border-line px-sm h-header-row-h",
+        RANK_GRID,
+      )}
+    >
+      {/* ♥ + 순위 트랙 묶어 라벨(♥ 트랙은 라벨 없음). */}
+      <span className={cn(COL_HEADER, "col-span-2 text-center")}>
+        {RANK_COL_RANK}
+      </span>
+      <span className={COL_HEADER}>{RANK_COL_STOCK}</span>
+      <span className={cn(COL_HEADER, "hidden md:block")}>{RANK_COL_SECTOR}</span>
+      <span className={cn(COL_HEADER, "text-right")}>{RANK_COL_PRICE}</span>
+      <span className={cn(COL_HEADER, "text-right")}>{RANK_COL_CHANGE}</span>
+      <span className={cn(COL_HEADER, "hidden text-right md:block")}>
+        {RANK_COL_MARKETCAP}
+      </span>
+    </div>
+  );
+}
+
+/** 위험종목 숨기기 토글 — off=흰+muted / on=accent-soft+primary pill(RankTabs 형제 톤). */
+function RiskHideToggle({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={cn(
+        "h-button-sm-h shrink-0 cursor-pointer rounded-pill px-md text-button-sm transition-colors",
+        active
+          ? "bg-accent-soft text-primary"
+          : "text-text-muted hover:text-text-strong",
+      )}
+      onClick={onToggle}
+    >
+      {RANK_RISK_HIDE_LABEL}
+    </button>
   );
 }
 
@@ -326,13 +457,16 @@ function RankTabs({
 function RankRow({
   row,
   rank,
-  showSector,
+  warnings,
+  badgeMax,
   favorited,
   onToggleFavorite,
 }: {
   row: RankableRow;
   rank: number;
-  showSector: boolean;
+  warnings: StockWarningItem[] | undefined;
+  /** 배지 상한 — md=2 / 모바일=1(최상위 심각도). */
+  badgeMax: number;
   favorited: boolean;
   onToggleFavorite: () => void;
 }) {
@@ -357,6 +491,8 @@ function RankRow({
     onToggleFavorite();
   };
 
+  const hasBadges = (warnings?.length ?? 0) > 0;
+
   return (
     <ListRow
       role="listitem"
@@ -364,10 +500,7 @@ function RankRow({
       aria-label={`${row.name} 상세 보기`}
       className={cn(
         "-mx-sm cursor-pointer rounded-sm px-sm transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none",
-        "grid items-center gap-md",
-        showSector
-          ? "grid-cols-[auto_1.25rem_1fr_auto] md:grid-cols-[auto_1.25rem_1fr_8rem_auto]"
-          : "grid-cols-[auto_1.25rem_1fr_auto]",
+        RANK_GRID,
       )}
       onClick={go}
       onKeyDown={(e) => {
@@ -398,43 +531,50 @@ function RankRow({
         {rank}
       </span>
 
-      {/* 로고닷 + 종목명(코드 미표시) */}
-      <div className="flex min-w-0 items-center gap-sm">
-        <span
-          className={cn(
-            "inline-grid h-6 w-6 shrink-0 place-items-center rounded-sm text-caption font-bold",
-            rankLogoDotClass(row.ticker),
-          )}
-          aria-hidden="true"
-        >
-          {rankLogoInitial(row.name)}
-        </span>
-        <span className="truncate text-body-sm-strong text-text-strong">
-          {row.name}
-        </span>
+      {/* 로고닷 + 종목명(코드 미표시) + 경고 배지(md=인라인 / 모바일=아래 줄바꿈) */}
+      <div className="flex min-w-0 flex-col gap-xs md:flex-row md:items-center md:gap-xs">
+        <div className="flex min-w-0 items-center gap-sm">
+          <span
+            className={cn(
+              "inline-grid h-6 w-6 shrink-0 place-items-center rounded-sm text-caption font-bold",
+              rankLogoDotClass(row.ticker),
+            )}
+            aria-hidden="true"
+          >
+            {rankLogoInitial(row.name)}
+          </span>
+          <span className="truncate text-body-sm-strong text-text-strong">
+            {row.name}
+          </span>
+        </div>
+        {hasBadges && (
+          <div className="flex shrink-0 items-center gap-xs">
+            <StockWarningBadges warnings={warnings} size="sm" max={badgeMax} />
+          </div>
+        )}
       </div>
 
-      {/* 산업(sector) — 데이터 있을 때만, md 이상 */}
-      {showSector && (
-        <span className="hidden truncate text-caption text-text-muted md:block">
-          {row.sector ?? ""}
-        </span>
-      )}
+      {/* 산업(업종명) — md 이상. 미조회는 빈칸(graceful omit). */}
+      <span className="hidden truncate text-caption text-text-muted md:block">
+        {row.sector ?? ""}
+      </span>
 
-      {/* 현재가 + 등락률(우정렬 클러스터) */}
-      <div className="flex items-center justify-end gap-md">
-        <span className="text-body-sm-strong tabular-nums text-text-strong">
-          {formatNumber(row.price)}
-        </span>
-        <span
-          className={cn(
-            "w-16 text-right text-body-sm-strong",
-            changeClass(row.direction),
-          )}
-        >
-          {formatPct(row.changePercent, { sign: true })}
-        </span>
-      </div>
+      {/* 현재가 */}
+      <span className="text-right text-body-sm-strong tabular-nums text-text-strong">
+        {formatNumber(row.price)}
+      </span>
+
+      {/* 등락률(부호색) */}
+      <span
+        className={cn("text-right text-body-sm-strong", changeClass(row.direction))}
+      >
+        {formatPct(row.changePercent, { sign: true })}
+      </span>
+
+      {/* 시가총액 — md 이상. enrich 실패/미설정은 "-". */}
+      <span className="hidden text-right text-body-sm-strong tabular-nums text-text-muted md:block">
+        {formatMarketCap(row.marketCap)}
+      </span>
     </ListRow>
   );
 }

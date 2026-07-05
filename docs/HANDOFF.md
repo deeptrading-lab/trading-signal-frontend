@@ -6056,3 +6056,46 @@
   - KOSDAQ 업종(`FID_INPUT_ISCD=1001`)·해외 섹터 확장(현재 KOSPI 국내 1열, grid 2열 확장 대비 완료).
   - 기간수익률 카드(어제/1개월/3개월/1년, 업종지수 시계열) — DESIGN R9 조건부, 시계열 확보 시.
   - breadth fan-out 최적화(웹소켓/캐시 공유) + prod 장중 KIS 실검증(평일 09~15:30).
+
+### 2026-07-05 — 실시간 순위 컬럼/옵션 확장 — 헤더행·시총·산업·경고배지·위험숨기기 (#251)
+
+- **slug**: `ranking-columns` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/251
+- **요약**: 실시간 순위 컬럼/옵션 확장 — 헤더행·시총·산업·경고배지·위험숨기기
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 마켓 홈 실시간 순위(`RealtimeRankingSection`, 4탭)에 **헤더 컬럼 행 + 시가총액·산업 컬럼 + 경고 배지 인라인 + 위험종목 숨기기 토글**을 얹었다. #247 가용성 모델·`MaintenanceNotice`·가변 탭바·관리자 재시도는 **완전 무편집**(순수 add). 시총(토스 마스터)·산업(KIS)은 서버 전용 자격증명이라 BFF route enrich, 경고는 기존 클라 배치 훅 재사용.
+  > 
+  > PRD `docs/prd/ranking-columns.md` · DESIGN `docs/design/ranking-columns.md`.
+  > 
+  > ## 커밋 분할 (PRD §8 권고 준수)
+  > 
+  > 1. `feat(market)` — 행 타입 확장(marketCap·sector 옵셔널) + route 서버 enrich(`enrichMarketCap` 공용화 `marketCapEnrich.ts` + `rankingEnrich.ts` 산업 fan-out) + mock 채움 + 유닛테스트
+  > 2. `chore(utils)` — `formatMarketCap`(조/억) + 카피(헤더 라벨·토글·빈 상태) + 유닛테스트
+  > 3. `feat(home)` — 헤더 컬럼 행 + 시총/산업 셀 + 경고 배지 배선 + 위험숨기기 토글 + 반응형
+  > 
+  > ## AC 대응 / 자가검증
+  > 
+  > | AC | 결과 |
+  > |---|---|
+  > | AC-1/2 경고 배지 인라인·배치 1회 | `useQueryStockWarningsBatch(가시 union)` 섹션 단일 인스턴스. 라이브: `/api/stock/warnings/batch` union 조회 → 활성 3종목(`122350`,`001210`,`002990`) 검출, 200 |
+  > | AC-3 시총 컬럼 | 라이브 `/api/market/volume-rank`(dataSource=kis) 9/9행 marketCap 채움(삼성전자 1809조). enrich 실패·미설정은 `formatMarketCap`→"-" |
+  > | AC-4 산업 컬럼 | 라이브 9/9행 sector(전기·전자·건설·유통…). 미조회 빈칸 |
+  > | AC-5/6 위험숨기기 토글 | severity `critical`+`warn` 필터(배치 재사용, 추가 fetch 0). 전량필터 시 "숨긴 종목뿐이에요" 빈 상태 |
+  > | AC-7 헤더 컬럼 행 | 바디와 동일 `RANK_GRID` 트랙 공유 → 빌드 CSS `grid-template-columns:1.5rem 1.25rem 1fr 128px 5.5rem 4rem 96px`(col-sector/col-marketcap 토큰) |
+  > | AC-8 enrich never-block | `enrichRankingRows` never-throw + 예산 3s race. 실패 시 컬럼만 빈값, 랭킹 응답 무붕괴 |
+  > | AC-9 레이트 억제 | top-N≤14 + 산업 dedup·동시성캡6 + `loadKisPriceMeta` 10분 캐시 + 토스 24h. 라이브 주간 진입 EGW00201 미관측(9/14행 전량 enrich 성공) |
+  > | AC-10 mock | 무키 mock 채움(marketCap·sector) |
+  > | AC-11 #247 무회귀 | `git diff main -- lib/market/availability.ts lib/market/rankingView.ts components/market/MaintenanceNotice.tsx` = **무변경** |
+  > | AC-12 반응형 | 산업·시총 `hidden md:block`, 배지 `useBreakpoint` max 1↔2 |
+  > | AC-13 컨벤션 | hex/px 직타 0(주석 제외), 카피 `lib/copy/home/marketOverview.ts` 단일, 클라 `fetch(` 0, useQuery 직접 import 0, 시총 포맷터 단일 |
+  > 
+  > ## 게이트
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 활성탭 값 컬럼(거래대금 순 원값) — 행 타입에 원값 필드 없음(PRD §3-1 범위 밖). 필드 추가는 PM 영역
+  - 국내/해외(US) 랭킹 토글 — 후속 PRD
+  - 기간별 랭킹(1일·1주·1개월·1년) — 현행 실시간 스냅샷 유지, 후속
+  - 운영: prod 주간 장중(평일 09~15:30) 산업 fan-out EGW00201 실측 — 관측 시 활성탭 한정/N 축소 폴백(PRD §8 q2)

@@ -13,6 +13,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { fetchVolumeRank } from "@/lib/api/kis/volume-rank";
+import { enrichRankingRows } from "@/lib/api/kis/rankingEnrich";
 import { isApiError } from "@/lib/api/errors";
 import { getMockVolumeRank } from "@/lib/mock/market/volumeRank";
 import { isRegularStock } from "@/lib/server/rankingFilter";
@@ -63,8 +64,10 @@ export async function GET(request: NextRequest) {
         { status: 502, headers: { "Cache-Control": "no-store" } },
       );
     }
+    // 시총(토스)·산업(KIS) best-effort enrich — never-block(실패·예산초과 시 컬럼만 빈값, 랭킹 무붕괴).
+    const enriched = await enrichRankingRows(rows.slice(0, TOP_N));
     const result: VolumeRankResponse = {
-      rows: rows.slice(0, TOP_N),
+      rows: enriched,
       asOf: new Date().toISOString(),
     };
     return jsonWithDataSource(result, "kis", { "X-KIS-Env": resolveKisEnv() });

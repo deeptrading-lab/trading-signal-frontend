@@ -12,6 +12,7 @@
 
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { fetchFluctuation } from "@/lib/api/kis/fluctuation";
+import { enrichRankingRows } from "@/lib/api/kis/rankingEnrich";
 import { getMockFluctuation } from "@/lib/mock/market/fluctuation";
 import { isRegularStock } from "@/lib/server/rankingFilter";
 import type {
@@ -63,8 +64,10 @@ export async function GET(request: NextRequest) {
         "X-KIS-Env": resolveKisEnv(),
       });
     }
+    // 시총(토스)·산업(KIS) best-effort enrich — never-block(실패·예산초과 시 컬럼만 빈값, 랭킹 무붕괴).
+    const enriched = await enrichRankingRows(rows);
     const result: FluctuationResponse = {
-      rows,
+      rows: enriched,
       direction,
       asOf: new Date().toISOString(),
     };

@@ -280,6 +280,9 @@ spacing:
   orderbook-row-h: 30px
   orderbook-row-h-compact: 24px
   strength-gauge-h: 10px
+  header-row-h: 30px
+  col-sector: 128px
+  col-marketcap: 96px
 rounded:
   sm: 8px
   md: 12px
