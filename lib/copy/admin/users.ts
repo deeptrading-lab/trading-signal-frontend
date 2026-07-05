@@ -38,3 +38,11 @@ export const ADMIN_ROLE_CHANGE_ERROR = "변경에 실패했어요. 다시 시도
 /** 마지막 superadmin 강등 차단(409). */
 export const ADMIN_LAST_SUPERADMIN_ERROR =
   "마지막 최고 관리자는 강등할 수 없어요.";
+/** 등급 변경 성공 토스트. */
+export const ADMIN_ROLE_CHANGED = "등급을 변경했어요.";
+/** 승인 성공 토스트. */
+export const ADMIN_STATUS_APPROVED_TOAST = "승인했어요.";
+/** 승인 취소 성공 토스트. */
+export const ADMIN_STATUS_REVOKED_TOAST = "승인을 취소했어요.";
+/** 승인/취소 실패 토스트. */
+export const ADMIN_STATUS_CHANGE_ERROR = "처리에 실패했어요. 다시 시도해 주세요.";

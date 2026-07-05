@@ -30,8 +30,6 @@ import {
   ADMIN_USERS_APPROVE_CTA,
   ADMIN_USERS_REVOKE_CTA,
   ADMIN_JOINED_PREFIX,
-  ADMIN_ROLE_CHANGE_ERROR,
-  ADMIN_LAST_SUPERADMIN_ERROR,
 } from "@/lib/copy/admin/users";
 
 export interface AdminUsersPanelProps {
@@ -48,7 +46,6 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
     changeRole,
     setStatus,
     mutatingSub,
-    lastError,
   } = useAdminUsers();
 
   return (
@@ -57,14 +54,6 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
         <h1 className="text-h1 text-text-strong">{ADMIN_USERS_TITLE}</h1>
         <p className="text-body-sm text-text-muted">{ADMIN_USERS_SUBTITLE}</p>
       </header>
-
-      {lastError ? (
-        <p role="alert" className="input-helper-error">
-          {lastError === "last_superadmin"
-            ? ADMIN_LAST_SUPERADMIN_ERROR
-            : ADMIN_ROLE_CHANGE_ERROR}
-        </p>
-      ) : null}
 
       {isLoading ? (
         <p className="text-body-sm text-text-muted">{ADMIN_USERS_LOADING}</p>
