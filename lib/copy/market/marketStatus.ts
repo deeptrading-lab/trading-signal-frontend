@@ -12,12 +12,6 @@ import type { MarketStatus } from "@/lib/types/market/marketStatus";
 /** 배지 컨테이너 스크린리더 라벨. */
 export const MARKET_STATUS_ARIA = "국내 장 상태";
 
-/**
- * 공용 마감 안내(`MarketClosedNotice`) 제목 폴백 — `marketStatusLabel` 이 null(phase="unknown")을
- * 줄 때 방어값. 정상 경로(마감 안내는 `!isRegularOpen`=closed 에서만 노출)에선 도달하지 않는다.
- */
-export const MARKET_CLOSED_TITLE_FALLBACK = "장 마감";
-
 export type MarketStatusLabel = { full: string; short: string };
 
 /**
