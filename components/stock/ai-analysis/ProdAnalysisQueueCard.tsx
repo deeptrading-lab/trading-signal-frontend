@@ -12,7 +12,7 @@
  *   - requesting : 요청 보내는 중(버튼 disabled + 스피너).
  *   - accepted/offline/duplicate/error : 상단 상태 배너(S4/S5/S6/실패). 이전 결론 카드는 아래 유지.
  *
- * 배치(DESIGN.md Layout): [상태 배너] → [재요청 안내 / 빈 인트로] → [FinalVerdictCard].
+ * 배치(DESIGN.md Layout): [상태 배너] → [재요청 안내 / 빈 인트로] → [VerdictHero + VerdictDetails].
  * 색·간격은 신규 토큰 0 — .card-info/.card-warn/.card-critical + accent-vivid 재사용.
  *
  * ⚠️ 이 컴포넌트는 prod 분기에서만 마운트된다(AIAnalysisPanel). 로컬은 기존 라이브 경로 그대로.
@@ -27,7 +27,8 @@ import {
   type ProdRequestPhase,
 } from "@/hooks/stock/useProdAnalysisRequest";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
-import { FinalVerdictCard } from "./FinalVerdictCard";
+import { VerdictHero } from "./VerdictHero";
+import { VerdictDetails } from "./VerdictDetails";
 import { ProdQueueBanner, type ProdQueueBannerTone } from "./ProdQueueBanner";
 import { ProdRequestCta } from "./ProdRequestCta";
 import { WorkerActivityBadge } from "./WorkerActivityBadge";
@@ -201,14 +202,18 @@ export function ProdAnalysisQueueCard({
             </div>
           )}
 
-          {/* 이전 결론 — 로컬 SavedDecisionView 와 동일 단일 카드. FinalVerdictCard 가 판정 헤더+
-              목표가/손절/손익비+상세 전부라 별도 VerdictHero 는 두지 않는다(헤더 중복). */}
-          <FinalVerdictCard
-            data={snapshot.decision}
+          {/* 이전 결론 — 로컬 SavedDecisionView 와 동일한 히어로(글랜스)+상세(플랫 스택) 스택.
+              staleness 판정은 prod 에서 별도 계산하지 않고 위 재요청 안내/PreviousMeta 로 대체한다. */}
+          <VerdictHero
+            final={snapshot.decision}
             signal={snapshot.signal}
+            doneCount={0}
+            totalCount={0}
+            mode="saved"
             calibration={getCalibration(snapshot.decision.confidence)}
             calibrationMinSampleN={minSampleN}
           />
+          <VerdictDetails data={snapshot.decision} />
         </>
       ) : (
         // S3: 이전 결과 없음 — 빈 인트로 + 첫 요청 CTA(아직 요청 안 했을 때만).

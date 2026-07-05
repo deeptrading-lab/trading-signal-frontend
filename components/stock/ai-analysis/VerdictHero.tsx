@@ -2,26 +2,34 @@
 
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
-import { TrendingUp, TrendingDown, Minus, Clock } from "lucide-react";
+import { BadgeCheck, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { roundToKrxTick } from "@/lib/utils/krxTick";
+import { formatNumber } from "@/lib/utils/formatMoney";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { AXIS_LABEL, ACTION_LABEL } from "@/lib/copy/signal/labels";
-import { VERDICT_LABEL, isBullishVerdict, isBearishVerdict } from "./FinalVerdictCard";
+import {
+  CALIBRATION_BASIS,
+  CALIBRATION_INSUFFICIENT,
+  calibrationHitRateText,
+  calibrationInsufficientBasis,
+} from "@/lib/copy/scorecard/labels";
+import { VERDICT_LABEL, isBullishVerdict, isBearishVerdict } from "./verdictLabels";
 import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
+import type { ConfidenceCalibration } from "@/lib/types/scorecard/scorecard";
 import type { AxisKey, RuleDirection, SignalAction } from "@/lib/types/signal";
 
 /**
- * verdict-forward 히어로(T4 항시-글랜스) — 라이브 패널 상단에 늘 보이는 판정 요약.
+ * verdict-forward 히어로(T4 항시-글랜스) — 판정 요약(노스스타 `.verdict` 히어로).
  *
  *   - 스트리밍/대기(`final` 없음): "판정 대기 중" + 가격 기반 결정론 시그널(점수·4축)을 채워
  *     12분 대기 동안 빈 화면을 막는다(최종 AI 판정은 완료 후 표시).
- *   - 완료(`final` 있음): 판정 라벨(VERDICT_LABEL) + 신호강도(또는 확신도) + 목표/손절/손익비 +
- *     예상 기간(구체 텍스트). **SNS 감정 칩은 여기 두지 않는다**(분석가 페이즈 소관).
+ *   - 완료(`final` 있음): 노스스타 `.verdict.buy` 처럼 좌측 4px 방향 바 + 방향-soft 배경 위에
+ *     `.v-row1`(판정 라벨 + enum + 신뢰도 칩 + [saved]이전분석 태그 + 우측 신호강도) ·
+ *     `.v-lvls`(목표/손절/손익비 흰 박스 3개) · `.v-meta`(기간 · 현재가/시점가 · [live]상세 힌트).
  *
- * 전체 판정 상세(근거·전략·전망·강점/리스크)는 최종 판정 페이즈의 `FinalVerdictCard` 가 담당한다.
- * `signal` 은 프레젠테이션 prop 으로만 받는다 — 라이브는 `useSignalResult`, 저장모드(PR③)는 스냅샷 시그널을
- * 넘겨 이 컴포넌트를 그대로 재사용할 수 있다.
+ * 전체 판정 상세(근거·전략·전망·강점/리스크)는 `VerdictDetails` 가 히어로 아래에서 담당한다(글랜스↔상세 분리).
+ * `signal` 은 프레젠테이션 prop — 라이브는 `useSignalResult`, 저장모드는 스냅샷 시그널을 그대로 넘겨 재사용.
  */
 
 /** 히어로가 그리는 결정론 시그널 최소 형태 — SignalResult·DecisionSignal 양쪽이 구조적으로 만족. */
@@ -40,6 +48,16 @@ interface VerdictHeroProps {
   /** 전체 완료 에이전트 수 — 대기 진행 카운터("N/12 에이전트"). */
   doneCount: number;
   totalCount: number;
+  /** "live"(v-meta 현재가·상세 힌트) / "saved"(분석 시점가). 기본 live. */
+  mode?: "live" | "saved";
+  /** 라이브 현재가(원) — live 모드 v-meta "현재가". saved 모드는 final.base_price 를 쓴다. */
+  livePrice?: number | null;
+  /** saved 모드에서 이전(과거) 분석 태그를 노출할지 — 재분석 권유(stale) 시 true. */
+  stale?: boolean;
+  /** 보정 신뢰도(scorecard-feedback) — v-meta 실측 적중률 배지. null 이면 미표시. */
+  calibration?: ConfidenceCalibration | null;
+  /** 표본 부족 안내 문구에 노출할 게이트 기준 표본수. */
+  calibrationMinSampleN?: number;
 }
 
 const clampPct = (n: number) => Math.max(0, Math.min(100, n));
@@ -69,29 +87,32 @@ function AxisMini({ axis, score }: { axis: AxisKey; score: number }) {
   );
 }
 
-function StatCell({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-sm bg-surface px-md py-sm">
-      <span className="text-caption font-medium text-text-muted whitespace-nowrap">{label}</span>
-      {children}
-    </div>
-  );
-}
-
-/** %값 → basePrice 있으면 "절대가격(±N%)", 없으면 "±N%". FinalVerdictCard 표기 규칙 정합. */
-function pctValue(pct: number, basePrice: number | null, colorClass: string): ReactNode {
+/** %값 → basePrice 있으면 "절대가격 +N%", 없으면 "±N%". FinalVerdict 표기 규칙 정합. */
+function lvlValue(pct: number, basePrice: number | null, colorClass: string): ReactNode {
   const pctStr = `${pct > 0 ? "+" : ""}${pct}%`;
   if (basePrice == null) {
-    return <span className={cn("text-mono-numeric tabular-nums", colorClass)}>{pctStr}</span>;
+    return (
+      <span className={cn("text-mono-numeric font-extrabold tabular-nums", colorClass)}>{pctStr}</span>
+    );
   }
   const price = roundToKrxTick(basePrice * (1 + pct / 100));
   return (
     <span className="flex items-baseline gap-1 whitespace-nowrap">
-      <span className={cn("text-mono-numeric tabular-nums", colorClass)}>
+      <span className={cn("text-mono-numeric font-extrabold tabular-nums", colorClass)}>
         {price.toLocaleString("ko-KR")}
       </span>
-      <span className="text-caption font-medium text-text-muted">({pctStr})</span>
+      <span className="text-caption font-medium text-text-muted">{pctStr}</span>
     </span>
+  );
+}
+
+/** v-lvls 한 칸 — 라벨(위) + 값(아래) 흰 박스. */
+function LvlBox({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="rounded-sm border border-border-line bg-surface px-md py-sm">
+      <div className="text-caption text-text-muted">{label}</div>
+      <div className="mt-0.5">{children}</div>
+    </div>
   );
 }
 
@@ -150,104 +171,166 @@ function PendingHero({
   );
 }
 
-/** 완료 히어로 — 판정 글랜스(라벨 + 신호강도/확신도 + 목표/손절/손익비 + 예상 기간). */
-function DoneHero({ final, signal }: { final: FinalDecision; signal: HeroSignal | null }) {
+/** 완료 히어로 — 노스스타 `.verdict.buy` 글랜스(라벨·신호강도·목표/손절/손익비·기간·현재가). */
+function DoneHero({
+  final,
+  signal,
+  mode,
+  livePrice,
+  stale,
+  calibration,
+  calibrationMinSampleN,
+}: {
+  final: FinalDecision;
+  signal: HeroSignal | null;
+  mode: "live" | "saved";
+  livePrice: number | null;
+  stale: boolean;
+  calibration: ConfidenceCalibration | null;
+  calibrationMinSampleN?: number;
+}) {
   const bullish = isBullishVerdict(final.verdict);
   const bearish = isBearishVerdict(final.verdict);
+  const isSaved = mode === "saved";
+
+  // 방향 색 토큰 — 좌측 바·배경·테두리·강조 텍스트.
+  const dirBar = bullish ? "border-l-signal-up" : bearish ? "border-l-signal-down" : "border-l-text-muted";
+  const dirBg = bullish ? "bg-signal-up-soft" : bearish ? "bg-signal-down-soft" : "bg-surface-muted";
+  const dirBorder = bullish
+    ? "border-signal-up-soft"
+    : bearish
+      ? "border-signal-down-soft"
+      : "border-border-line";
+  const dirText = bullish ? "text-signal-up" : bearish ? "text-signal-down" : "text-text-strong";
+
   const basePrice =
     typeof final.base_price === "number" && final.base_price > 0 ? final.base_price : null;
   const hasRR = final.risk_reward_ratio !== null;
   const targetIsReentry = final.target_pct !== null && final.target_pct < 0;
+  // v-meta 가격 — live=현재가(prop) / saved=분석 시점가(base_price).
+  const metaPrice = isSaved ? basePrice : livePrice;
+  const metaPriceLabel = isSaved ? COPY.hero.metaBasePrice : COPY.hero.metaLivePrice;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-line bg-surface shadow-card">
-      <div className="p-lg">
-        <div className="flex items-center gap-md">
-          <div
-            className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
-              bullish && "bg-signal-up-soft",
-              bearish && "bg-signal-down-soft",
-              !bullish && !bearish && "bg-surface-muted",
-            )}
-          >
-            {bullish && <TrendingUp className="text-signal-up" size={22} />}
-            {bearish && <TrendingDown className="text-signal-down" size={22} />}
-            {!bullish && !bearish && <Minus className="text-text-muted" size={22} />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-h1 font-extrabold leading-tight text-text-strong">
-              {VERDICT_LABEL[final.verdict]}
-            </h3>
-            <div className="mt-1 flex flex-wrap items-center gap-x-sm gap-y-xs text-caption text-text-muted">
-              <span className="inline-flex items-center gap-1">
-                <Clock size={13} />
-                {COPY.verdict.horizonLabel} {COPY.verdict.horizonConcrete[final.time_horizon]}
-              </span>
-            </div>
-          </div>
-          {/* 신호강도(시그널 있으면) 또는 확신도 — 근거는 title. */}
-          <div
-            className={cn(
-              "flex flex-col items-center justify-center rounded-md px-md py-xs shrink-0 min-w-16",
-              bullish && "bg-signal-up-soft",
-              bearish && "bg-signal-down-soft",
-              !bullish && !bearish && "bg-surface-muted",
-            )}
-            title={signal ? COPY.verdict.signalStrengthBasis : COPY.verdict.confidenceBasis}
-          >
-            <span
-              className={cn(
-                "font-extrabold leading-none tabular-nums",
-                signal ? "text-display" : "text-h2",
-                bullish && "text-signal-up",
-                bearish && "text-signal-down",
-                !bullish && !bearish && "text-text-strong",
-              )}
-            >
-              {signal ? Math.round(signal.score) : COPY.verdict.confidenceValue(final.confidence)}
-            </span>
-            <span className="mt-0.5 text-caption font-medium text-text-muted whitespace-nowrap">
-              {signal ? COPY.verdict.signalStrengthShort : COPY.verdict.confidenceShort}
-            </span>
-          </div>
+    <div className={cn("overflow-hidden rounded-md border border-l-4 p-lg", dirBg, dirBorder, dirBar)}>
+      {/* .v-row1 — 판정 라벨 + enum + 신뢰도 칩 + [saved]이전분석 + 우측 신호강도. */}
+      <div className="flex flex-wrap items-center gap-x-sm gap-y-xs">
+        <span className="flex items-baseline gap-1.5">
+          <span className={cn("text-h1 font-extrabold leading-none", dirText)}>
+            {VERDICT_LABEL[final.verdict]}
+          </span>
+          <span className="text-caption font-bold text-text-muted opacity-70">{final.verdict}</span>
+        </span>
+
+        {/* 신뢰도 칩(모델 confidence) — 신호강도가 우측 박스를 차지할 때만(중복 회피). 흰 pill 로 tint 위 대비. */}
+        {signal && (
+          <span className={cn("rounded-pill bg-surface px-sm py-0.5 text-caption font-bold", dirText)}>
+            {COPY.verdict.confidenceShort} {COPY.verdict.confidenceValue(final.confidence)}
+          </span>
+        )}
+
+        {/* 저장모드 stale — 이전(과거) 분석 태그. */}
+        {isSaved && stale && (
+          <span className="rounded-pill bg-surface px-sm py-0.5 text-caption font-bold text-text-muted">
+            {COPY.hero.previousTag}
+          </span>
+        )}
+
+        {/* 우측 신호강도(시그널 있으면) 또는 확신도 값 — 근거는 title. */}
+        <div
+          className="ml-auto flex flex-none flex-col items-end text-right"
+          title={signal ? COPY.verdict.signalStrengthBasis : COPY.verdict.confidenceBasis}
+        >
+          <span className={cn("text-h1 font-extrabold leading-none tabular-nums", dirText)}>
+            {signal ? Math.round(signal.score) : COPY.verdict.confidenceValue(final.confidence)}
+          </span>
+          <span className="mt-0.5 text-caption font-medium text-text-muted whitespace-nowrap">
+            {signal ? COPY.verdict.signalStrengthShort : COPY.verdict.confidenceShort}
+          </span>
         </div>
       </div>
 
-      {/* 목표/손절/손익비 — gap-px + border-line 배경으로 셀 사이 헤어라인. */}
-      <div
-        className={cn(
-          "grid grid-cols-1 gap-px border-t border-border-line bg-border-line",
-          hasRR ? "sm:grid-cols-3" : "sm:grid-cols-2",
-        )}
-      >
-        <StatCell label={targetIsReentry ? COPY.verdict.reentryLabel : COPY.verdict.targetLabel}>
+      {/* .v-lvls — 목표/손절/손익비 흰 박스 3개(손익비 없으면 2개). */}
+      <div className={cn("mt-md grid gap-2", hasRR ? "grid-cols-3" : "grid-cols-2")}>
+        <LvlBox label={targetIsReentry ? COPY.verdict.reentryLabel : COPY.verdict.targetLabel}>
           {!final.target_pct ? (
             <span className="text-mono-numeric tabular-nums text-text-muted">—</span>
           ) : (
-            pctValue(
+            lvlValue(
               final.target_pct,
               basePrice,
               final.target_pct > 0 ? "text-signal-up" : "text-signal-down",
             )
           )}
-        </StatCell>
-        <StatCell label={COPY.verdict.stopLossLabel}>
-          {pctValue(final.stop_loss_pct, basePrice, "text-signal-down")}
-        </StatCell>
+        </LvlBox>
+        <LvlBox label={COPY.verdict.stopLossLabel}>
+          {lvlValue(final.stop_loss_pct, basePrice, "text-signal-down")}
+        </LvlBox>
         {hasRR && (
-          <StatCell label={COPY.verdict.rrLabel}>
-            <span className="text-mono-numeric tabular-nums text-text-strong">
+          <LvlBox label={COPY.verdict.rrLabel}>
+            <span className="text-mono-numeric font-extrabold tabular-nums text-text-strong">
               {final.risk_reward_ratio} : 1
             </span>
-          </StatCell>
+          </LvlBox>
+        )}
+      </div>
+
+      {/* .v-meta — 기간 · 현재가/시점가 · [보정 신뢰도] · [live]상세 힌트. */}
+      <div className="mt-md flex flex-wrap items-center gap-x-md gap-y-xs text-caption text-text-muted">
+        <span>
+          {COPY.hero.metaPeriod}{" "}
+          <b className="font-bold text-text-strong">
+            {COPY.verdict.horizonConcrete[final.time_horizon]}
+          </b>
+        </span>
+        {metaPrice != null && (
+          <span>
+            {metaPriceLabel}{" "}
+            <b className="font-bold tabular-nums text-text-strong">{formatNumber(metaPrice)}</b>
+          </span>
+        )}
+        {calibration && (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-pill px-sm py-0.5 text-caption font-medium",
+              calibration.sufficient
+                ? "bg-accent-vivid-soft text-accent-vivid"
+                : "bg-surface text-text-muted",
+            )}
+            title={
+              calibration.sufficient
+                ? CALIBRATION_BASIS
+                : calibrationInsufficientBasis(calibrationMinSampleN ?? calibration.sample)
+            }
+          >
+            <BadgeCheck size={12} className="flex-shrink-0" />
+            {calibration.sufficient
+              ? calibrationHitRateText(calibration.hitRate, calibration.sample)
+              : CALIBRATION_INSUFFICIENT}
+          </span>
+        )}
+        {!isSaved && (
+          <span className="inline-flex items-center gap-0.5">
+            {COPY.hero.detailHint}
+            <ChevronDown size={13} className="flex-shrink-0" />
+          </span>
         )}
       </div>
     </div>
   );
 }
 
-export function VerdictHero({ final, signal, doneCount, totalCount }: VerdictHeroProps) {
+export function VerdictHero({
+  final,
+  signal,
+  doneCount,
+  totalCount,
+  mode = "live",
+  livePrice = null,
+  stale = false,
+  calibration = null,
+  calibrationMinSampleN,
+}: VerdictHeroProps) {
   return (
     <motion.section
       aria-label={COPY.panel.title}
@@ -255,7 +338,15 @@ export function VerdictHero({ final, signal, doneCount, totalCount }: VerdictHer
       animate={{ opacity: 1, y: 0 }}
     >
       {final ? (
-        <DoneHero final={final} signal={signal} />
+        <DoneHero
+          final={final}
+          signal={signal}
+          mode={mode}
+          livePrice={livePrice}
+          stale={stale}
+          calibration={calibration}
+          calibrationMinSampleN={calibrationMinSampleN}
+        />
       ) : (
         <PendingHero signal={signal} doneCount={doneCount} totalCount={totalCount} />
       )}

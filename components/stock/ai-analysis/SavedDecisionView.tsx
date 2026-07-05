@@ -5,9 +5,9 @@
  *
  * /analyze 저장 결론 클릭·종목 상세 재열기 등으로 패널이 저장 스냅샷을 열 때(로컬, 슬롯 all-pending)의 뷰.
  * 과정(분석가/토론/리스크 대화)은 **저장되지 않으므로**(verdict-only) 회색 12-칩·페이즈 노드를 그리지 않고,
- * 저장된 FinalDecision 전체를 verdict-forward 로 보여준다:
- *   - FinalVerdictCard 단일 카드 — 판정 헤더·목표가/손절/손익비·근거·전략·전망·강점/리스크 전부 포함.
- *     별도 VerdictHero 는 두지 않는다(헤더 중복 — 노스스타 결과뷰 = 단일 카드). 라이브 뷰만 히어로+타임라인.
+ * 저장된 FinalDecision 전체를 verdict-forward 로 보여준다(노스스타 `.fv-stack`):
+ *   - VerdictHero(mode="saved") — 판정 라벨·신호강도·목표/손절/손익비·기간·분석 시점가(글랜스).
+ *   - VerdictDetails — 근거·집행 가이드·전망·강점/리스크(플랫 상세 스택).
  *   - staleness(decisionStaleness): 분석 시점가(base_price) 대비 라이브 현재가가 목표/손절/큰이동/오래됨이면
  *     **상단 앰버 배너 + [지금 기준 재분석]** 로 재분석 권유 + verdict 살짝 낮춤(이전 분석). 유효하면 배너 없이
  *     **하단 subtle 재분석 행**.
@@ -26,7 +26,8 @@ import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
 import { useMe } from "@/hooks/auth/useMe";
 import { evaluateDecisionStaleness } from "@/lib/stock/decisionStaleness";
-import { FinalVerdictCard } from "./FinalVerdictCard";
+import { VerdictHero } from "./VerdictHero";
+import { VerdictDetails } from "./VerdictDetails";
 import type { AIAnalysisDecisionSnapshot } from "@/lib/types/stock/aiAnalysis";
 
 interface SavedDecisionViewProps {
@@ -49,7 +50,7 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
   });
 
   return (
-    // 라이브 뷰와 동일하게 패널 폭을 꽉 채운다. 배치: [앰버 배너?] → verdict 히어로+카드 → [하단 재분석 행?].
+    // 라이브 뷰와 동일하게 패널 폭을 꽉 채운다. 배치: [앰버 배너?] → 히어로 → 상세 → [하단 재분석 행?].
     <div className="w-full space-y-3">
       {/* stale — 상단 앰버 배너 + 지금 기준 재분석. role=status 로 전이 알림. */}
       {stale && reason && (
@@ -78,18 +79,19 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
         </div>
       )}
 
-      {/* 단일 결과 카드(노스스타). FinalVerdictCard 가 판정 헤더+목표가/손절/손익비+상세 전부 →
-          별도 VerdictHero 는 두지 않는다(헤더 중복). stale 이면 살짝 낮춰 "이전 분석" 전달. */}
+      {/* 노스스타 `.fv-stack` — 히어로(글랜스) + 상세(플랫 스택). stale 이면 살짝 낮춰 "이전 분석" 전달. */}
       <div className={cn("space-y-3 transition-opacity", stale && "opacity-90")}>
-        {stale && (
-          <p className="text-caption font-medium text-text-muted">{COPY.savedMode.previousTag}</p>
-        )}
-        <FinalVerdictCard
-          data={snapshot.decision}
+        <VerdictHero
+          final={snapshot.decision}
           signal={snapshot.signal}
+          doneCount={0}
+          totalCount={0}
+          mode="saved"
+          stale={stale}
           calibration={getCalibration(snapshot.decision.confidence)}
           calibrationMinSampleN={minSampleN}
         />
+        <VerdictDetails data={snapshot.decision} />
       </div>
 
       {/* valid(신선) — 하단 subtle 재분석 행. 일반 사용자엔 "AI 분석" 총칭(엔진/모델은 아래 관리자 전용 캡션). */}
