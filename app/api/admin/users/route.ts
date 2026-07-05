@@ -16,7 +16,8 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const identity = await readSession(token);
-  if (!isAtLeast(identity?.role, "superadmin")) {
+  // 전체 목록 조회는 **admin 이상**(admin 은 읽기·승인만, 등급 변경은 superadmin 전용 /users/role).
+  if (!isAtLeast(identity?.role, "admin")) {
     return NextResponse.json(
       { error: "forbidden" },
       { status: 403, headers: { "Cache-Control": "no-store" } },

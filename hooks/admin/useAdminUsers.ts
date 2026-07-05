@@ -1,9 +1,10 @@
 /**
- * 유저 관리(superadmin) 도메인 훅 — 전체 목록 + 등급/승인 액션을 화면에 추상화.
+ * 유저 관리(admin 이상) 도메인 훅 — 전체 목록 + 등급/승인 액션을 화면에 추상화.
  *
  * PRD user-login-auth Phase 2 / frontend.md §2(커스텀훅 의무화):
  *   화면은 본 훅만 import — TanStack 내부 인터페이스 미노출. `mutatingSub`(행 로딩)·`lastError`
  *   (`last_superadmin` = 마지막 최고관리자 강등 차단 409 vs `generic`)로 도메인 의미만 노출.
+ *   목록 조회는 admin 이상, 등급 변경은 superadmin 전용(라우트 재방어 · 패널이 canChangeRole 로 게이트).
  */
 
 "use client";
@@ -18,9 +19,9 @@ import type {
   ProfileStatus,
 } from "@/lib/types/auth/profile";
 
-export type SuperadminUsersError = null | "generic" | "last_superadmin";
+export type AdminUsersError = null | "generic" | "last_superadmin";
 
-export function useSuperadminUsers() {
+export function useAdminUsers() {
   const query = useQueryAllUsers();
   const roleMutation = useMutationSetUserRole();
   const statusMutation = useMutationSetUserStatus();
@@ -46,7 +47,7 @@ export function useSuperadminUsers() {
     void query.refetch();
   }, [query]);
 
-  const lastError: SuperadminUsersError = roleMutation.isError
+  const lastError: AdminUsersError = roleMutation.isError
     ? roleMutation.error?.status === 409
       ? "last_superadmin"
       : "generic"
@@ -66,7 +67,7 @@ export function useSuperadminUsers() {
     isLoading: query.isLoading,
     isError: query.isError,
     refetch,
-    /** 등급 변경(성공 시 목록 자동 갱신). */
+    /** 등급 변경(superadmin 전용 — 패널이 canChangeRole 로 노출 게이트). */
     changeRole,
     /** 승인/취소(status = approved/pending). */
     setStatus,
