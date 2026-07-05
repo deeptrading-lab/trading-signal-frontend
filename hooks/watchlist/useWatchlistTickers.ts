@@ -25,6 +25,8 @@ import {
   markSeeded,
   type WatchlistEntry,
 } from "@/lib/api/watchlist/store";
+import { useToast } from "@/hooks/utils/useToast";
+import { WATCHLIST_LIMIT_MSG } from "@/lib/copy/watchlist/labels";
 
 /** 최초 진입 시 자동 시드되는 국내 대표주 3종 — 삼성전자 / SK하이닉스 / NAVER. */
 export const WATCHLIST_SEED_ENTRIES: readonly WatchlistEntry[] = [
@@ -51,6 +53,7 @@ export type UseWatchlistTickers = {
 };
 
 export function useWatchlistTickers(): UseWatchlistTickers {
+  const toast = useToast();
   // SSR 안전 — 초기엔 빈 배열로 서버/클라 동일, mount 후 store 와 동기화.
   const [entries, setEntries] = useState<WatchlistEntry[]>([]);
 
@@ -67,19 +70,29 @@ export function useWatchlistTickers(): UseWatchlistTickers {
     setEntries(stored);
   }, []);
 
-  const addTicker = useCallback((ticker: string, name?: string) => {
-    setEntries((prev) => {
-      if (
-        prev.some((e) => e.ticker === ticker) ||
-        prev.length >= MAX_TICKERS
-      ) {
-        return prev;
+  const addTicker = useCallback(
+    (ticker: string, name?: string) => {
+      // 토스트는 부수효과라 setState updater 안에서 호출 금지 — 현재 entries 로 먼저 판정.
+      if (entries.some((e) => e.ticker === ticker)) return; // 이미 담김 — 무동작(거짓 성공 방지).
+      if (entries.length >= MAX_TICKERS) {
+        toast.info(WATCHLIST_LIMIT_MSG(MAX_TICKERS));
+        return;
       }
-      const next = [...prev, name ? { ticker, name } : { ticker }];
-      writeEntries(next);
-      return next;
-    });
-  }, []);
+      setEntries((prev) => {
+        // updater 안 동시성 재확인 가드는 유지(연속 호출 시 중복·초과 방지).
+        if (
+          prev.some((e) => e.ticker === ticker) ||
+          prev.length >= MAX_TICKERS
+        ) {
+          return prev;
+        }
+        const next = [...prev, name ? { ticker, name } : { ticker }];
+        writeEntries(next);
+        return next;
+      });
+    },
+    [entries, toast],
+  );
 
   const removeTicker = useCallback((ticker: string) => {
     setEntries((prev) => {

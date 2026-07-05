@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
+import { useToast } from "@/hooks/utils/useToast";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import {
   AGENT_ORDER,
@@ -529,6 +530,7 @@ const EMPTY_PROJECTION = {
 
 export function AIAnalysisProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
   // 종목별 AbortController + 이벤트 핸들러가 동기 조회할 최신 state 미러 + 탭 라벨 이름 캐시.
@@ -577,14 +579,22 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
       }
       dispatch({ kind: "event", ticker, event, now: Date.now() });
 
+      // 슬롯 캐시 우선, 없으면 이름 캐시(line 637 패턴) — 코드 대신 종목명으로 피드백.
+      const name = stateRef.current.slots[ticker]?.name ?? namesRef.current[ticker];
+
       if (event.type === "done") {
         // 분석 완료 → 저장된 결론/목록 캐시 무효화로 /analyze 카드를 자동 갱신.
         //   서버는 final 직후 upsert 를 await 하므로 done 시점엔 Supabase 저장이 끝나 있다.
         queryClient.invalidateQueries({ queryKey: queryKeys.stock.aiDecisions });
         queryClient.invalidateQueries({ queryKey: queryKeys.stock.aiDecision(ticker) });
+        toast.success(COPY.toast.done(name));
+      }
+
+      if (event.type === "error") {
+        toast.error(COPY.toast.failed(name));
       }
     },
-    [queryClient],
+    [queryClient, toast],
   );
 
   // ── 스트림 시작 공통(I/O 만 담당, 상태 전이는 호출 전 dispatch) ─────────────
@@ -612,9 +622,12 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
         const msg = (err as { message?: string })?.message ?? "분석 중 오류가 발생했어요.";
         console.error("[AIAnalysis] fetch 오류:", msg);
         dispatch({ kind: "fetchError", ticker: targetTicker, message: msg });
+        const name =
+          stateRef.current.slots[targetTicker]?.name ?? namesRef.current[targetTicker];
+        toast.error(COPY.toast.failed(name));
       });
     },
-    [handleStreamEvent],
+    [handleStreamEvent, toast],
   );
 
   /** 대상 종목 제외 running 이 상한 이상이면 안내 후 차단. true=차단됨. */
