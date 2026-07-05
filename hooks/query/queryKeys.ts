@@ -93,6 +93,11 @@ export const queryKeys = {
     /** 등락률 순위(급상승/급하락, 실시간 랭킹 탭) — 방향별 분리 캐시. */
     fluctuation: (dir: FluctuationDirection) =>
       ["market", "fluctuation", dir] as const,
+    /** "지금 뜨는 산업" 업종 등락 랭킹 — 인자 없는 단일 키. */
+    sectorRanking: ["market", "sector-ranking"] as const,
+    /** 업종 구성종목(대표/급등) — 업종 코드별 분리 캐시(모달 열릴 때만 조회). */
+    sectorConstituents: (code: string) =>
+      ["market", "sector-constituents", code] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>

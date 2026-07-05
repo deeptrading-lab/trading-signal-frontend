@@ -274,6 +274,7 @@ spacing:
   donut-size: 120px
   donut-thickness: 22px
   table-row-h: 42px
+  sector-row-h: 56px
   table-cell-px: 12px
   disclosure-row-py: 12px
   orderbook-row-h: 30px
