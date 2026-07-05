@@ -97,15 +97,19 @@ function Guide({
   text: string;
 }) {
   return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-md border border-border-line border-l-4 bg-surface-muted px-md py-sm",
-        variant === "new" ? "border-l-accent-vivid" : "border-l-text-muted",
-      )}
-    >
+    // 노스스타 `.guide` — 좌측 바를 absolute 스트립으로(라운드 코너에서 안 휘게 클립). pl-lg 로 바 클리어.
+    <div className="relative overflow-hidden rounded-sm border border-border-line bg-surface-muted py-sm pl-lg pr-md">
+      {/* `.guide::before` — 좌측 방향 바(신규=accent-vivid / 보유=text-muted). */}
+      <div
+        className={cn(
+          "absolute inset-y-0 left-0 w-1",
+          variant === "new" ? "bg-accent-vivid" : "bg-text-muted",
+        )}
+        aria-hidden="true"
+      />
       <p
         className={cn(
-          "mb-0.5 text-caption font-bold",
+          "mb-0.5 text-caption font-extrabold",
           variant === "new" ? "text-accent-vivid" : "text-text-muted",
         )}
       >
@@ -137,8 +141,8 @@ export function VerdictDetails({ data }: { data: FinalDecision }) {
         </div>
       )}
 
-      {/* .fv-reason — 근거(surface-muted 박스). */}
-      <div className="rounded-md border border-border-line bg-surface-muted px-md py-sm text-body-sm leading-relaxed text-text-strong">
+      {/* .fv-reason — 근거(surface-muted 박스). 노스스타 border-radius:8px → rounded-sm. */}
+      <div className="rounded-sm border border-border-line bg-surface-muted px-md py-sm text-body-sm leading-relaxed text-text-strong">
         <InlineBold text={data.reasoning} />
       </div>
 
@@ -158,7 +162,8 @@ export function VerdictDetails({ data }: { data: FinalDecision }) {
       {hasOutlook && (
         <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
           {data.short_term_outlook && (
-            <div className="border-l-2 border-border-line pl-md">
+            // 노스스타 `.outlook{border-left:2px solid var(--border-2)}` — border-line 보다 진한 세로선.
+            <div className="border-l-2 border-text-muted/20 pl-md">
               <p className="text-label-sm text-text-strong">{COPY.verdict.shortTermLabel}</p>
               <p className="mt-0.5 text-caption leading-relaxed text-text-muted">
                 <InlineBold text={data.short_term_outlook} />
@@ -166,7 +171,7 @@ export function VerdictDetails({ data }: { data: FinalDecision }) {
             </div>
           )}
           {data.mid_term_outlook && (
-            <div className="border-l-2 border-border-line pl-md">
+            <div className="border-l-2 border-text-muted/20 pl-md">
               <p className="text-label-sm text-text-strong">{COPY.verdict.midTermLabel}</p>
               <p className="mt-0.5 text-caption leading-relaxed text-text-muted">
                 <InlineBold text={data.mid_term_outlook} />

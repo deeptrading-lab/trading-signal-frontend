@@ -106,10 +106,11 @@ function lvlValue(pct: number, basePrice: number | null, colorClass: string): Re
   );
 }
 
-/** v-lvls 한 칸 — 라벨(위) + 값(아래) 흰 박스. */
+/** v-lvls 한 칸 — 라벨(위) + 값(아래) 반투명 흰 박스. */
 function LvlBox({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-sm border border-border-line bg-surface px-md py-sm">
+    // 노스스타 `.v-lvls .lvl{background:rgba(255,255,255,.6)}` — 히어로 그라데이션이 비치는 반투명 흰 박스.
+    <div className="rounded-sm border border-border-line bg-surface/60 px-md py-sm">
       <div className="text-caption text-text-muted">{label}</div>
       <div className="mt-0.5">{children}</div>
     </div>
@@ -127,7 +128,10 @@ function PendingHero({
   totalCount: number;
 }) {
   return (
-    <div className="rounded-xl border border-border-line bg-surface p-lg shadow-card">
+    // 노스스타 `.verdict.pending` — 완료 히어로와 같은 verdict 패밀리(rounded-md·border·좌측 바, 그림자 없음).
+    <div className="relative overflow-hidden rounded-md border border-border-line bg-surface p-lg">
+      {/* `.verdict.pending::before` — 옅은 좌측 4px 바(대기: border 톤). */}
+      <div className="absolute inset-y-0 left-0 w-1 bg-border-line" aria-hidden="true" />
       <div className="flex items-start justify-between gap-md">
         <div className="min-w-0">
           <div className="flex items-center gap-sm">
@@ -193,9 +197,14 @@ function DoneHero({
   const bearish = isBearishVerdict(final.verdict);
   const isSaved = mode === "saved";
 
-  // 방향 색 토큰 — 좌측 바·배경·테두리·강조 텍스트.
-  const dirBar = bullish ? "border-l-signal-up" : bearish ? "border-l-signal-down" : "border-l-text-muted";
-  const dirBg = bullish ? "bg-signal-up-soft" : bearish ? "bg-signal-down-soft" : "bg-surface-muted";
+  // 방향 색 토큰 — 좌측 4px 바(absolute 스트립)·배경 그라데이션·테두리·강조 텍스트.
+  // 노스스타 `.verdict.buy{background:linear-gradient(180deg,#fff6f7,#fffdfd)}` → 방향-soft → surface 세로 그라데이션.
+  const dirBar = bullish ? "bg-signal-up" : bearish ? "bg-signal-down" : "bg-text-muted";
+  const dirGradient = bullish
+    ? "bg-gradient-to-b from-signal-up-soft to-surface"
+    : bearish
+      ? "bg-gradient-to-b from-signal-down-soft to-surface"
+      : "bg-gradient-to-b from-surface-muted to-surface";
   const dirBorder = bullish
     ? "border-signal-up-soft"
     : bearish
@@ -212,14 +221,18 @@ function DoneHero({
   const metaPriceLabel = isSaved ? COPY.hero.metaBasePrice : COPY.hero.metaLivePrice;
 
   return (
-    <div className={cn("overflow-hidden rounded-md border border-l-4 p-lg", dirBg, dirBorder, dirBar)}>
+    <div className={cn("relative overflow-hidden rounded-md border p-lg", dirGradient, dirBorder)}>
+      {/* 노스스타 `.verdict::before` — 좌측 4px 방향 바(absolute 스트립). overflow-hidden 로 클립돼
+          border-l-4 처럼 라운드 코너에서 휘지 않고 직선으로 떨어진다. */}
+      <div className={cn("absolute inset-y-0 left-0 w-1", dirBar)} aria-hidden="true" />
       {/* .v-row1 — 판정 라벨 + enum + 신뢰도 칩 + [saved]이전분석 + 우측 신호강도. */}
       <div className="flex flex-wrap items-center gap-x-sm gap-y-xs">
         <span className="flex items-baseline gap-1.5">
           <span className={cn("text-h1 font-extrabold leading-none", dirText)}>
             {VERDICT_LABEL[final.verdict]}
           </span>
-          <span className="text-caption font-bold text-text-muted opacity-70">{final.verdict}</span>
+          {/* 노스스타 `.badge small{opacity:.72}` — 판정색을 옅게(muted 회색 아님). */}
+          <span className={cn("text-caption font-bold opacity-70", dirText)}>{final.verdict}</span>
         </span>
 
         {/* 신뢰도 칩(모델 confidence) — 신호강도가 우측 박스를 차지할 때만(중복 회피). 흰 pill 로 tint 위 대비. */}
