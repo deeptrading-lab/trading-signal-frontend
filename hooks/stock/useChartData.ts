@@ -41,6 +41,15 @@ const WARMUP_DAYS: Record<ChartPeriod, number> = { D: 190, W: 900, M: 2400 };
 const MAX_FETCH_DAYS = 3000; // 라우트 MAX_DAYS 와 정합(초과 클램프)
 
 /**
+ * 보기 구간(days) → 실제 fetch 봉 수(워밍업 포함, MAX 클램프). 아래 useQueryStockChart 요청과 동일 키.
+ *   Peek 선반입이 이 함수로 **똑같은 쿼리키**(period·fetchDays)를 계산해야 마운트 시 캐시 히트한다
+ *   (WARMUP_DAYS 를 프리패치 쪽에 복제하면 값 드리프트로 키가 어긋나 중복 페치 발생 → 단일 출처 유지).
+ */
+export function warmupFetchDays(period: ChartPeriod, days: number): number {
+  return Math.min(days + WARMUP_DAYS[period], MAX_FETCH_DAYS);
+}
+
+/**
  * 볼린저밴드(20/2) 오버레이 필드 — 가격 시리즈(캔들·라인)에 함께 실어 메인 차트에 그린다.
  *   `bbRange`=[하단, 상단] 은 recharts 범위 Area(음영 밴드)용(캔들 wickRange 와 동일 메커니즘).
  *   룩백(20봉) 전 봉은 null → 렌더에서 미표시.
@@ -116,7 +125,7 @@ export function useChartData(
   //   워밍업 포함 fetch — 보기 구간(days)보다 더 과거까지 받아 지표 계산용 데이터 확보.
   //   ※ useSignalResult 의 `D`/200 요청과는 `days` 키가 달라 초기 1왕복 중복이 있으나, 기간 선택기가
   //     `days` 를 가변으로 두므로 안전한 단일 키 공유가 어렵다(사유·보류 근거는 useSignalResult 헤더 참고).
-  const fetchDays = Math.min(days + WARMUP_DAYS[period], MAX_FETCH_DAYS);
+  const fetchDays = warmupFetchDays(period, days);
   const daily = useQueryStockChart(ticker, {
     period,
     days: fetchDays,

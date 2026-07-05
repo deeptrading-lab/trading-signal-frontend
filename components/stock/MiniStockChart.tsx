@@ -28,6 +28,12 @@ import { CandleTooltip } from "@/components/profile/chart/CandleTooltip";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatMoney } from "@/lib/utils/formatMoney";
 
+/**
+ * 미니 차트 기본 표시 구간(캘린더일, 약 3개월). Peek 선반입이 프리패치 키를 이 값으로 맞춘다
+ *   (여기 default 와 프리패치가 한 상수를 공유 — 값이 갈리면 캐시 미스).
+ */
+export const MINI_CHART_DEFAULT_DAYS = 90;
+
 export interface MiniStockChartProps {
   ticker: string;
   /** 표시 구간(캘린더일). 기본 90(약 3개월). */
@@ -40,7 +46,7 @@ export interface MiniStockChartProps {
 
 export function MiniStockChart({
   ticker,
-  days = 90,
+  days = MINI_CHART_DEFAULT_DAYS,
   height = 120,
   showAxis = false,
 }: MiniStockChartProps) {

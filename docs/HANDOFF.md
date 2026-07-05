@@ -6099,3 +6099,40 @@
   - 국내/해외(US) 랭킹 토글 — 후속 PRD
   - 기간별 랭킹(1일·1주·1개월·1년) — 현행 실시간 스냅샷 유지, 후속
   - 운영: prod 주간 장중(평일 09~15:30) 산업 fan-out EGW00201 실측 — 관측 시 활성탭 한정/N 축소 폴백(PRD §8 q2)
+
+### 2026-07-05 — perf(peek): 미리보기 차트 hover 선반입 + recharts 청크 워밍 (#253)
+
+- **slug**: `peek-chart-prefetch` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/253
+- **요약**: perf(peek): 미리보기 차트 hover 선반입 + recharts 청크 워밍
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 실시간 순위 리스트에서 행에 hover 하면 미니 차트를 그려주는데, 캐시 안 된 종목은 **1~2초 공백** 뒤에 차트가 뜬다(사용자 관찰). 원인은 (1) 일봉 차트 쿼리가 **팝오버가 마운트된 뒤에야** 페치를 시작하고, (2) 첫 hover 는 recharts 지연 로드 청크 다운로드까지 기다리기 때문.
+  > 
+  > ## 변경
+  > 경량 UX 폴리시(PRD 없음). 두 레버로 지연을 흡수:
+  > 
+  > 1. **hover 의도 시점 차트 선반입** — `usePrefetchStockDetail({ warmDailyChart: true })` opt-in. Peek 지면(랭킹·관심·검색)만 hover 의도(120ms)에서 일봉 차트 쿼리를 미리 데운다. 팝오버가 뜰 땐 캐시 히트 → 즉시 그림. 상세 이동 전용 선반입 지면은 차트를 안 열므로 기본 false(과페치 없음).
+  > 2. **recharts 청크 유휴 워밍** — `preloadPeekChunk()` 를 마우스 기기(`pointer: fine`)에서 유휴 시 세션당 1회 호출. 첫 hover 의 청크 다운로드 지연 제거. 터치 전용 기기는 hover peek 이 없어 recharts 를 미리 받지 않는다(mobile-perf 무회귀).
+  > 
+  > ### 키 정합
+  > 프리패치 쿼리키는 `warmupFetchDays("D", MINI_CHART_DEFAULT_DAYS)`(단일 출처)로 `useChartData` 요청과 **정확히 동일**하게 맞춘다. WARMUP_DAYS 복제 시 값 드리프트로 캐시 미스가 나므로 단위 테스트로 고정.
+  > 
+  > ## 영향 범위
+  > - `usePrefetchStockDetail` — optional 인자 추가(기본 false). 기존 3개 detail-nav 콜러(useStockNavClick·StockSearchContainer·InvestorFlowTop10Card) 동작 무변경.
+  > - `GlobalStockPeek` — dynamic 정의를 `peekDynamic.ts` 로 이전(동일 청크, 코드 스플리팅 유지).
+  > - rate-limit: 차트 선반입은 hover 의도(120ms) 게이트 + prefetchQuery fresh no-op(1일 staleTime)라 단일 활성 Peek 설계와 정합.
+  > 
+  > ## 테스트
+  > - `hooks/stock/__tests__/peekChartPrefetch.test.ts` — 프리패치 키 = useChartData 요청 정합(280봉) 고정.
+  > - `npx tsc --noEmit` clean · `eslint` clean · `npm run build` 통과.
+  > 
+  > ## 다음 작업
+  > - Peek 배치 실험(팝업 vs 순위표 우측 도킹 패널) — 디자이너 레이아웃 판단 선행 (`project_realtime-ranking-followups`).
+  > - 보이는 상위 9~14행 배경 프리패치(requestIdleCallback 스태거) — 더 공격적 옵션, 이번엔 hover 의도 프리패치만 도입.
+  > - 실시간 순위 값 컬럼(거래대금 순 원값)·기간별 랭킹.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - Peek 배치 실험(팝업 vs 순위표 우측 도킹 패널) — 디자이너 레이아웃 판단 선행 (`project_realtime-ranking-followups`).
+  - 보이는 상위 9~14행 배경 프리패치(requestIdleCallback 스태거) — 더 공격적 옵션, 이번엔 hover 의도 프리패치만 도입.
+  - 실시간 순위 값 컬럼(거래대금 순 원값)·기간별 랭킹.

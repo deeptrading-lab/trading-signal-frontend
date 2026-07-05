@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { usePrefetchStockDetail } from "@/hooks/stock/usePrefetchStockDetail";
+import { preloadPeekChunk } from "@/components/stock/peekDynamic";
 import {
   useStockPeekActions,
   type PeekSeed,
@@ -14,9 +15,16 @@ import {
  * 좌표 계산·클램프·오버레이 렌더는 전부 전역 호스트가 담당(행마다 중복 로직 없음).
  *
  * ## 선반입과 동일 의도 신호에 부착
- * 내부에서 `usePrefetchStockDetail` 을 함께 소유해, 상세 선반입과 **똑같은 120ms 의도 지연**으로
- * Peek 을 띄운다(스쳐 지나가는 hover 는 미발화). 선반입이 데운 `stock.price` 캐시를 Peek 의
- * `useQueryStockPrice` 가 그대로 히트하므로 추가 호출이 없다.
+ * 내부에서 `usePrefetchStockDetail({ warmDailyChart: true })` 을 함께 소유해, 상세 선반입과
+ * **똑같은 120ms 의도 지연**으로 Peek 을 띄운다(스쳐 지나가는 hover 는 미발화). 선반입이 데운
+ * `stock.price` + **일봉 차트** 캐시를 Peek 의 `useQueryStockPrice`·`MiniStockChart` 가 그대로 히트하므로
+ * 팝오버가 뜰 땐 차트 페치가 이미 끝나 있어 hover 후 1~2초 공백이 사라진다.
+ *
+ * ## 첫 hover 청크 워밍(마우스 기기·유휴 1회)
+ * 팝오버/시트(→ recharts)는 지연 로드라 **첫 소환** 은 청크 다운로드를 기다린다. 마우스 기기
+ * (`pointer: fine`)에서 유휴 시점에 `preloadPeekChunk()` 를 한 번 호출해 청크를 미리 데운다 —
+ * 데이터 프리패치(위)와 합쳐 첫 peek 도 즉시 그린다. 터치 전용 기기는 hover peek 이 없어 워밍하지
+ * 않는다(recharts 불필요 로드 방지). 모듈 가드로 세션당 1회만 스케줄(행이 다수라도 중복 없음).
  *
  * ## 입력 모달리티로 팝오버 vs 시트 분기(뷰포트 아님)
  * 데스크탑=hover 팝오버, 모바일=롱프레스 시트. 분기 기준은 **입력 종류**(mouse vs touch)이지
@@ -46,6 +54,20 @@ const MOVE_TOLERANCE = 10;
 const TOUCH_GUARD_MS = 600;
 /** 포커스 앵커 — 행 좌측에서 안으로 들인 지점(커서 앵커 근사). */
 const FOCUS_ANCHOR_INSET = 40;
+
+/** 세션당 1회 청크 워밍 가드 — Peek 행이 다수라도 preload 를 한 번만 스케줄한다. */
+let peekChunkWarmScheduled = false;
+
+/** 마우스 기기 유휴 시점에 Peek 청크(→ recharts)를 1회 미리 로드(터치 전용 기기는 skip). */
+function schedulePeekChunkWarm(): void {
+  if (peekChunkWarmScheduled || typeof window === "undefined") return;
+  // hover peek 이 없는 터치 전용 기기는 recharts 를 미리 받지 않는다.
+  if (!window.matchMedia?.("(pointer: fine)").matches) return;
+  peekChunkWarmScheduled = true;
+  const ric = window.requestIdleCallback;
+  if (typeof ric === "function") ric(() => preloadPeekChunk(), { timeout: 2000 });
+  else window.setTimeout(() => preloadPeekChunk(), 800);
+}
 
 export interface UseStockPeekArgs {
   ticker: string;
@@ -77,7 +99,14 @@ export function useStockPeek({
   seed,
 }: UseStockPeekArgs): StockPeekBinding {
   const actions = useStockPeekActions();
-  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail();
+  const { prefetch, onIntent, cancelIntent } = usePrefetchStockDetail({
+    warmDailyChart: true,
+  });
+
+  // 마우스 기기 유휴 시점에 Peek 청크를 1회 미리 로드(첫 hover 청크 지연 흡수). 모듈 가드로 세션당 1회.
+  useEffect(() => {
+    schedulePeekChunkWarm();
+  }, []);
 
   const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
