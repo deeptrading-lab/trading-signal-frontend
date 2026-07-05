@@ -26,7 +26,11 @@ import {
   type WatchlistEntry,
 } from "@/lib/api/watchlist/store";
 import { useToast } from "@/hooks/utils/useToast";
-import { WATCHLIST_LIMIT_MSG } from "@/lib/copy/watchlist/labels";
+import {
+  WATCHLIST_ADDED,
+  WATCHLIST_LIMIT_MSG,
+  WATCHLIST_REMOVED,
+} from "@/lib/copy/watchlist/labels";
 
 /** 최초 진입 시 자동 시드되는 국내 대표주 3종 — 삼성전자 / SK하이닉스 / NAVER. */
 export const WATCHLIST_SEED_ENTRIES: readonly WatchlistEntry[] = [
@@ -90,18 +94,25 @@ export function useWatchlistTickers(): UseWatchlistTickers {
         writeEntries(next);
         return next;
       });
+      toast.success(WATCHLIST_ADDED(name));
     },
     [entries, toast],
   );
 
-  const removeTicker = useCallback((ticker: string) => {
-    setEntries((prev) => {
-      if (!prev.some((e) => e.ticker === ticker)) return prev;
-      const next = prev.filter((e) => e.ticker !== ticker);
-      writeEntries(next);
-      return next;
-    });
-  }, []);
+  const removeTicker = useCallback(
+    (ticker: string) => {
+      const entry = entries.find((e) => e.ticker === ticker);
+      if (!entry) return; // 미보유 — 무동작.
+      setEntries((prev) => {
+        if (!prev.some((e) => e.ticker === ticker)) return prev;
+        const next = prev.filter((e) => e.ticker !== ticker);
+        writeEntries(next);
+        return next;
+      });
+      toast.info(WATCHLIST_REMOVED(entry.name));
+    },
+    [entries, toast],
+  );
 
   const tickers = useMemo(() => entries.map((e) => e.ticker), [entries]);
 
