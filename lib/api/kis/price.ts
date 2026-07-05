@@ -68,7 +68,7 @@ async function buildAuthHeaders(trId: string): Promise<AuthHeaders> {
  * KIS `inquire-price` 값을 best-effort 합성한다(`tossEnrich.ts` 설계 제약 참조).
  * 외인비율은 일 단위 데이터라 10분 캐시로 충분.
  */
-const loadKisPriceMeta = createKisMetaLoader({
+export const loadKisPriceMeta = createKisMetaLoader({
   ttlMs: 10 * 60_000,
   failureTtlMs: 60_000,
   budgetMs: 1_200,

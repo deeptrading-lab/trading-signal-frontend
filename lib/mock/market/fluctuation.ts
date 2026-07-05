@@ -11,21 +11,21 @@ import type {
 } from "@/lib/types/market/fluctuation";
 
 const MOCK_UP: FluctuationRow[] = [
-  { ticker: "096770", name: "SK이노베이션", price: 128500, changePercent: 12.4, direction: "up" },
-  { ticker: "011200", name: "HMM", price: 21850, changePercent: 9.8, direction: "up" },
-  { ticker: "066570", name: "LG전자", price: 98700, changePercent: 7.6, direction: "up" },
-  { ticker: "010140", name: "삼성중공업", price: 14320, changePercent: 6.1, direction: "up" },
-  { ticker: "047810", name: "한국항공우주", price: 62400, changePercent: 4.9, direction: "up" },
-  { ticker: "003670", name: "포스코퓨처엠", price: 241000, changePercent: 3.3, direction: "up" },
+  { ticker: "096770", name: "SK이노베이션", price: 128500, changePercent: 12.4, direction: "up", marketCap: 12_500_000_000_000, sector: "화학" },
+  { ticker: "011200", name: "HMM", price: 21850, changePercent: 9.8, direction: "up", marketCap: 21_300_000_000_000, sector: "운수창고업" },
+  { ticker: "066570", name: "LG전자", price: 98700, changePercent: 7.6, direction: "up", marketCap: 16_100_000_000_000, sector: "전기·전자" },
+  { ticker: "010140", name: "삼성중공업", price: 14320, changePercent: 6.1, direction: "up", marketCap: 13_600_000_000_000, sector: "운수장비" },
+  { ticker: "047810", name: "한국항공우주", price: 62400, changePercent: 4.9, direction: "up", marketCap: 6_080_000_000_000, sector: "운수장비" },
+  { ticker: "003670", name: "포스코퓨처엠", price: 241000, changePercent: 3.3, direction: "up", marketCap: 18_700_000_000_000, sector: "화학" },
 ];
 
 const MOCK_DOWN: FluctuationRow[] = [
-  { ticker: "247540", name: "에코프로비엠", price: 132900, changePercent: -11.7, direction: "down" },
-  { ticker: "091990", name: "셀트리온헬스케어", price: 68300, changePercent: -8.4, direction: "down" },
-  { ticker: "068270", name: "셀트리온", price: 174200, changePercent: -6.9, direction: "down" },
-  { ticker: "035900", name: "JYP Ent.", price: 61800, changePercent: -5.2, direction: "down" },
-  { ticker: "058470", name: "리노공업", price: 158900, changePercent: -4.1, direction: "down" },
-  { ticker: "022100", name: "포스코DX", price: 41250, changePercent: -3.0, direction: "down" },
+  { ticker: "247540", name: "에코프로비엠", price: 132900, changePercent: -11.7, direction: "down", marketCap: 13_000_000_000_000, sector: "전기·전자" },
+  { ticker: "091990", name: "셀트리온헬스케어", price: 68300, changePercent: -8.4, direction: "down", marketCap: 10_700_000_000_000, sector: "의약품" },
+  { ticker: "068270", name: "셀트리온", price: 174200, changePercent: -6.9, direction: "down", marketCap: 37_800_000_000_000, sector: "의약품" },
+  { ticker: "035900", name: "JYP Ent.", price: 61800, changePercent: -5.2, direction: "down", marketCap: 2_190_000_000_000, sector: "서비스업" },
+  { ticker: "058470", name: "리노공업", price: 158900, changePercent: -4.1, direction: "down", marketCap: 2_420_000_000_000, sector: "전기·전자" },
+  { ticker: "022100", name: "포스코DX", price: 41250, changePercent: -3.0, direction: "down", marketCap: 6_270_000_000_000, sector: "서비스업" },
 ];
 
 export function getMockFluctuation(

@@ -285,7 +285,11 @@
         "disclosure-row-py": "12px",
         "orderbook-row-h": "30px",
         "orderbook-row-h-compact": "24px",
-        "strength-gauge-h": "10px"
+        "strength-gauge-h": "10px",
+        "header-row-h": "30px",
+        "col-sector": "128px",
+        "col-marketcap": "96px",
+        "badge-h": "20px"
       },
       "screens": {
         "sm": "640px",

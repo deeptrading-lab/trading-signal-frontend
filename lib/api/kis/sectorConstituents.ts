@@ -26,8 +26,7 @@ import { getKisClient } from "./client";
 import { makeKisBusinessError, makeKisTransportError } from "./errors";
 import { toNumber } from "./mappers";
 import { getAccessToken } from "./token";
-import { getTossStockMaster } from "@/lib/api/toss/stockMaster";
-import { isTossConfigured } from "@/lib/api/toss/client";
+import { loadMarketCaps } from "./marketCapEnrich";
 import type { FlowDirection } from "@/lib/types/flow/top10";
 import type { SectorConstituent } from "@/lib/types/market/sectors";
 
@@ -63,36 +62,21 @@ export function mapSectorConstituentItem(
   };
 }
 
-/** 시총 enrich 동시성 캡 — 토스 `/api/v1/stocks` 조회(24h 캐시)라도 콜드 시 폭주 방지. */
-const MARKETCAP_CONCURRENCY = 6;
-
 /**
  * 구성종목에 시가총액(토스 마스터 `sharesOutstanding × price`)을 best-effort 로 채운다.
  *
- * 토스 미설정이면 즉시 원본 반환(전부 null). 설정 시 동시성 캡 배치로 마스터를 조회해
- * `shares × price` 계산, 실패·미상장은 null 유지(fail-soft). 원본 순서 보존.
+ * 공용 `loadMarketCaps`(`marketCapEnrich.ts`) 배치 로더를 재사용한다 — 토스 미설정이면 원본(전부 null),
+ * 설정 시 동시성 캡 배치로 계산, 실패·미상장은 null 유지(fail-soft). 원본 순서 보존.
  */
 export async function enrichMarketCap(
   constituents: SectorConstituent[],
 ): Promise<SectorConstituent[]> {
-  if (!isTossConfigured() || constituents.length === 0) return constituents;
-
-  const enriched = [...constituents];
-  for (let i = 0; i < enriched.length; i += MARKETCAP_CONCURRENCY) {
-    const batch = enriched.slice(i, i + MARKETCAP_CONCURRENCY);
-    const results = await Promise.allSettled(
-      batch.map((c) => getTossStockMaster(c.ticker)),
-    );
-    results.forEach((result, j) => {
-      if (result.status !== "fulfilled" || !result.value) return;
-      const shares = toNumber(result.value.sharesOutstanding);
-      const price = batch[j].price;
-      if (shares > 0 && price > 0) {
-        batch[j].marketCap = shares * price;
-      }
-    });
-  }
-  return enriched;
+  if (constituents.length === 0) return constituents;
+  const caps = await loadMarketCaps(constituents);
+  return constituents.map((c) => ({
+    ...c,
+    marketCap: caps.get(c.ticker) ?? c.marketCap,
+  }));
 }
 
 /**
