@@ -6431,3 +6431,33 @@
   > - 기간별 랭킹·⑥ DART 확장·US 주식(모두 큰 건).
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 기간별 랭킹·⑥ DART 확장·US 주식(모두 큰 건).
+
+### 2026-07-05 — fix(peek): 우측 도크를 순위표 옆에 붙임 (콘텐츠 우측 앵커) (#270)
+
+- **slug**: `peek-dock-anchor` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/270
+- **요약**: fix(peek): 우측 도크를 순위표 옆에 붙임 (콘텐츠 우측 앵커)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 지적(스크린샷): 넓은 화면에서 우측 도크가 **브라우저 창 오른쪽 끝에 딱 붙어** 순위표와 동떨어져 보인다. 순위표 바로 옆에 붙어야 자연스럽다.
+  > 
+  > ## 변경
+  > 도크 좌측 앵커를 **뷰포트 우측 끝 → 콘텐츠(순위표) 우측 끝 + 12px** 으로 변경:
+  > - `measureDockWidth`(우측 여백 폭) → `measureDockLayout({left, width})`.
+  > - `left = main.left + min(main.width, (main.width+1152)/2) + 12`(콘텐츠 우측 끝 + 간격).
+  > - `width = viewportW − left − 16` 을 `[248, 400]` 클램프.
+  > - 결과: **표 옆에 붙고**, 초광폭이면 도크 오른쪽에 빈 공간(far-right)이 남는다(기존=far-right 고정으로 표와 멀었음).
+  > 
+  > ## 무회귀·안전
+  > - `<main>` 미발견 시 우측 가장자리 폴백(기존 동작). ≥1920 게이트가 최소 여백 보장.
+  > - 세로중앙 고정·pointer-events-auto·툴팁·클릭이동·hover-hold(#269) 무변경. 팝오버/시트/<1920 무영향.
+  > - lazy init 실측(client-only dock)로 첫 페인트 깜빡임 0. 신규 Tailwind 0(폭·좌측 인라인 style).
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean. 격리 worktree(node_modules exclude 가드).
+  > 
+  > ## 다음 작업
+  > - 도크 차트 다중 패널화(가격+이평선·거래량·MACD·RSI) — 사용자 요청, 별도 PR 예정.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 도크 차트 다중 패널화(가격+이평선·거래량·MACD·RSI) — 사용자 요청, 별도 PR 예정.
