@@ -20,9 +20,19 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   icon: "button-icon",
 };
 
+export type ButtonSize = "sm" | "md";
+
+/** sm — 행 인라인 액션용 컴팩트(드롭다운 스케일 정합). 합성 클래스의 h/px/text 를 유틸이 덮어씀. */
+const SIZE_CLASS: Record<ButtonSize, string> = {
+  md: "",
+  sm: "h-auto px-sm py-xs text-caption",
+};
+
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  /** 크기 — md(기본) / sm(컴팩트 행 인라인 액션). */
+  size?: ButtonSize;
   /** 처리 중 — 스피너 표시 + 비활성(중복 클릭 방지). */
   loading?: boolean;
 }
@@ -30,6 +40,7 @@ export interface ButtonProps
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = "primary",
+    size = "md",
     className,
     type = "button",
     loading = false,
@@ -43,7 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={cn(VARIANT_CLASS[variant], className)}
+      className={cn(VARIANT_CLASS[variant], SIZE_CLASS[size], className)}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}
