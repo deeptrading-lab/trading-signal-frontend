@@ -139,19 +139,21 @@ function SectorRow({
         {sector.name}
       </span>
 
-      {/* 등락률 + breadth(세로 우정렬) */}
-      <div className="flex shrink-0 flex-col items-end">
-        <span
-          className={cn("text-body-sm-strong", changeClass(sector.direction))}
-        >
-          {formatPct(sector.changePct, { sign: true })}
-        </span>
-        {sector.total > 0 && (
-          <span className="text-caption text-text-muted">
-            {sectorsBreadthSummary(sector.up, sector.total)}
-          </span>
+      {/* 등락률 — 우측 컬럼(고정폭 정렬). 이전엔 breadth 와 세로 스택이라 행이 높았다(사용자 지적). */}
+      <span
+        className={cn(
+          "w-16 shrink-0 text-right text-body-sm-strong",
+          changeClass(sector.direction),
         )}
-      </div>
+      >
+        {formatPct(sector.changePct, { sign: true })}
+      </span>
+
+      {/* 상승 종목수(breadth) — 등락률과 **별도 가로 컬럼**(토스 UI 정합)으로 한 줄 유지. sm+ 노출
+          (좁은 모바일은 폭이 부족해 숨김 — 실시간 순위표의 부가 컬럼 md+ 관례와 동일 취지). total 0 은 빈칸. */}
+      <span className="hidden w-32 shrink-0 text-right text-caption text-text-muted sm:block">
+        {sector.total > 0 ? sectorsBreadthSummary(sector.up, sector.total) : ""}
+      </span>
     </ListRow>
   );
 }
