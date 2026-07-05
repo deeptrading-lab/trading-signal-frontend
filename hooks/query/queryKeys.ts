@@ -98,6 +98,9 @@ export const queryKeys = {
     /** 업종 구성종목(대표/급등) — 업종 코드별 분리 캐시(모달 열릴 때만 조회). */
     sectorConstituents: (code: string) =>
       ["market", "sector-constituents", code] as const,
+    /** 스파크라인 배치 — 티커 집합별 캐시(정렬·join 으로 안정 키, 순서 무관 동일 캐시). */
+    sparklines: (tickers: readonly string[]) =>
+      ["market", "sparklines", [...tickers].sort().join(",")] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>

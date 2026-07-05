@@ -6567,3 +6567,44 @@
   > - ⑥ 확장(매출/영업이익률 DART·기간수익률·해외) — 별도 큰 건.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - ⑥ 확장(매출/영업이익률 DART·기간수익률·해외) — 별도 큰 건.
+
+### 2026-07-05 — fix(market): 구성종목 모달 — 배치 스파크라인 + UI 통일 + 시총탭 정리 (#277)
+
+- **slug**: `sector-modal-polish` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/277
+- **요약**: fix(market): 구성종목 모달 — 배치 스파크라인 + UI 통일 + 시총탭 정리
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경 (사용자 지적)
+  > 구성종목 모달의 문제 4가지:
+  > 1. **차트 API 콜 폭주** — 행마다 개별 `MiniStockChart` = top-30 열면 최대 30개 `/api/stock/chart` 동시 발사(레이트리밋 위험), 빈 네모가 종목별로 **순차** 채워짐(지연 로딩도 근본 해결 X).
+  > 2. **우하단만 직각** — 스크롤 본문/스크롤바가 둥근 모서리를 뚫음.
+  > 3. **폰트 통일성** — 모달 숫자만 순위표보다 크게 튐(현재가·등락률 크기 미지정 → 상속).
+  > 4. **시가총액 탭 무반응** — marketCap 이 prod 에서 전부 null(토스 미설정) → 정렬 no-op.
+  > 
+  > ## 변경
+  > 
+  > ### ① 배치 스파크라인 (개별 콜 → 일괄, 사용자 선택)
+  > - 신규 BFF `GET /api/market/sparklines?tickers=a,b,c` — **한 요청**으로 전 종목 최근 종가를 서버가 모아 반환(동시성 캡 8·이중 게이트·`withTimeout`·never-throw). `loadSparklines`=`fetchStockDaily`(일자별 시세 ~30봉) 종가(지표 워밍업 불필요→경량).
+  > - `useQuerySectorSparklines` 배치 훅 + `getSparklines` 어댑터 + `queryKeys.market.sparklines`(티커 정렬·join 안정 키).
+  > - **경량 SVG `Sparkline`** 컴포넌트(recharts 30개 대신 `polyline` 하나, `currentColor`+`text-signal-up/down` 토큰색, 다크 자동) — 구간 추세 색.
+  > - 모달: 차트 열이 **스켈레톤 → 배치 도착 시 전 행 일괄** 표시(빈 네모·순차 렌더 소멸). 개별 차트 콜 0.
+  > 
+  > ### ② 우하단 직각 → `overflow-hidden`
+  > 모달 컨테이너에 `overflow-hidden` 추가 → 스크롤이 둥근 모서리로 클립.
+  > 
+  > ### ③ 폰트 순위표 정합
+  > 종목명·현재가·등락률 `text-body-sm-strong` + 헤어라인 행(`border-b`, `-mx-sm px-sm rounded-sm hover`) — 실시간 순위표/섹터 섹션과 동일 밀도.
+  > 
+  > ### ④ 시가총액 탭 정리
+  > `marketCap` 이 전부 null 이면(토스 미설정) 탭을 **숨김**(죽은 탭 방지). 토스 설정 시 자동 노출.
+  > 
+  > ## 무회귀·안전
+  > - 레이트리밋: 개별 30콜(클라 버스트) → 서버 배치 1요청(동시성 캡 8·staleTime 캐시). 
+  > - 신규 커스텀 Tailwind/토큰 0(Sparkline 은 토큰 색 클래스+currentColor). 가용성·breadth·모달 열기 무변경.
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean · **`npm run build` Compiled successfully**(실 node_modules, `/api/market/sparklines` 라우트 등록 확인).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (옵션) 시총을 KIS(상장주수×가)로 계산해 시가총액 탭을 prod 에서도 활성.
+  - ⑥ 확장(매출/영업이익률 DART·기간수익률·해외).

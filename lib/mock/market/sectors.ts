@@ -58,3 +58,26 @@ export function getMockSectorConstituents(
     asOf: new Date().toISOString(),
   };
 }
+
+/**
+ * 스파크라인 mock — 티커 문자에서 결정론적으로 파생한 완만한 파형(로컬/무키 demo 용, Math.random 없음).
+ *   30점, base 근처를 사인+틱으로 흔들어 실데이터 없이도 모달 차트 열을 시연.
+ */
+export function getMockSparklines(
+  tickers: readonly string[],
+): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  const POINTS = 30;
+  for (const ticker of tickers) {
+    const seed = [...ticker].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+    const base = 1000 + (seed % 50) * 100;
+    const amp = base * 0.06;
+    const drift = ((seed % 7) - 3) * 0.004; // 완만한 추세(상/하).
+    out[ticker] = Array.from({ length: POINTS }, (_, i) => {
+      const wave = Math.sin((i + seed) * 0.5) * amp;
+      const tick = ((seed >> (i % 5)) & 1 ? 1 : -1) * amp * 0.15;
+      return Math.round(base * (1 + drift * i) + wave + tick);
+    });
+  }
+  return out;
+}
