@@ -283,7 +283,6 @@ spacing:
   header-row-h: 30px
   col-sector: 128px
   col-marketcap: 96px
-  badge-h: 20px
 rounded:
   sm: 8px
   md: 12px
