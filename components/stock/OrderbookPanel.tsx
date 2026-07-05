@@ -19,7 +19,7 @@
 import { cn } from "@/lib/utils/cn";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { useQueryStockOrderbook } from "@/hooks/stock/useQueryStockOrderbook";
-import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { useMarketStatus } from "@/hooks/market/useMarketStatus";
 import { ORDERBOOK_COPY as C } from "@/lib/copy/stock/orderbook";
 import type { Orderbook, OrderbookLevel } from "@/lib/types/stock/orderbook";
 
@@ -296,7 +296,8 @@ function RatioBar({
 
 function OrderbookEmpty() {
   // 장중 빈 응답은 "미지원", 장외는 "장 마감" 으로 안내(둘 다 동일 제목).
-  const closed = !isKstMarketHoursWithCloseGrace();
+  // 폴링 게이트와 동일 기준(②의 `isRegularOpen`, 공휴일 인지·fail-open)으로 마감 표시가 어긋나지 않게.
+  const closed = !useMarketStatus().isRegularOpen;
   return (
     <div className="flex flex-col items-center gap-xs py-lg text-center">
       <p className="text-body-sm text-text-strong">{C.emptyTitle}</p>

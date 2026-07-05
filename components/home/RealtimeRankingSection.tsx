@@ -1,35 +1,32 @@
 /**
- * RealtimeRankingSection — 홈 "실시간" 랭킹(카드리스 플랫 표).
+ * RealtimeRankingSection — 홈 "실시간" 랭킹(카드리스 플랫 표), **가용성 기반** 렌더.
  *
- * home-reskin 신규. 노스스타 `#homeScreen .sec(실시간)` 정합 — 박스 없는 흰 바탕 표:
- *   [♥ 관심] [순위] [로고닷+종목명] [(산업)] [현재가] [등락률]. 행 헤어라인만, 아웃라인 박스 없음.
+ * home-reskin 신규 · `market-status-aware-home` 가용성 개정. 노스스타 `#homeScreen .sec(실시간)` 정합 —
+ * 박스 없는 흰 바탕 표: [♥ 관심] [순위] [로고닷+종목명] [(산업)] [현재가] [등락률]. 행 헤어라인만.
  *
- * 탭(거래량/거래대금/급상승/급하락) **4종 모두 실배선**:
+ * 탭(거래량/거래대금/급상승/급하락) **4종 모두 실배선 + 항상 프로브**:
  *   - 거래량   → `useQueryVolumeRank("volume")`
  *   - 거래대금 → `useQueryVolumeRank("value")`
  *   - 급상승   → `useQueryFluctuation("up")`
  *   - 급하락   → `useQueryFluctuation("down")`
- *   4개 훅을 항상 호출(rules of hooks)하되 **활성 탭만 `enabled` 로 켠다** — 마운트 시 KIS 랭킹 TR 을
- *   한 번에 여러 개 발사하지 않기 위함(홈은 이미 KIS 콜이 많아 초당 한도 위험). 활성 탭 결과가
- *   리스트/로딩/에러/스켈레톤을 구동한다.
+ *   4개 훅을 모두 `enabled`(가용성을 알려면 활성 탭만이 아니라 전 탭 조회 필요, PRD §3-1). KIS 레이트리밋
+ *   (EGW00201)은 훅 staleTime 60s 캐시(§8 q2)로 반복 마운트를 흡수한다.
  *
- * 탭별 우아한 실패 처리(KIS TR 장애 시): 활성 탭 조회가 실패하면 그 탭을 **failed 집합**에 넣는다.
- *   - failed + **비활성** 탭 → 탭바에서 흐림(opacity) "직전 실패" 힌트만, 하지만 **클릭 가능**.
- *     클릭하면 활성화 → `enabled` 재점화로 재조회 → 성공 시 자가 복구, 재실패 시 활성 탭으로서 에러 표시.
- *   - failed + **활성** 탭 → 리스트 영역에서 기존 에러 문구 + "다시 시도"(refetch) 노출(죽은 탭 방지).
- *   - 복구: 실패 탭을 (다시) 활성화하거나 활성 실패 탭에서 "다시 시도" 성공 시 failed 집합에서 제거.
- *   ★ 에러 시 탭 자동 전환은 하지 않는다 — 로컬(KIS down)에서 전 탭이 실패해도 스위치 루프로
- *     떨리지 않도록. 전환은 오직 사용자 클릭으로만.
+ * **가용성 판정(§6, `resolveAvailability`)**: 각 탭 결과에서
+ *   - available   = `isError=false` AND `dataSource ∈ {kis, mock}` (dev mock 정상 표시)
+ *   - unavailable = `isError=true`(502) OR `dataSource ∈ {mock-timeout, mock-empty, mock-error}`
+ *   - loading     = 첫 프로브 진행 중
+ * **렌더**:
+ *   - available 탭만 탭바에 노출(unavailable 탭은 **DOM 제거** — 흐림 아님). 남은 탭 좌측 정렬.
+ *   - 활성 탭이 unavailable 로 바뀌면 첫 available 탭으로 자동 이동(빈 콘텐츠 방지).
+ *   - available 탭이 1개뿐이면 탭바 → 정적 소제목 라벨로 강등(어포던스 제거).
+ *   - 전탭 unavailable(0개) → `MaintenanceNotice`(중립 점검 안내, 관리자만 "다시 시도").
+ *   ★ 시각(장 열림/닫힘) 게이팅은 폐기(초판 `isRegularOpen` 하드 게이팅 정정) — 주말·장외 정상 랭킹 노출.
  *
- * 데이터: 거래량/거래대금 순위(`VolumeRankRow`)·등락률 순위(`FluctuationRow`) 모두 **산업(sector)
- *   필드가 없다**. 노스스타의 산업 컬럼은 데이터가 있을 때만 노출하고, 전 행 부재 시 컬럼을 통째로
- *   접는다(graceful omit). 향후 sector 를 싣는 목록이 오면 자동으로 컬럼이 살아난다.
+ * 데이터: 랭킹 행은 산업(sector) 부재 → 컬럼 graceful omit. 색은 부호(상승=빨강/하락=파랑).
+ * 행 클릭 → `/stock/[ticker]`. hover/focus·롱프레스 시 `useStockPeek` 로 상세 선반입 + 차트 Peek.
  *
- * 색은 부호로 결정(한국식): 상승=빨강(signal-up) / 하락=파랑(signal-down).
- * 행 클릭 → `/stock/[ticker]`. hover/focus·롱프레스 시 `useStockPeek` 로 상세 선반입 + 차트 Peek
- *   (미리보기). 시드(가격/등락/방향)를 넘겨 팝오버/시트 즉시 페인트.
- *
- * 컨벤션(`docs/rules/frontend.md` §1): useQuery 직접 import 금지 → 도메인 훅만 소비.
+ * 컨벤션(`docs/rules/frontend.md` §1·§2): useQuery 직접 import 금지 → 도메인 훅만 소비.
  */
 
 "use client";
@@ -40,10 +37,17 @@ import { Heart } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
 import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryFluctuation } from "@/hooks/market/useQueryFluctuation";
+import { useMe } from "@/hooks/auth/useMe";
 import { useStockPeek } from "@/hooks/stock/useStockPeek";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
+import { resolveAvailability, type Availability } from "@/lib/market/availability";
+import {
+  deriveRankingView,
+  type RankingViewState,
+} from "@/lib/market/rankingView";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatPct } from "@/lib/utils/formatPct";
@@ -56,11 +60,8 @@ import {
   RANK_TAB_TURNOVER,
   RANK_TAB_SURGE,
   RANK_TAB_PLUNGE,
-  RANK_TAB_RETRY_HINT,
   RANK_LOADING,
-  RANK_ERROR,
   RANK_EMPTY,
-  RANK_RETRY,
   RANK_CAPTION_VOLUME,
   RANK_CAPTION_TURNOVER,
   RANK_CAPTION_SURGE,
@@ -72,12 +73,17 @@ import {
 /** 랭킹 기준 탭 — 4종 모두 실배선. */
 type RankTab = "volume" | "turnover" | "surge" | "plunge";
 
-const RANK_TABS: ReadonlyArray<{ value: RankTab; label: string }> = [
+type RankTabDef = { value: RankTab; label: string };
+
+const RANK_TABS: ReadonlyArray<RankTabDef> = [
   { value: "volume", label: RANK_TAB_VOLUME },
   { value: "turnover", label: RANK_TAB_TURNOVER },
   { value: "surge", label: RANK_TAB_SURGE },
   { value: "plunge", label: RANK_TAB_PLUNGE },
 ];
+
+/** 가용성 파생용 탭 순서(좌측 정렬 기준). */
+const RANK_TABS_ORDER: ReadonlyArray<RankTab> = RANK_TABS.map((t) => t.value);
 
 /** 활성 탭별 기준 캡션 — 무엇으로 줄 세운 순위인지 명시. */
 const RANK_CAPTIONS: Record<RankTab, string> = {
@@ -109,139 +115,178 @@ function changeClass(direction: FlowDirection): string {
 
 export function RealtimeRankingSection() {
   const [tab, setTab] = useState<RankTab>("volume");
-  // 조회 실패 탭 집합 — 활성 탭이 실패하면 담고, 다시 성공하면 뺀다(복구). 비활성 실패 탭은 회색 처리.
-  const [failedTabs, setFailedTabs] = useState<ReadonlySet<RankTab>>(
-    () => new Set<RankTab>(),
-  );
 
-  // 4개 랭킹 훅을 항상 호출(rules of hooks)하되, 활성 탭만 enabled-게이트로 실제 페치한다.
-  const volumeQuery = useQueryVolumeRank("volume", {
-    enabled: tab === "volume",
-  });
-  const turnoverQuery = useQueryVolumeRank("value", {
-    enabled: tab === "turnover",
-  });
-  const surgeQuery = useQueryFluctuation("up", { enabled: tab === "surge" });
-  const plungeQuery = useQueryFluctuation("down", { enabled: tab === "plunge" });
+  // 4개 랭킹 훅을 **모두 프로브**(가용성 판정에 전 탭 필요). staleTime 60s 캐시가 반복 마운트/레이트리밋 흡수.
+  const volumeQuery = useQueryVolumeRank("volume");
+  const turnoverQuery = useQueryVolumeRank("value");
+  const surgeQuery = useQueryFluctuation("up");
+  const plungeQuery = useQueryFluctuation("down");
 
-  // ★ 관심종목 훅은 섹션에서 **단일 인스턴스**로 소유한다. 행마다 useWatchlistTickers 를 호출하면
-  //   각 행이 독립 state 스냅샷을 들고 전체 배열을 덮어써(writeEntries) 서로의 추가를 지운다.
-  //   단일 소유 → 토글 시 섹션 리렌더로 전 행의 favorited 가 함께 갱신된다.
+  // ★ 관심종목 훅은 섹션에서 **단일 인스턴스**로 소유한다(행마다 호출 시 서로의 추가를 덮어씀).
   const { hasTicker, addTicker, removeTicker } = useWatchlistTickers();
 
-  // 활성 탭 결과가 리스트/로딩/에러/스켈레톤을 구동한다(switch 등가 — 탭 키로 선택).
-  const activeQuery = {
+  // 관리자만 점검 안내에서 "다시 시도"를 본다(표시용 — 재시도는 공개 refetch).
+  const { isAdmin } = useMe();
+
+  const queryByTab = {
     volume: volumeQuery,
     turnover: turnoverQuery,
     surge: surgeQuery,
     plunge: plungeQuery,
-  }[tab];
+  } as const;
 
-  const activeIsError = activeQuery.isError;
-  const activeIsSuccess = activeQuery.isSuccess;
+  // 탭별 가용성(loading/available/unavailable) → 순수 파생(노출 탭·활성 탭 이동·뷰 상태).
+  const availabilityByTab: Record<RankTab, Availability> = {
+    volume: resolveAvailability(volumeQuery),
+    turnover: resolveAvailability(turnoverQuery),
+    surge: resolveAvailability(surgeQuery),
+    plunge: resolveAvailability(plungeQuery),
+  };
+  const { effectiveTab, view } = deriveRankingView(
+    RANK_TABS_ORDER,
+    availabilityByTab,
+    tab,
+  );
+  const availableTabDefs = RANK_TABS.filter(
+    (t) => availabilityByTab[t.value] === "available",
+  );
 
-  // 활성 탭 조회 결과만 failed 집합에 반영 — 실패면 추가, 성공이면 제거(복구). 비활성 탭은 손대지 않아
-  // 떠난 실패 탭의 회색 상태가 유지된다. 자동 탭 전환은 하지 않으므로 스위치 루프가 없다.
+  // 활성 탭이 available 목록에서 빠지면(초기·소실) 첫 available 로 이동(빈 콘텐츠 방지). 그 외 클릭 존중.
   useEffect(() => {
-    if (activeIsError) {
-      setFailedTabs((prev) => {
-        if (prev.has(tab)) return prev;
-        const next = new Set(prev);
-        next.add(tab);
-        return next;
-      });
-    } else if (activeIsSuccess) {
-      setFailedTabs((prev) => {
-        if (!prev.has(tab)) return prev;
-        const next = new Set(prev);
-        next.delete(tab);
-        return next;
-      });
-    }
-  }, [activeIsError, activeIsSuccess, tab]);
+    if (effectiveTab && effectiveTab !== tab) setTab(effectiveTab);
+  }, [effectiveTab, tab]);
 
-  const rows: RankableRow[] = activeQuery.data?.rows ?? [];
-  // 전 행이 산업 부재면 컬럼을 접는다(현재 랭킹은 sector 미제공 → 접힘).
-  const hasSector = rows.some((row) => !!row.sector);
+  const retryAll = () => {
+    volumeQuery.refetch();
+    turnoverQuery.refetch();
+    surgeQuery.refetch();
+    plungeQuery.refetch();
+  };
+
+  const hasTabBar = availableTabDefs.length >= 2;
+  const singleLabel =
+    availableTabDefs.length === 1 ? availableTabDefs[0].label : null;
 
   return (
     <Section
       title={RANK_SECTION_TITLE}
       action={
-        <RankTabs
-          value={tab}
-          onChange={setTab}
-          failedTabs={failedTabs}
-          className="hidden sm:inline-flex"
-        />
+        hasTabBar ? (
+          <RankTabs
+            tabs={availableTabDefs}
+            value={effectiveTab ?? availableTabDefs[0].value}
+            onChange={setTab}
+            className="hidden sm:inline-flex"
+          />
+        ) : undefined
       }
     >
-      {/* 모바일 — 탭을 제목줄 아래 분리 배치(액션 슬롯이 좁음). self-start 로 콘텐츠 폭만. */}
-      <RankTabs
-        value={tab}
-        onChange={setTab}
-        failedTabs={failedTabs}
-        className="inline-flex self-start sm:hidden"
-      />
-
-      {activeQuery.isLoading ? (
-        <RankSkeleton />
-      ) : activeQuery.isError ? (
-        <div className="flex flex-col items-start gap-md py-md" role="alert">
-          <p className="text-body-sm text-text-muted">{RANK_ERROR}</p>
-          <button
-            type="button"
-            className="button-secondary"
-            onClick={() => activeQuery.refetch()}
-          >
-            {RANK_RETRY}
-          </button>
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="py-md text-body-sm text-text-muted">{RANK_EMPTY}</p>
-      ) : (
-        <>
-          <div role="list">
-            {rows.map((row, i) => (
-              <RankRow
-                key={row.ticker}
-                row={row}
-                rank={i + 1}
-                showSector={hasSector}
-                favorited={hasTicker(row.ticker)}
-                onToggleFavorite={() =>
-                  hasTicker(row.ticker)
-                    ? removeTicker(row.ticker)
-                    : addTicker(row.ticker, row.name)
-                }
-              />
-            ))}
-          </div>
-          {/* 기준 각주 — 활성 탭 기준을 명시. */}
-          <p className="text-caption text-text-muted">{RANK_CAPTIONS[tab]}</p>
-        </>
+      {/* 모바일 — 탭을 제목줄 아래 분리 배치(액션 슬롯이 좁음). */}
+      {hasTabBar && (
+        <RankTabs
+          tabs={availableTabDefs}
+          value={effectiveTab ?? availableTabDefs[0].value}
+          onChange={setTab}
+          className="inline-flex self-start sm:hidden"
+        />
       )}
+
+      {/* available 탭이 1개뿐 — 정적 소제목 라벨로 강등(비인터랙티브). */}
+      {singleLabel && (
+        <p className="self-start text-body-sm-strong text-text-strong">
+          {singleLabel}
+        </p>
+      )}
+
+      <RankingContent
+        view={view}
+        activeQuery={effectiveTab ? queryByTab[effectiveTab] : null}
+        activeTab={effectiveTab}
+        isAdmin={isAdmin}
+        onRetry={retryAll}
+        hasTicker={hasTicker}
+        addTicker={addTicker}
+        removeTicker={removeTicker}
+      />
     </Section>
+  );
+}
+
+/** 콘텐츠 영역 — 로딩/점검/리스트 3-상태 분기(탭바·헤더는 상위가 소유). */
+function RankingContent({
+  view,
+  activeQuery,
+  activeTab,
+  isAdmin,
+  onRetry,
+  hasTicker,
+  addTicker,
+  removeTicker,
+}: {
+  view: RankingViewState;
+  activeQuery:
+    | { data?: { rows: RankableRow[] } | undefined; isLoading: boolean }
+    | null;
+  activeTab: RankTab | undefined;
+  isAdmin: boolean;
+  onRetry: () => void;
+  hasTicker: (ticker: string) => boolean;
+  addTicker: (ticker: string, name: string) => void;
+  removeTicker: (ticker: string) => void;
+}) {
+  if (view === "loading") return <RankSkeleton />;
+  if (view === "maintenance") {
+    return <MaintenanceNotice isAdmin={isAdmin} onRetry={onRetry} />;
+  }
+
+  // view === "list" — 활성(effective) 탭 리스트. 활성 탭은 available 이라 에러 상태가 아니다.
+  if (!activeQuery || activeQuery.isLoading) return <RankSkeleton />;
+
+  const rows: RankableRow[] = activeQuery.data?.rows ?? [];
+  if (rows.length === 0) {
+    return <p className="py-md text-body-sm text-text-muted">{RANK_EMPTY}</p>;
+  }
+  const hasSector = rows.some((row) => !!row.sector);
+
+  return (
+    <>
+      <div role="list">
+        {rows.map((row, i) => (
+          <RankRow
+            key={row.ticker}
+            row={row}
+            rank={i + 1}
+            showSector={hasSector}
+            favorited={hasTicker(row.ticker)}
+            onToggleFavorite={() =>
+              hasTicker(row.ticker)
+                ? removeTicker(row.ticker)
+                : addTicker(row.ticker, row.name)
+            }
+          />
+        ))}
+      </div>
+      {/* 기준 각주 — 활성 탭 기준을 명시. */}
+      {activeTab && (
+        <p className="text-caption text-text-muted">{RANK_CAPTIONS[activeTab]}</p>
+      )}
+    </>
   );
 }
 
 /**
  * 거래량/거래대금/급상승/급하락 세그먼트 — ModeToggle 과 동일 시각 언어(pill + 흰 활성).
- *
- * 직전 조회가 실패한 **비활성** 탭은 흐리게(opacity) "직전 실패" 힌트만 준다 — 하지만 **클릭 가능**하다.
- * 클릭하면 `setTab` 으로 활성화 → 해당 훅의 `enabled` 가 true 로 바뀌며 재조회 → 상위 effect 가
- * 성공 시 실패 집합에서 자가 제거(복구), 재실패 시 활성 탭으로서 리스트에 에러+다시 시도를 보여준다.
- * (탭 전환은 오직 사용자 클릭으로만 — 자동 전환 없음 → 스위치 루프/떨림 없음.)
+ * available 탭만 렌더(unavailable 은 상위가 목록에서 제외 — DOM 제거). 흐림/재시도 힌트 없음.
  */
 function RankTabs({
+  tabs,
   value,
   onChange,
-  failedTabs,
   className,
 }: {
+  tabs: ReadonlyArray<RankTabDef>;
   value: RankTab;
   onChange: (tab: RankTab) => void;
-  failedTabs: ReadonlySet<RankTab>;
   className?: string;
 }) {
   return (
@@ -253,24 +298,19 @@ function RankTabs({
         className,
       )}
     >
-      {RANK_TABS.map((opt) => {
+      {tabs.map((opt) => {
         const isActive = value === opt.value;
-        // 직전 조회 실패한 비활성 탭 — 흐림 힌트만, 여전히 클릭해 재조회(자가 복구)할 수 있다.
-        const failedHint = failedTabs.has(opt.value) && !isActive;
         return (
           <button
             key={opt.value}
             type="button"
             role="tab"
             aria-selected={isActive}
-            title={failedHint ? RANK_TAB_RETRY_HINT : undefined}
             className={cn(
               "h-button-sm-h cursor-pointer rounded-pill px-md text-button-sm transition-colors",
               isActive
                 ? "bg-surface text-text-strong shadow-sm"
-                : failedHint
-                  ? "text-text-muted opacity-50 hover:text-text-strong hover:opacity-100"
-                  : "text-text-muted hover:text-text-strong",
+                : "text-text-muted hover:text-text-strong",
             )}
             onClick={() => onChange(opt.value)}
           >

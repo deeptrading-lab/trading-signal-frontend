@@ -248,6 +248,16 @@ export const queryConfig = {
       gcTime: 5 * MINUTE,
     },
   },
+  auth: {
+    /**
+     * 현재 세션 role(표시용) — 세션 수명 내 사실상 불변(승인/역할 변경은 재로그인 필요). 재조회 부담을
+     * 줄이려 staleTime 길게(30분). 표시용이라 실시간성 불요(PRD `market-status-aware-home` §3-5).
+     */
+    me: {
+      staleTime: 30 * MINUTE,
+      gcTime: 1 * HOUR,
+    },
+  },
 } as const;
 
 export type QueryConfig = typeof queryConfig;

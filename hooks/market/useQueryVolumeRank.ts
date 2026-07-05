@@ -11,10 +11,11 @@
 "use client";
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { getVolumeRank } from "@/lib/api/market/volumeRank";
+import { getVolumeRank, type VolumeRankResult } from "@/lib/api/market/volumeRank";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
+import type { DataSource } from "@/lib/types/market/dataSource";
 import type {
   VolumeRankBy,
   VolumeRankResponse,
@@ -24,15 +25,33 @@ export type UseQueryVolumeRankOptions = {
   enabled?: boolean;
 };
 
+/**
+ * useQuery 결과에서 `data` 를 화면 데이터로 되돌리고 `dataSource`(표면화된 출처)를 함께 노출한다.
+ * (queryFn 이 `{ data, dataSource }` envelope 를 반환하므로 컨슈머가 `.data.rows` 를 그대로 읽게 unwrap.)
+ */
+export type UseQueryVolumeRankResult = Omit<
+  UseQueryResult<VolumeRankResult, ApiError>,
+  "data"
+> & {
+  data: VolumeRankResponse | undefined;
+  /** 표면화된 `X-Data-Source` — 가용성 판정 근거(§3-0). */
+  dataSource: DataSource | undefined;
+};
+
 export function useQueryVolumeRank(
   by: VolumeRankBy = "volume",
   options?: UseQueryVolumeRankOptions,
-): UseQueryResult<VolumeRankResponse, ApiError> {
-  return useQuery({
+): UseQueryVolumeRankResult {
+  const query = useQuery<VolumeRankResult, ApiError>({
     queryKey: queryKeys.market.volumeRank(by),
     queryFn: () => getVolumeRank(by),
     enabled: options?.enabled ?? true,
     staleTime: queryConfig.market.volumeRank.staleTime,
     gcTime: queryConfig.market.volumeRank.gcTime,
   });
+  return {
+    ...query,
+    data: query.data?.data,
+    dataSource: query.data?.dataSource,
+  } as UseQueryVolumeRankResult;
 }

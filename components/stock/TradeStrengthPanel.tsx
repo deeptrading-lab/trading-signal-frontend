@@ -23,7 +23,7 @@
 import { cn } from "@/lib/utils/cn";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { useQueryStockTrades } from "@/hooks/stock/useQueryStockTrades";
-import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { useMarketStatus } from "@/hooks/market/useMarketStatus";
 import { TRADES_COPY as C } from "@/lib/copy/stock/trades";
 import type { TapeTrade, TradeStrength } from "@/lib/types/stock/trades";
 
@@ -213,7 +213,8 @@ function TradeRow({
 
 function TradesEmpty() {
   // 장중 빈 응답은 "미지원", 장외는 "장 마감" 으로 안내(둘 다 동일 제목).
-  const closed = !isKstMarketHoursWithCloseGrace();
+  // 폴링 게이트와 동일 기준(②의 `isRegularOpen`, 공휴일 인지·fail-open)으로 마감 표시 정합.
+  const closed = !useMarketStatus().isRegularOpen;
   return (
     <div className="flex flex-col items-center gap-xs py-lg text-center">
       <p className="text-body-sm text-text-strong">{C.emptyTitle}</p>

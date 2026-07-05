@@ -16,12 +16,12 @@ import type {
   TossMarketSession,
 } from "@/lib/api/toss/types";
 import {
-  UNKNOWN_MARKET_STATUS,
   type MarketPhase,
   type MarketStatus,
   type SessionTimes,
 } from "@/lib/types/market/marketStatus";
 import { isoToKstHm } from "@/lib/api/toss/kst";
+import { isKstMarketHours, isKstWeekend } from "@/lib/utils/kstMarketHours";
 
 /** ISO(+09:00) → epoch ms. 파싱 실패 시 null(구간 판정에서 제외). */
 function epoch(iso: string | undefined): number | null {
@@ -77,8 +77,43 @@ function regularOpenOf(day: TossCalendarDay | undefined): {
 }
 
 /**
+ * 캘린더 미가용(키 없음/조회 실패) 시 **KST 시각 휴리스틱 폴백** — 공휴일 미인지(주말·시간만).
+ *
+ * 원천은 토스 캘린더(공휴일 인지)이지만, prod(TOSS 키 미설정)·토스 장애에선 캘린더가 null 로
+ * 떨어져 예전엔 `unknown → isRegularOpen=true`(fail-open)로만 흡수돼 **마감 게이팅이 아예 발동하지
+ * 않았다**. 이 폴백이 최소한 주말·야간 마감은 잡아 준다(사용자 확정 결정).
+ *
+ * fail-open 정신 유지: "확실히 마감"(주말·정규장 시간 밖)일 때만 closed, 장중이면 regular.
+ * 평일 공휴일은 KST 로 구분 불가 → 장중 시간엔 regular(장중 취급, fail-open) 로 남는다.
+ * grace: `isRegularOpen` 은 캘린더 경로와 동일하게 엄격 정규장(09:00~15:30) — 15:30~15:40 유예
+ * 손실은 수용(PRD §8/§3-3, 두 경로 일관). nextOpen 은 캘린더 없이는 정확 산출 불가라 null.
+ */
+function deriveMarketStatusFromKst(nowMs: number): MarketStatus {
+  const now = new Date(nowMs);
+  if (isKstMarketHours(now)) {
+    return {
+      phase: "regular",
+      isRegularOpen: true,
+      todayIsBusinessDay: true,
+      todayDate: "",
+      nextOpen: null,
+      sessionTimes: null,
+    };
+  }
+  // 주말·장전·시간외·야간 — closed 취급. 주말이면 휴장, 평일이면 장 마감(라벨 분기용).
+  return {
+    phase: "closed",
+    isRegularOpen: false,
+    todayIsBusinessDay: !isKstWeekend(now),
+    todayDate: "",
+    nextOpen: null,
+    sessionTimes: null,
+  };
+}
+
+/**
  * 캘린더 + 기준시각 → `MarketStatus`.
- *   - calendar 없음 → phase="unknown"(fail-soft, isRegularOpen fail-open true).
+ *   - calendar 없음 → **KST 휴리스틱 폴백**(`deriveMarketStatusFromKst`, 공휴일 미인지·주말/야간 마감).
  *   - today.integrated === null → phase="closed"·휴장(nextOpen = 다음 영업일 정규장 개장).
  *   - 영업일 → nowMs 가 어느 세션 [start,end) 인지로 pre/regular/after, 어디에도 안 들면 closed
  *     (개장 전이면 오늘 정규장, 마감 후면 다음 영업일을 nextOpen 으로).
@@ -87,7 +122,7 @@ export function deriveMarketStatus(
   calendar: TossMarketCalendar | null | undefined,
   nowMs: number,
 ): MarketStatus {
-  if (!calendar || !calendar.today) return UNKNOWN_MARKET_STATUS;
+  if (!calendar || !calendar.today) return deriveMarketStatusFromKst(nowMs);
 
   const today = calendar.today;
   const todayDate = today.date ?? "";
