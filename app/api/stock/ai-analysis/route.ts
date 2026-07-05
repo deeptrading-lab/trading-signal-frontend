@@ -913,6 +913,12 @@ export async function POST(req: NextRequest): Promise<Response> {
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
                   // % 기준가 = LLM 에 넘긴 "현재가"(priceData?.price ?? 마지막 봉 종가). 절대가격 표기·재현용.
                   base_price: priceData?.price ?? sorted[sorted.length - 1]?.close ?? null,
+                  // 분석 엔진 모델 — provider 별 base env 를 대표값으로 캡처(관리자 표시용, decision JSONB 무마이그레이션).
+                  model:
+                    (provider === "codex"
+                      ? process.env.CODEX_CLI_MODEL
+                      : process.env.CLAUDE_CLI_MODEL
+                    )?.trim() || null,
                   short_term_outlook: typeof d.short_term_outlook === "string" ? d.short_term_outlook : "",
                   mid_term_outlook: typeof d.mid_term_outlook === "string" ? d.mid_term_outlook : "",
                   limitedData: signalResult.limitedData,

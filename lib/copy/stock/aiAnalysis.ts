@@ -37,8 +37,8 @@ export const COPY = {
   /**
    * 저장모드(우측 패널 verdict-forward) — ai-analysis-redesign PR③.
    * 저장된 결론을 그대로 보여주고, staleness(decisionStaleness) 에 따라 재분석을 권한다.
-   * ⚠️ 사용자 노출 뷰에는 provider/model 명을 쓰지 않는다("AI 분석"으로 총칭).
-   *    TODO(admin-role): 로그인 + 관리자 권한 도입 시에만 실제 분석 엔진/모델을 함께 노출.
+   * ⚠️ 일반 사용자 뷰엔 provider/model 명을 쓰지 않는다("AI 분석"으로 총칭). **관리자에게만** 실제
+   *    분석 엔진/모델을 하단 캡션(adminEngine)으로 노출한다(user-login-auth Phase 2 — useMe().isAdmin).
    */
   savedMode: {
     /** 재분석 권유 사유 라벨(배너 내부용·접근성). */
@@ -56,6 +56,12 @@ export const COPY = {
     reanalyze: "재분석",
     /** 저장모드 스크림 라벨(이전 분석임을 알리는 미니 태그) — stale 일 때 히어로 위. */
     previousTag: "이전 분석 기준",
+    /**
+     * 관리자 전용 — 분석 엔진/모델 표기(user-login-auth Phase 2). 모델(claude-sonnet-5 등)이 있으면
+     * 모델을, 없으면(legacy·env 미설정) provider(claude/codex)를 총칭한다. 일반 사용자에겐 미노출.
+     */
+    adminEngine: (provider: string, model: string | null | undefined): string =>
+      `분석 엔진 · ${model || provider}`,
   },
   previousDecision: {
     title: "저장된 이전 분석",
