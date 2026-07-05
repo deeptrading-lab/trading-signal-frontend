@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { X } from "lucide-react";
 import { StockPeekContent } from "@/components/stock/StockPeekContent";
+import { MiniStockChart } from "@/components/stock/MiniStockChart";
 import { DURATION, EASE } from "@/lib/motion/tokens";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import {
@@ -98,8 +99,13 @@ export function StockPeekSheet({ target, onClose }: StockPeekSheetProps) {
         <StockPeekContent
           ticker={target.ticker}
           seed={target.seed}
-          chartHeight={SHEET_CHART_HEIGHT}
-          showAxis
+          chart={
+            <MiniStockChart
+              ticker={target.ticker}
+              height={SHEET_CHART_HEIGHT}
+              showAxis
+            />
+          }
         />
 
         <button

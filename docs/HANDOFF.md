@@ -6461,3 +6461,39 @@
   > - 도크 차트 다중 패널화(가격+이평선·거래량·MACD·RSI) — 사용자 요청, 별도 PR 예정.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 도크 차트 다중 패널화(가격+이평선·거래량·MACD·RSI) — 사용자 요청, 별도 PR 예정.
+
+### 2026-07-05 — feat(peek): 도크 다중 패널 차트 (가격+이평선·거래량·MACD·RSI) (#271)
+
+- **slug**: `peek-dock-rich-chart` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/271
+- **요약**: feat(peek): 도크 다중 패널 차트 (가격+이평선·거래량·MACD·RSI)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 요청(스크린샷): 우측 도크 차트에 **거래량·MACD·RSI** 서브플롯과 **이동평균선**을 같이 띄워달라. 지금은 가격 캔들만(`MiniStockChart`).
+  > 
+  > ## 변경
+  > 도크 미리보기를 상세에 가까운 **4패널**로:
+  > 1. 가격 — 캔들 + **이동평균선 MA 5/20/60/120**
+  > 2. 거래량
+  > 3. MACD (12/26/9)
+  > 4. RSI (14)
+  > 
+  > - **`PeekChart`(신규)** — `StockDailyChart` 4패널을 컨트롤·카드셸·오버레이 토글 없이 압축한 읽기 전용. 데이터/색/아톰은 상세 차트와 **동일 소스** 재사용(`useChartData`·`useChartTheme`·CandleBar/CandleTooltip/SubLabel). 컴팩트 서브플롯 높이 + 우측 축.
+  > - **`StockPeekContent` 를 차트 render-prop 화** — 이 컴포넌트는 팝오버/시트/도크 **공용(공유 청크)** 이라, 여기서 `PeekChart` 를 import 하면 무거운 4패널 차트가 팝오버/시트 청크에도 딸려간다(mobile-perf 저해). 차트를 주입받아 **`PeekChart` 는 도크 청크에만 로드**. 팝오버/시트는 `MiniStockChart` 주입(동작 무변경).
+  > - `PeekChart` 도 `useChartData(ticker,"D",90)` → 배경 선반입(#266)·hover(#253) 캐시를 **그대로 히트**(추가 페치 0). 도크 인터랙티브(#269)라 각 패널 툴팁 hover 가능.
+  > 
+  > ## 무회귀·안전
+  > - 팝오버(캔들만)·시트·모바일·<1920px 무변경(MiniStockChart 주입). 도크만 PeekChart.
+  > - 신규 Tailwind 클래스·토큰 0(기존 유틸 + 상세 차트 아톰 재사용). 캐시 키 동일.
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint`(변경 5파일) clean. 격리 worktree(node_modules exclude 가드).
+  > - ⚠️ Turbopack build 는 worktree 심볼릭 node_modules 제약으로 미실행 → **QA 빌드 검증 필요**(신규 Tailwind 0·상세 차트와 동일 recharts 패턴이라 저위험).
+  > 
+  > ## 다음 작업
+  > - (옵션) 이평선 색 범례 도크에도 추가 검토.
+  > - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (옵션) 이평선 색 범례 도크에도 추가 검토.
+  - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).

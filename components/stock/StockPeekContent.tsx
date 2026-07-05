@@ -1,6 +1,5 @@
 "use client";
 
-import { MiniStockChart } from "@/components/stock/MiniStockChart";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { formatNumber } from "@/lib/utils/formatMoney";
@@ -11,12 +10,16 @@ import type { PeekSeed } from "@/hooks/stock/peekProvider";
 import type { StockDirection } from "@/lib/store/stockMetaStore";
 
 /**
- * StockPeekContent — Peek 팝오버/시트 공용 본문(가격 + 등락% + 미니 차트).
+ * StockPeekContent — Peek 팝오버/시트/도크 공용 본문(가격 + 등락% + 차트).
  *
- * 종목명(코드 미표시)은 컨테이너(팝오버 헤더/시트 헤더)가 렌더하고, 여기선 시세와 차트만.
+ * 종목명(코드 미표시)은 컨테이너(팝오버/시트/도크 헤더)가 렌더하고, 여기선 시세와 차트만.
  * 시세는 `useQueryStockPrice`(도메인 훅)가 진실 원천 — 시드(seed)는 도착 전 즉시 페인트용.
- * 차트는 `MiniStockChart`(→ `useQueryStockChart`, 1일 staleTime). 재hover 는 캐시 히트, 상세와는
- * 같은 구간을 볼 때만 캐시 공유(구간이 다르면 재요청).
+ *
+ * ## 차트는 지면이 주입(render-prop)
+ * 좁은 팝오버/시트는 `MiniStockChart`(가격 캔들만), 넓은 도크는 `PeekChart`(가격+MA·거래량·MACD·RSI)를
+ * 주입한다. 여기서 직접 import 하지 않는 이유: 이 컴포넌트는 세 지면 공용(공유 청크)이라, 무거운
+ * `PeekChart` 를 import 하면 팝오버/시트 청크에까지 4패널 차트가 딸려간다(mobile-perf 저해). 차트를
+ * 주입받으면 `PeekChart` 는 도크 청크에만 로드된다.
  */
 
 /** 등락 방향 → 색 토큰(합성 클래스라 cn 사이즈 override 시에도 색 유지, 홈 랭킹과 동일). */
@@ -29,17 +32,14 @@ function changeClass(direction?: StockDirection): string {
 export interface StockPeekContentProps {
   ticker: string;
   seed?: PeekSeed;
-  /** 차트 높이(px) — 팝오버는 작게, 시트는 크게. */
-  chartHeight: number;
-  /** 축·툴팁 노출 — 시트(큰 차트)만 true. */
-  showAxis?: boolean;
+  /** 차트 — 지면이 주입(팝오버/시트=MiniStockChart, 도크=PeekChart). */
+  chart: React.ReactNode;
 }
 
 export function StockPeekContent({
   ticker,
   seed,
-  chartHeight,
-  showAxis = false,
+  chart,
 }: StockPeekContentProps) {
   const { data, isError } = useQueryStockPrice(ticker);
   const price = data?.price ?? seed?.price;
@@ -69,14 +69,8 @@ export function StockPeekContent({
         </span>
       </div>
 
-      {/* 미니 차트 — 소환 즉시 1회 페치(단일 활성 Peek → burst 없음). */}
-      <div className="mt-sm">
-        <MiniStockChart
-          ticker={ticker}
-          height={chartHeight}
-          showAxis={showAxis}
-        />
-      </div>
+      {/* 차트(주입) — 소환 즉시 1회 페치(단일 활성 Peek → burst 없음). */}
+      <div className="mt-sm">{chart}</div>
     </>
   );
 }
