@@ -28,8 +28,8 @@ export const ADMIN_STATUS_APPROVED = "승인됨";
 export const ADMIN_STATUS_PENDING = "대기 중";
 /** 대기 사용자 승인 버튼. */
 export const ADMIN_USERS_APPROVE_CTA = "승인";
-/** 승인된 사용자 접근 취소 버튼. */
-export const ADMIN_USERS_REVOKE_CTA = "승인 취소";
+/** 승인된 사용자 접근 차단 버튼(대기로 되돌림 — 계정 삭제 아님). */
+export const ADMIN_USERS_REVOKE_CTA = "접근 차단";
 /** 가입 시각 접두(예: "가입 3일 전"). */
 export const ADMIN_JOINED_PREFIX = "가입";
 
@@ -42,7 +42,7 @@ export const ADMIN_LAST_SUPERADMIN_ERROR =
 export const ADMIN_ROLE_CHANGED = "등급을 변경했어요.";
 /** 승인 성공 토스트. */
 export const ADMIN_STATUS_APPROVED_TOAST = "승인했어요.";
-/** 승인 취소 성공 토스트. */
-export const ADMIN_STATUS_REVOKED_TOAST = "승인을 취소했어요.";
+/** 접근 차단 성공 토스트. */
+export const ADMIN_STATUS_REVOKED_TOAST = "접근을 차단했어요.";
 /** 승인/취소 실패 토스트. */
 export const ADMIN_STATUS_CHANGE_ERROR = "처리에 실패했어요. 다시 시도해 주세요.";

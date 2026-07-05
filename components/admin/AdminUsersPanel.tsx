@@ -128,6 +128,7 @@ export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
 
                   <Button
                     variant={approved ? "secondary" : "primary"}
+                    size="sm"
                     onClick={() => setStatus(u.sub, approved ? "pending" : "approved")}
                     disabled={anyMutating}
                     loading={statusLoading}
