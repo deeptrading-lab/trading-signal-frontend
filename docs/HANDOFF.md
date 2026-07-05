@@ -6014,3 +6014,45 @@
   - 실시간 순위 마감 시 직전 세션 스냅샷 표시(PRD q1) — 종가 랭킹 데이터 소스 확보 후.
   - 수급 당일 직전거래일 폴백(PRD q2 b) — BE 신규 필요.
   - prod TOSS 키 등록 후 공휴일 인지 게이팅 라이브 확인(평일 공휴일).
+
+### 2026-07-05 — 가용성 인지형 마켓 홈: KIS 점검 우아한 대체 + 관리자 재시도 (시각 게이팅 폐기) (#247)
+
+- **slug**: `market-status-aware-home` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/247
+- **요약**: 가용성 인지형 마켓 홈: KIS 점검 우아한 대체 + 관리자 재시도 (시각 게이팅 폐기)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약 (개정 — 가용성 기반)
+  > 
+  > `market-status-aware-home` 를 **시각 게이팅 폐기 → 데이터 가용성 기반**으로 재작업했다. 초판(#247 초기 커밋 `5e3b509`)의 전제(에러 원인=장 마감)가 틀렸다 — 실제 원인은 KIS 야간점검이고 주말·장외에도 랭킹은 정상 제공된다. 축을 **"장이 열렸나"가 아니라 "데이터를 받을 수 있나(가용성)"** 로 전환했다.
+  > 
+  > - **X-Data-Source 표면화**: 클라 어댑터(volume-rank·fluctuation·flow)가 버리던 `X-Data-Source` 헤더를 `{data, dataSource}` envelope 로 표면화. 라우트 무변경.
+  > - **가용성 판정**(`resolveAvailability`, §6): `kis/mock`=available(dev mock 정상 표시 — 영구 점검중 회귀 방지), `mock-timeout/mock-empty/mock-error`+502=unavailable. never-throw(fluctuation) vs 502(volume-rank·flow) 구조 차이를 HTTP 상태+헤더 둘 다로 흡수.
+  > - **실시간 순위 4탭 가용성 렌더**: 4탭 전부 프로브(staleTime 60s 캐시로 레이트리밋 흡수) → available 탭만 노출·unavailable 탭 **DOM 제거**(흐림 아님)·활성 탭 소실 시 첫 available 자동 이동·1개면 정적 라벨·**0개면 `MaintenanceNotice`**.
+  > - **순매수 당일 일관 적용**: 시각 게이팅 폐기, unavailable 시 점검 안내 + "7일 누적 보기" 넛지. **7일 누적(kv)은 무변경**(항상 정상). 초판 강제 cumulative 넛지·settledRef 제거.
+  > - **관리자 전용 재시도**: `GET /api/auth/me`(readSession HMAC 읽기전용) + `useIsAdmin` → "다시 시도"는 관리자에게만. 일반 사용자는 버튼 슬롯 비움.
+  > - **MaintenanceNotice**(신규, 중립 muted·다음 개장 표기 없음·`critical` 미사용) — 실시간 순위·순매수 공용. **초판 `MarketClosedNotice` 제거**.
+  > 
+  > **유지(초판 유효 커밋)**: `73dedc8`(useMarketStatus KST 폴백)·`b032baa`(호가·체결 폴링 스왑). `isRegularOpen` 은 이제 폴링에서만 소비.
+  > 
+  > ## 유지된 것 / 걷어낸 것
+  > 
+  > | | |
+  > |---|---|
+  > | 유지 | KST 폴백·폴링 게이트(호가·체결). 7일 누적. |
+  > | 폐기 | 실시간 순위/순매수의 `isRegularOpen` 하드 게이팅·`enabled && isRegularOpen`·`MarketClosedNotice`·강제 cumulative 넛지·탭 opacity 흐림. |
+  > 
+  > ## 자가검증
+  > 
+  > **게이트**
+  > - `npm run design:sync` → no-op(theme.json 무변경).
+  > - `npx tsc --noEmit` → 0 에러.
+  > - `npm run lint` → 0.
+  > - `npm run build` → 성공.
+  > - `npx vitest run lib/market lib/api/toss lib/utils/__tests__/dataSource.test.ts` → **16 files / 138 tests 통과**(availability·rankingView·dataSource 유닛 신규 포함).
+  > 
+  > **가용성 유닛(신규)**
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **prod 야간점검 실검증**: 평일 21:50~23시대 KIS 전 TR 500 시각에 홈 진입 → 4탭 전부 unavailable → `MaintenanceNotice` 노출 + 관리자 "다시 시도" 동작 확인(로컬은 KIS 설정돼 available 만 관측됨). 주간(정상)·야간(점검) 양쪽 EGW00201 레이트리밋 실측(§8 q2 — staleTime 캐시가 4탭 프로브를 흡수하는지).
+  - **QA 재검증 필요**: 초판 대비 방향 전면 개정(시각 게이팅 폐기·가용성 기반). 기존 `qa-passed` 무효 → AC-1~AC-14 재실행(특히 부분 탭 숨김·자동 이동·관리자 재시도·dev mock 정상 표시).
+  - 관련 slug: `toss-market-calendar`(②, `isRegularOpen` 원천 — 폴링에서만 소비).
