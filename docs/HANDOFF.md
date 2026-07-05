@@ -6178,3 +6178,44 @@
   - 모바일 값 노출(현재 md+ only) — 좁은 폭에서 거래대금/거래량을 어떻게 보일지(예: 시총 대체 토글) 디자이너 판단.
   - 급상승/급하락 값 컬럼 — 거래대금을 enrich(`loadKisPriceMeta`에 tradeAmount 노출)로 실으면 4탭 통일 가능(별도 티켓).
   - 값 컬럼 정렬/기간별 랭킹(1일~1년).
+
+### 2026-07-05 — feat(peek): 초광폭 우측 도킹 미리보기 (여백 있을 때만) (#260)
+
+- **slug**: `peek-dock-wide` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/260
+- **요약**: feat(peek): 초광폭 우측 도킹 미리보기 (여백 있을 때만)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 실시간 순위 hover peek 은 커서 앵커 팝오버라 시선을 따라 흔들리고 작다. 사용자 제안: **화면 우측에 여백이 충분하면 큰 차트를 우측에 고정 도킹**하고, 여백이 없으면 기존 팝오버.
+  > 
+  > ## 레이아웃 사실
+  > - 홈 콘텐츠 = `max-w-main-max-w`(1152px) 중앙 정렬, 사이드바 208px(접힘 76px).
+  > - 콘텐츠 **바깥** 우측 여백 = `(vw − sidebar − 1152) / 2` → 1920px 뷰포트(흔한 외부 모니터)에서 ≈280px.
+  > - 순위표는 1152px 풀폭 → 여백은 초광폭에서만 생김(사용자와 합의).
+  > 
+  > ## 변경 (경량 UX 폴리시, PRD 없음)
+  > - **`useMediaQuery`**(신규, `hooks/utils`) — `useBreakpoint` 일반형(임의 임계, SSR-safe). matchMedia 캡슐화는 hooks/utils 안에서만(frontend.md §8).
+  > - **`StockPeekDock`**(신규) — 우측·세로중앙 **고정** 패널. 커서 안 쫓음. 차트 220px + 축 노출(팝오버 96px·축없음보다 큼). `pointer-events-none`로 팝오버와 동일 안전 시맨틱(행 클릭/hover 통과, `aria-hidden`). 폭 248px·우측 16px 여백은 runtime-positioned JS 상수(팝오버 PEEK_WIDTH 관례).
+  > - **`GlobalStockPeek`** — `mode==="popover"`일 때 `useMediaQuery("(min-width:1920px)")` 매칭이면 도크, 아니면 팝오버. 시트(모바일 롱프레스)·포커스 경로 무변경.
+  > - **`peekDynamic`** — 도크 dynamic 추가(recharts 는 팝오버와 공유 청크 → 추가 워밍 불필요).
+  > 
+  > ### 임계 근거
+  > 사이드바 확장(208px) 최악 기준으로 `(vw−208−1152)/2 ≥ 248+여유` → `vw ≳ 1920`. 이 폭 아래에선 도크가 콘텐츠를 침범할 수 있어 팝오버 유지. 단일 임계로 예측 가능하게 고정(접힌 사이드바면 더 여유 있으나 보수적으로).
+  > 
+  > ## 무회귀
+  > - <1920px·터치·포커스 모두 기존 경로 그대로. #253 프리패치·청크워밍과 정합(도크도 같은 `StockPeekContent`/차트 캐시 히트).
+  > - SSR 초기 false → 첫 렌더 팝오버, 마운트 후 폭 반영(dock 은 client dynamic, mismatch 0).
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean · `npm run build` 통과.
+  > - 시각 검증은 QA(뷰포트 ≥1920px 로 도크, <1920 로 팝오버, 모바일 시트).
+  > 
+  > ## 다음 작업
+  > - 도크 인터랙티브화(hover 툴팁) — 현재 pointer-events-none(안전 우선). 원하면 hide 지연+close 어포던스로 확장.
+  > - 도크 폭/차트 크기를 여백에 따라 가변(초광폭일수록 크게) — 현재 고정 248px.
+  > - 모바일 값 컬럼 노출, 급상승/급하락 거래대금 enrich (⑤ 후속).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 도크 인터랙티브화(hover 툴팁) — 현재 pointer-events-none(안전 우선). 원하면 hide 지연+close 어포던스로 확장.
+  - 도크 폭/차트 크기를 여백에 따라 가변(초광폭일수록 크게) — 현재 고정 248px.
+  - 모바일 값 컬럼 노출, 급상승/급하락 거래대금 enrich (⑤ 후속).
