@@ -6329,3 +6329,37 @@
   - 배경 프리패치를 관심종목·검색 지면으로 확장(현재 랭킹 한정).
   - 도크 인터랙티브화(hover 툴팁)·가변 폭(#260 후속).
   - 기간별 랭킹·⑥ DART 확장·US 주식.
+
+### 2026-07-05 — perf(peek): 관심종목 상위 행 차트 배경 선반입 (#266 확장) (#267)
+
+- **slug**: `watchlist-chart-prefetch` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/267
+- **요약**: perf(peek): 관심종목 상위 행 차트 배경 선반입 (#266 확장)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > #266 배경 프리패치는 **홈 랭킹**에만 적용됐다. 사용자가 **자기 종목을 자주 hover 하는 관심종목 화면**에도 적용하면 체감이 크다.
+  > 
+  > ## 변경 (경량 perf)
+  > `WatchlistContainer` 에 `useVisibleChartPrefetch(tickers, !isEmpty)` 배선 — 관심종목 상위 6행의 일봉 차트를 유휴 시점에 배경 선반입 → hover peek 즉시.
+  > 
+  > - **훅 재사용**(#266 `useVisibleChartPrefetch`) — 신규 로직 0, 배선 1줄 + import.
+  > - 레이트리밋 가드(유휴·상위6·스태거400ms·`pointer:fine`·세션 dedupe)는 훅 내부.
+  > - 세션 `warmed` Set 공유 → 랭킹에서 이미 데운 종목은 관심에서 재요청 skip(중복 0).
+  > 
+  > ## 무회귀
+  > - 빈 관심목록(`isEmpty`)·터치 기기 미실행. 관심 시세/경고/디그레이드 행 로직 무영향.
+  > - 신규 Tailwind 클래스·토큰 0.
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean. 키 정합은 #253 `peekChartPrefetch.test.ts`로 이미 고정.
+  > - 격리 worktree(node_modules exclude 가드).
+  > 
+  > ## 다음 작업
+  > - 검색 결과 지면 배경 프리패치(결과 churn 고려해 신중히).
+  > - 도크 인터랙티브화(hover 툴팁)·가변 폭.
+  > - 기간별 랭킹·⑥ DART 확장·US 주식.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 검색 결과 지면 배경 프리패치(결과 churn 고려해 신중히).
+  - 도크 인터랙티브화(hover 툴팁)·가변 폭.
+  - 기간별 랭킹·⑥ DART 확장·US 주식.

@@ -25,6 +25,7 @@ import { useCallback } from "react";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
+import { useVisibleChartPrefetch } from "@/hooks/stock/useVisibleChartPrefetch";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { useStockMetaStore } from "@/lib/store/stockMetaStore";
@@ -66,6 +67,10 @@ export function WatchlistContainer() {
 
   // tickers 0건 — 시드 전부 삭제 등(§3.9 빈 상태). enabled=false 라 query 는 idle.
   const isEmpty = tickers.length === 0;
+
+  // 관심종목 상위 행의 일봉 차트를 유휴 시점에 배경 선반입 → hover peek 즉시(#266 랭킹 → 관심 확장).
+  //   마우스 기기·상위 소수·스태거·세션 dedupe 는 훅 내부 가드. 자주 보는 내 종목이라 체감이 크다.
+  useVisibleChartPrefetch(tickers, !isEmpty);
   // 데이터가 아직 없고 fetch 중일 때만 스켈레톤(이전 데이터 있으면 표 유지=placeholderData).
   const showSkeleton = !isEmpty && query.isPending && quotes.length === 0;
   const showError = !isEmpty && query.isError && quotes.length === 0;
