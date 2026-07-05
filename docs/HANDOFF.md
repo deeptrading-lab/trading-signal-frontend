@@ -6531,3 +6531,39 @@
   > - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 기간별 랭킹·⑥ DART 확장·US 주식(큰 건).
+
+### 2026-07-05 — fix(home): 지금 뜨는 산업 행 밀도 — 실시간 순위표와 통일 (#275)
+
+- **slug**: `sectors-density` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/275
+- **요약**: fix(home): 지금 뜨는 산업 행 밀도 — 실시간 순위표와 통일
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 지적(스크린샷): "지금 뜨는 산업" 섹션만 행이 **과하게 크고 간격이 넓다**. 바로 위 형제 섹션인 실시간 순위표(카드리스 플랫 행)와 밀도가 안 맞는다.
+  > 
+  > ## 원인
+  > - 행 높이가 `h-sector-row-h`(**56px 고정**) — 순위표의 `ListRow`(`py-md` 자동 높이)보다 큼.
+  > - 업종명 `text-body-strong`, 등락률은 크기 클래스 없이 상속(≈16px 볼드) — 순위표는 `text-body-sm-strong`(14px).
+  > - 순번이 회색 배지, 행 간 헤어라인 없음.
+  > 
+  > ## 변경 (경량 UX 폴리시)
+  > 실시간 순위표(`RealtimeRankingSection`)와 **동일 디자인 컴포넌트·폰트**로 통일:
+  > - `h-sector-row-h`(56px) 제거 → **`ListRow`**(카드리스 플랫, 헤어라인 `border-b` + `py-md`) 채택.
+  > - 업종명·등락률 → **`text-body-sm-strong`**(순위표 정합). breadth `text-caption` 유지.
+  > - 순번 회색 배지 → **plain 넘버**(`text-caption font-bold tabular-nums`, 순위표와 동일).
+  > - `-mx-sm px-sm rounded-sm hover:bg-surface-muted` 로 hover/포커스도 순위표 정합. 스켈레톤도 플랫 헤어라인.
+  > - **`sector-row-h` 토큰 제거**(유일 사용처였음) — DESIGN.md → `design:sync` → theme.json.
+  > 
+  > ## 무회귀·안전
+  > - 클릭→구성종목 모달·가용성·breadth 로직 무변경. 키보드(Enter/Space) 접근성 유지(ListRow div + onKeyDown).
+  > - 신규 커스텀 Tailwind 클래스 0(전부 순위표가 쓰는 기존 유틸). 변경 3파일(컴포넌트·DESIGN.md·theme.json 1줄).
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean · `design:sync` 멱등(theme.json sector-row-h 1줄만 제거).
+  > - ⚠️ QA 빌드 검증 요망(worktree 심볼릭 node_modules). 신규 클래스 0·저위험.
+  > 
+  > ## 다음 작업
+  > - ⑥ 확장(매출/영업이익률 DART·기간수익률·해외) — 별도 큰 건.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - ⑥ 확장(매출/영업이익률 DART·기간수익률·해외) — 별도 큰 건.
