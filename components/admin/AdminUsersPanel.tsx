@@ -1,15 +1,16 @@
 /**
- * SuperadminUsersPanel — 유저 관리 화면 본문(client). **superadmin 전용**(상위 서버 page 가 role 방어).
+ * AdminUsersPanel — 유저 관리 화면 본문(client). **admin 이상**(상위 서버 page 가 role 방어).
  *
  * PRD user-login-auth Phase 2(3-tier 권한):
- *   - 전체 사용자 목록 + 행별 등급 드롭다운(user/admin/superadmin) + 승인/취소.
- *   - 도메인 훅 `useSuperadminUsers` 만 사용. 카드리스 플랫 목록 — 토큰만(hex/px 직타 0).
- *   - 마지막 최고관리자 강등은 409 → 상단 alert. 각 변경은 route 가 재차 superadmin 방어.
+ *   - 전체 사용자 목록 + 승인/취소 — admin·superadmin 공통.
+ *   - 등급 드롭다운은 **superadmin 만**(`canChangeRole`) — admin 은 등급을 읽기 전용 텍스트로만 본다.
+ *   - 도메인 훅 `useAdminUsers`. 카드리스 플랫 목록 — 토큰만(hex/px 직타 0).
+ *   - 등급 변경 라우트(`/users/role`)는 superadmin 전용 재방어 · 마지막 최고관리자 강등 409.
  */
 
 "use client";
 
-import { useSuperadminUsers } from "@/hooks/admin/useSuperadminUsers";
+import { useAdminUsers } from "@/hooks/admin/useAdminUsers";
 import { Button } from "@/components/ui/Button";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { ALL_ROLES } from "@/lib/auth/roles";
@@ -33,7 +34,12 @@ import {
   ADMIN_LAST_SUPERADMIN_ERROR,
 } from "@/lib/copy/admin/users";
 
-export function SuperadminUsersPanel() {
+export interface AdminUsersPanelProps {
+  /** 등급 드롭다운 노출 — superadmin 만 true. admin 은 등급 읽기 전용. */
+  canChangeRole: boolean;
+}
+
+export function AdminUsersPanel({ canChangeRole }: AdminUsersPanelProps) {
   const {
     users,
     isLoading,
@@ -43,7 +49,7 @@ export function SuperadminUsersPanel() {
     setStatus,
     mutatingSub,
     lastError,
-  } = useSuperadminUsers();
+  } = useAdminUsers();
 
   return (
     <section className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg px-lg py-xl">
@@ -104,22 +110,31 @@ export function SuperadminUsersPanel() {
                     {approved ? ADMIN_STATUS_APPROVED : ADMIN_STATUS_PENDING}
                   </span>
 
-                  <label className="sr-only" htmlFor={`role-${u.sub}`}>
-                    {ADMIN_ROLE_SELECT_LABEL}
-                  </label>
-                  <select
-                    id={`role-${u.sub}`}
-                    value={u.role}
-                    disabled={busy}
-                    onChange={(e) => changeRole(u.sub, e.target.value as ProfileRole)}
-                    className="cursor-pointer rounded-sm border border-border-line bg-surface px-sm py-xs text-caption text-text-strong disabled:opacity-60"
-                  >
-                    {ALL_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ADMIN_ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
+                  {canChangeRole ? (
+                    <>
+                      <label className="sr-only" htmlFor={`role-${u.sub}`}>
+                        {ADMIN_ROLE_SELECT_LABEL}
+                      </label>
+                      <select
+                        id={`role-${u.sub}`}
+                        value={u.role}
+                        disabled={busy}
+                        onChange={(e) => changeRole(u.sub, e.target.value as ProfileRole)}
+                        className="cursor-pointer rounded-sm border border-border-line bg-surface px-sm py-xs text-caption text-text-strong disabled:opacity-60"
+                      >
+                        {ALL_ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ADMIN_ROLE_LABEL[r]}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    // admin — 등급 읽기 전용(superadmin 만 변경).
+                    <span className="text-caption text-text-strong">
+                      {ADMIN_ROLE_LABEL[u.role]}
+                    </span>
+                  )}
 
                   <Button
                     variant={approved ? "secondary" : "primary"}

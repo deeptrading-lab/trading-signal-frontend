@@ -48,6 +48,8 @@ import {
 
 export interface SettingsMenuCardProps {
   items: ProfileMenuItem[];
+  /** 섹션 제목 — 기본 "설정". "관리자 메뉴" 등으로 재사용 시 주입(user-login-auth Phase 2). */
+  title?: string;
 }
 
 const MENU_LABEL: Record<ProfileMenuKey, string> = {
@@ -72,12 +74,15 @@ const ICON_MAP = {
   LogOut,
 } as const;
 
-export function SettingsMenuCard({ items }: SettingsMenuCardProps) {
+export function SettingsMenuCard({
+  items,
+  title = SETTINGS_SECTION_TITLE,
+}: SettingsMenuCardProps) {
   const danger = items.find((item) => item.variant === "danger");
   const defaults = items.filter((item) => item.variant !== "danger");
 
   return (
-    <Section title={SETTINGS_SECTION_TITLE}>
+    <Section title={title}>
       <ul role="list" className="divide-y divide-border-line">
         {defaults.map((item) => (
           <li key={item.key}>
