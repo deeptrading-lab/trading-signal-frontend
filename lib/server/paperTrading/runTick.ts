@@ -31,6 +31,8 @@ export type RunPaperTradingTickInput = {
    * (분봉/일봉 페치 + 에이전트 그룹). mock/existing-ai 세션에는 사용 안 함.
    */
   intradayResolver?: (args: IntradayTickArgs) => Promise<IntradayTickResult>;
+  /** 취소 신호 — 스케줄러 틱 타임아웃 시 abort → CLI 중단(폴백) → 틱이 hang 하지 않게. */
+  abortSignal?: AbortSignal;
 };
 
 export type RunPaperTradingTickResult = {
@@ -80,6 +82,7 @@ export async function runPaperTradingTick(
       priceSnapshot,
       existingTicks: input.existingTicks,
       tickWindowStart: input.tickWindowStart,
+      abortSignal: input.abortSignal,
     });
     decision = resolved.decision;
     forcedExit = resolved.forcedExit;

@@ -46,22 +46,38 @@ const TICK_CONCURRENCY = envInt("INTRADAY_TICK_CONCURRENCY", 3, 1, 5);
  */
 const TICK_TIMEOUT_MS = envInt("INTRADAY_TICK_TIMEOUT_MS", 120_000, 30_000, 600_000);
 
-/** 틱을 상한 시간과 race — 초과 시 reject(하위 hang 프로미스는 버려지되 사이클은 진행). */
+/** abort 후 CLI 가 중단·폴백까지 도달할 유예(ms) — 이 안에 틱이 settle 하면 tickChain 자가복구된다. */
+const ABORT_SETTLE_GRACE_MS = 15_000;
+
+/**
+ * 틱을 상한 시간으로 보호 — 2단 방어:
+ * ① `TICK_TIMEOUT_MS` 에 **abort** → 틱의 CLI 호출(abortSignal 존중, intradayCli try/catch 폴백)이
+ *    중단되고 결정론 폴백으로 틱이 **settle** → 해당 세션의 `tickChain` 이 풀려 **자가 복구**(다음
+ *    사이클 정상 틱). hang 한 CLI 프로세스도 실제로 종료된다.
+ * ② abort 로도 settle 되지 않는 hang(취소 미존중 경로)엔 `+ABORT_SETTLE_GRACE_MS` 백스톱 race 로
+ *    사이클만은 확실히 진행(그 세션은 다음 재시작까지 degraded — #292 동작).
+ */
 async function tickWithTimeout(sessionId: string): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
+  const controller = new AbortController();
+  let backstopTimer: ReturnType<typeof setTimeout> | undefined;
+  const abortTimer = setTimeout(() => controller.abort(), TICK_TIMEOUT_MS);
+  const backstop = new Promise<never>((_, reject) => {
+    backstopTimer = setTimeout(
       () => reject(new Error(`tick-timeout ${TICK_TIMEOUT_MS}ms`)),
-      TICK_TIMEOUT_MS,
+      TICK_TIMEOUT_MS + ABORT_SETTLE_GRACE_MS,
     );
   });
   try {
     await Promise.race([
-      runPaperTradingSessionTick(sessionId, { triggeredBy: "auto" }),
-      timeout,
+      runPaperTradingSessionTick(sessionId, {
+        triggeredBy: "auto",
+        abortSignal: controller.signal,
+      }),
+      backstop,
     ]);
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(abortTimer);
+    if (backstopTimer) clearTimeout(backstopTimer);
   }
 }
 

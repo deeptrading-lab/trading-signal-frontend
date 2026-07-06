@@ -223,6 +223,8 @@ export async function runPaperTradingSessionTick(
     triggeredBy?: PaperTradingTriggeredBy;
     tickWindowStart?: string;
     priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
+    /** 취소 신호 — 스케줄러 틱 타임아웃 시 abort → CLI 중단(폴백)으로 hang 회피·tickChain 자가복구. */
+    abortSignal?: AbortSignal;
   },
 ): Promise<PaperTradingSessionDetail | null> {
   await ensureHydrated();
@@ -244,6 +246,7 @@ async function runTickOnce(
     triggeredBy?: PaperTradingTriggeredBy;
     tickWindowStart?: string;
     priceSnapshotProvider?: PaperTradingPriceSnapshotProvider;
+    abortSignal?: AbortSignal;
   },
 ): Promise<PaperTradingSessionDetail> {
   if (entry.session.status !== "running") return toDetail(entry);
@@ -259,6 +262,7 @@ async function runTickOnce(
     triggeredBy: options.triggeredBy ?? "user",
     tickWindowStart,
     priceSnapshotProvider: options.priceSnapshotProvider,
+    abortSignal: options.abortSignal,
   });
 
   const alreadyExists = entry.ticks.some((tick) => tick.id === result.tick.id);
