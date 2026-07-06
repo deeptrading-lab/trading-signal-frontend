@@ -7,10 +7,22 @@
 import type { RuleHit } from "@/lib/types/signal";
 import { crossover, crossunder } from "@/lib/utils/technicalIndicators";
 import type { FactorContext } from "../context";
-import { RULE_WEIGHTS, ADX_TREND, ADX_WEAK } from "../weights";
+import {
+  RULE_WEIGHTS,
+  ADX_TREND,
+  ADX_WEAK,
+  HIGHER_LOW_LOOKBACK,
+  STRUCTURE_SWING_WINDOW,
+} from "../weights";
+import { findSwingHighs, findSwingLows } from "../levels/swingLevels";
 
-export function evaluateTrend(ctx: FactorContext): RuleHit[] {
-  const { i, closes, sma, adx } = ctx;
+export type EvaluateTrendOptions = {
+  /** 저점 우상향/고점 우하향 판정용 스윙 룩백(캔들 슬라이스 길이). 기본 HIGHER_LOW_LOOKBACK(30). */
+  higherLowLookback?: number;
+};
+
+export function evaluateTrend(ctx: FactorContext, opts?: EvaluateTrendOptions): RuleHit[] {
+  const { i, closes, sma, adx, candles } = ctx;
   const hits: RuleHit[] = [];
   const s = sma.short[i];
   const m = sma.mid[i];
@@ -93,6 +105,40 @@ export function evaluateTrend(ctx: FactorContext): RuleHit[] {
         direction: 0,
         weight: 0,
         detail: `ADX ${a.adx.toFixed(1)}`,
+      });
+    }
+  }
+
+  // 5) 구조 반전 임박 — 저점 우상향(바닥 다지기)/고점 우하향(천장 다지기).
+  //    최근 lookback 봉 구간의 스윙 피벗(양방향 STRUCTURE_SWING_WINDOW) 마지막 두 값 비교.
+  const lookback = opts?.higherLowLookback ?? HIGHER_LOW_LOOKBACK;
+  const structureSlice = candles.slice(-lookback);
+  const swingLows = findSwingLows(structureSlice, STRUCTURE_SWING_WINDOW);
+  const swingHighs = findSwingHighs(structureSlice, STRUCTURE_SWING_WINDOW);
+
+  if (swingLows.length >= 2) {
+    const lastLow = swingLows[swingLows.length - 1];
+    const prevLow = swingLows[swingLows.length - 2];
+    if (lastLow > prevLow) {
+      hits.push({
+        key: "HIGHER_LOW_BASE",
+        axis: "trend",
+        direction: 1,
+        weight: RULE_WEIGHTS.higherLowBase,
+        detail: `저점 ${prevLow.toFixed(0)}→${lastLow.toFixed(0)}`,
+      });
+    }
+  }
+  if (swingHighs.length >= 2) {
+    const lastHigh = swingHighs[swingHighs.length - 1];
+    const prevHigh = swingHighs[swingHighs.length - 2];
+    if (lastHigh < prevHigh) {
+      hits.push({
+        key: "LOWER_HIGH_TOP",
+        axis: "trend",
+        direction: -1,
+        weight: RULE_WEIGHTS.higherLowBase,
+        detail: `고점 ${prevHigh.toFixed(0)}→${lastHigh.toFixed(0)}`,
       });
     }
   }

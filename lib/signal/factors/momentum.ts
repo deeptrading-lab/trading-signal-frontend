@@ -13,6 +13,7 @@ import {
   RSI_OVERSOLD,
   RSI_OVERBOUGHT,
   REGIME_DAMPEN,
+  MACD_CONVERGE_LOOKBACK,
 } from "../weights";
 
 export function evaluateMomentum(
@@ -47,7 +48,38 @@ export function evaluateMomentum(
     raw.push({ key: "MACD_ABOVE_ZERO", axis: "momentum", direction: 1, weight: RULE_WEIGHTS.macdZero });
   }
 
-  // 4) RSI — 과매도/과매수(극단) 우선, 아니면 중심선(50) 위/아래.
+  // 4) MACD 히스토그램 수렴(반전 임박) — 최근 MACD_CONVERGE_LOOKBACK봉의 |histogram|이
+  //    strict 단조 감소(0에 가까워짐)면 반전 전조로 본다. null(웜업 미확보) 봉이 섞이면 미발화.
+  const convergeStart = i - MACD_CONVERGE_LOOKBACK + 1;
+  if (convergeStart >= 0) {
+    const window: (number | null)[] = [];
+    for (let k = convergeStart; k <= i; k++) {
+      window.push(macd[k].histogram);
+    }
+    if (window.every((h): h is number => h !== null)) {
+      const values = window as number[];
+      const abs = values.map((h) => Math.abs(h));
+      let narrowing = true;
+      for (let k = 1; k < abs.length; k++) {
+        if (!(abs[k] < abs[k - 1])) {
+          narrowing = false;
+          break;
+        }
+      }
+      if (narrowing) {
+        const first = values[0];
+        const last = values[values.length - 1];
+        const detail = `${MACD_CONVERGE_LOOKBACK}봉 연속 축소(${first.toFixed(0)}→${last.toFixed(0)})`;
+        if (last < 0) {
+          raw.push({ key: "MACD_CONVERGE_UP", axis: "momentum", direction: 1, weight: RULE_WEIGHTS.macdConverge, detail });
+        } else if (last > 0) {
+          raw.push({ key: "MACD_CONVERGE_DOWN", axis: "momentum", direction: -1, weight: RULE_WEIGHTS.macdConverge, detail });
+        }
+      }
+    }
+  }
+
+  // 5) RSI — 과매도/과매수(극단) 우선, 아니면 중심선(50) 위/아래.
   const r = rsi[i];
   if (r !== null) {
     const detail = `RSI ${r.toFixed(1)}`;

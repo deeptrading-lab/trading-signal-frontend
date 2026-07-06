@@ -47,7 +47,7 @@ export function evaluateSignal(
 
   const ctx = buildContext(candles, opts?.indicators);
 
-  const trendHits = evaluateTrend(ctx);
+  const trendHits = evaluateTrend(ctx, { higherLowLookback: opts?.trendHigherLowLookback });
   const trendAxis = aggregateAxis("trend", trendHits);
 
   // 모멘텀은 추세 방향을 레짐 게이트로 받는다(역추세 신호 감쇠).

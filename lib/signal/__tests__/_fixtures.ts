@@ -16,15 +16,18 @@ export type CandleOpts = {
   volumes?: number[];
   /** 고가/저가 마진(절대값). 기본 close*0.01. */
   wick?: number;
+  /** 봉별 저가 오버라이드 — 지정 인덱스는 이 값을 그대로 쓴다(스윙 피벗 테스트용). 미지정이면 기존 close±wick 파생. */
+  lows?: number[];
 };
 
-/** 종가 배열 → 캔들. open=직전 종가(첫 봉은 자기 종가), high/low=close±wick. */
+/** 종가 배열 → 캔들. open=직전 종가(첫 봉은 자기 종가), high/low=close±wick(또는 opts.lows 오버라이드). */
 export function makeCandles(closes: number[], opts: CandleOpts = {}): StockDailyCandle[] {
   return closes.map((close, i) => {
     const open = i > 0 ? closes[i - 1] : close;
     const wick = opts.wick ?? close * 0.01;
     const high = Math.max(open, close) + wick;
-    const low = Math.min(open, close) - wick;
+    const derivedLow = Math.min(open, close) - wick;
+    const low = opts.lows?.[i] ?? derivedLow;
     return {
       date: dateAt(i),
       open,

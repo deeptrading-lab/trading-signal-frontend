@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured, fetchStockPrice, fetchInvestorTrend, getSymbolName } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
 import { evaluateSignal } from "@/lib/signal/engine";
-import { AXIS_LABEL } from "@/lib/copy/signal/labels";
+import { AXIS_LABEL, ruleLabel } from "@/lib/copy/signal/labels";
 import type { AxisScore, SignalResult } from "@/lib/types/signal";
 import type { StockPrice, StockDailyCandle } from "@/lib/api/kis/types";
 import type { StockInvestorTrend } from "@/lib/types/stock/investors";
@@ -299,7 +299,7 @@ function formatSignalForPrompt(
       .filter((h) => h.direction !== 0)
       .sort((x, y) => y.weight - x.weight)
       .slice(0, 3)
-      .map((h) => h.detail ? `${h.key}(${h.detail})` : h.key)
+      .map((h) => h.detail ? `${ruleLabel(h.key)}(${h.detail})` : ruleLabel(h.key))
       .join(", ");
     return `  ${AXIS_LABEL[a.axis]}: ${a.score.toFixed(0)}/100${topHits ? ` — ${topHits}` : ""}`;
   }).join("\n");

@@ -64,6 +64,8 @@ export const RULE_WEIGHTS = {
   rsiMid: 1.5,
   volumeSurge: 3,
   bollTouch: 1, // was 2 — 하단 터치 반등 가정이 한국 일봉서 역예측, 최소화
+  macdConverge: 1,
+  higherLowBase: 2,
 } as const;
 
 /** 임계값. */
@@ -78,6 +80,11 @@ export const ADX_TREND = 25;
 export const ADX_WEAK = 20;
 /** 볼린저 밴드폭 스퀴즈 임계(작을수록 변동성 수축). */
 export const BOLL_SQUEEZE_BW = 0.1;
+
+/** MACD 히스토그램 수렴(반전 임박) 판정 룩백 봉수 — 최근 N봉 |histogram| 이 단조 감소인지 확인. */
+export const MACD_CONVERGE_LOOKBACK = 4;
+/** 저점 우상향/고점 우하향(구조 반전) 판정용 스윙 피벗 룩백 봉수(캔들 슬라이스 길이). */
+export const HIGHER_LOW_LOOKBACK = 30;
 
 /** 레짐 게이트 — 추세 역방향 모멘텀 신호 가중 감쇠 계수(0.5=절반). */
 export const REGIME_DAMPEN = 0.5;

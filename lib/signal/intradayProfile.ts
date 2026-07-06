@@ -125,6 +125,7 @@ export function evaluateIntradaySignal(
     minBars: profile.minBars,
     regimeOverride: dailyRegime,
     regimeFilter: true,
+    trendHigherLowLookback: profile.structureLookback,
   };
   return evaluateSignal(candles, opts);
 }
