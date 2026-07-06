@@ -143,6 +143,44 @@ export const COPY = {
     resume: "여기서부터 다시",
   },
   /**
+   * 완료(done) 뷰 전용 — 노스스타 flat 행/컴팩트 카드의 라벨·태그·힌트.
+   * 진행(running/pending) 뷰는 기존 카피(AnalystCard·DebateMsgCard)를 그대로 쓴다(PHASE 1 미변경).
+   */
+  phaseDone: {
+    /** 분석가 flat 행 — 짧은 도메인 라벨(약 66px 라벨열). 전문 오버레이 제목엔 AGENT_META 풀 라벨 사용. */
+    analystLabel: {
+      market: "기술적",
+      news: "뉴스",
+      fundamentals: "기본적",
+      social: "SNS",
+    } as Record<"market" | "news" | "fundamentals" | "social", string>,
+    /** 4행 아래 힌트 — 감정 칩 옆 "눌러서 전문 펼침" 안내. */
+    rowHint: "각 항목을 누르면 리포트 전문을 볼 수 있어요",
+    /** 종합 flat 행 — 짧은 역할 라벨(약 82px 라벨열). */
+    synLabel: {
+      research_manager: "리서치매니저",
+      trader: "트레이더",
+    } as Record<"research_manager" | "trader", string>,
+    /** 리스크 3카드 — 짧은 역할 라벨(공격/중립/보수). */
+    riskLabel: {
+      risk_risky: "공격적",
+      risk_neutral: "중립적",
+      risk_safe: "보수적",
+    } as Record<"risk_risky" | "risk_neutral" | "risk_safe", string>,
+    /**
+     * 리스크 역할별 특성 스탠스 태그 — 각 검토관의 **고정 렌즈**(공격=기회 옹호 / 중립=균형 / 보수=하방 집중)를
+     * 나타낸다. TradingAgents 구조상 세 리스크 검토관은 종목과 무관하게 스탠스가 고정돼 있어, 이 태그는
+     * '해당 관점의 성향'이지 이 종목의 최종 판정이 아니다(최종 판정은 히어로·판정 페이즈가 담당). 실제 결론은 카드를 눌러 확인.
+     */
+    riskTag: {
+      risk_risky: "매수",
+      risk_neutral: "조건부",
+      risk_safe: "주의",
+    } as Record<"risk_risky" | "risk_neutral" | "risk_safe", string>,
+    /** done 이지만 리포트 본문이 비었을 때 폴백 미리보기. */
+    emptyPreview: "요약을 불러오지 못했어요",
+  },
+  /**
    * verdict-forward 히어로(T4 항시-글랜스) — 스트리밍 중 도출-대기 + 완료 시 판정 글랜스.
    * 스트리밍 중엔 가격 기반 결정론 시그널을 채워 12분 대기 동안 빈 화면을 막는다.
    */
@@ -219,6 +257,14 @@ export const COPY = {
     bearWriting: "반론 작성 중...",
     detailTitle: (side: "bull" | "bear", round: number) =>
       `${side === "bull" ? "강세" : "약세"} 연구원 — ${round}라운드`,
+    /**
+     * 완료(done) 세로 스택 버블의 방향 라벨 — 라운드 번호는 좌측 `.rn` 박스가 담당하므로
+     * 버블 헤더엔 방향("강세" 위 / "약세 반박" 아래)만 노출한다. 진행 뷰(좌우 대치)는 roundMarker 유지.
+     */
+    bubbleWho: {
+      bull: "강세",
+      bear: "약세 반박",
+    } as Record<"bull" | "bear", string>,
   },
   verdict: {
     badge: "최종 결정",

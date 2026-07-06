@@ -10,9 +10,14 @@ interface DebateMsgCardProps {
   msg: DebateMessage;
   debatingSide: "bull" | "bear" | null;
   onExpand: (title: string, content: string) => void;
+  /**
+   * 완료(done) 세로 스택 뷰 전용 — 헤더에 라운드 번호(좌측 `.rn` 박스가 담당) 대신 방향 라벨("강세"/"약세 반박")을 노출.
+   * 미전달 시(진행 좌우 대치 뷰) 기존 라운드 마커를 그대로 쓴다.
+   */
+  whoLabel?: string;
 }
 
-export function DebateMsgCard({ msg, debatingSide, onExpand }: DebateMsgCardProps) {
+export function DebateMsgCard({ msg, debatingSide, onExpand, whoLabel }: DebateMsgCardProps) {
   const isBull = msg.speaker === "bull";
   const isStreaming = msg.isStreaming && debatingSide === msg.speaker;
   // 미리보기는 마크다운 기호를 제거한 평문 teaser(전체보기는 원문 그대로 마크다운 렌더).
@@ -42,7 +47,7 @@ export function DebateMsgCard({ msg, debatingSide, onExpand }: DebateMsgCardProp
           "text-caption font-bold flex-1 truncate",
           isBull ? "text-signal-up" : "text-signal-down",
         )}>
-          {COPY.debate.roundMarker(msg.round)}
+          {whoLabel ?? COPY.debate.roundMarker(msg.round)}
         </span>
         {/* 완료 시 — 헤더 오른쪽에 전체보기 */}
         {!msg.isStreaming && msg.content && (
