@@ -16,6 +16,11 @@ interface DebateMsgCardProps {
    * 미전달 시 라운드 마커로 폴백.
    */
   whoLabel?: string;
+  /**
+   * true 면 `debatingSide` 일치 여부와 무관하게 항상 활성(스트리밍) 버블로 그린다.
+   * 첫 토큰이 아직 안 왔지만 해당 발화자가 진행 중임을 미리 보여줄 placeholder 용도.
+   */
+  forceActive?: boolean;
 }
 
 /**
@@ -26,9 +31,9 @@ interface DebateMsgCardProps {
  *
  * 색은 앱 토큰만 — bull=signal-up/up-soft · bear=signal-down/down-soft. 커서는 방향 톤(motion-reduce 정지).
  */
-export function DebateMsgCard({ msg, debatingSide, onExpand, whoLabel }: DebateMsgCardProps) {
+export function DebateMsgCard({ msg, debatingSide, onExpand, whoLabel, forceActive }: DebateMsgCardProps) {
   const isBull = msg.speaker === "bull";
-  const isStreaming = msg.isStreaming && debatingSide === msg.speaker;
+  const isStreaming = msg.isStreaming && (forceActive || debatingSide === msg.speaker);
   const who = whoLabel ?? COPY.debate.roundMarker(msg.round);
 
   const bubbleClass = cn(
