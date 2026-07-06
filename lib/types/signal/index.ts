@@ -113,6 +113,12 @@ export type EvaluateOptions = {
   softMinBars?: number;
   /** 풀 품질 최소 봉수 오버라이드 (분봉 프로파일). 미지정 시 `MIN_BARS`(130). */
   minBars?: number;
+  /**
+   * 저점 우상향/고점 우하향(구조 반전 임박) 판정용 스윙 룩백 오버라이드 — 분봉 프로파일은
+   * `structureLookback` 을 그대로 재사용해 일봉 기본값(30봉)이 분봉 타임프레임에 맞지 않는
+   * 문제를 막는다. 미지정 시 `HIGHER_LOW_LOOKBACK`(30).
+   */
+  trendHigherLowLookback?: number;
 };
 
 // ───────────────────────── 백테스트 ─────────────────────────
