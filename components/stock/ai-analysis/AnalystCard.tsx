@@ -56,8 +56,8 @@ export const AnalystCard = memo(function AnalystCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      // 탈-카드: 그림자·헤더 색띠·헤더 하단선 제거. 헤어라인 타일 + 상태 점(dot)만으로 진행을 표시.
-      className="bg-surface rounded-md border border-border-line overflow-hidden flex flex-col min-h-[120px]"
+      // 탈-카드: 그림자·헤더 색띠·헤더 하단선 제거. 흰 패널 위 회색 타일(노스스타 stream-box=surface-2) + 상태 점(dot).
+      className="bg-surface-muted rounded-md border border-border-line overflow-hidden flex flex-col min-h-[120px]"
     >
       <div className="flex items-center gap-sm px-md pt-md pb-1 flex-none">
         {/* 완료 시 점 → 체크(노스스타 done 초록). */}

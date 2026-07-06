@@ -131,7 +131,7 @@ function PendingHero({
 }) {
   return (
     // 노스스타 `.verdict.pending` — 완료 히어로와 같은 verdict 패밀리(rounded-md·border·좌측 바, 그림자 없음).
-    <div className="relative overflow-hidden rounded-md border border-border-line bg-surface p-lg">
+    <div className="relative overflow-hidden rounded-md border border-border-line bg-surface-muted p-lg">
       {/* `.verdict.pending::before` — 옅은 좌측 4px 바(대기: border 톤). */}
       <div className="absolute inset-y-0 left-0 w-1 bg-border-line" aria-hidden="true" />
       <div className="flex items-start justify-between gap-md">

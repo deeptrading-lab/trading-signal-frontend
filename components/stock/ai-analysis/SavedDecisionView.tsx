@@ -107,7 +107,7 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
 
       {/* valid(신선) — 하단 subtle 재분석 행. 일반 사용자엔 "AI 분석" 총칭(엔진/모델은 아래 관리자 전용 캡션). */}
       {!stale && (
-        <div className="flex items-center justify-between gap-3 px-1 pt-1">
+        <div className="mt-lg flex items-center justify-between gap-3 border-t border-border-line pt-md">
           <p className="text-caption text-text-muted">
             {COPY.savedMode.validFooter(formatRelativeTime(snapshot.updatedAt))}
           </p>
