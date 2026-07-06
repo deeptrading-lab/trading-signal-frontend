@@ -6819,3 +6819,30 @@
   > - (옵션) hang 한 세션의 poisoned tickChain 자가 복구(abortSignal 타임아웃 배선 or tickChain 리셋) — 현재는 멈춤 배지+재시작으로 대응.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (옵션) hang 한 세션의 poisoned tickChain 자가 복구(abortSignal 타임아웃 배선 or tickChain 리셋) — 현재는 멈춤 배지+재시작으로 대응.
+
+### 2026-07-06 — fix(intraday): 틱 타임아웃에 abort 배선 — hang 세션 자가 복구 (#293)
+
+- **slug**: `intraday-tick-abort` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/293
+- **요약**: fix(intraday): 틱 타임아웃에 abort 배선 — hang 세션 자가 복구
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > #292 후속. #292는 스케줄러 **전체 정지**(cycleRunning 고착)만 막았고, hang 한 **개별 세션**은 poisoned tickChain 으로 다음 dev 재시작까지 degraded(글로벌 동시성 슬롯 점유·매 사이클 timeout)로 남았다.
+  > 
+  > ## 변경 — abortSignal 3계층 배선 + 타임아웃 abort
+  > CLI 호출(`invokeAgentCliStream`)은 **이미 abortSignal을 수신·존중**하고, intradayCli 는 그 에러를 try/catch로 삼켜 **결정론 폴백**으로 이어진다. 그래서 스케줄러가 타임아웃에 abort 하면 → CLI 중단 → 폴백으로 틱이 **settle** → 해당 세션 `tickChain` 이 풀려 **자가 복구**(다음 사이클 정상 틱), hang 한 CLI 프로세스도 종료된다.
+  > 
+  > - **abortSignal 배선**: `runPaperTradingSessionTick` → `runTickOnce` → `runPaperTradingTick` → resolver args(`resolveIntradayTickDecision` 이미 `abortSignal?` 수신) → `decideIntradayWithCli` → `invokeAgentCliStream`(이미 존중).
+  > - **`tickScheduler.tickWithTimeout`**: `TICK_TIMEOUT_MS` 에 `controller.abort()` → 위 경로로 틱 settle. + 백스톱 `Promise.race`(`+ABORT_SETTLE_GRACE_MS` 15s)는 취소 미존중 hang 대비 사이클 진행 보장(#292 동작 유지).
+  > 
+  > ## 무회귀·안전
+  > - 서버 전용 스케줄러/틱 로직. abortSignal 은 옵셔널(미주입 시 기존 동작). 정상 틱(빠름)엔 타이머만 붙고 clearTimeout. paperTrading vitest 46 통과.
+  > 
+  > ## 테스트
+  > - `tsc`·`eslint` clean · paperTrading vitest 46(scheduler 8 포함).
+  > 
+  > ## 다음 작업
+  > - (옵션) 취소 미존중 데이터 fetch(fetchDailyChunked 등)에도 signal 전파 — 현재 CLI hang 은 자가복구, 그 외는 백스톱+멈춤 배지.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (옵션) 취소 미존중 데이터 fetch(fetchDailyChunked 등)에도 signal 전파 — 현재 CLI hang 은 자가복구, 그 외는 백스톱+멈춤 배지.
