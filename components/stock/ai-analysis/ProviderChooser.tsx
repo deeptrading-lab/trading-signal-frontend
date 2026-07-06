@@ -91,7 +91,7 @@ function ProviderCard({
       type="button"
       onClick={() => onSelect(provider)}
       className={cn(
-        "flex flex-col items-center text-center gap-2 rounded-md border bg-surface px-md py-lg transition-colors cursor-pointer active:scale-95",
+        "flex flex-col items-center text-center gap-2 rounded-md border bg-surface-muted px-md py-lg transition-colors cursor-pointer active:scale-95",
         // PC: 아이콘 왼쪽 + 텍스트 오른쪽 가로 카드(설명 한 줄).
         "md:flex-row md:items-center md:text-left md:gap-4 md:px-6",
         style.ring,

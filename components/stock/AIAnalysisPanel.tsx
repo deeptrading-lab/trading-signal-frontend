@@ -263,7 +263,7 @@ export function AIAnalysisPanel({
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
-              "fixed top-[56px] right-0 bottom-0 z-[70] bg-surface-muted shadow-overlay border-t border-l border-border-line flex flex-col overflow-hidden",
+              "fixed top-[56px] right-0 bottom-0 z-[70] bg-surface shadow-overlay border-t border-l border-border-line flex flex-col overflow-hidden",
               "w-full",
             )}
             aria-label={COPY.panel.title}
