@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils/cn";
 import { stripMarkdown } from "@/lib/utils/stripMarkdown";
 import { AGENT_META } from "@/lib/types/stock/aiAnalysis";
-import { AnalystTile } from "./AnalystTile";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
+import { StreamPips, StreamBox, StreamEta, activeStreamAgent } from "./PhaseStream";
 import type { AgentKey, AgentState } from "@/lib/types/stock/aiAnalysis";
 
 /**
@@ -12,10 +12,14 @@ import type { AgentKey, AgentState } from "@/lib/types/stock/aiAnalysis";
  *
  * - 완료(done, 5인 전부 done): 노스스타 `.syn-row` 납작 행(리서치매니저·트레이더) + `.risk-3` 컴팩트 3카드(공격/중립/보수).
  *   각 행·카드 클릭 → 기존 전체보기 경로(onExpand)로 리포트 전문 펼침. 트레이더 '심층 추론' 배지는 done 뷰에서도 보존.
- * - 진행/대기/오류(그 외): 기존 progressive reveal 타일 그대로(PHASE 1 미변경 — 스트리밍·재시도 보존).
+ * - 진행/대기/오류(그 외, PHASE 2): 노스스타 stream 모델 — pip 5개(전원 상태) + stream-box(활성 하나) + eta.
+ *   리서치매니저→트레이더는 순차, 리스크 3인은 병렬(Promise.allSettled)이라 activeStreamAgent 로 활성 하나를
+ *   고른다. 오류·재개는 상위 PhaseRow 어포던스가 담당.
  */
 const RISK_KEYS = ["risk_risky", "risk_neutral", "risk_safe"] as const;
 const PLAN_KEYS = ["research_manager", "trader"] as const;
+/** pip·활성 선택 순서 — 실행 순서(리서치매니저 → 트레이더 → 리스크 3). */
+const SYN_KEYS = [...PLAN_KEYS, ...RISK_KEYS] as const;
 
 /**
  * 리스크 역할별 특성 스탠스 태그 톤(#280 매핑) — 각 검토관의 고정 렌즈를 나타낸다(종목별 판정 아님, COPY.phaseDone.riskTag 주석 참조).
@@ -30,15 +34,11 @@ const RISK_TAG_TONE: Record<(typeof RISK_KEYS)[number], string> = {
 export function SynthesisPhaseBody({
   agents,
   reports,
-  isRunning,
   onExpand,
-  onResume,
 }: {
   agents: AgentState[];
   reports: Partial<Record<AgentKey, string>>;
-  isRunning: boolean;
   onExpand: (title: string, content: string, highlight?: string) => void;
-  onResume: (key: AgentKey) => void;
 }) {
   const statusOf = (key: AgentKey) => agents.find((a) => a.key === key)?.status ?? "pending";
   const allDone =
@@ -140,69 +140,27 @@ export function SynthesisPhaseBody({
     );
   }
 
-  // ── 진행/대기/오류(running) — 기존 progressive reveal 타일 그대로(PHASE 1 미변경). ──
-  const showPlan = statusOf("research_manager") !== "pending" || statusOf("trader") !== "pending";
-  const showRisk = RISK_KEYS.some((k) => statusOf(k) !== "pending");
-  const traderPending = statusOf("trader") === "pending";
+  // ── 진행/대기/오류(PHASE 2) — 노스스타 stream 모델(pip 5개 + 활성 stream-box + eta). ──
+  const pips = SYN_KEYS.map((key) => ({
+    key,
+    label: COPY.phase.stream.synPip[key],
+    status: statusOf(key),
+  }));
+  const doneCount = pips.filter((p) => p.status === "done").length;
+  const active = activeStreamAgent(agents, SYN_KEYS);
+  const activeMeta = active ? AGENT_META.find((m) => m.key === active.key) : null;
 
   return (
-    <div className="space-y-3">
-      {/* 리서치 매니저 + 트레이더(심층 추론 배지) */}
-      {showPlan && (
-        <div className="grid grid-cols-2 gap-3">
-          <AnalystTile
-            agentKey="research_manager"
-            agents={agents}
-            reports={reports}
-            isRunning={isRunning}
-            onExpand={onExpand}
-            onResume={onResume}
-          />
-          {traderPending ? (
-            <AnalystTile
-              agentKey="trader"
-              agents={agents}
-              reports={reports}
-              isRunning={isRunning}
-              onExpand={onExpand}
-              onResume={onResume}
-            />
-          ) : (
-            <div className="relative">
-              {/* AI 시그니처 — 심층 추론 배지는 gradient-ai 인디고 톤(브랜드 강조). */}
-              <span className="absolute -top-3.5 right-3 z-10 rounded-pill bg-gradient-ai-soft px-2 py-0.5 text-caption font-bold text-gradient-ai-from">
-                {COPY.panel.deepReasoning}
-              </span>
-              <AnalystTile
-                agentKey="trader"
-                agents={agents}
-                reports={reports}
-                isRunning={isRunning}
-                onExpand={onExpand}
-                onResume={onResume}
-              />
-            </div>
-          )}
-        </div>
+    <div className="flex flex-col gap-md">
+      <StreamPips pips={pips} />
+      {active && activeMeta && (
+        <StreamBox
+          who={COPY.phase.stream.writing(activeMeta.label)}
+          text={active.streamingChunk}
+          fallback={COPY.progress[active.key]?.[0]}
+        />
       )}
-
-      {/* 리스크 3인 — 모바일 스냅 캐러셀(다음 카드 peek), md+ 3열 그리드. */}
-      {showRisk && (
-        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide-mobile md:grid md:grid-cols-3 md:overflow-visible">
-          {RISK_KEYS.map((key) => (
-            <div key={key} className="snap-start w-[78%] shrink-0 sm:w-[46%] md:w-auto">
-              <AnalystTile
-                agentKey={key}
-                agents={agents}
-                reports={reports}
-                isRunning={isRunning}
-                onExpand={onExpand}
-                onResume={onResume}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      <StreamEta done={doneCount} total={SYN_KEYS.length} />
     </div>
   );
 }
