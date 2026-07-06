@@ -15,6 +15,8 @@ import { queryKeys } from "@/hooks/query/queryKeys";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
 import { useToast } from "@/hooks/utils/useToast";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
+import { stripTickerCode } from "@/lib/utils/stripTickerCode";
+import { stripDecisionTickers } from "@/lib/stock/stripDecisionTickers";
 import {
   AGENT_ORDER,
   INITIAL_AGENT_STATES,
@@ -768,22 +770,80 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
     ? state.slots[state.viewTicker] ?? null
     : null;
 
+  // ── 표시 직전 티커 코드 strip(전역 "종목 코드 미표시" 규칙) ───────────────────
+  //   분석 프롬프트가 AI 에게 티커를 주다 보니 리포트·토론·판정·라이브 토큰에 6자리 코드가 새어 나온다.
+  //   패널로 투영하는 이 지점이 ticker 를 알고 있으니 여기서 일괄 제거하면 하위 표시(분석가행·전문·
+  //   토론 카드·최종 판정·CardDetailOverlay)가 전부 클린해진다. **대상 슬롯 ticker 로만** 정리해
+  //   가격·수치 오탐이 없다. 스트리밍(streamingChunk·진행 중 토론)은 **누적값**에 적용해 청크 경계로
+  //   쪼개진 코드까지 안전하게 걷어낸다. prod(봇 소스) 분석도 같은 표시 지점을 지나므로 크로스소스 방어.
+  const activeTicker = activeSlot?.ticker ?? "";
+
+  const strippedReports = useMemo<Partial<Record<AgentKey, string>>>(() => {
+    const reports = activeSlot?.reports;
+    if (!reports || !activeTicker) return reports ?? {};
+    const out: Partial<Record<AgentKey, string>> = {};
+    for (const key of Object.keys(reports) as AgentKey[]) {
+      const value = reports[key];
+      out[key] = value == null ? value : stripTickerCode(value, activeTicker);
+    }
+    return out;
+  }, [activeSlot?.reports, activeTicker]);
+
+  const strippedDebate = useMemo<DebateMessage[]>(() => {
+    const debate = activeSlot?.debate;
+    if (!debate || !activeTicker) return debate ?? [];
+    return debate.map((msg) => ({
+      ...msg,
+      content: stripTickerCode(msg.content, activeTicker),
+    }));
+  }, [activeSlot?.debate, activeTicker]);
+
+  const strippedAgents = useMemo<AgentState[]>(() => {
+    const agents = activeSlot?.agents ?? INITIAL_AGENT_STATES;
+    if (!activeTicker) return agents;
+    // streamingChunk(라이브 토큰)만 누적값에 strip — status/failReason 등 상태는 불변.
+    return agents.map((agent) =>
+      agent.streamingChunk
+        ? { ...agent, streamingChunk: stripTickerCode(agent.streamingChunk, activeTicker) }
+        : agent,
+    );
+  }, [activeSlot?.agents, activeTicker]);
+
+  const strippedFinal = useMemo<FinalDecision | null>(() => {
+    const final = activeSlot?.final ?? null;
+    if (!final || !activeTicker) return final;
+    return stripDecisionTickers(final, activeTicker);
+  }, [activeSlot?.final, activeTicker]);
+
+  const strippedSentiment = useMemo<SentimentReport | null>(() => {
+    const sentiment = activeSlot?.sentiment ?? null;
+    if (!sentiment || !activeTicker) return sentiment;
+    return { ...sentiment, summary: stripTickerCode(sentiment.summary, activeTicker) };
+  }, [activeSlot?.sentiment, activeTicker]);
+
   const projected = useMemo(() => {
     if (!activeSlot) return EMPTY_PROJECTION;
     return {
       provider: activeSlot.provider,
-      agents: activeSlot.agents,
-      reports: activeSlot.reports,
-      debate: activeSlot.debate,
+      agents: strippedAgents,
+      reports: strippedReports,
+      debate: strippedDebate,
       debatingSide: activeSlot.debatingSide,
-      final: activeSlot.final,
-      sentiment: activeSlot.sentiment,
+      final: strippedFinal,
+      sentiment: strippedSentiment,
       error: activeSlot.error,
       resumeFrom: activeSlot.resumeFrom,
       isRunning: activeSlot.isRunning,
       doneCount: doneCountOf(activeSlot),
     };
-  }, [activeSlot]);
+  }, [
+    activeSlot,
+    strippedAgents,
+    strippedReports,
+    strippedDebate,
+    strippedFinal,
+    strippedSentiment,
+  ]);
 
   const tabs = useMemo<AnalysisTab[]>(
     () =>
