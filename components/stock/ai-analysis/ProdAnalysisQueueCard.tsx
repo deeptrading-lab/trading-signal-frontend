@@ -8,20 +8,24 @@
  * 따라서 실시간 진행 스트림·라이브 재분석 컨트롤을 그리지 않는다(prod 무회귀 — 로컬 전용).
  *
  * 상태 머신(useProdAnalysisRequest.phase):
- *   - idle       : 이전 결론 신선도에 따라 재요청/첫요청 CTA(또는 신선하면 CTA 숨김 — S1).
+ *   - idle       : 저장 결론 staleness 에 따라 배치 — 만료=상단 앰버 배너, 유효=하단 subtle 푸터.
  *   - requesting : 요청 보내는 중(버튼 disabled + 스피너).
  *   - accepted/offline/duplicate/error : 상단 상태 배너(S4/S5/S6/실패). 이전 결론 카드는 아래 유지.
  *
- * 배치(DESIGN.md Layout): [상태 배너] → [재요청 안내 / 빈 인트로] → [VerdictHero + VerdictDetails].
- * 색·간격은 신규 토큰 0 — .card-info/.card-warn/.card-critical + accent-vivid 재사용.
+ * 배치(로컬 SavedDecisionView 미러): [상태 배너] → [만료 앰버 배너?] → [VerdictHero(stale 딤)+VerdictDetails]
+ *   → [유효 subtle 푸터?]. staleness 는 로컬과 동일 evaluateDecisionStaleness(3영업일+가격규칙)로 판정해
+ *   같은 2일짜리가 prod/로컬에서 갈리지 않게 통일한다. 색·간격은 신규 토큰 0 —
+ *   .card-info/.card-warn/.card-critical + accent-vivid + bg-warn 재사용.
  *
  * ⚠️ 이 컴포넌트는 prod 분기에서만 마운트된다(AIAnalysisPanel). 로컬은 기존 라이브 경로 그대로.
  */
 
+import { RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import { REANALYSIS_PROMPT_MIN_AGE_MS } from "@/hooks/stock/aiAnalysisProvider";
+import { evaluateDecisionStaleness } from "@/lib/stock/decisionStaleness";
 import {
   useProdAnalysisRequest,
   type ProdRequestPhase,
@@ -32,10 +36,7 @@ import { VerdictDetails } from "./VerdictDetails";
 import { ProdQueueBanner, type ProdQueueBannerTone } from "./ProdQueueBanner";
 import { ProdRequestCta } from "./ProdRequestCta";
 import { WorkerActivityBadge } from "./WorkerActivityBadge";
-import type {
-  AIAnalysisDecisionSnapshot,
-  AIAnalysisProvider,
-} from "@/lib/types/stock/aiAnalysis";
+import type { AIAnalysisDecisionSnapshot } from "@/lib/types/stock/aiAnalysis";
 
 interface ProdAnalysisQueueCardProps {
   ticker: string;
@@ -43,15 +44,52 @@ interface ProdAnalysisQueueCardProps {
   name?: string | null;
   /** 저장된 이전 결론(없으면 S3 빈 인트로). */
   snapshot: AIAnalysisDecisionSnapshot | null;
+  /** 라이브 현재가(원) — staleness 평가·만료 배너 표기용. 로딩 전이면 null(가격 규칙 건너뜀). */
+  livePrice?: number | null;
   /** 이 종목이 분석 큐에서 진행 중(pending/processing)이면 — "분석 중" 선제 표시 + 요청 CTA 숨김. */
   activeJob?: { status: "pending" | "processing" } | null;
 }
 
-/** 마지막 분석이 30분 이내면 신선(S1) — 재요청 CTA 숨김. 로컬 재분석 프롬프트와 동일 임계. */
-function isFresh(updatedAt: string): boolean {
-  const t = new Date(updatedAt).getTime();
-  if (Number.isNaN(t)) return false;
-  return Date.now() - t < REANALYSIS_PROMPT_MIN_AGE_MS;
+/**
+ * 만료 배너·유효 푸터용 compact pill 요청 버튼 — 로컬 SavedDecisionView 의 stale/valid pill 미러.
+ * variant: warn(만료 앰버 채움) | accent(유효 accent 아웃라인). isPending 이면 스피너 + disabled.
+ * (S3 빈 인트로·error retry 는 큰 ProdRequestCta 유지 — compact 는 이미 결론이 떠 있는 곳 전용.)
+ */
+function RequestPill({
+  variant,
+  isPending,
+  onClick,
+}: {
+  variant: "warn" | "accent";
+  isPending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isPending}
+      aria-disabled={isPending || undefined}
+      aria-busy={isPending || undefined}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-pill px-lg py-1.5 text-caption font-bold transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-80",
+        variant === "warn"
+          ? "bg-warn text-surface hover:brightness-110"
+          : "border border-accent-vivid bg-accent-vivid-soft text-accent-vivid hover:bg-accent-vivid hover:text-surface",
+      )}
+    >
+      {isPending ? (
+        <Loader2
+          size={13}
+          className="animate-spin motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      ) : (
+        <RefreshCw size={13} aria-hidden="true" />
+      )}
+      {isPending ? COPY.prodQueue.requesting : COPY.prodQueue.request}
+    </button>
+  );
 }
 
 /** phase → 상태 배너 톤·카피. idle/requesting 은 배너 없음(null). */
@@ -88,28 +126,11 @@ function bannerOf(
   }
 }
 
-/** 이전 결론 메타 한 줄 — 상대 경과시간(얼마나 지났는지) · provider. formatRelativeTime 이 3일 초과 시 절대날짜로 강등. */
-function PreviousMeta({
-  updatedAt,
-  provider,
-}: {
-  updatedAt: string;
-  provider: AIAnalysisProvider;
-}) {
-  return (
-    <p className="text-caption text-text-muted break-keep">
-      {COPY.prodQueue.recentMeta(
-        formatRelativeTime(updatedAt),
-        COPY.provider[provider],
-      )}
-    </p>
-  );
-}
-
 export function ProdAnalysisQueueCard({
   ticker,
   name,
   snapshot,
+  livePrice = null,
   activeJob = null,
 }: ProdAnalysisQueueCardProps) {
   // 종목명 우선순위: 현재 해석명(prop) → 이전 결론 저장명(snapshot). 서버가 pickStockName 으로 재정제.
@@ -134,7 +155,16 @@ export function ProdAnalysisQueueCard({
   // 요청을 보냈거나(배너) 이미 진행 중(activeJob)이면 재요청/첫요청 CTA 는 숨긴다 — 중복 요청 혼란 제거.
   const requested =
     banner != null || request.phase === "requesting" || activeJob != null;
-  const fresh = snapshot ? isFresh(snapshot.updatedAt) : false;
+  // 로컬 SavedDecisionView 와 동일 staleness(3영업일+가격규칙) — 만료=상단 배너, 유효=하단 푸터로 갈린다.
+  const staleness = snapshot
+    ? evaluateDecisionStaleness({
+        decision: snapshot.decision,
+        livePrice,
+        updatedAt: snapshot.updatedAt,
+      })
+    : null;
+  const stale = staleness?.stale ?? false;
+  const staleReason = staleness?.reason ?? null;
   // 실패(error) 배너에는 "다시 요청" CTA 를 함께(S9 톤 — enqueue 자체 실패 재시도).
   const errorRetryCta =
     request.phase === "error" ? (
@@ -166,54 +196,72 @@ export function ProdAnalysisQueueCard({
 
       {snapshot ? (
         <>
-          {/* S2: 신선도 낮은 이전 결론 — 재요청 안내 박스(아직 요청 안 했을 때만). S1(신선): CTA 숨김. */}
-          {!requested && !fresh && (
-            <div className="w-full rounded-lg border border-border-line bg-surface-muted p-card-px-mobile">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-body-sm-strong text-text-strong break-keep">
-                    {COPY.prodQueue.staleTitle}
-                  </p>
-                  <div className="mt-1">
-                    <PreviousMeta
-                      updatedAt={snapshot.updatedAt}
-                      provider={snapshot.provider}
-                    />
-                  </div>
-                </div>
-                <div className="w-full shrink-0 sm:w-auto">
-                  <ProdRequestCta
-                    label={COPY.prodQueue.request}
-                    isPending={request.isPending}
-                    onClick={() => request.submit({ force: true })}
-                  />
-                </div>
+          {/* 만료(stale) — 상단 앰버 배너 + compact 재요청 pill(로컬 SavedDecisionView 미러).
+              요청중/진행중(requested)이면 숨긴다(중복 요청 방지 — 기존 동작 보존). */}
+          {stale && staleReason && !requested && (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label={COPY.savedMode.staleAria}
+              className="card-warn flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex min-w-0 items-start gap-2">
+                {/* 노스스타 `.sb-ic` — 앰버 채움 원 + 흰 "!"(경고 아이콘). */}
+                <span
+                  className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-warn text-caption font-extrabold text-surface"
+                  aria-hidden="true"
+                >
+                  !
+                </span>
+                <p className="text-body-sm font-medium leading-relaxed break-keep">
+                  {COPY.savedMode.staleBanner(
+                    staleReason,
+                    livePrice != null ? formatNumber(livePrice) : null,
+                  )}
+                </p>
               </div>
-            </div>
-          )}
-
-          {/* S1: 신선하면 메타만 곁들이고 CTA 숨김(결과 소비). */}
-          {!requested && fresh && (
-            <div className="w-full px-1">
-              <PreviousMeta
-                updatedAt={snapshot.updatedAt}
-                provider={snapshot.provider}
+              <RequestPill
+                variant="warn"
+                isPending={request.isPending}
+                onClick={() => request.submit({ force: true })}
               />
             </div>
           )}
 
-          {/* 이전 결론 — 로컬 SavedDecisionView 와 동일한 히어로(글랜스)+상세(플랫 스택) 스택.
-              staleness 판정은 prod 에서 별도 계산하지 않고 위 재요청 안내/PreviousMeta 로 대체한다. */}
-          <VerdictHero
-            final={snapshot.decision}
-            signal={snapshot.signal}
-            doneCount={0}
-            totalCount={0}
-            mode="saved"
-            calibration={getCalibration(snapshot.decision.confidence)}
-            calibrationMinSampleN={minSampleN}
-          />
-          <VerdictDetails data={snapshot.decision} />
+          {/* 노스스타 `.fv-stack` — 히어로(글랜스, stale 이면 opacity .66 딤 "이전 분석") + 상세(플랫 스택).
+              상세는 가독성을 위해 풀 opacity 유지. 로컬 SavedDecisionView 와 동일 구조. */}
+          <div className="space-y-3">
+            <div className={cn("transition-opacity", stale && "opacity-[.66]")}>
+              <VerdictHero
+                final={snapshot.decision}
+                signal={snapshot.signal}
+                doneCount={0}
+                totalCount={0}
+                mode="saved"
+                stale={stale}
+                calibration={getCalibration(snapshot.decision.confidence)}
+                calibrationMinSampleN={minSampleN}
+              />
+            </div>
+            <VerdictDetails data={snapshot.decision} />
+          </div>
+
+          {/* 유효(신선) — 하단 subtle 재분석 푸터 + compact 재요청 pill(로컬 valid 푸터 미러).
+              요청중/진행중(requested)이면 숨긴다(중복 요청 방지 — 기존 동작 보존). */}
+          {!stale && !requested && (
+            <div className="mt-lg flex items-center justify-between gap-3 border-t border-border-line pt-md">
+              <p className="text-caption text-text-muted">
+                {COPY.savedMode.validFooter(
+                  formatRelativeTime(snapshot.updatedAt),
+                )}
+              </p>
+              <RequestPill
+                variant="accent"
+                isPending={request.isPending}
+                onClick={() => request.submit()}
+              />
+            </div>
+          )}
         </>
       ) : (
         // S3: 이전 결과 없음 — 빈 인트로 + 첫 요청 CTA(아직 요청 안 했을 때만).

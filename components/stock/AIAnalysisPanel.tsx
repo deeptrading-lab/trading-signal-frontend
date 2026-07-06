@@ -451,6 +451,7 @@ export function AIAnalysisPanel({
                           ticker={ticker}
                           name={stockData?.name ?? null}
                           snapshot={previousDecision}
+                          livePrice={stockData?.price ?? null}
                           activeJob={previousDecisionData?.active ?? null}
                         />
                       ) : previousDecision && !showProviderChooser ? (
