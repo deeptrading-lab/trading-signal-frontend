@@ -40,6 +40,8 @@ import {
   type PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
 import { IntradayMiniChart } from "@/components/intraday/IntradayMiniChart";
+import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
+import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 /** 주기 드랍다운 기본값(분) — 초단타 기본. */
@@ -683,15 +685,22 @@ function WatchRow({
               </div>
 
               {tab === "chart" ? (
-                <IntradayMiniChart
-                  ticker={item.ticker}
-                  timeframe={chartTimeframe}
-                  orders={allOrders.map((order) => ({
-                    at: order.at,
-                    price: order.price,
-                    side: order.side,
-                  }))}
-                />
+                <div className="flex flex-col gap-md">
+                  <IntradayMiniChart
+                    ticker={item.ticker}
+                    timeframe={chartTimeframe}
+                    orders={allOrders.map((order) => ({
+                      at: order.at,
+                      price: order.price,
+                      side: order.side,
+                    }))}
+                  />
+                  {/* 차트 밑 — 호가창(좌) + 체결강도(우). 종목 펼침 시에만 렌더돼 폴링도 그때만(사용자 배치). */}
+                  <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
+                    <OrderbookPanel ticker={item.ticker} variant="compact" />
+                    <TradeStrengthPanel ticker={item.ticker} variant="compact" />
+                  </div>
+                </div>
               ) : !current ? (
                 <p className="text-caption text-text-muted">{T.ordersNoSession}</p>
               ) : (
