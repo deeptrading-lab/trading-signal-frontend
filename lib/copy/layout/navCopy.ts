@@ -15,7 +15,7 @@ export const NAV_MENU_HOME = "홈";
 export const NAV_MENU_ANALYZE = "AI 분석";
 export const NAV_MENU_MARKET = "시장 동향";
 export const NAV_MENU_STOCK = "종목 분석";
-export const NAV_MENU_INTRADAY = "단타 워치";
+export const NAV_MENU_INTRADAY = "AI 단타";
 export const NAV_MENU_WATCHLIST = "관심 종목";
 export const NAV_MENU_PROFILE = "마이페이지";
 

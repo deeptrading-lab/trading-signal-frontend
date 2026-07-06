@@ -6693,3 +6693,35 @@
   > - (옵션) 우측 패널이 뷰포트보다 길면 내부 스크롤(`lg:max-h`/`overflow-y-auto`) 검토.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (옵션) 우측 패널이 뷰포트보다 길면 내부 스크롤(`lg:max-h`/`overflow-y-auto`) 검토.
+
+### 2026-07-06 — fix(intraday): 호가/체결강도 펼침 차트 밑으로 + "AI 단타" 리네임 (#285)
+
+- **slug**: `intraday-expand-panels` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/285
+- **요약**: fix(intraday): 호가/체결강도 펼침 차트 밑으로 + "AI 단타" 리네임
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 지적: #284 우측 sticky 도크가 **창이 좁을 때 워치 표를 밀어** 컬럼이 깨진다(포지션 세로 줄바꿈·AI 잘림). 새 제안 = 종목 펼침 시 **차트 밑에 호가창(좌)·체결강도(우)**.
+  > 
+  > ## 변경
+  > ### 1. 호가/체결강도 → 펼침 차트 탭 밑
+  > - `IntradayWatchTable` 펼침 차트 탭에서 `IntradayMiniChart` 아래 `grid grid-cols-1 sm:grid-cols-2`로 **호가창(좌) + 체결강도(우)**.
+  > - 종목 **펼칠 때만** 렌더 → 폴링도 그때만(도크처럼 표를 밀지 않음). 좁은 창에서도 표 폭 온전.
+  > - 워크스페이스 우측 도크(`aside`) 제거 → 표 **단일 컬럼 복귀**(#284 되돌림). 미사용 import·selectedName 정리.
+  > 
+  > ### 2. "단타 워치" → "AI 단타" 리네임
+  > - 사이드 메뉴(`NAV_MENU_INTRADAY`), 페이지 타이틀(`INTRADAY_WATCH_COPY.title`), 뒤로가기(`PAPER_TRADING_BACK_TO_WATCH`), 자동틱 안내(`PAPER_TRADING_AUTO_TICK_NOTE`).
+  > - 내부 주석의 "단타 워치"는 비노출이라 유지.
+  > 
+  > ## 무회귀·안전
+  > - 펼침 체결내역 탭·행 선택 하이라이트·폴링·후보·검색 무변경. 신규 커스텀 Tailwind/토큰 0.
+  > - ⚠️ 펼침 여러 개면 호가/체결 폴링이 그만큼(사용자 opt-in 펼침). prod는 토스 미설정으로 dormant.
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean.
+  > 
+  > ## 다음 작업
+  > - navbar 장 상태 표시를 토스처럼 **시간 + 국장/미장 둘 다**로 확장(사용자 후속 요청 — 별도 티켓).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - navbar 장 상태 표시를 토스처럼 **시간 + 국장/미장 둘 다**로 확장(사용자 후속 요청 — 별도 티켓).

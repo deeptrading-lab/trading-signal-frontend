@@ -22,8 +22,6 @@ import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
-import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
-import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
@@ -134,7 +132,6 @@ export function IntradayWatchWorkspace() {
       prev && rowTickers.includes(prev) ? prev : (rowTickers[0] ?? null),
     );
   }, [rowTickers]);
-  const selectedName = rows.find((item) => item.ticker === selectedTicker)?.name ?? null;
 
   const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
@@ -207,48 +204,27 @@ export function IntradayWatchWorkspace() {
       {rows.length === 0 ? (
         <p className="py-md text-body-sm text-text-muted">{W.empty}</p>
       ) : (
-        // 워치 표 + 선택 종목 상세(호가·체결강도) 마스터-디테일. 데스크탑=2컬럼(표 좌, 상세 우측 sticky
-        //   도킹), 모바일=세로 스택(표 아래 상세). 이전엔 상세가 표 한참 아래 세로 스택이라 어색했다(사용자 지적).
-        <div className="flex flex-col gap-lg lg:flex-row lg:items-start">
-          {/* 좌측 — 안내 + 워치 표(좁아지면 표 자체 overflow-x-auto 로 흡수). */}
-          <div className="flex min-w-0 flex-1 flex-col gap-lg">
-            {/* 동작·매매 규칙·면책 — 카드 대신 은은한 surface-muted 노트(가벼운 캡션 톤). */}
-            <div className="flex flex-col gap-xs rounded-md bg-surface-muted px-md py-sm text-caption text-text-muted">
-              {P.noticeLines.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </div>
-            <IntradayWatchTable
-              items={rows}
-              quotes={quotes}
-              sessionByTicker={sessionByTicker}
-              warningsByTicker={warningsByTicker}
-              selectedTicker={selectedTicker}
-              onSelect={setSelectedTicker}
-              isCreating={isCreating}
-              onStart={start}
-              onRemove={remove}
-            />
+        <>
+          {/* 동작·매매 규칙·면책 — 카드 대신 은은한 surface-muted 노트(가벼운 캡션 톤). */}
+          <div className="flex flex-col gap-xs rounded-md bg-surface-muted px-md py-sm text-caption text-text-muted">
+            {P.noticeLines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
           </div>
-
-          {/* 우측 — 선택 종목 호가창 + 체결강도(단일·compact 촘촘한 폴링). 행 클릭으로 종목 전환.
-              데스크탑: 표 옆 sticky 도킹(스크롤해도 따라옴). 모바일: 표 아래 스택. */}
-          {selectedTicker ? (
-            <aside
-              className="flex w-full flex-col gap-sm lg:sticky lg:top-lg lg:w-[22rem] lg:shrink-0"
-              aria-label={W.orderbookTitle}
-            >
-              {selectedName ? (
-                <p className="text-caption text-text-muted">
-                  {selectedName} {W.orderbookHint}
-                </p>
-              ) : null}
-              <OrderbookPanel ticker={selectedTicker} variant="compact" />
-              {/* 체결강도 + 체결 테이프 — 호가 바로 아래. */}
-              <TradeStrengthPanel ticker={selectedTicker} variant="compact" />
-            </aside>
-          ) : null}
-        </div>
+          {/* 워치 표 — 행 펼침 시 차트 탭 아래에 호가창(좌)·체결강도(우)가 함께 뜬다(IntradayWatchTable).
+              이전엔 표 옆/아래 도킹이라 좁은 창서 표가 밀렸다(사용자 지적) → 펼침 내부로 이동. */}
+          <IntradayWatchTable
+            items={rows}
+            quotes={quotes}
+            sessionByTicker={sessionByTicker}
+            warningsByTicker={warningsByTicker}
+            selectedTicker={selectedTicker}
+            onSelect={setSelectedTicker}
+            isCreating={isCreating}
+            onStart={start}
+            onRemove={remove}
+          />
+        </>
       )}
     </div>
   );
