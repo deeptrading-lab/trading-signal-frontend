@@ -117,7 +117,6 @@ export function PhaseTimeline({
             debate={debate}
             debatingSide={debatingSide}
             bullAgent={agents.find((a) => a.key === "bull")!}
-            bearAgent={agents.find((a) => a.key === "bear")!}
             onExpand={onExpand}
           />
         );
