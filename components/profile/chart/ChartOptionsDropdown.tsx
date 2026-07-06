@@ -13,6 +13,7 @@ import { useRef, useState } from "react";
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useOutsideClick } from "@/hooks/utils/useOutsideClick";
+import { useDropdownFlip } from "@/hooks/utils/useDropdownFlip";
 import {
   CHART_OPTIONS_LABEL,
   CHART_OVERLAY_OPTIONS,
@@ -27,6 +28,8 @@ export interface ChartOptionsDropdownProps {
 export function ChartOptionsDropdown({ options, onToggle }: ChartOptionsDropdownProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const dropUp = useDropdownFlip(open, containerRef, menuRef);
   useOutsideClick(containerRef, () => setOpen(false), { enabled: open });
 
   const activeCount = CHART_OVERLAY_OPTIONS.filter((o) => options[o.key]).length;
@@ -58,7 +61,12 @@ export function ChartOptionsDropdown({ options, onToggle }: ChartOptionsDropdown
 
       {open && (
         <div
-          className="dropdown-panel absolute right-0 top-full z-[40] mt-xs min-w-[144px]"
+          ref={menuRef}
+          className={cn(
+            "dropdown-panel absolute right-0 z-[40] min-w-[144px]",
+            // 아래 공간 부족 시 위로 펼침(공통 드롭다운 플립).
+            dropUp ? "bottom-full mb-xs" : "top-full mt-xs",
+          )}
           role="menu"
           aria-label="차트 옵션"
         >

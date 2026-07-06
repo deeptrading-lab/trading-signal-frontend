@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useDropdownFlip } from "@/hooks/utils/useDropdownFlip";
 
 export interface SelectMenuProps<T extends string | number> {
   options: { label: string; value: T }[];
@@ -40,6 +41,8 @@ export function SelectMenu<T extends string | number>({
 }: SelectMenuProps<T>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const dropUp = useDropdownFlip(open, containerRef, menuRef);
 
   const current = options.find((o) => o.value === value) ?? options[0];
 
@@ -86,9 +89,12 @@ export function SelectMenu<T extends string | number>({
 
       {open && (
         <div
+          ref={menuRef}
           className={cn(
-            "dropdown-panel absolute top-full z-[40] mt-xs min-w-[112px]",
+            "dropdown-panel absolute z-[40] min-w-[112px]",
             align === "right" ? "right-0" : "left-0",
+            // 아래 공간 부족 시 위로 펼침(사용자 지적: 하단 옵션 잘려 선택 불가).
+            dropUp ? "bottom-full mb-xs" : "top-full mt-xs",
           )}
           role="listbox"
           aria-label={ariaLabel}

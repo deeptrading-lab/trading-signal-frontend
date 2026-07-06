@@ -6725,3 +6725,32 @@
   > - navbar 장 상태 표시를 토스처럼 **시간 + 국장/미장 둘 다**로 확장(사용자 후속 요청 — 별도 티켓).
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - navbar 장 상태 표시를 토스처럼 **시간 + 국장/미장 둘 다**로 확장(사용자 후속 요청 — 별도 티켓).
+
+### 2026-07-06 — fix(ui): 드롭다운 하단 공간 부족 시 위로 플립 (전 드롭다운 공통) (#287)
+
+- **slug**: `dropdown-flip-up` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/287
+- **요약**: fix(ui): 드롭다운 하단 공간 부족 시 위로 플립 (전 드롭다운 공통)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 지적(스크린샷): 드롭다운(모의 투자금 select)이 **항상 아래로만** 열려, 뷰포트 하단 근처 트리거에선 마지막 옵션이 잘려 **선택 불가**. "모든 드롭다운에 해당" → 공통 처리.
+  > 
+  > ## 변경
+  > 아래 공간이 메뉴보다 부족하고 **위가 더 넉넉하면 위로** 펼침. 앱의 드롭다운 4종 전부:
+  > - **신규 `useDropdownFlip(open, triggerRef, menuRef)`** — 메뉴 **실측 높이**로 `useLayoutEffect`(페인트 전 결정 → 깜빡임 0). `absolute` 패널용 `dropUp` 반환.
+  > - **`SelectMenu`·`ChartOptionsDropdown`** (absolute `top-full`): `dropUp` 시 `bottom-full mb-xs`. → 투자금·주기·차트봉·기간·등급·차트옵션 커버.
+  > - **`IntradayWatchTable` MenuPanel·`AIDecisionCardMenu`** (fixed `rect.bottom`): 패널 실측 후 하단 초과 + 위 여유면 앵커 위로(`top` 재계산). `anchorTop` 추가.
+  > - 아래로 충분하면 **그대로 아래**(무회귀).
+  > 
+  > ## 무회귀·안전
+  > - 열림/닫힘·외부클릭·선택·정렬(left/right) 무변경. 신규 커스텀 Tailwind/토큰 0.
+  > - `useLayoutEffect` 페인트 전 결정으로 위치 플리커 없음.
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean.
+  > 
+  > ## 다음 작업
+  > - 좌우 오버플로(수평 플립)는 별도(현재 세로만).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 좌우 오버플로(수평 플립)는 별도(현재 세로만).
