@@ -108,9 +108,7 @@ export function PhaseTimeline({
             agents={agents}
             reports={reports}
             sentiment={sentiment}
-            isRunning={isRunning}
             onExpand={onExpand}
-            onResume={resume}
           />
         );
       case "debate":
@@ -128,9 +126,7 @@ export function PhaseTimeline({
           <SynthesisPhaseBody
             agents={agents}
             reports={reports}
-            isRunning={isRunning}
             onExpand={onExpand}
-            onResume={resume}
           />
         );
       case "verdict":

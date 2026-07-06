@@ -3,11 +3,11 @@
 import { useMemo } from "react";
 import { motion } from "motion/react";
 import { MessageSquare } from "lucide-react";
-import { DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
+import { AGENT_META, DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
-import type { AgentState, DebateMessage } from "@/lib/types/stock/aiAnalysis";
-import { DebateLoadingCard } from "./DebateLoadingCard";
+import type { AgentState, AgentStatus, DebateMessage } from "@/lib/types/stock/aiAnalysis";
 import { DebateMsgCard } from "./DebateMsgCard";
+import { StreamPips, StreamBox, type StreamPip } from "./PhaseStream";
 
 interface DebateSectionProps {
   debate: DebateMessage[];
@@ -39,8 +39,6 @@ export function DebateSection({
 }: DebateSectionProps) {
   const bullMsgs = useMemo(() => debate.filter(d => d.speaker === "bull"), [debate]);
   const bearMsgs = useMemo(() => debate.filter(d => d.speaker === "bear"), [debate]);
-  const completedBullRounds = useMemo(() => bullMsgs.filter(m => !m.isStreaming).length, [bullMsgs]);
-  const completedBearRounds = useMemo(() => bearMsgs.filter(m => !m.isStreaming).length, [bearMsgs]);
 
   if (bullAgent.status === "pending") return null;
 
@@ -96,65 +94,48 @@ export function DebateSection({
     );
   }
 
-  // ── 진행/오류(running) — 기존 좌우 대치(강세 | R# | 약세) + 스트리밍·게이팅 로직 그대로(PHASE 1 미변경). ──
+  // ── 진행/오류(PHASE 2) — 노스스타 stream 모델(발화 pip 4 + 활성 발화 stream-box). ──
+  // 토론은 순차(bull R1 → bear R1 → bull R2 → bear R2)라 활성 하나가 자연스럽다. R# 라벨 pip 가 라운드
+  // 진행을 담아 별도 eta 없이도 진척이 읽힌다. 활성 발화는 debatingSide 의 스트리밍 메시지.
+  const utterancePips: StreamPip[] = [];
+  for (let r = 1; r <= DEBATE_ROUNDS; r++) {
+    for (const side of ["bull", "bear"] as const) {
+      const msg = debate.find((d) => d.round === r && d.speaker === side);
+      const agentErrored =
+        (side === "bull" ? bullAgent.status : bearAgent.status) === "error";
+      const status: AgentStatus =
+        msg && !msg.isStreaming
+          ? "done"
+          : msg && msg.isStreaming
+            ? "running"
+            : agentErrored
+              ? "error"
+              : "pending";
+      utterancePips.push({
+        key: `${r}-${side}`,
+        label: `R${r} ${COPY.phase.stream.debatePip[side]}`,
+        status,
+      });
+    }
+  }
+  const activeMsg = debatingSide
+    ? [...debate].reverse().find((d) => d.speaker === debatingSide && d.isStreaming) ?? null
+    : null;
+  const activeLabel = debatingSide
+    ? AGENT_META.find((m) => m.key === debatingSide)?.label
+    : null;
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      {/* 탈-카드: 바깥 박스를 걷어내고 헤더 + 여백으로만 구분(토론 메시지 타일이 강세/약세 tint 로 구분). */}
-      <div className="flex flex-col gap-md border-t border-border-line pt-lg">
-        <DebateHeader currentRound={currentRound} />
-
-        <div className="grid grid-cols-[1fr_28px_1fr] gap-sm">
-          <div className="text-caption font-extrabold text-signal-up">
-            {COPY.debate.bullColumn}
-          </div>
-          <div />
-          <div className="text-caption font-extrabold text-signal-down text-right">
-            {COPY.debate.bearColumn}
-          </div>
-        </div>
-
-        <div className="space-y-md">
-          {Array.from({ length: DEBATE_ROUNDS }, (_, i) => {
-            const round = i + 1;
-            const bullMsg = bullMsgs.find(m => m.round === round);
-            const bearMsg = bearMsgs.find(m => m.round === round);
-
-            const isBullThisRound =
-              bullAgent.status === "running" &&
-              !bullMsg &&
-              round === completedBullRounds + 1 &&
-              completedBearRounds === round - 1;
-            const isBearThisRound =
-              bearAgent.status === "running" &&
-              !bearMsg &&
-              round === completedBearRounds + 1 &&
-              completedBullRounds === round;
-
-            if (!bullMsg && !isBullThisRound && !bearMsg && !isBearThisRound) return null;
-
-            return (
-              <div key={round} className="grid grid-cols-[1fr_28px_1fr] gap-1 items-stretch">
-                <div>
-                  {bullMsg && (
-                    <DebateMsgCard msg={bullMsg} debatingSide={debatingSide} onExpand={onExpand} />
-                  )}
-                  {isBullThisRound && !bullMsg && <DebateLoadingCard side="bull" />}
-                </div>
-                <div className="flex flex-col items-center gap-1 py-1">
-                  {/* 노스스타 `.rn` — surface 배경 boxed 라운드 라벨(10.5px w800 muted). */}
-                  <span className="rounded-sm bg-surface-muted px-1.5 py-0.5 text-caption font-black text-text-muted">R{round}</span>
-                  <div className="flex-1 w-px bg-border-line min-h-[20px]" />
-                </div>
-                <div>
-                  {bearMsg && (
-                    <DebateMsgCard msg={bearMsg} debatingSide={debatingSide} onExpand={onExpand} />
-                  )}
-                  {isBearThisRound && !bearMsg && <DebateLoadingCard side="bear" />}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="flex flex-col gap-md">
+        <StreamPips pips={utterancePips} />
+        {activeMsg && activeLabel && (
+          <StreamBox
+            who={COPY.phase.stream.writing(activeLabel)}
+            text={activeMsg.content}
+            fallback={debatingSide ? COPY.progress[debatingSide]?.[0] : undefined}
+          />
+        )}
       </div>
     </motion.div>
   );

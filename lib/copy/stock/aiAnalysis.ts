@@ -141,10 +141,34 @@ export const COPY = {
     toggleCollapse: (label: string) => `${label} 상세 접기`,
     /** 오류 페이즈 재개 버튼 라벨. */
     resume: "여기서부터 다시",
+    /**
+     * 진행중(running) 뷰 전용 — 노스스타 `.stream-agents`/`.stream-box`/`.stream-eta` 스트리밍 스캐폴딩.
+     * done 뷰는 phaseDone 카피를 쓴다(PHASE 1 미변경). 병렬 페이즈(분석가·리스크)는 pip 로 전원 상태를,
+     * stream-box 는 지금 토큰을 뿜는 활성 에이전트 하나를 `.sbx-who` 로 표기한다.
+     */
+    stream: {
+      /** stream-box 헤더(`.sbx-who`) — "{에이전트} · 작성 중". */
+      writing: (label: string) => `${label} · 작성 중`,
+      /** stream-eta 진행 카운터 — "에이전트 N / total 완료"(경과/예상 시간 데이터 미보유 → 카운터만). */
+      eta: (done: number, total: number) => `에이전트 ${done} / ${total} 완료`,
+      /** 종합 페이즈 pip 짧은 라벨(리서치매니저 → 트레이더 → 리스크 3인). */
+      synPip: {
+        research_manager: "리서치매니저",
+        trader: "트레이더",
+        risk_risky: "공격적",
+        risk_neutral: "중립적",
+        risk_safe: "보수적",
+      } as Record<
+        "research_manager" | "trader" | "risk_risky" | "risk_neutral" | "risk_safe",
+        string
+      >,
+      /** 토론 페이즈 pip 짧은 방향 라벨 — 라운드 접두(R#)는 컴포넌트가 붙인다. */
+      debatePip: { bull: "강세", bear: "약세" } as Record<"bull" | "bear", string>,
+    },
   },
   /**
    * 완료(done) 뷰 전용 — 노스스타 flat 행/컴팩트 카드의 라벨·태그·힌트.
-   * 진행(running/pending) 뷰는 기존 카피(AnalystCard·DebateMsgCard)를 그대로 쓴다(PHASE 1 미변경).
+   * 진행(running) 뷰는 phase.stream 스트리밍 카피를 쓴다(PHASE 2 노스스타 stream 모델).
    */
   phaseDone: {
     /** 분석가 flat 행 — 짧은 도메인 라벨(약 66px 라벨열). 전문 오버레이 제목엔 AGENT_META 풀 라벨 사용. */
