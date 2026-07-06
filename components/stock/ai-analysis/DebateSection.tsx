@@ -60,19 +60,26 @@ export function DebateSection({
 
   const currentRound = Math.max(bullMsgs.length, bearMsgs.length, 1);
 
+  // 다음 차례 화자/라운드 — bull 이 매 라운드 먼저 말하므로 카운트만으로 유일하게 정해진다.
+  // bull.status/bear.status 는 "이 역할이 토론 내내 아직 안 끝났다"는 굵은 신호라(라운드 전환에도
+  // running 유지) 라운드별로 각자 판정하면 안 됨 — 그러면 R1 bear 진행 중에도 bull.status===running
+  // 이 여전히 참이라 R2 bull 이 동시에 placeholder 로 새는 버그가 난다. 반드시 "다음 슬롯 1개"로 계산.
+  const bullCount = bullMsgs.length;
+  const bearCount = bearMsgs.length;
+  const nextSpeaker: "bull" | "bear" = bullCount === bearCount ? "bull" : "bear";
+  const nextRound = bullCount === bearCount ? bullCount + 1 : bullCount;
+  const nextAgent = nextSpeaker === "bull" ? bullAgent : bearAgent;
+  const pendingSlot = nextAgent.status === "running" ? { round: nextRound, speaker: nextSpeaker } : null;
+
   const rounds: ReactNode[] = [];
   for (let round = 1; round <= DEBATE_ROUNDS; round++) {
     const bullMsg = bullMsgs.find((m) => m.round === round);
     const bearMsg = bearMsgs.find((m) => m.round === round);
-    // bull 차례: 이 라운드가 다음 순번(직전 라운드까지 완결)이고 진행중이면 첫 청크 전이어도 placeholder.
-    const bullPending =
-      !bullMsg && bullAgent.status === "running" && round === bullMsgs.length + 1;
-    // bear 차례: 같은 라운드 bull 이 이미 나왔고 진행중이면 placeholder.
-    const bearPending =
-      !bearMsg && Boolean(bullMsg) && bearAgent.status === "running" && round === bearMsgs.length + 1;
+    const bullPending = !bullMsg && pendingSlot?.round === round && pendingSlot.speaker === "bull";
+    const bearPending = !bearMsg && pendingSlot?.round === round && pendingSlot.speaker === "bear";
 
     // 이 라운드도, 이후 라운드도 아직 미착수 — 여기서 중단(라운드는 순차 진행이므로 이후도 전부 미착수).
-    if (!bullMsg && !bearMsg && !bullPending) break;
+    if (!bullMsg && !bearMsg && !bullPending && !bearPending) break;
 
     rounds.push(
       <div key={round} className="grid grid-cols-[30px_1fr] items-start gap-sm">
