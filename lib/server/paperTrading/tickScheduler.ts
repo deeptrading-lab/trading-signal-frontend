@@ -35,6 +35,36 @@ function envInt(name: string, fallback: number, min: number, max: number): numbe
 /** 세션 간 동시 판단 수 — CLI 부하와 KIS/토스 레이트리밋을 감안한 기본 3(1~5). */
 const TICK_CONCURRENCY = envInt("INTRADAY_TICK_CONCURRENCY", 3, 1, 5);
 
+/**
+ * 개별 틱 상한(ms) — 초과하면 이 사이클에서 그 세션을 포기(다음 사이클 재시도)한다.
+ *
+ * ★ 프리즈 버그 방지: 틱의 CLI 분석 호출엔 자체 타임아웃이 없어(abortSignal 미발화), 한 틱이 무한
+ *   대기하면 `runWithLimit` 이 끝나지 않아 `cycleRunning` 을 되돌리는 finally 가 실행되지 못하고
+ *   → 이후 모든 사이클이 즉시 return -1 → **스케줄러 전체 정지**(사용자 지적: 실행중인데 판단이
+ *   특정 시각에서 멈춤). Promise.race 타임아웃으로 매 틱을 유한하게 만들어 사이클이 항상 완료되게 한다.
+ *   기본 120초(30초~10분) — 정상 단타 틱(LLM 분석)보다 넉넉하고, hang 은 확실히 끊는다.
+ */
+const TICK_TIMEOUT_MS = envInt("INTRADAY_TICK_TIMEOUT_MS", 120_000, 30_000, 600_000);
+
+/** 틱을 상한 시간과 race — 초과 시 reject(하위 hang 프로미스는 버려지되 사이클은 진행). */
+async function tickWithTimeout(sessionId: string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`tick-timeout ${TICK_TIMEOUT_MS}ms`)),
+      TICK_TIMEOUT_MS,
+    );
+  });
+  try {
+    await Promise.race([
+      runPaperTradingSessionTick(sessionId, { triggeredBy: "auto" }),
+      timeout,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const STARTED_KEY = "__intradayTickSchedulerStarted";
 type GlobalWithFlag = typeof globalThis & { [STARTED_KEY]?: boolean };
 
@@ -75,10 +105,10 @@ export async function runScheduledIntradayTicks(now: Date = new Date()): Promise
     if (sessions.length === 0) return 0;
     await runWithLimit(sessions, TICK_CONCURRENCY, async (session) => {
       try {
-        await runPaperTradingSessionTick(session.id, { triggeredBy: "auto" });
+        await tickWithTimeout(session.id);
       } catch (error) {
-        // 개별 세션 실패(KIS 일시 오류 등)는 다음 사이클에 재시도 — 다른 세션을 막지 않는다.
-        log.warn(`틱 실패 session=${session.id.slice(0, 8)}`, error);
+        // 개별 세션 실패(KIS 일시 오류·시간초과 등)는 다음 사이클에 재시도 — 다른 세션·사이클을 막지 않는다.
+        log.warn(`틱 실패/시간초과 session=${session.id.slice(0, 8)}`, error);
       }
     });
     return sessions.length;

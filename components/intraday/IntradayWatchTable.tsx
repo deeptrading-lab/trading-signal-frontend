@@ -21,6 +21,8 @@ import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSess
 import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
 import { IntradayPaperDetailSheet } from "@/components/intraday/IntradayPaperDetailSheet";
 import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
+import { Badge } from "@/components/ui/Badge";
+import { isPaperSessionStalled } from "@/lib/utils/paperTradingStale";
 import {
   INTRADAY_PAPER_COPY as P,
   INTRADAY_READ_COPY as C,
@@ -408,6 +410,8 @@ function WatchRow({
   const position = detail?.positions.find((p) => p.quantity >= 1) ?? null;
   const lastTick = detail?.ticks.at(-1) ?? null;
   const running = current?.status === "running";
+  // 장중인데 자동 판단이 끊긴 running 세션 = "멈춤"(스케줄러 hang). refresh 폴링 재렌더마다 재평가.
+  const stalled = current ? isPaperSessionStalled(current) : false;
   // 체결 전체(시간순) — 차트 탭 마커용. 미니 로그는 최근 5건(최신 위), 전체·손익 합계는 시트.
   const allOrders = (detail?.ticks ?? []).flatMap((tick) =>
     tick.orders.map((order) => ({ ...order, at: tick.tickWindowStart })),
@@ -460,7 +464,15 @@ function WatchRow({
             <span className="text-body-sm-strong text-text-strong">{item.name}</span>
             <StockWarningBadges warnings={warnings} max={1} size="sm" />
             {current ? (
-              <span className="text-caption text-text-muted">{STATUS_LABEL[current.status]}</span>
+              stalled ? (
+                <Badge variant="warn" title={P.stalledHint}>
+                  {P.stalled}
+                </Badge>
+              ) : (
+                <span className="text-caption text-text-muted">
+                  {STATUS_LABEL[current.status]}
+                </span>
+              )
             ) : null}
           </div>
         </td>

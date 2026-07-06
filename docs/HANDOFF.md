@@ -6784,3 +6784,38 @@
   > - (옵션) 전역 동시 생성 상한이 필요하면 서버측 세마포어로(현재 UI는 병렬 허용).
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (옵션) 전역 동시 생성 상한이 필요하면 서버측 세마포어로(현재 UI는 병렬 허용).
+
+### 2026-07-06 — fix(intraday): 틱 스케줄러 프리즈 방지 + 멈춤 UI 표시 (#292)
+
+- **slug**: `intraday-tick-freeze-guard` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/292
+- **요약**: fix(intraday): 틱 스케줄러 프리즈 방지 + 멈춤 UI 표시
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 지적: 단타 세션이 "실행 중"인데 마지막 판단이 14:14에서 멈춤(지금 15:16 장중, 서버는 살아있음=401 응답).
+  > 
+  > ## 원인 (프리즈 확정)
+  > - 스케줄러는 60초마다 running 세션을 틱하며 `cycleRunning` 으로 사이클 중첩을 막음.
+  > - 틱의 **CLI 분석 호출에 타임아웃이 없음**(`abortSignal` 생성만 되고 미발화). 한 틱이 무한 대기하면 → `runWithLimit`(Promise.all)이 안 끝남 → `cycleRunning=false` 로 되돌리는 `finally` 미실행 → 이후 모든 사이클이 즉시 `return -1` → **스케줄러 전체 정지**.
+  > - 재시작하면 풀리던 이유: 새 프로세스 = `cycleRunning=false` 리셋 + 세션 재수화 + 인터벌 재기동.
+  > 
+  > ## 변경
+  > ### ① 프리즈 방지 (`tickScheduler.ts`)
+  > - 매 틱을 **`Promise.race` 로 상한**(`INTRADAY_TICK_TIMEOUT_MS`, 기본 120초·30초~10분)과 race → 사이클이 항상 유한하게 완료 → `cycleRunning` 항상 리셋. hang 한 틱이 스케줄러 전체를 얼리지 못함.
+  > 
+  > ### ② 멈춤 UI 표시 (`isPaperSessionStalled` 신규 + 배지)
+  > - `running` + **장중**(`isKstMarketHoursWithCloseGrace`) + 마지막 틱 창이 **2주기+2분** 넘게 끊기면 → "멈춤" `warn` 배지(재시작 유도).
+  > - **★장 마감·주말은 예외**(멈춤 아님) — 안 도는 게 정상(사용자 요청).
+  > - refresh 폴링 재렌더마다 재평가.
+  > 
+  > ## 무회귀·안전
+  > - 서버 전용 스케줄러 로직 + 순수 판정 util + 클라 배지. 기존 scheduler 테스트 8개 통과. 신규 stale 테스트 5개.
+  > 
+  > ## 테스트
+  > - `tsc`·`eslint` clean · vitest 13(신규 5 + scheduler 8).
+  > 
+  > ## 다음 작업
+  > - (옵션) hang 한 세션의 poisoned tickChain 자가 복구(abortSignal 타임아웃 배선 or tickChain 리셋) — 현재는 멈춤 배지+재시작으로 대응.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (옵션) hang 한 세션의 poisoned tickChain 자가 복구(abortSignal 타임아웃 배선 or tickChain 리셋) — 현재는 멈춤 배지+재시작으로 대응.
