@@ -6846,3 +6846,46 @@
   > - (옵션) 취소 미존중 데이터 fetch(fetchDailyChunked 등)에도 signal 전파 — 현재 CLI hang 은 자가복구, 그 외는 백스톱+멈춤 배지.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - (옵션) 취소 미존중 데이터 fetch(fetchDailyChunked 등)에도 signal 전파 — 현재 CLI hang 은 자가복구, 그 외는 백스톱+멈춤 배지.
+
+### 2026-07-06 — feat(signal): MACD 수렴·저점우상향/고점우하향 반전 임박 룰 추가 (#294)
+
+- **slug**: `signal-reversal-rules` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/294
+- **요약**: feat(signal): MACD 수렴·저점우상향/고점우하향 반전 임박 룰 추가
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PRD `signal-reversal-rules` §3.2 항목 1~8을 구현했다. 시그널 엔진(추세·모멘텀 축)에 "반전 임박" 신호 2종을 추가한다.
+  > 
+  > - **MACD 히스토그램 수렴**: 최근 4봉(`MACD_CONVERGE_LOOKBACK`) 연속으로 `|histogram|`이 단조 축소되면 반전 임박으로 판단. 음수에서 축소 중이면 `MACD_CONVERGE_UP`(+1), 양수에서 축소 중이면 `MACD_CONVERGE_DOWN`(-1).
+  > - **저점 우상향 / 고점 우하향**: 최근 30봉(`HIGHER_LOW_LOOKBACK`) 구간의 스윙 피벗(`findSwingLows`/`findSwingHighs`, 기존 `STRUCTURE_SWING_WINDOW=3` 재사용) 마지막 두 값을 비교 — 저점이 우상향이면 `HIGHER_LOW_BASE`(+1, 바닥 다지기), 고점이 우하향이면 `LOWER_HIGH_TOP`(-1, 천장 다지기).
+  > 
+  > ## 변경 파일 (PRD §3.2 1~8)
+  > 
+  > 1. `lib/signal/weights.ts` — `MACD_CONVERGE_LOOKBACK`/`HIGHER_LOW_LOOKBACK` 상수 + `RULE_WEIGHTS.macdConverge`(1)/`higherLowBase`(2) 추가. **기존 키 값 무변경**.
+  > 2. `lib/signal/factors/momentum.ts` — MACD 수렴 룰(null 방어 포함), 레짐 게이트가 자동 적용되는 동일 `raw` 배열에 추가.
+  > 3. `lib/signal/factors/trend.ts` — `evaluateTrend(ctx, opts?)`로 옵셔널 확장, 스윙 피벗 기반 구조 반전 룰 추가.
+  > 4. `lib/types/signal/index.ts` + `lib/signal/engine.ts` — `EvaluateOptions.trendHigherLowLookback` seam, 엔진 호출부 배선.
+  > 5. `lib/copy/signal/labels.ts` — 신규 4개 규칙 한글 라벨.
+  > 6. `app/api/stock/ai-analysis/route.ts` — 프롬프트에 규칙 키 대신 `ruleLabel()` 한글 라벨 표기.
+  > 7. `lib/signal/__tests__/_fixtures.ts` — `CandleOpts.lows` 오버라이드 추가(하위호환 유지).
+  > 8. `lib/signal/__tests__/factors.test.ts` — 발화 케이스(MACD 수렴 UP, 저점 우상향, 고점 우하향) + 비발화 케이스(단조 상승 시퀀스) 4건 추가.
+  > 
+  > ## 무회귀 보장
+  > 
+  > - `evaluateTrend`/`evaluateMomentum` 시그니처 변경은 전부 옵셔널 — grep으로 유일 호출부(`engine.ts`) 확인 완료.
+  > - 분봉(`intradayProfile.ts`)은 신규 필드 만들지 않고 기존 `structureLookback`을 `trendHigherLowLookback`에 그대로 재사용(단타 안전장치 유지).
+  > - 기존 `RULE_WEIGHTS`/`AXIS_SCALE` 등 값 변경 없음(diff 확인).
+  > 
+  > ## 검증
+  > 
+  > - `npx tsc --noEmit -p tsconfig.json` — clean
+  > - `npx vitest run lib/signal/__tests__/factors.test.ts` — 11/11 통과
+  > - `npx vitest run lib/signal` — 89 통과, 3 skip(RUN_LIVE_BACKTEST 라이브 전용, 이 단계 미실행)
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (머지 후 후속) `MACD_CONVERGE_LOOKBACK`/`STRUCTURE_SWING_WINDOW` 분봉 프로필화 검토 — QA 분봉 스팟체크에서 5분봉 발화율(HIGHER_LOW_BASE 49~64%, LOWER_HIGH_TOP 42~52%, MACD_CONVERGE 19~22%)이 일봉 기저(22~45%)보다 다소 높게 관찰됨. 일봉은 AC-9 백테스트로 순예측력 확인됐으나 분봉 전용 백테스트 하니스가 없어 이 빈도대의 분봉 예측력은 미검증 — 라이브 모의세션 관찰 기반 후속 모니터링 필요(`docs/qa/signal-reversal-rules.md` "에지 케이스" 절 참조).
+  - (머지 후 후속) `STRONG_BULL_TRIGGERS`/`STRONG_BEAR_TRIGGERS`에 `macdConverge`/`higherLowBase` 키 추가 여부 — QA 백테스트에서 `HIGHER_LOW_BASE`가 표본이 클수록(47→242) 더 강한 양의 예측력(+0.55%→+0.97%)을 보였으므로, 트리거 승격을 별도 PRD/PR로 검토할 근거가 될 수 있음.
+  - (머지 후 후속) `AXIS_SCALE`(momentum=9, trend=11) 상향 여부 — 이번 백테스트에서 조기 포화로 인한 명백한 왜곡은 관찰되지 않았으나(pooled 지표 개선), 라이브 운영 중 포화 빈도를 계속 관찰.
+  - 리뷰어: QA 리포트(`docs/qa/signal-reversal-rules.md`)의 AC-10 HD현대 재현 결과(`HIGHER_LOW_BASE` 미발화가 look-ahead 안전 설계상 정상임) 및 분봉 발화율 비교표 확인 요청.
