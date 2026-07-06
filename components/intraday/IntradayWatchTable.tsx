@@ -74,7 +74,6 @@ export interface IntradayWatchTableProps {
   /** 호가창을 볼 선택 종목(단일) — 행 클릭으로 전환. */
   selectedTicker?: string | null;
   onSelect?: (ticker: string) => void;
-  isCreating: boolean;
   onStart: (
     stock: PaperTradingSelectedStock,
     initialCash: number,
@@ -90,7 +89,6 @@ export function IntradayWatchTable({
   warningsByTicker,
   selectedTicker,
   onSelect,
-  isCreating,
   onStart,
   onRemove,
 }: IntradayWatchTableProps) {
@@ -127,7 +125,6 @@ export function IntradayWatchTable({
               warnings={warningsByTicker?.[item.ticker]}
               selected={selectedTicker === item.ticker}
               onSelect={onSelect}
-              isCreating={isCreating}
               onStart={onStart}
               onRemove={() => onRemove(item.ticker)}
             />
@@ -378,7 +375,6 @@ function WatchRow({
   warnings,
   selected,
   onSelect,
-  isCreating,
   onStart,
   onRemove,
 }: {
@@ -388,7 +384,6 @@ function WatchRow({
   warnings: StockWarningItem[] | undefined;
   selected?: boolean;
   onSelect?: (ticker: string) => void;
-  isCreating: boolean;
   onStart: IntradayWatchTableProps["onStart"];
   onRemove: () => void;
 }) {
@@ -397,7 +392,8 @@ function WatchRow({
   const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
   const [startError, setStartError] = useState<string | null>(null);
-  // 생성 진행 표시는 "내가 누른 행"에만 — isCreating(전역)은 중복 클릭 방지용 disabled 로만 쓴다.
+  // 세션 생성 중 표시·disabled 모두 **이 행 한정**(starting). 전역 isCreating 은 다른 종목 시작까지
+  // 막던 버그라 제거 — 세션은 종목당 1개·병렬 허용이므로 각 행은 자기 생성 중에만 잠긴다(사용자 지적).
   const [starting, setStarting] = useState(false);
   // 펼침 탭 — 차트(당일 분봉+체결 마커) 기본, 체결 내역(미니 로그) 전환.
   const [tab, setTab] = useState<"chart" | "orders">("chart");
@@ -582,7 +578,7 @@ function WatchRow({
             <button
               type="button"
               className={BTN_PRIMARY}
-              disabled={isCreating}
+              disabled={starting}
               onClick={(e) => {
                 e.stopPropagation();
                 void handleStart();

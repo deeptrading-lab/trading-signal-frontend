@@ -90,7 +90,7 @@ export function IntradayWatchWorkspace() {
 
   const { data: flow, isLoading: flowLoading } = useQueryFlowTop10("today");
   const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
-  const { sessionByTicker, activeStocks, runningSessionIds, isCreating, start } =
+  const { sessionByTicker, activeStocks, runningSessionIds, start } =
     useIntradayPaperWatch();
   // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
   useIntradayPaperRefresh(runningSessionIds);
@@ -220,7 +220,6 @@ export function IntradayWatchWorkspace() {
             warningsByTicker={warningsByTicker}
             selectedTicker={selectedTicker}
             onSelect={setSelectedTicker}
-            isCreating={isCreating}
             onStart={start}
             onRemove={remove}
           />
