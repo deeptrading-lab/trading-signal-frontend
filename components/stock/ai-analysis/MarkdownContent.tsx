@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { stripStrikethrough } from "@/lib/utils/stripMarkdown";
 
 /**
  * 카드 상세 본문의 마크다운 렌더러 — `CardDetailOverlay` 가 `next/dynamic` 으로 지연 로드한다.
@@ -22,7 +23,7 @@ const PROSE =
 export function MarkdownContent({ content }: { content: string }) {
   return (
     <div className={PROSE}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripStrikethrough(content)}</ReactMarkdown>
     </div>
   );
 }

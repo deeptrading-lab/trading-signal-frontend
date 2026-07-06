@@ -1,4 +1,18 @@
 /**
+ * 취소선(`~~old~~new`) 자기수정 흔적을 제거한다.
+ *
+ * 분석 에이전트가 값을 재검토하며 "~~1주~~2주"처럼 이전 값을 취소선으로 남기고 새 값을
+ * 이어붙이는 경우가 있다 — 의도는 old 값 삭제였는데 마크다운 취소선 문법이 그대로 남아
+ * 렌더러(remark-gfm)가 취소선 스타일로 그려버린다. old(취소선 안쪽) 자체를 통째로 들어내
+ * "~~1~~2주" → "2주" 처럼 최종값만 남긴다. teaser(`stripMarkdown`)·전체보기
+ * (`MarkdownContent`) 양쪽에서 공유해서 쓴다.
+ */
+export function stripStrikethrough(md: string): string {
+  if (!md) return "";
+  return md.replace(/~~([^~]+)~~/g, "");
+}
+
+/**
  * 마크다운 원문을 미리보기용 평문으로 변환한다.
  *
  * 카드 미리보기는 3줄 클램프 teaser 라 전체보기(ReactMarkdown 렌더)와 달리
@@ -8,7 +22,7 @@
  */
 export function stripMarkdown(md: string): string {
   if (!md) return "";
-  return md
+  return stripStrikethrough(md)
     // 코드펜스 ``` 블록 마커 제거(내용은 남김)
     .replace(/```[^\n]*\n?/g, "")
     // 이미지 ![alt](url) → alt
