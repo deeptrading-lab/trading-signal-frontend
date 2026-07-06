@@ -6754,3 +6754,33 @@
   > - 좌우 오버플로(수평 플립)는 별도(현재 세로만).
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 좌우 오버플로(수평 플립)는 별도(현재 세로만).
+
+### 2026-07-06 — fix(intraday): 세션 생성 중 다른 종목 시작 버튼 막힘 해제 (#288)
+
+- **slug**: `intraday-concurrent-start` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/288
+- **요약**: fix(intraday): 세션 생성 중 다른 종목 시작 버튼 막힘 해제
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 사용자 지적(스크린샷): 한 종목 세션을 시작하면(세션 생성 중) **다른 종목들의 "모의 시작" 버튼까지 잠긴다**. "로직적으로 정책인가?" → **아니오, 과잉 방지 버그.**
+  > 
+  > ## 원인
+  > - `isCreating = createMutation.isPending` = **전역 pending 플래그**(mutation 1개 공유).
+  > - 시작 버튼이 `disabled={isCreating}` → 아무 종목이나 생성 중이면 전 행 잠김.
+  > - 인트라데이 세션은 **종목당 1개·병렬 허용**이라 다른 종목까지 막을 이유 없음. 눌린 행엔 이미 per-row `starting`("세션 생성 중" 스피너)가 있어 전역 disable은 불필요.
+  > 
+  > ## 변경
+  > - 시작 버튼 disabled 를 전역 `isCreating` → **그 행 한정 `starting`** 으로. 생성 중인 행만 잠기고 다른 종목은 즉시 시작 가능.
+  > - 안 쓰게 된 `isCreating` prop 스레딩 제거(table props·row props·workspace 전달). 훅 export(`usePaperTradingSessions`)는 무회귀로 유지.
+  > 
+  > ## 무회귀·안전
+  > - 눌린 행의 "세션 생성 중" 스피너·중복 클릭 방지(자기 행 disabled) 동일. 세션 생성/시작 로직 무변경. 신규 커스텀 Tailwind 0.
+  > 
+  > ## 테스트
+  > - `tsc` clean · `eslint` clean.
+  > 
+  > ## 다음 작업
+  > - (옵션) 전역 동시 생성 상한이 필요하면 서버측 세마포어로(현재 UI는 병렬 허용).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - (옵션) 전역 동시 생성 상한이 필요하면 서버측 세마포어로(현재 UI는 병렬 허용).
