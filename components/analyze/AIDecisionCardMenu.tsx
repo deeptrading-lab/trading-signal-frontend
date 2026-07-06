@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -30,9 +30,15 @@ interface AIDecisionCardMenuProps {
 export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
   const { openFor, isTickerRunning } = useAIAnalysisContext();
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    right: number;
+    anchorTop: number;
+  } | null>(null);
+  const [menuTop, setMenuTop] = useState(0);
 
   const runningThis = isTickerRunning(item.ticker);
 
@@ -43,9 +49,20 @@ export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
       return;
     }
     const r = btnRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    if (r) {
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right, anchorTop: r.top });
+    }
     setMenuOpen(true);
   };
+
+  // 아래로 넘치고 위 공간이 충분하면 앵커 위로 플립(공통 드롭다운 플립). 내용(confirming) 변화 시 재측정.
+  useLayoutEffect(() => {
+    if (!menuOpen || !pos) return;
+    const h = menuPanelRef.current?.offsetHeight ?? 0;
+    const overflowsBelow = pos.top + h > window.innerHeight - 8;
+    const flippedTop = pos.anchorTop - h - 4;
+    setMenuTop(overflowsBelow && flippedTop > 8 ? flippedTop : pos.top);
+  }, [menuOpen, pos, confirming]);
 
   // Esc / 스크롤로 닫기(바깥 클릭은 아래 투명 백드롭이 처리 — 카드 열림과 충돌 방지).
   useEffect(() => {
@@ -105,10 +122,11 @@ export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
               }}
             />
             <div
+              ref={menuPanelRef}
               role="menu"
               aria-label={CARD_MENU_LABEL}
               className="dropdown-panel fixed z-[70] min-w-[9rem]"
-              style={{ top: pos.top, right: pos.right }}
+              style={{ top: menuTop, right: pos.right }}
               onClick={(e) => e.stopPropagation()}
             >
               <button

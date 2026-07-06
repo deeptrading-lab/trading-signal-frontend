@@ -10,7 +10,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ExternalLink, History, Loader2, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
@@ -147,7 +147,12 @@ export function IntradayWatchTable({
  */
 function useFixedMenu(rootRef: React.RefObject<HTMLDivElement | null>) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    anchorTop: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -170,7 +175,12 @@ function useFixedMenu(rootRef: React.RefObject<HTMLDivElement | null>) {
   function toggle(anchor: HTMLElement | null) {
     if (!open && anchor) {
       const rect = anchor.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      setPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        anchorTop: rect.top,
+      });
     }
     setOpen((v) => !v);
   }
@@ -182,14 +192,24 @@ function MenuPanel({
   pos,
   children,
 }: {
-  pos: { top: number; left: number; width: number };
+  pos: { top: number; left: number; width: number; anchorTop: number };
   children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState(pos.top);
+  // 아래로 넘치고(뷰포트 하단 초과) 위 공간이 충분하면 앵커 위로 플립(사용자 지적: 하단 옵션 잘림).
+  useLayoutEffect(() => {
+    const h = ref.current?.offsetHeight ?? 0;
+    const overflowsBelow = pos.top + h > window.innerHeight - 8;
+    const flippedTop = pos.anchorTop - h - 4;
+    setTop(overflowsBelow && flippedTop > 8 ? flippedTop : pos.top);
+  }, [pos]);
   return (
     <div
+      ref={ref}
       role="listbox"
       className="dropdown-panel z-50 overflow-hidden"
-      style={{ position: "fixed", top: pos.top, left: pos.left, minWidth: pos.width }}
+      style={{ position: "fixed", top, left: pos.left, minWidth: pos.width }}
     >
       {children}
     </div>
