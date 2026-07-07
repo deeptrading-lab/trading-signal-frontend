@@ -128,9 +128,11 @@ describe("cli-agent 세션 생성 (intraday-paper-watch)", () => {
       targetReturnPct: 5,
       riskMode: "balanced",
       decisionProvider: "cli-agent",
+      aiProvider: "codex",
     }, { priceSnapshotProvider: testPriceProvider });
 
     expect(detail.session.decisionProvider).toBe("cli-agent");
+    expect(detail.session.aiProvider).toBe("codex");
     expect(detail.session.tickIntervalMinutes).toBe(5);
     expect(detail.ticks).toHaveLength(1);
     expect(detail.latestDecision?.source).toBe("cli-agent");

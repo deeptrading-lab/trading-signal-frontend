@@ -33,6 +33,17 @@ describe("getPaperTradingAiCliGate", () => {
     expect(getPaperTradingAiCliGate()).toEqual({
       ok: true,
       available: ["codex"],
+      provider: "codex",
+    });
+  });
+
+  it("Codex와 Claude가 모두 있으면 단타 모의투자는 Codex를 우선 사용한다", () => {
+    mocks.detectProviders.mockReturnValue({ claude: true, codex: true });
+
+    expect(getPaperTradingAiCliGate()).toEqual({
+      ok: true,
+      available: ["claude", "codex"],
+      provider: "codex",
     });
   });
 

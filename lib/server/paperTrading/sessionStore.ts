@@ -163,6 +163,7 @@ export async function createPaperTradingSession(
     cashBufferPct: PAPER_TRADING_DEFAULT_CASH_BUFFER_PCT,
     tickIntervalMinutes,
     decisionProvider,
+    aiProvider: decisionProvider === "cli-agent" ? request.aiProvider : undefined,
     mode: "live-paper",
     lastTickWindowStart: null,
     startedAt: now,

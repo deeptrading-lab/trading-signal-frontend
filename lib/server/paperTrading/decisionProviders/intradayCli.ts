@@ -531,8 +531,10 @@ export async function decideIntradayWithCli(
   const analystModel = process.env.INTRADAY_ANALYST_MODEL ?? process.env.INTRADAY_MODEL;
   const judgeModel = process.env.INTRADAY_JUDGE_MODEL ?? process.env.INTRADAY_MODEL;
   // 판단을 내린 모델·토큰 사용량을 틱에 기록 — 모델 A/B·세션 누적 비용 집계의 원장 근거.
+  const providerDefaultModel =
+    provider === "codex" ? process.env.CODEX_CLI_MODEL : process.env.CLAUDE_CLI_MODEL;
   const effectiveModel = (model?: string) =>
-    model ?? process.env.CLAUDE_CLI_MODEL ?? "cli-default";
+    model ?? providerDefaultModel ?? "cli-default";
   let analystUsage: AgentUsage | undefined;
   let judgeUsage: AgentUsage | undefined;
   const withModels = (

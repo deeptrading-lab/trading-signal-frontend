@@ -20,6 +20,7 @@ export type PaperTradingTickStatus =
   | "failed";
 export type PaperTradingTriggeredBy = "user" | "auto" | "cli";
 export type PaperTradingMode = "sandbox" | "live-paper" | "replay";
+export type PaperTradingAiProvider = import("@/lib/types/stock/aiAnalysis").AIAnalysisProvider;
 
 export type PaperTradingSelectedStock = {
   ticker: string;
@@ -127,6 +128,8 @@ export type PaperTradingSession = {
   cashBufferPct: number;
   tickIntervalMinutes: number;
   decisionProvider: PaperTradingDecisionProvider;
+  /** 단타 cli-agent 실행에 사용할 로컬 AI CLI. 기존 세션은 미기록일 수 있어 optional. */
+  aiProvider?: PaperTradingAiProvider;
   mode: PaperTradingMode;
   lastTickWindowStart: string | null;
   startedAt: string;
@@ -207,6 +210,8 @@ export type CreatePaperTradingSessionRequest = {
   targetReturnPct: number;
   riskMode: PaperTradingRiskMode;
   decisionProvider: PaperTradingDecisionProvider;
+  /** 서버가 감지한 로컬 AI CLI provider. 클라이언트 미지정 시 서버 게이트가 채운다. */
+  aiProvider?: PaperTradingAiProvider;
   /** 단타(cli-agent) 판단 주기(분) — 미지정 시 서버 기본(env). mock 세션에선 무시. */
   tickIntervalMinutes?: number;
 };

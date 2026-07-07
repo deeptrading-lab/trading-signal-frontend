@@ -5,6 +5,10 @@ import {
   type AgentStreamResult,
 } from "@/lib/server/claudeAgent";
 import {
+  resolveClaudeCliPath,
+  resolveCodexCliPath,
+} from "@/lib/server/ai/cliPaths";
+import {
   type AgentUsage,
   type AIAnalysisProvider,
   UNMEASURED_USAGE,
@@ -45,7 +49,7 @@ export function buildAgentCliInvocation(
   request: Omit<AgentCliRequest, "signal" | "timeoutMs">,
 ): AgentCliInvocation {
   if (request.provider === "claude") {
-    const bin = process.env.CLAUDE_CLI_PATH ?? "claude";
+    const bin = resolveClaudeCliPath();
     const model = process.env.CLAUDE_CLI_MODEL?.trim();
     const args = [
       "--print",
@@ -59,7 +63,7 @@ export function buildAgentCliInvocation(
     return { bin, args, stdin: request.userPrompt };
   }
 
-  const bin = process.env.CODEX_CLI_PATH ?? "codex";
+  const bin = resolveCodexCliPath();
   const model = process.env.CODEX_CLI_MODEL?.trim();
   const workdir = process.env.CODEX_CLI_WORKDIR?.trim() || "/tmp";
   const args: string[] = [
@@ -257,7 +261,7 @@ export async function invokeAgentCliStream(
     // --model 로 지정한 요청 모델(에이전트별 override ?? CLAUDE_CLI_MODEL).
     const requestedModel = (request.model ?? process.env.CLAUDE_CLI_MODEL)?.trim() || null;
     const result = await invokeClaudeAgentStream(
-      process.env.CLAUDE_CLI_PATH ?? "claude",
+      resolveClaudeCliPath(),
       requestedModel ?? undefined,
       request,
       signal,

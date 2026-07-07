@@ -10,46 +10,16 @@
  * 가능 여부가 어긋나지 않도록.
  */
 
-import { accessSync, constants } from "node:fs";
-import { delimiter, join, isAbsolute } from "node:path";
+import {
+  binaryAvailable,
+  resolveClaudeCliPath,
+  resolveCodexCliPath,
+} from "@/lib/server/ai/cliPaths";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 
 /** 반복 fs 조회를 줄이기 위한 모듈 레벨 캐시(TTL). 로컬에서 CLI 설치 상태 변경 즉시성은 30초 내. */
 const CACHE_TTL_MS = 30_000;
 let cache: { value: Record<AIAnalysisProvider, boolean>; expiresAt: number } | null = null;
-
-function isExecutable(path: string): boolean {
-  try {
-    accessSync(path, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * `bin` 이 경로 구분자를 포함하면(절대/상대 경로) 그 경로를 직접 검사하고,
- * 단순 명령어면 `PATH` 의 각 디렉터리에서 실행 가능 파일을 탐색한다.
- */
-export function binaryAvailable(bin: string): boolean {
-  if (!bin) return false;
-  if (isAbsolute(bin) || bin.includes("/")) {
-    return isExecutable(bin);
-  }
-  const pathEnv = process.env.PATH ?? "";
-  return pathEnv
-    .split(delimiter)
-    .filter(Boolean)
-    .some((dir) => isExecutable(join(dir, bin)));
-}
-
-function claudeBin(): string {
-  return process.env.CLAUDE_CLI_PATH ?? "claude";
-}
-
-function codexBin(): string {
-  return process.env.CODEX_CLI_PATH ?? "codex";
-}
 
 /** claude·codex CLI 각각의 로컬 설치 여부. */
 export function detectProviders(): Record<AIAnalysisProvider, boolean> {
@@ -57,8 +27,8 @@ export function detectProviders(): Record<AIAnalysisProvider, boolean> {
   if (cache && cache.expiresAt > now) return cache.value;
 
   const value: Record<AIAnalysisProvider, boolean> = {
-    claude: binaryAvailable(claudeBin()),
-    codex: binaryAvailable(codexBin()),
+    claude: binaryAvailable(resolveClaudeCliPath()),
+    codex: binaryAvailable(resolveCodexCliPath()),
   };
   cache = { value, expiresAt: now + CACHE_TTL_MS };
   return value;

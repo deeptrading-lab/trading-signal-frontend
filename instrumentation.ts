@@ -11,11 +11,9 @@
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  if (process.env.NODE_ENV !== "production") return;
-  const { startMarketRefreshScheduler } = await Function(
-    "specifier",
-    "return import(specifier)",
-  )("@/lib/server/market/refreshScheduler");
+  const { startMarketRefreshScheduler } = await import(
+    "@/lib/server/market/refreshScheduler"
+  );
   startMarketRefreshScheduler();
   const { startIntradayTickScheduler } = await import(
     "@/lib/server/paperTrading/tickScheduler"

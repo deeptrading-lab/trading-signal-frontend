@@ -16,6 +16,7 @@ import {
 import { isKisConfigured } from "@/lib/api/kis";
 import { dailyRegimeFromCandles } from "@/lib/signal/intradayProfile";
 import { decideIntradayWithCli } from "@/lib/server/paperTrading/decisionProviders/intradayCli";
+import { detectProviders } from "@/lib/server/ai/detectCli";
 import {
   PAPER_TRADING_CLOSE_FLATTEN_HHMM,
   PAPER_TRADING_DAILY_LOSS_KILL_PCT,
@@ -34,6 +35,7 @@ import type {
   IntradayDecisionEcho,
   IntradayPositionView,
 } from "@/lib/types/intraday/intradayDecision";
+import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 
 export interface IntradayTickArgs {
   session: PaperTradingSession;
@@ -115,6 +117,13 @@ function buildPreviousEcho(existingTicks: PaperTradingTick[]): IntradayDecisionE
     invalidationPrice: d.invalidationPrice ?? null,
     rationale: d.rationale,
   };
+}
+
+function resolveSessionAiProvider(session: PaperTradingSession): AIAnalysisProvider {
+  if (session.aiProvider) return session.aiProvider;
+  const providers = detectProviders();
+  if (providers.codex) return "codex";
+  return "claude";
 }
 
 /** 보유 경과분 추정 — 마지막 BUY 체결 틱 이후 경과(틱수 × 주기). */
@@ -201,6 +210,7 @@ export async function resolveIntradayTickDecision(
     dailyLossKill,
     riskMode: session.riskMode,
     maxPositionPct: session.maxPositionPct,
+    provider: resolveSessionAiProvider(session),
     abortSignal: args.abortSignal ?? new AbortController().signal,
   });
 

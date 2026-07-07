@@ -9,8 +9,14 @@ export const PAPER_TRADING_AI_CLI_VERCEL_MESSAGE =
   "AI 모의투자는 로컬 AI CLI 실행이 필요해 Vercel 환경에서는 진행할 수 없어요.";
 
 export type PaperTradingAiCliGate =
-  | { ok: true; available: AIAnalysisProvider[] }
+  | { ok: true; available: AIAnalysisProvider[]; provider: AIAnalysisProvider }
   | { ok: false; status: 422 | 503; message: string };
+
+function preferredProvider(available: AIAnalysisProvider[]): AIAnalysisProvider | null {
+  if (available.includes("codex")) return "codex";
+  if (available.includes("claude")) return "claude";
+  return null;
+}
 
 export function getPaperTradingAiCliGate(): PaperTradingAiCliGate {
   if (isVercelEnv()) {
@@ -34,5 +40,5 @@ export function getPaperTradingAiCliGate(): PaperTradingAiCliGate {
     };
   }
 
-  return { ok: true, available };
+  return { ok: true, available, provider: preferredProvider(available) ?? available[0] };
 }
