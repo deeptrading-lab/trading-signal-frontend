@@ -92,56 +92,6 @@ export const USAGE_EMPTY_BODY =
 /** run 수 요약. */
 export const usageRunCount = (n: number): string => `분석 ${n}회 기준`;
 
-// ─── 삼성전자 A/B 토큰 개선 리포트 ─────────────────────────────────────────────
-export const AB_SAMSUNG_SESSION = "samsung-005930-token-ab-c1-r2";
-export const AB_SAMSUNG_TITLE = "삼성전자 A/B 토큰 개선 확인";
-export const AB_SAMSUNG_SUBTITLE =
-  "005930을 같은 조건으로 baseline과 최적화안에 실행한 뒤, 토큰·비용·소요와 결론 흔들림을 비교합니다.";
-export const AB_SAMSUNG_SESSION_LABEL = "실험 세션";
-export const AB_SAMSUNG_SESSION_PLACEHOLDER = "예: samsung-005930-token-ab";
-export const AB_SAMSUNG_COMMAND_TITLE = "로컬에서 삼성전자만 실행";
-export const AB_SAMSUNG_COMMAND =
-  "PROVIDER=codex CONFIG_IDS=A,C1 SESSION=samsung-005930-token-ab-c1-r2 TICKERS=005930 REPEATS=1 BASE_URL=http://localhost:3000 node scripts/ab-harness/run-golden-set.mjs";
-export const AB_SAMSUNG_COMMAND_HINT =
-  "C1은 후단 입력에 1차 리포트를 900자 압축 발췌로 전달합니다. Claude CLI가 있으면 PROVIDER=claude로 바꿔 비용까지 함께 볼 수 있습니다.";
-export const AB_REPORT_LOADING = "A/B 리포트를 불러오는 중…";
-export const AB_REPORT_ERROR = "A/B 리포트를 불러오지 못했어요.";
-export const AB_REPORT_EMPTY_TITLE = "아직 이 세션의 실험 결과가 없어요";
-export const AB_REPORT_EMPTY_BODY =
-  "위 명령으로 삼성전자 실험을 실행하면 baseline 대비 개선율이 여기에 표시됩니다.";
-export const AB_REPORT_NOT_CONFIGURED_TITLE = "A/B 저장소가 아직 연결되지 않았어요";
-export const AB_REPORT_NOT_CONFIGURED_BODY =
-  "docs/sql/ab-run-config.sql 과 Supabase service role 설정이 필요합니다.";
-export const AB_REPORT_REFRESH = "리포트 새로고침";
-export const AB_BASELINE = "기준안";
-export const AB_VARIANT = "개선안";
-export const AB_STATUS_PASS = "통과";
-export const AB_STATUS_REVIEW = "검토 필요";
-export const AB_STATUS_INSUFFICIENT = "표본 부족";
-export const AB_SINGLE_TICKER_NOTICE =
-  "삼성전자 단일 실험은 비용·토큰 개선 확인용 스모크 테스트입니다. 품질 PASS 판정은 공통 ticker 3개 이상에서 더 신뢰할 수 있어요.";
-export const AB_COL_CONFIG = "실험안";
-export const AB_COL_RUNS = "실행";
-export const AB_COL_COST = "평균 비용";
-export const AB_COL_INPUT = "입력 토큰";
-export const AB_COL_OUTPUT = "출력 토큰";
-export const AB_COL_TIME = "평균 소요";
-export const AB_COL_MEDIAN_TIME = "중앙 소요";
-export const AB_COL_WORST_TIME = "최악 소요";
-export const AB_COL_HEALTH = "실행 진단";
-export const AB_COL_STATUS = "판정";
-export const AB_DELTA_COST = "비용 변화";
-export const AB_DELTA_INPUT = "입력 토큰 변화";
-export const AB_DELTA_TIME = "소요 변화";
-export const AB_DELTA_WORST_TIME = "최악 소요";
-export const AB_DELTA_OUTPUT = "출력 변화";
-export const AB_DELTA_VERDICT = "verdict 일치";
-export const AB_DELTA_DIRECTION = "방향 일치";
-export const AB_DELTA_ORDINAL = "verdict 거리";
-export const abRunHealth = (incomplete: number, longAgents: number, unmeasured: number): string =>
-  `미완료 ${incomplete} · 장시간 ${longAgents} · 미측정 ${unmeasured}`;
-export const abRunCount = (n: number): string => `${n}회`;
-
 // ─── provider 탭 ───────────────────────────────────────────────────────────────
 export const PROVIDER_TAB_CLAUDE = "Claude";
 export const PROVIDER_TAB_CODEX = "Codex";
