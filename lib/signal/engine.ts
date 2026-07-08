@@ -22,8 +22,9 @@ import { MIN_BARS, SOFT_MIN_BARS } from "./weights";
  * 미확보된 상태에서 동의도가 높게 표기돼 과신을 유도하는 것을 막는 보조 신호.
  * (verdict 라벨 HIGH 금지는 프롬프트가 1차 제어; 이 캡은 signalSummary 의 "동의도 N%" 를 눌러
  *  LLM 에 데이터 제한을 간접 전달하는 결정적 보조 수단이다.)
+ * export — 분봉 graded 동의도(`evaluateIntradaySignal`)가 같은 상한을 재적용한다(리터럴 복제 금지).
  */
-const LIMITED_DATA_CONFIDENCE_CAP = 0.6;
+export const LIMITED_DATA_CONFIDENCE_CAP = 0.6;
 
 /** 캔들 배열 마지막 봉 기준 신호 평가. */
 export function evaluateSignal(
