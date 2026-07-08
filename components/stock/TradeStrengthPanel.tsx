@@ -40,8 +40,8 @@ export interface TradeStrengthPanelProps {
 
 /** 지면별 폴링 주기(ms) — 단타 촘촘·상세 느슨(OrderbookPanel 과 동일 정책). */
 const REFETCH_MS = { compact: 3_000, full: 10_000 } as const;
-/** 테이프 표시 건수 — compact·full 모두 20(옆 호가창 20단계와 높이 균형, 과다 나열 방지). */
-const TAPE_LIMIT = { compact: 20, full: 20 } as const;
+/** 테이프 표시 건수 — compact 19 · full 20(옆 호가창 20단계와 높이 균형, 과다 나열 방지). */
+const TAPE_LIMIT = { compact: 19, full: 20 } as const;
 
 export function TradeStrengthPanel({
   ticker,
