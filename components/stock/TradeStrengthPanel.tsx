@@ -108,8 +108,9 @@ function StrengthGauge({
 
   return (
     <div className={cn("flex flex-col", compact ? "gap-xs" : "gap-sm")}>
+      {/* 상단 라벨 — 탭/헤더가 이미 "체결강도"를 표기하므로 중복 제목은 빼고, 정직성 표기인 "추정치"
+          칩만 남긴다(툴팁으로 근사 근거 안내). */}
       <div className="flex items-center gap-sm">
-        <span className="text-label-sm text-primary">{C.strengthLabel}</span>
         <span
           className="rounded-sm bg-accent-soft px-xs py-xs text-caption text-text-muted"
           title={C.approxTooltip}
