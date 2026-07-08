@@ -47,8 +47,9 @@ export interface NavItem {
   /** lucide-react 아이콘 컴포넌트. */
   icon: LucideIcon;
   /**
-   * 로컬 CLI(구독) 전용 기능 — Vercel 배포에서는 라우트가 503 이므로 메뉴를 숨긴다.
-   * `getVisibleNavItems()` 가 Vercel 환경에서 이 항목을 걸러낸다.
+   * 운영 도구(단타 워치 등) — **로컬(dev)은 전체 노출, Vercel 배포(prod)는 admin 이상만** 노출한다.
+   * DB(Supabase) 기반이라 prod 에서도 세션 조회는 동작(신규 세션 시작만 로컬 CLI 필요).
+   * `getVisibleNavItems(isAdmin)` 가 이 규칙을 적용한다.
    */
   localOnly?: boolean;
 }
@@ -58,23 +59,23 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, shortLabel: NAV_MENU_WATCHLIST_SHORT, icon: Star },
   { path: "/stock", label: NAV_MENU_STOCK, shortLabel: NAV_MENU_STOCK_SHORT, icon: BarChart2 },
   { path: "/analyze", label: NAV_MENU_ANALYZE, shortLabel: NAV_MENU_ANALYZE_SHORT, icon: Compass },
-  // 단타 워치 — 로컬 CLI 전용. 마이페이지 바로 위 고정.
+  // 단타 워치 — 로컬은 전체, prod 는 admin 이상만(localOnly). 마이페이지 바로 위 고정.
   { path: "/intraday", label: NAV_MENU_INTRADAY, shortLabel: NAV_MENU_INTRADAY_SHORT, icon: Zap, localOnly: true },
   { path: "/profile", label: NAV_MENU_PROFILE, shortLabel: NAV_MENU_PROFILE_SHORT, icon: User },
 ];
 
 /**
- * 현재 실행 환경에서 노출할 메뉴 목록.
- * - 로컬 dev(`next dev`): 전부 노출.
- * - Vercel 배포(production·preview): `localOnly` 항목 제외 — 단타 워치는 로컬 CLI 없이는 동작 불가.
+ * 현재 실행 환경·권한에서 노출할 메뉴 목록.
+ * - 로컬 dev(`next dev`): 전부 노출(`isAdmin` 무관).
+ * - Vercel 배포(production·preview): `localOnly` 항목은 **admin 이상만** 노출(그 외 유저에게 숨김).
  *
- * `NEXT_PUBLIC_VERCEL_ENV` 는 Vercel 이 클라이언트 번들에 빌드타임 인라인하므로 서버/클라 값이
- * 동일 → 하이드레이션 불일치 없음. (서버 판별은 `lib/server/env.ts isVercelEnv()`.)
+ * `isAdmin` 은 호출 측이 `useMe()` 로 넘긴다(클라 전용, `/api/auth/me` 기반). 미인증·로딩 시 false →
+ * prod 에서 첫 렌더는 숨김, 신원 확인 후 admin 이면 노출(짧은 지연, 라우트 자체는 서버 가드가 재방어).
+ * `NEXT_PUBLIC_VERCEL_ENV` 는 빌드타임 인라인이라 서버/클라 동일 → 하이드레이션 불일치 없음.
  */
-export function getVisibleNavItems(): NavItem[] {
-  return isVercelRuntime()
-    ? NAV_ITEMS.filter((item) => !item.localOnly)
-    : NAV_ITEMS;
+export function getVisibleNavItems(isAdmin: boolean): NavItem[] {
+  if (!isVercelRuntime()) return NAV_ITEMS;
+  return NAV_ITEMS.filter((item) => !item.localOnly || isAdmin);
 }
 
 /**
