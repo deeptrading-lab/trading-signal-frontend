@@ -7098,3 +7098,45 @@
   - PR-3b: preGate 교차 트리거(VWAP 재탈환·ORB 돌파·volume z≥2 — crossing 이벤트 시맨틱, callLlm 만 유발)
   - PR-3c: CLI 신뢰성 — PR-0 텔레메트리 1주 축적 후(AGENT_TIMEOUT env 화·타임아웃 예산 불변식·failureKind 별 재시도 정책)
   - PR-4: 장중 실검증 — 5분 주기 표준 세션, 버킷 승률로 컷(INTRADAY_BUY_CONVICTION_MIN 등) 캘리브레이션
+
+### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-3b — preGate 교차 이벤트 트리거 확장 (#318)
+
+- **slug**: `intraday-pregate-triggers` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/318
+- **요약**: feat(intraday): 단타 판단 고도화 PR-3b — preGate 교차 이벤트 트리거 확장
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 단타 판단 고도화 시리즈 **PR-3b** — preGate 의 "무포지션+HOLD+직전 HOLD → LLM 스킵" 최적화(감사 기준 틱의 51%)를 뚫는 트리거를 기존 전고 돌파 1종에서 4종으로 확장합니다. 다음 틱까지 기다리면 늦는 셋업 순간(VWAP 재탈환·오프닝 레인지 상단 돌파·거래량 z≥2 급증)에 AI 에게 묻습니다.
+  > 
+  > 핵심 시맨틱: **상태 검사가 아니라 교차 이벤트** — 직전 마감봉에서는 성립하지 않았고 이번 마감봉에서 처음 성립할 때만 발화합니다. 상태 검사("VWAP 위")로 만들면 오후 내내 매 틱 재발화해 스킵 최적화가 무력화됩니다(AC-13).
+  > 
+  > ## 변경
+  > 
+  > - `lib/signal/intradayFeatures.ts`
+  >   - `IntradayFeatureRead` 에 교차 리드 3종 추가: `vwapReclaim`(직전 마감봉 종가 ≤ 그 시점 누적 VWAP && 이번 마감봉 종가 > 현재 누적 VWAP), `orBreakout`(OR 형성 완료 후 직전 ≤ OR 고가 && 이번 > OR 고가), `volumeZSurge`(이번 z≥2 && 직전 z<2)
+  >   - 마지막 봉은 진행 중(미확정) 취급 — 판정 쌍은 항상 "마지막 마감봉 vs 그 직전 마감봉"(기존 꼬리 읽기와 동일 규칙, 주석 문서화)
+  >   - `formatIntradayFeatures`: 발화 틱에만 `[셋업 이벤트] …` 한 줄 추가(미발화 시 무주입 — 프롬프트 길이 영향 최소)
+  > - `lib/signal/intradayAxes.ts`
+  >   - `volumeZAt(candles, idx)` 헬퍼 추출 — `gradedVolumeAxis` 와 교차 트리거가 **z 산식을 단일 공유**(산식 중복 금지). gradedVolumeAxis 동작은 비트 동일(회귀 테스트로 고정)
+  > - `lib/server/paperTrading/decisionProviders/intradayCli.ts`
+  >   - `deriveStructureEvent(features, regime)` 추출·export — 기존 "전고 돌파 진행" 유지 + 신규 3종, 동시 성립 시 `" · "` 결합(스냅샷·프롬프트에 전부 기록). `regime !== -1` 가드 유지(약세면 사후 게이트가 매수를 죽이므로 트리거로 안 침)
+  >   - `evaluatePreGate` 로직 자체는 무변경 — structureEvent 는 `callLlm` 만 유발하며, PR-3a 재진입 쿨다운은 3번째 인자로 `noNewEntry` 에 합산돼 관통을 차단(테스트로 확인)
+  > 
+  > ## AC-13 검증
+  > 
+  > | 시나리오 | 기대 | 결과 |
+  > |---|---|---|
+  > | VWAP 아래→위 교차 봉 | 발화 1회 | ✅ 테스트 |
+  > | VWAP 위 체류 중 다음 평가 | 재발화 없음 | ✅ 테스트 |
+  > | OR 상단 체류 중 | 재발화 없음 | ✅ 테스트 |
+  > | 연속 z≥2(급증 지속) | 재발화 없음 | ✅ 테스트 |
+  > | 경계(직전 종가=VWAP·룩백 경계 z 미산출) | ≤ 성립 발화 / 교차 불성립 미발화 | ✅ 테스트 |
+  > 
+  > 안전 불변식(테스트 고정): 트리거는 `callLlm` 만 유발 — `deriveFromSignal`(폴백) 불관여, 시장경보 사후 게이트 그대로 발화(경보 우회 금지), noNewEntry(15:00+·손실킬·쿨다운)가 관통 차단.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-3c: CLI 신뢰성 — PR-0 텔레메트리 장중 축적 후(AGENT_TIMEOUT env화·타임아웃 예산 불변식·failureKind별 재시도 정책)
+  - PR-4: 장중 실검증 — 5분 주기 표준 세션, 왕복 2~5회/일 목표, 버킷 승률로 env 컷 캘리브레이션
+  - Supabase `intraday-tick-labels.sql` 수동 실행 + 기존 코퍼스 백필(PR-2 라벨 루프 활성화)

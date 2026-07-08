@@ -164,3 +164,89 @@ describe("당일 컨텍스트 · VWAP · 오프닝 레인지 · 모멘텀", () =
     expect(text).toContain("[모멘텀]");
   });
 });
+
+// ─── 셋업 이벤트(교차) — preGate 트리거 (PR-3b, AC-13) ───────────────────────
+
+describe("셋업 이벤트(교차) — vwapReclaim · orBreakout · volumeZSurge", () => {
+  /** 꼬리 없는 평평한 봉(o=h=l=c) — VWAP=가격 가중평균이 손검산 가능. */
+  function flat(time: string, p: number, v = 1000): StockMinuteCandle {
+    return bar(time, p, p, p, p, v);
+  }
+  const t = (i: number) =>
+    `${String(9 + Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}`;
+
+  describe("vwapReclaim — VWAP 재탈환", () => {
+    // 마지막 봉은 진행 중 취급 — 교차 판정 쌍은 끝에서 두 번째(마감) vs 세 번째.
+    const crossing = [100, 100, 100, 100, 90, 112]; // 90 봉: VWAP(98) 아래 → 112 봉: VWAP(100.3) 위
+    it("아래→위 교차 봉에서 발화한다", () => {
+      const candles = [...crossing, 112].map((p, i) => flat(t(i), p));
+      const f = extractIntradayFeatures(candles, 1, 130)!;
+      expect(f.vwapReclaim).toBe(true);
+      expect(formatIntradayFeatures(f)).toContain("[셋업 이벤트] VWAP 재탈환");
+    });
+    it("AC-13: 위 체류 중(직후 봉)에는 재발화하지 않는다", () => {
+      const candles = [...crossing, 112, 112].map((p, i) => flat(t(i), p));
+      const f = extractIntradayFeatures(candles, 1, 130)!;
+      expect(f.vwapReclaim).toBe(false);
+      expect(formatIntradayFeatures(f)).not.toContain("[셋업 이벤트]");
+    });
+    it("경계 — 직전 종가 = VWAP(≤ 성립)이었다가 넘어서면 발화한다", () => {
+      // 100×6 → VWAP 100, 직전 봉 종가 100(=VWAP) → 112 돌파.
+      const candles = [100, 100, 100, 100, 100, 100, 112, 112].map((p, i) => flat(t(i), p));
+      expect(extractIntradayFeatures(candles, 1, 130)!.vwapReclaim).toBe(true);
+    });
+    it("계속 아래(교차 없음)면 발화하지 않는다", () => {
+      const candles = [100, 100, 100, 100, 90, 89, 89].map((p, i) => flat(t(i), p));
+      expect(extractIntradayFeatures(candles, 1, 130)!.vwapReclaim).toBe(false);
+    });
+  });
+
+  describe("orBreakout — 오프닝 레인지 상단 돌파", () => {
+    /** OR(09:00~09:04, 고가 105) + 09:31 이후 봉들. */
+    function orSeries(post: number[]): StockMinuteCandle[] {
+      const or = [100, 105, 103, 102, 101].map((p, i) => flat(`09:0${i}`, p));
+      return [...or, ...post.map((p, i) => flat(`09:3${1 + i}`, p))];
+    }
+    it("레인지 내 → 상단 돌파 교차 봉에서 발화한다", () => {
+      // 마감봉 쌍: 104(≤105) → 106(>105). 마지막 107은 진행 중.
+      const f = extractIntradayFeatures(orSeries([104, 106, 107]), 1, 130)!;
+      expect(f.orBreakout).toBe(true);
+      expect(formatIntradayFeatures(f)).toContain("오프닝 레인지 상단 돌파");
+    });
+    it("AC-13: 상단 체류 중(직후 봉)에는 재발화하지 않는다", () => {
+      const f = extractIntradayFeatures(orSeries([104, 106, 107, 107]), 1, 130)!;
+      expect(f.orBreakout).toBe(false);
+    });
+    it("레인지 형성 중(~09:30 이전)에는 판정하지 않는다", () => {
+      const candles = [100, 105, 103, 102, 101, 104, 106, 107].map((p, i) => flat(`09:0${i}`, p));
+      expect(extractIntradayFeatures(candles, 1, 130)!.orBreakout).toBe(false);
+    });
+  });
+
+  describe("volumeZSurge — 거래량 z ≥ 2 교차", () => {
+    /**
+     * 직전 창 700/1400 교대(log std≈0.35) 뒤에 tail 거래량 — intradayAxes zCandles 와 동일 구도.
+     * tail 마지막 원소는 진행 중 봉(판정 제외).
+     */
+    function zSeries(head: number, tail: number[]): StockMinuteCandle[] {
+      const base = Array.from({ length: head }, (_, i) =>
+        flat(t(i), 100, i % 2 === 0 ? 700 : 1_400),
+      );
+      return [...base, ...tail.map((v, i) => flat(t(head + i), 100, v))];
+    }
+    it("z<2 → z≥2 교차 봉에서 발화한다 (2,200 → z≈2.3)", () => {
+      const f = extractIntradayFeatures(zSeries(44, [2_200, 1_000]), 1, 130)!;
+      expect(f.volumeZSurge).toBe(true);
+      expect(formatIntradayFeatures(f)).toContain("거래량 급증(z≥2)");
+    });
+    it("AC-13: 연속 z≥2(급증 지속)에는 재발화하지 않는다", () => {
+      const f = extractIntradayFeatures(zSeries(44, [2_200, 2_200, 1_000]), 1, 130)!;
+      expect(f.volumeZSurge).toBe(false);
+    });
+    it("직전 봉 z 미산출(룩백 경계)이면 교차 불성립 — 발화하지 않는다", () => {
+      // n=42: 이번 마감봉(idx 40)은 z 산출 가능, 직전(idx 39)은 룩백(40) 미달 → null.
+      const f = extractIntradayFeatures(zSeries(40, [2_200, 1_000]), 1, 130)!;
+      expect(f.volumeZSurge).toBe(false);
+    });
+  });
+});

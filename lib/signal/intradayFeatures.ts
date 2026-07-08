@@ -7,9 +7,13 @@
  *   ② 스윙 구조 — 직전 저점/고점, 저점 붕괴(LL)·전고 돌파(HH), 상승/하락 구조
  *   ③ 피보나치 되돌림 — 룩백 스윙 고저 기준 0.236~0.786 레벨과 현재가 위치
  *   ④ 단기 박스 — 최근 몇 봉 변동폭 수축(다지기) 여부
+ *   ⑤ 셋업 이벤트(교차) — VWAP 재탈환·오프닝 레인지 상단 돌파·거래량 z≥2 급증. **상태가 아니라
+ *      교차**(직전 마감봉에선 아니었고 이번 마감봉에서 처음 성립)만 true — preGate 의 LLM-스킵을
+ *      뚫는 트리거라 상태 검사로 만들면 오후 내내 재발화해 스킵 최적화가 무력화된다(PR-3b, AC-13).
  */
 
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
+import { volumeZAt } from "./intradayAxes";
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -109,6 +113,17 @@ export interface IntradayFeatureRead {
   /** 오프닝 레인지(09:00~09:30). 당일 초반 데이터 없으면 null. */
   openingRange: OpeningRangeRead | null;
   momentum: MomentumRead;
+  /**
+   * 셋업 이벤트 ① VWAP 재탈환 — 직전 마감봉 종가 ≤ 그 시점 누적 VWAP 이었다가 이번 마감봉
+   * 종가 > 현재 누적 VWAP 로 **처음** 올라선 교차. 마지막 봉은 진행 중(미확정)일 수 있어
+   * 판정은 항상 마지막 마감봉(끝에서 두 번째) vs 그 직전 마감봉으로 한다(꼬리 읽기와 동일 규칙).
+   * 상태("VWAP 위")가 아니라 교차라 위 체류 중 재발화하지 않는다(AC-13).
+   */
+  vwapReclaim: boolean;
+  /** 셋업 이벤트 ② — 오프닝 레인지(~09:30) 형성 완료 후, 직전 마감봉 종가 ≤ OR 고가 && 이번 마감봉 종가 > OR 고가 교차. */
+  orBreakout: boolean;
+  /** 셋업 이벤트 ③ — 이번 마감봉 log-거래량 z ≥ 2 && 직전 마감봉 z < 2 교차(z 산식 = gradedVolumeAxis 와 공유). */
+  volumeZSurge: boolean;
 }
 
 // ─── 추출 ─────────────────────────────────────────────────────────────────────
@@ -118,6 +133,10 @@ const FIB_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786] as const;
 const SWING_K = 2;
 /** 박스(다지기) 판정 변동폭 임계(%). */
 const BOX_RANGE_PCT = 0.5;
+/** 오프닝 레인지 마감 시각(HH:mm) — 이 시각 미만 봉이 레인지를 형성한다. */
+const OR_END_HHMM = "09:30";
+/** 셋업 이벤트 ③ 거래량 급증 z 임계 — 교차(직전 <2 → 이번 ≥2) 판정에 사용. */
+const VOLUME_Z_SURGE = 2;
 
 function hhmm(date: string): string {
   return date.slice(-5);
@@ -271,14 +290,61 @@ function readVwap(today: StockMinuteCandle[], close: number): { price: number; g
 
 /** 오프닝 레인지(정규장 첫 30분, ~09:30) 고저와 현재가 위치. */
 function readOpeningRange(today: StockMinuteCandle[], close: number): OpeningRangeRead | null {
-  const orBars = today.filter((c) => c.date.slice(-5) < "09:30");
+  const orBars = today.filter((c) => hhmm(c.date) < OR_END_HHMM);
   if (orBars.length === 0) return null;
   const high = Math.max(...orBars.map((c) => c.high));
   const low = Math.min(...orBars.map((c) => c.low));
-  const forming = (today.at(-1)?.date.slice(-5) ?? "") < "09:30";
+  const forming = (today.at(-1)?.date.slice(-5) ?? "") < OR_END_HHMM;
   const position: OpeningRangeRead["position"] =
     close > high ? "상단 돌파" : close < low ? "하단 이탈" : "레인지 내";
   return { high, low, forming, position };
+}
+
+// ─── 셋업 이벤트(교차) — preGate LLM-스킵 해제 트리거 (PR-3b) ────────────────
+//
+// 공통 규칙: 마지막 봉은 진행 중(미확정)일 수 있으므로 **마감봉만** 본다 — 판정 쌍은 항상
+// "마지막 마감봉(끝에서 두 번째) vs 그 직전 마감봉". 직전 봉에서 성립하지 않았고 이번 봉에서
+// 처음 성립할 때만 true(교차 1회) — 상태 검사로 만들면 매 틱 재발화한다(AC-13 위반).
+
+/** ① VWAP 재탈환 — 직전 마감봉 종가 ≤ 그 시점 누적 VWAP && 이번 마감봉 종가 > 현재 누적 VWAP. */
+function readVwapReclaim(today: StockMinuteCandle[]): boolean {
+  const closed = today.slice(0, -1); // 마지막 봉은 진행 중일 수 있어 제외
+  if (closed.length < 2) return false;
+  // 각 시점의 증분 VWAP(해당 봉 포함) — readVwap 과 동일 산식(대표가 = (고+저+종)/3).
+  let pv = 0;
+  let vol = 0;
+  let prevVwap: number | null = null;
+  let curVwap: number | null = null;
+  for (let i = 0; i < closed.length; i++) {
+    const c = closed[i];
+    pv += ((c.high + c.low + c.close) / 3) * c.volume;
+    vol += c.volume;
+    if (i === closed.length - 2) prevVwap = vol > 0 ? pv / vol : null;
+    else if (i === closed.length - 1) curVwap = vol > 0 ? pv / vol : null;
+  }
+  if (prevVwap == null || curVwap == null) return false;
+  return closed[closed.length - 2].close <= prevVwap && closed[closed.length - 1].close > curVwap;
+}
+
+/** ② 오프닝 레인지 상단 돌파 — 레인지 형성 완료 후 직전 마감봉 종가 ≤ OR 고가 && 이번 마감봉 종가 > OR 고가. */
+function readOrBreakout(today: StockMinuteCandle[]): boolean {
+  const closed = today.slice(0, -1);
+  if (closed.length < 2) return false;
+  const cur = closed[closed.length - 1];
+  if (hhmm(cur.date) < OR_END_HHMM) return false; // 레인지 형성 중 — 돌파 판정 보류
+  const orBars = closed.filter((c) => hhmm(c.date) < OR_END_HHMM);
+  if (orBars.length === 0) return false;
+  const orHigh = Math.max(...orBars.map((c) => c.high));
+  return closed[closed.length - 2].close <= orHigh && cur.close > orHigh;
+}
+
+/** ③ 거래량 z 급증 — 이번 마감봉 z ≥ 2 && 직전 마감봉 z < 2 (z 산식은 gradedVolumeAxis 와 공유). */
+function readVolumeZSurge(candles: StockMinuteCandle[]): boolean {
+  const n = candles.length;
+  const zCur = volumeZAt(candles, n - 2); // 마지막 마감봉(끝 봉은 진행 중 미확정)
+  const zPrev = volumeZAt(candles, n - 3);
+  // 직전 z 미산출(룩백 경계·균질 거래량)이면 "직전엔 아니었다"를 확인할 수 없어 교차 불성립 처리.
+  return zCur != null && zPrev != null && zCur >= VOLUME_Z_SURGE && zPrev < VOLUME_Z_SURGE;
 }
 
 /** Wilder RSI 시리즈(기간 14) — 인덱스 정렬, 워밍업 구간은 null. */
@@ -386,6 +452,10 @@ export function extractIntradayFeatures(
     vwap: readVwap(today, close),
     openingRange: readOpeningRange(today, close),
     momentum: readMomentum(window),
+    vwapReclaim: readVwapReclaim(today),
+    orBreakout: readOrBreakout(today),
+    // z 룩백(40봉)은 당일 초반이면 전일 봉까지 걸친다 — gradedVolumeAxis 와 동일하게 전체 배열 사용.
+    volumeZSurge: readVolumeZSurge(candles),
   };
 }
 
@@ -405,6 +475,13 @@ function wickNote(bar: CandleWickRead): string {
 export function formatIntradayFeatures(features: IntradayFeatureRead | null): string {
   if (!features) return "";
   const { lastBars, swing, fib, box, day, vwap, openingRange, momentum } = features;
+
+  // 셋업 이벤트(교차) — 발생 틱에만 한 줄 추가(미발생 시 무주입, 프롬프트 길이 영향 최소).
+  const setupEvents = [
+    ...(features.vwapReclaim ? ["VWAP 재탈환"] : []),
+    ...(features.orBreakout ? ["오프닝 레인지 상단 돌파"] : []),
+    ...(features.volumeZSurge ? ["거래량 급증(z≥2)"] : []),
+  ];
 
   const barLines = lastBars
     .map(
@@ -462,6 +539,7 @@ export function formatIntradayFeatures(features: IntradayFeatureRead | null): st
     `[당일 컨텍스트] ${dayLine}`,
     `[VWAP] ${vwapLine}`,
     `[오프닝 레인지 ~09:30] ${orLine}`,
+    ...(setupEvents.length ? [`[셋업 이벤트] ${setupEvents.join(" · ")} — 이번 마감봉에서 첫 성립(교차)`] : []),
     `[스윙 구조] ${swingLine}`,
     `[피보나치 되돌림] ${fibLine}`,
     `[모멘텀] ${momentumLine}`,
