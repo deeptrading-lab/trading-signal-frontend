@@ -22,6 +22,8 @@
 "use client";
 
 import { useCallback } from "react";
+import { RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
@@ -38,6 +40,8 @@ import {
   WATCHLIST_RETRY,
   WATCHLIST_EMPTY_TITLE,
   WATCHLIST_SEARCH_HINT,
+  WATCHLIST_REFRESH,
+  WATCHLIST_REFRESHING,
 } from "@/lib/copy/watchlist/labels";
 
 export function WatchlistContainer() {
@@ -78,17 +82,32 @@ export function WatchlistContainer() {
   const canRefresh = !isEmpty && !showSkeleton && !showError;
 
   return (
-    <WatchlistPage
-      onRefresh={() => query.refetch()}
-      isRefreshing={query.isFetching}
-      canRefresh={canRefresh}
-    >
-      {/* 상단 인라인 검색 — 별 버튼으로 추가/제거(여러 개 연속 추가, 바깥 클릭 시에만 닫힘). */}
-      <WatchlistSearch
-        hasTicker={hasTicker}
-        addTicker={addTicker}
-        removeTicker={removeTicker}
-      />
+    <WatchlistPage>
+      {/* 상단 — 인라인 검색(별 버튼으로 추가/제거) + 새로고침(md+ 우측, 모바일은 pull-to-refresh).
+          타이틀 제거 후 새로고침이 홀로 상단을 차지하지 않게 검색과 한 줄에 둔다. */}
+      <div className="flex items-center gap-sm">
+        <div className="min-w-0 flex-1">
+          <WatchlistSearch
+            hasTicker={hasTicker}
+            addTicker={addTicker}
+            removeTicker={removeTicker}
+          />
+        </div>
+        {canRefresh ? (
+          <button
+            type="button"
+            className="hidden md:inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-text-muted transition-colors hover:bg-surface-muted hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
+            onClick={() => query.refetch()}
+            disabled={query.isFetching}
+            aria-label={query.isFetching ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
+          >
+            <RefreshCw
+              className={cn("h-5 w-5", query.isFetching && "animate-spin")}
+              aria-hidden="true"
+            />
+          </button>
+        ) : null}
+      </div>
 
       {isEmpty ? (
         // 빈 상태 — 카드리스(카드 박스 없이 흰 바탕 + 여백). 첫 진입 프롬프트.
