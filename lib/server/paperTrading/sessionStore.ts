@@ -234,7 +234,7 @@ export async function patchPaperTradingSession(
   // 틱 자가채점(intraday-decision-overhaul PR-2) — 완료 **전이** 시 그날 분봉으로 라벨링.
   // 마감 스윕(tickScheduler)·수동 PATCH 모두 이 함수를 지나므로 여기 한 곳이 완료 훅의 choke point.
   // fire-and-forget + 내부 never-throw — 모의투자 흐름을 절대 막지 않는다(관측 전용).
-  if (status === "completed" && !wasCompleted) {
+  if (patch.status === "completed" && !wasCompleted) {
     scheduleSessionTickLabeling(entry.session, [...entry.ticks]);
   }
   return toDetail(entry);
@@ -315,6 +315,13 @@ export function resetPaperTradingStoreForTest(): void {
   // 테스트 격리 — hydration 상태도 초기화(테스트 env 는 Supabase 미설정이라 즉시 disabled).
   store.hydration = undefined;
   store.hydrated = undefined;
+}
+
+/** 테스트 전용 — 세션을 메모리 스토어에 직접 시드(hydrate 스킵). */
+export function seedPaperTradingSessionForTest(session: PaperTradingSession): void {
+  const store = getStore();
+  store.sessions.set(session.id, { session, positions: [], ticks: [] });
+  store.hydrated = true;
 }
 
 /**
