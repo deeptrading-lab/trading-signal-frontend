@@ -115,6 +115,10 @@ export const queryKeys = {
     /** confidence 버킷별 실측 보정값(scorecard-feedback (가)). 인자 없는 단일 키. */
     calibration: ["scorecard", "calibration"] as const,
   },
+  intraday: {
+    /** 틱 자가채점 라벨 집계(캘리브레이션 패널) — 인자 없는 단일 키. */
+    tickLabelSummary: ["intraday", "tick-label-summary"] as const,
+  },
   paperTrading: {
     /** AI 모의투자 세션 목록 — MVP-A in-memory BFF. */
     sessions: ["paper-trading", "sessions"] as const,
