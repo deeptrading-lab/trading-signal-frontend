@@ -624,9 +624,9 @@ function WatchRow({
                 <ExternalLink className="size-4" aria-hidden />
               </Link>
             ) : null}
-            {/* 진행중 행만 자동 상주(제거해도 재등장) — 멈춘 세션(일시정지·완료·실패)·세션 없음 행은
-                ✕ 로 제거 가능. 제거해도 세션은 지워지지 않는다(재추가 시 재개로 복귀). */}
-            {!current || current.status !== "running" ? (
+            {/* 세션 행은 상태와 무관하게 DB 기준으로 항상 상주(단일 소스 — 모의투자 목록 동등) → ✕ 없음.
+                세션이 아직 없는 워치 행(검색으로 추가)만 ✕ 로 뺄 수 있다. */}
+            {!current ? (
               <button
                 type="button"
                 className={ICON_BTN}
