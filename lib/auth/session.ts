@@ -157,6 +157,9 @@ async function verifyAndDecode(
 
     const now = Math.floor(nowMs / 1000);
     if (payload.exp <= now) return null;
+    // v=1(비밀번호) 세션 거부 — 비밀번호 로그인 폐지 후 남아 있던 30일 쿠키를 무효화해
+    // 강제로 Google 재로그인시킨다. v=2(Google 신원)만 유효(verifySession·readSession 공통 적용).
+    if (payload.v !== SESSION_TOKEN_VERSION_IDENTITY) return null;
     return payload;
   } catch {
     // 디코드·crypto 예외는 전부 invalid 로 안전 실패.

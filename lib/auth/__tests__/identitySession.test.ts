@@ -2,7 +2,7 @@
  * `lib/auth/session.ts` 신원 확장 단위 테스트 (PRD user-login-auth §3.2 / AC-5·11·18).
  *
  *   - `signIdentitySession` round-trip: verifySession true + readSession 이 sub/email/role 반환.
- *   - `v=1`(비밀번호) 세션 하위호환: verifySession true(강제 로그아웃 0), readSession 은 신원 없음.
+ *   - `v=1`(비밀번호) 세션: 비밀번호 로그인 폐지 후 **거부**(verifySession false, readSession null → 재로그인 강제).
  *   - 위조/만료 신원 토큰: readSession null(위조 role=admin 통과 차단).
  *   - 시크릿 미설정: sign null + readSession null(안전 실패).
  */
@@ -16,7 +16,6 @@ import {
 } from "../session";
 import {
   SESSION_MAX_AGE_SECONDS,
-  SESSION_TOKEN_VERSION,
   SESSION_TOKEN_VERSION_IDENTITY,
 } from "../constants";
 
@@ -51,20 +50,14 @@ describe("lib/auth/session — 신원 확장", () => {
     });
   });
 
-  it("[AC-5] v=1 비밀번호 세션 — verifySession true(하위호환), readSession 은 신원 없음", async () => {
+  it("v=1 비밀번호 세션 — 폐지 후 거부(verifySession false, readSession null → 재로그인 강제)", async () => {
     const now = Date.now();
     const legacy = (await signSession(now)) as string;
+    expect(legacy).toContain(".");
 
-    // 게이트 통과는 유지(강제 로그아웃 0).
-    await expect(verifySession(legacy, now)).resolves.toBe(true);
-
-    const identity = await readSession(legacy, now);
-    expect(identity).toEqual({
-      v: SESSION_TOKEN_VERSION,
-      sub: undefined,
-      email: undefined,
-      role: undefined,
-    });
+    // 비밀번호 로그인 폐지 — 남아 있던 v=1 쿠키는 서명이 유효해도 게이트·신원 양쪽에서 거부.
+    await expect(verifySession(legacy, now)).resolves.toBe(false);
+    await expect(readSession(legacy, now)).resolves.toBeNull();
   });
 
   it("[AC-11] 위조 신원 토큰 — readSession null(위조 role=admin 통과 차단)", async () => {
