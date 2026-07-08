@@ -10,7 +10,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { ChevronDown, ExternalLink, History, Loader2, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
@@ -50,6 +51,89 @@ import type { StockWarningItem } from "@/lib/types/stock/warnings";
 const DEFAULT_INTERVAL_MIN = 2;
 
 const T = P.table;
+
+// ─── 날짜별 그룹(세션 시작일 KST 기준) ────────────────────────────────────────
+/** ISO → KST YYYY-MM-DD 그룹/정렬 키. 파싱 실패면 null. */
+function kstDateKey(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  // en-CA 로케일 = YYYY-MM-DD. Asia/Seoul(거래일) 기준으로 그룹·정렬한다.
+  return new Date(ms).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
+/** 그룹 헤더 라벨 — 오늘/어제/그 외 M/D. */
+function groupLabel(dateKey: string, todayKey: string, yesterdayKey: string): string {
+  const [, m, d] = dateKey.split("-");
+  const md = `${Number(m)}/${Number(d)}`;
+  if (dateKey === todayKey) return `${T.groupToday} · ${md}`;
+  if (dateKey === yesterdayKey) return `${T.groupYesterday} · ${md}`;
+  return md;
+}
+
+/** 당일 요약 — 그 날 세션들의 합산 수익률(자금가중)·승/패·진행중. 세션 없는 워치 행은 제외. */
+type DaySummary = {
+  sessions: number;
+  wins: number;
+  losses: number;
+  running: number;
+  aggReturnPct: number | null;
+};
+function daySummary(
+  items: WatchItem[],
+  sessionByTicker: Map<string, PaperTradingSession>,
+): DaySummary {
+  let sessions = 0, wins = 0, losses = 0, running = 0, totalInit = 0, totalPnl = 0;
+  for (const item of items) {
+    const s = sessionByTicker.get(item.ticker);
+    if (!s) continue;
+    sessions++;
+    if (s.status === "running") running++;
+    if (s.returnPct > 0) wins++;
+    else if (s.returnPct < 0) losses++;
+    totalInit += s.initialCash;
+    totalPnl += s.portfolioValue - s.initialCash;
+  }
+  return {
+    sessions,
+    wins,
+    losses,
+    running,
+    aggReturnPct: totalInit > 0 ? (totalPnl / totalInit) * 100 : null,
+  };
+}
+
+/** 펼침 시 행 진입 애니(페이드+살짝 아래로 슬라이드). 마운트 시 1회 — 폴링 리렌더엔 재발화 안 함. */
+const ROW_ENTER = {
+  initial: { opacity: 0, y: -4 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
+} as const;
+
+/** 그룹 내부 컬럼 헤더 행 — 날짜를 펼쳤을 때 그 그룹 안에 표시(전역 thead 대신 그룹별). */
+function GroupColumnHeader() {
+  return (
+    <motion.tr
+      {...ROW_ENTER}
+      className="border-b border-border-line text-caption text-text-muted"
+    >
+      <th className="py-sm pl-lg pr-md text-left font-normal">{T.colStock}</th>
+      <th className="py-sm pr-md text-right font-normal">{T.colPrice}</th>
+      <th className="py-sm pr-md text-right font-normal">{T.colChange}</th>
+      <th className="border-l border-border-line py-sm pl-md pr-md text-right font-normal">
+        {T.colReturn}
+      </th>
+      <th className="py-sm pr-md text-right font-normal">{T.colValue}</th>
+      <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
+      <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
+      <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
+      <th className="py-sm pr-md text-center font-normal">{T.colInterval}</th>
+      <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
+      <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
+      <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
+    </motion.tr>
+  );
+}
 
 /**
  * 컴팩트 버튼 — button-primary/secondary 합성 클래스는 높이·패딩 토큰이 달라 크기가 어긋나므로
@@ -94,45 +178,137 @@ export function IntradayWatchTable({
   onStart,
   onRemove,
 }: IntradayWatchTableProps) {
+  // 오늘/어제 키(KST) — 그룹 라벨·기본 펼침 판정용. 마운트 1회 캡처(useState lazy init — 현재 시각은
+  // 외부 가변값이라 렌더 중 직접 읽지 않는다). 자정 롤오버는 재방문/새로고침 시 갱신(허용).
+  const [todayKey] = useState(() => kstDateKey(new Date().toISOString()) ?? "");
+  const [yesterdayKey] = useState(
+    () => kstDateKey(new Date(Date.now() - 86_400_000).toISOString()) ?? "",
+  );
+
+  // 세션 시작일 기준 날짜 그룹(최신 날짜 먼저). 세션 없는 워치 행(검색 추가)은 오늘 그룹으로.
+  const groups = useMemo(() => {
+    const map = new Map<string, WatchItem[]>();
+    for (const item of items) {
+      const session = sessionByTicker.get(item.ticker);
+      const key =
+        (session && kstDateKey(session.startedAt ?? session.createdAt)) || todayKey;
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([dateKey, groupItems]) => ({ dateKey, items: groupItems }));
+  }, [items, sessionByTicker, todayKey]);
+
+  // 그룹 펼침 — 기본은 **가장 최근 날짜 하나만** 펼침(그 외 접힘), 헤더 클릭으로 개별 토글.
+  const [expandOverride, setExpandOverride] = useState<Record<string, boolean>>({});
+  const mostRecentKey = groups[0]?.dateKey;
+  const isExpanded = (key: string) =>
+    expandOverride[key] ?? key === mostRecentKey;
+  const toggleGroup = (key: string) =>
+    setExpandOverride((o) => ({ ...o, [key]: !isExpanded(key) }));
+  const setAllGroups = (expanded: boolean) =>
+    setExpandOverride(Object.fromEntries(groups.map((g) => [g.dateKey, expanded])));
+
   return (
-    // 카드 박스 제거 — 흰 바탕 위 헤어라인 표(홈 랭킹·보유종목 표 정합). 넓은 표라 가로 스크롤만 유지.
-    <div className="overflow-x-auto">
+    <div className="flex flex-col">
+      {/* 전체 접기/펼치기 — 날짜 그룹이 2개 이상일 때만. */}
+      {groups.length > 1 && (
+        <div className="flex items-center justify-end gap-md pb-sm text-caption">
+          <button
+            type="button"
+            onClick={() => setAllGroups(true)}
+            className="text-text-muted transition-colors hover:text-text-strong cursor-pointer"
+          >
+            {T.groupExpandAll}
+          </button>
+          <span className="text-border-line" aria-hidden>·</span>
+          <button
+            type="button"
+            onClick={() => setAllGroups(false)}
+            className="text-text-muted transition-colors hover:text-text-strong cursor-pointer"
+          >
+            {T.groupCollapseAll}
+          </button>
+        </div>
+      )}
+      {/* 카드 박스 제거 — 흰 바탕 위 헤어라인 표(홈 랭킹·보유종목 표 정합). 넓은 표라 가로 스크롤만 유지.
+          전역 thead 없이 컬럼 헤더는 펼친 날짜 그룹 안에 각각 렌더한다(GroupColumnHeader). */}
+      <div className="overflow-x-auto">
       <table className="w-full text-body-sm">
-        <thead>
-          <tr className="border-b border-border-line text-caption text-text-muted">
-            <th className="py-sm pl-lg pr-md text-left font-normal">{T.colStock}</th>
-            <th className="py-sm pr-md text-right font-normal">{T.colPrice}</th>
-            <th className="py-sm pr-md text-right font-normal">{T.colChange}</th>
-            {/* 여기부터 모의 투자 데이터 — 종목 정보와 세로 구분선으로 분리(피드백). */}
-            <th className="border-l border-border-line py-sm pl-md pr-md text-right font-normal">
-              {T.colReturn}
-            </th>
-            <th className="py-sm pr-md text-right font-normal">{T.colValue}</th>
-            <th className="py-sm pr-md text-right font-normal">{T.colPosition}</th>
-            <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
-            <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
-            <th className="py-sm pr-md text-center font-normal">{T.colInterval}</th>
-            <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
-            <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
-            <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
-          </tr>
-        </thead>
         <tbody>
-          {items.map((item) => (
-            <WatchRow
-              key={item.ticker}
-              item={item}
-              quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
-              session={sessionByTicker.get(item.ticker) ?? null}
-              warnings={warningsByTicker?.[item.ticker]}
-              selected={selectedTicker === item.ticker}
-              onSelect={onSelect}
-              onStart={onStart}
-              onRemove={() => onRemove(item.ticker)}
-            />
-          ))}
+          {groups.map((g) => {
+            const expanded = isExpanded(g.dateKey);
+            const label = groupLabel(g.dateKey, todayKey, yesterdayKey);
+            const sum = daySummary(g.items, sessionByTicker);
+            return (
+              <Fragment key={g.dateKey}>
+                {/* 날짜 그룹 헤더 — colSpan 전폭. 좌=접기토글+라벨+건수 / 우=당일 요약(합산 수익률·승/패·진행). */}
+                <tr className="border-b border-border-line bg-surface-muted/40">
+                  <td colSpan={12} className="px-lg py-xs">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(g.dateKey)}
+                      aria-expanded={expanded}
+                      aria-label={T.groupToggleAria(label)}
+                      className="flex w-full items-center gap-sm text-caption font-bold text-text-strong hover:text-accent-vivid transition-colors cursor-pointer"
+                    >
+                      <ChevronDown
+                        size={14}
+                        className={cn("shrink-0 transition-transform", !expanded && "-rotate-90")}
+                        aria-hidden
+                      />
+                      <span>{label}</span>
+                      <span className="font-normal text-text-muted">{T.groupCount(g.items.length)}</span>
+                      {sum.sessions > 0 && (
+                        <span className="ml-auto flex items-center gap-md pl-md font-normal tabular-nums">
+                          {sum.aggReturnPct != null && (
+                            <span
+                              className={cn(
+                                "font-bold",
+                                sum.aggReturnPct > 0
+                                  ? "text-signal-up"
+                                  : sum.aggReturnPct < 0
+                                    ? "text-signal-down"
+                                    : "text-text-muted",
+                              )}
+                            >
+                              {T.groupSummaryReturn} {formatPct(sum.aggReturnPct)}
+                            </span>
+                          )}
+                          {(sum.wins > 0 || sum.losses > 0) && (
+                            <span className="text-text-muted">{T.groupWinLoss(sum.wins, sum.losses)}</span>
+                          )}
+                          {sum.running > 0 && (
+                            <span className="text-accent-vivid">{T.groupRunning(sum.running)}</span>
+                          )}
+                        </span>
+                      )}
+                    </button>
+                  </td>
+                </tr>
+                {expanded && <GroupColumnHeader />}
+                {expanded &&
+                  g.items.map((item) => (
+                    <WatchRow
+                      key={item.ticker}
+                      item={item}
+                      quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
+                      session={sessionByTicker.get(item.ticker) ?? null}
+                      warnings={warningsByTicker?.[item.ticker]}
+                      selected={selectedTicker === item.ticker}
+                      onSelect={onSelect}
+                      onStart={onStart}
+                      onRemove={() => onRemove(item.ticker)}
+                    />
+                  ))}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -448,7 +624,8 @@ function WatchRow({
 
   return (
     <>
-      <tr
+      <motion.tr
+        {...ROW_ENTER}
         onClick={() => {
           onSelect?.(item.ticker);
           setExpanded((v) => !v);
@@ -658,7 +835,7 @@ function WatchRow({
             </button>
           </div>
         </td>
-      </tr>
+      </motion.tr>
 
       {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
       {expanded ? (

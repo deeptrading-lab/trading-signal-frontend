@@ -139,6 +139,18 @@ export const INTRADAY_PAPER_COPY = {
     chartEmpty: "당일 분봉이 아직 없어요.",
     chartError: "분봉을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
     ordersNoSession: "모의 세션이 없어요 — 모의 시작을 누르면 여기에 체결이 기록돼요.",
+    /* 날짜별 그룹 헤더 — 세션 시작일 기준(오늘/어제/그 외 M/D) + 건수 + 당일 요약. */
+    groupToday: "오늘",
+    groupYesterday: "어제",
+    groupCount: (n: number) => `${n}건`,
+    groupToggleAria: (label: string) => `${label} 그룹 접기/펼치기`,
+    /* 당일 요약 — 합산 수익률 접두어 · 승/패 · 진행중. */
+    groupSummaryReturn: "합산",
+    groupWinLoss: (w: number, l: number) => `${w}승 ${l}패`,
+    groupRunning: (n: number) => `진행 ${n}`,
+    /* 전체 그룹 접기/펼치기 컨트롤. */
+    groupExpandAll: "모두 펼치기",
+    groupCollapseAll: "모두 접기",
   },
 
   /* 상세 시트 — 카드 클릭 시 체결 내역·거래별 손익. */
