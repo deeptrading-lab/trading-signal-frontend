@@ -9,6 +9,7 @@ import {
   evaluatePreGate,
   applyPostGate,
   deriveFromSignal,
+  deriveStructureEvent,
   deriveActionFromConviction,
   convictionEntryPositionPct,
   convictionToConfidence,
@@ -16,6 +17,7 @@ import {
   intradayEffort,
   toPaperTradingDecision,
 } from "../intradayCli";
+import type { IntradayFeatureRead } from "@/lib/signal/intradayFeatures";
 import type {
   IntradayContext,
   IntradayDecisionLlm,
@@ -138,6 +140,84 @@ describe("evaluatePreGate", () => {
       structureEvent: "전고 돌파 진행",
     });
     expect(evaluatePreGate(c, false, true).callLlm).toBe(false);
+  });
+  it("PR-3b 교차 이벤트(VWAP 재탈환 등)도 스킵을 뚫는다 — 단, 쿨다운이면 관통 차단", () => {
+    const c = ctx({
+      signal: signal({ action: "HOLD" }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+      structureEvent: "VWAP 재탈환 · 거래량 급증(z≥2)",
+    });
+    expect(evaluatePreGate(c, false).callLlm).toBe(true);
+    // 재진입 쿨다운은 evaluatePreGate 3번째 인자로 noNewEntry 에 합산 → pierce 차단.
+    const cooled = evaluatePreGate(c, false, true);
+    expect(cooled.noNewEntry).toBe(true);
+    expect(cooled.callLlm).toBe(false);
+  });
+});
+
+// ─── preGate 교차 트리거 파생 (PR-3b) ────────────────────────────────────────
+
+/** IntradayFeatureRead 빌더 — 이벤트 플래그만 뒤집어 트리거 파생을 검증. */
+function featuresStub(over: Partial<IntradayFeatureRead> = {}): IntradayFeatureRead {
+  return {
+    lastBars: [],
+    swing: {
+      lastSwingLow: null,
+      lastSwingHigh: null,
+      prevSwingLow: null,
+      prevSwingHigh: null,
+      lowBroken: false,
+      highBroken: false,
+      sequence: "혼조",
+    },
+    fib: null,
+    box: null,
+    day: null,
+    vwap: null,
+    openingRange: null,
+    momentum: { rsi: null, divergence: null, streak: 0 },
+    vwapReclaim: false,
+    orBreakout: false,
+    volumeZSurge: false,
+    ...over,
+  };
+}
+
+describe("deriveStructureEvent (preGate 교차 트리거 확장, PR-3b)", () => {
+  it("전고 돌파(기존 트리거) 라벨 유지", () => {
+    const f = featuresStub({ swing: { ...featuresStub().swing, highBroken: true } });
+    expect(deriveStructureEvent(f, 0)).toBe("전고 돌파 진행");
+  });
+  it("교차 이벤트 3종 각각 단독 라벨", () => {
+    expect(deriveStructureEvent(featuresStub({ vwapReclaim: true }), 0)).toBe("VWAP 재탈환");
+    expect(deriveStructureEvent(featuresStub({ orBreakout: true }), 1)).toBe(
+      "오프닝 레인지 상단 돌파",
+    );
+    expect(deriveStructureEvent(featuresStub({ volumeZSurge: true }), 0)).toBe("거래량 급증(z≥2)");
+  });
+  it("복수 동시 성립 → ' · ' 결합(스냅샷·프롬프트에 전부 남김)", () => {
+    const f = featuresStub({ vwapReclaim: true, volumeZSurge: true });
+    expect(deriveStructureEvent(f, 0)).toBe("VWAP 재탈환 · 거래량 급증(z≥2)");
+  });
+  it("약세 레짐(-1)이면 이벤트가 있어도 null — 사후 게이트가 매수를 죽이므로 트리거 안 침", () => {
+    const f = featuresStub({ vwapReclaim: true, orBreakout: true, volumeZSurge: true });
+    expect(deriveStructureEvent(f, -1)).toBeNull();
+  });
+  it("이벤트 없음·피처 null → null(스킵 최적화 유지)", () => {
+    expect(deriveStructureEvent(featuresStub(), 0)).toBeNull();
+    expect(deriveStructureEvent(null, 0)).toBeNull();
+  });
+  it("안전 불변식 — 트리거는 폴백(deriveFromSignal)에 관여하지 않는다: HOLD 신호면 HOLD 유지", () => {
+    const c = ctx({
+      signal: signal({ action: "HOLD" }),
+      structureEvent: "VWAP 재탈환 · 오프닝 레인지 상단 돌파",
+    });
+    expect(deriveFromSignal(c, false).action).toBe("HOLD");
+  });
+  it("안전 불변식 — 트리거로 LLM 이 BUY 를 내도 시장경보 사후 게이트가 그대로 강등(경보 우회 금지)", () => {
+    const c = ctx({ structureEvent: "VWAP 재탈환", warnings: [warn("LIQUIDATION_TRADING")] });
+    const { decision } = applyPostGate(buyLlm(), c, false);
+    expect(decision.action).toBe("HOLD");
   });
 });
 

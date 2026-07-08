@@ -16,6 +16,7 @@ import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/int
 import {
   extractIntradayFeatures,
   formatIntradayFeatures,
+  type IntradayFeatureRead,
 } from "@/lib/signal/intradayFeatures";
 import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
 import { atrAt, ATR_FALLBACK_TP_MULT, ATR_FALLBACK_SL_MULT } from "@/lib/signal/levels/atr";
@@ -190,6 +191,30 @@ function buildRecentBars(minuteCandles: StockMinuteCandle[], n = 5) {
   });
 }
 
+/**
+ * 매수 관심 구조 이벤트 — 결정론 시그널(4축)이 늦게 반응해도 셋업 순간엔 AI 에 묻는다
+ * (쌍바닥→돌파를 사전 게이트가 걸러버리던 커버리지 갭, 사용자 관찰 사례). 전고 돌파(기존)에
+ * PR-3b 교차 이벤트 3종(VWAP 재탈환·오프닝 레인지 상단 돌파·거래량 z≥2)을 추가 — 전부 교차
+ * 시맨틱(직전 마감봉에선 아니었고 이번 마감봉에서 처음 성립)이라 상태 지속 중 재발화하지
+ * 않는다(AC-13). 동시 성립 시 " · " 로 결합해 스냅샷·프롬프트에 전부 남긴다.
+ *
+ * 약세 레짐이면 어차피 사후 게이트가 매수를 차단하므로 트리거로 치지 않는다. 이 이벤트는
+ * evaluatePreGate 의 callLlm 스킵만 뚫는다 — noNewEntry(15:00+·손실킬·재진입 쿨다운)와
+ * 시장경보·사후 게이트는 그대로다(경보 우회 금지).
+ */
+export function deriveStructureEvent(
+  features: IntradayFeatureRead | null,
+  regime: RuleDirection,
+): string | null {
+  if (!features || regime === -1) return null;
+  const events: string[] = [];
+  if (features.swing.highBroken) events.push("전고 돌파 진행");
+  if (features.vwapReclaim) events.push("VWAP 재탈환");
+  if (features.orBreakout) events.push("오프닝 레인지 상단 돌파");
+  if (features.volumeZSurge) events.push("거래량 급증(z≥2)");
+  return events.length > 0 ? events.join(" · ") : null;
+}
+
 function buildContext(
   input: IntradayCliInput,
   signal: DecisionSignal,
@@ -203,11 +228,7 @@ function buildContext(
     profile.structureLookback,
   );
   const featuresText = formatIntradayFeatures(features);
-  // 매수 관심 구조 이벤트 — 결정론 시그널(4축)이 늦게 반응해도 전고 돌파 순간엔 AI 에 묻는다
-  // (쌍바닥→돌파를 사전 게이트가 걸러버리던 커버리지 갭, 사용자 관찰 사례). 약세 흐름이면
-  // 어차피 사후 게이트가 매수를 차단하므로 트리거로 치지 않는다.
-  const structureEvent =
-    features?.swing.highBroken && signal.regime !== -1 ? "전고 돌파 진행" : null;
+  const structureEvent = deriveStructureEvent(features, signal.regime);
   return {
     ticker: input.ticker,
     name: input.name,

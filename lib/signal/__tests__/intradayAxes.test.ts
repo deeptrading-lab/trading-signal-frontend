@@ -15,6 +15,7 @@ import {
   gradedConfidence,
   gradedVolumeAxis,
   gradedVwapAxis,
+  volumeZAt,
 } from "../intradayAxes";
 import { evaluateSignal } from "../engine";
 import { evaluateIntradaySignal } from "../intradayProfile";
@@ -101,6 +102,33 @@ describe("gradedVolumeAxis — log-거래량 z-score", () => {
   it("룩백 미달·균질 거래량(std=0)은 null — 레거시 축 유지", () => {
     expect(gradedVolumeAxis(minuteCandles(30, () => ({})))).toBeNull();
     expect(gradedVolumeAxis(minuteCandles(61, () => ({ volume: 1_000 })))).toBeNull();
+  });
+});
+
+// ─── volumeZAt 헬퍼 추출 회귀 (PR-3b — gradedVolumeAxis 산식 비트 동일) ───────
+
+describe("volumeZAt — z 산식 단일 추출(교차 트리거 공유)", () => {
+  it("gradedVolumeAxis 와 동일한 z — hit weight = min(z, 3), detail 문자열 일치", () => {
+    const candles = zCandles(1_500);
+    const z = volumeZAt(candles, candles.length - 1)!;
+    // 손검산 앵커: 700/1400 교대(log std≈0.346) 대비 1,500 → z≈1.198 (추출 전 산식과 동일).
+    expect(z).toBeCloseTo(1.198, 2);
+    const axis = gradedVolumeAxis(candles)!;
+    expect(axis.hits[0].weight).toBeCloseTo(Math.min(z, 3), 12);
+    expect(axis.hits[0].detail).toContain(`거래량 z ${z.toFixed(1)}`);
+  });
+
+  it("임의 마감봉 인덱스에서도 산출 — 자기 자신 제외 직전 40봉 창", () => {
+    // 60봉 뒤에 급증봉을 넣고 그 인덱스에서 직접 조회 — 마지막 봉이 아니어도 동일 산식.
+    const candles = minuteCandles(70, (i) => ({ volume: i === 55 ? 100_000 : i % 2 === 0 ? 700 : 1_400 }));
+    expect(volumeZAt(candles, 55)!).toBeGreaterThan(3);
+    expect(volumeZAt(candles, 54)!).toBeLessThan(2);
+  });
+
+  it("룩백 미달·범위 밖·균질 거래량은 null (gradedVolumeAxis 와 동일 가드)", () => {
+    expect(volumeZAt(minuteCandles(30, () => ({})), 29)).toBeNull(); // idx < 룩백(40)
+    expect(volumeZAt(minuteCandles(61, () => ({})), 61)).toBeNull(); // 범위 밖
+    expect(volumeZAt(minuteCandles(61, () => ({ volume: 1_000 })), 60)).toBeNull(); // std=0
   });
 });
 

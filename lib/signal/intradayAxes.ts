@@ -33,15 +33,14 @@ const VWAP_SIGMA_CAP = 2;
 const VWAP_MIN_BARS = 6;
 
 /**
- * 마지막 봉 log-거래량 z-score 축(0~100 graded).
- * 평균 이하 참여(z≤0)는 확인 신호 없음 — VOLUME_DRY 정보 hit(축 중립 유지, 기존 의미 동일).
- * 룩백 미달·분산 0(균질 거래량)이면 null — 레거시 이진 축 유지.
+ * 봉 `idx` 의 log-거래량 z-score — 직전 `VOLUME_Z_LOOKBACK` 봉(자기 자신 제외) 대비.
+ * `gradedVolumeAxis` 와 preGate 교차 트리거(volumeZSurge, PR-3b)가 공유하는 단일 z 산식 —
+ * 산식 중복 금지(임계·룩백이 갈라지면 트리거와 축이 다른 급증을 보게 된다).
+ * 룩백 미달·분산 0(균질 거래량)이면 null.
  */
-export function gradedVolumeAxis(candles: StockMinuteCandle[]): AxisScore | null {
-  const n = candles.length;
-  if (n < VOLUME_Z_LOOKBACK + 1) return null;
-  const last = candles[n - 1];
-  const window = candles.slice(n - 1 - VOLUME_Z_LOOKBACK, n - 1); // 직전 룩백(마지막 봉 제외)
+export function volumeZAt(candles: StockMinuteCandle[], idx: number): number | null {
+  if (idx < VOLUME_Z_LOOKBACK || idx >= candles.length) return null;
+  const window = candles.slice(idx - VOLUME_Z_LOOKBACK, idx); // 직전 룩백(해당 봉 제외)
 
   const logs = window.map((c) => Math.log1p(c.volume));
   const mean = logs.reduce((s, v) => s + v, 0) / logs.length;
@@ -51,7 +50,20 @@ export function gradedVolumeAxis(candles: StockMinuteCandle[]): AxisScore | null
   // (z 가 폭주해 가짜 포화 신호를 만든다) → 판정 불가로 취급.
   if (!(std > 1e-9)) return null;
 
-  const z = (Math.log1p(last.volume) - mean) / std;
+  return (Math.log1p(candles[idx].volume) - mean) / std;
+}
+
+/**
+ * 마지막 봉 log-거래량 z-score 축(0~100 graded).
+ * 평균 이하 참여(z≤0)는 확인 신호 없음 — VOLUME_DRY 정보 hit(축 중립 유지, 기존 의미 동일).
+ * 룩백 미달·분산 0(균질 거래량)이면 null — 레거시 이진 축 유지.
+ */
+export function gradedVolumeAxis(candles: StockMinuteCandle[]): AxisScore | null {
+  const n = candles.length;
+  const z = volumeZAt(candles, n - 1);
+  if (z == null) return null;
+  const last = candles[n - 1];
+  const window = candles.slice(n - 1 - VOLUME_Z_LOOKBACK, n - 1); // 직전 룩백(마지막 봉 제외)
   const avgVolume = window.reduce((s, c) => s + c.volume, 0) / window.length;
   const ratio = avgVolume > 0 ? last.volume / avgVolume : 0;
   const up = last.close >= last.open;
