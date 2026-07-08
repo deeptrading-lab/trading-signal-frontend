@@ -47,8 +47,13 @@ export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = 5;
 export const PAPER_TRADING_DAILY_LOSS_KILL_PCT = -3;
 /** 장 막판 강제 청산 시각(KST "HH:mm") — 단타는 오버나잇 보유 없음. */
 export const PAPER_TRADING_CLOSE_FLATTEN_HHMM = "15:20";
-/** 단타 warmup 전일 분봉 prefetch 거래일 수. */
-export const PAPER_TRADING_INTRADAY_PRIOR_DAYS = 1;
+/**
+ * 단타 warmup 전일 분봉 prefetch 거래일 수 — `INTRADAY_PRIOR_DAYS` env 로 조절(기본 3, 1~5).
+ * 3일 = graded 거래량 z-score(40봉 룩백)가 개장 직후부터 안정되게 하는 워밍업(PR-1b).
+ * ⚠️ 콜드캐시 첫 페치가 일수에 비례해 늘어난다(KIS 1분봉 30봉/콜) — `MARKET_DATA_SOURCE=toss`
+ *    (200봉/콜) 병행 권장. structureLookback(구조 룩백)은 별개 상수로 불변.
+ */
+export const PAPER_TRADING_INTRADAY_PRIOR_DAYS = envInt("INTRADAY_PRIOR_DAYS", 3, 1, 5);
 /**
  * 단타 가상 체결 거래 비용 — cli-agent 세션에만 적용(mock 무변경).
  * 위탁수수료 0.015%/편도 + 매도 제세금 0.15% + 슬리피지 0.05%/편도 ≈ 왕복 ~0.28%.

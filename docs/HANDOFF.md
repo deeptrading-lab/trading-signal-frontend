@@ -6971,6 +6971,50 @@
   - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
   - PR-3a: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지
 
+
+### 2026-07-08 — feat(signal): 단타 판단 고도화 PR-1b — graded 축(거래량 z-score·VWAP σ) + axisOverrides seam (#311)
+
+- **slug**: `intraday-graded-axes` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/311
+- **요약**: feat(signal): 단타 판단 고도화 PR-1b — graded 축(거래량 z-score·VWAP σ) + axisOverrides seam
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 시리즈 PRD `docs/prd/intraday-decision-overhaul.md` §3 PR-1b. 전수 감사의 핵심 원인 — **volume/volatility 이진 축이 만성 중립이라 동의도가 2/4=50%에 박제**(LLM이 '신뢰 부족'으로 읽어 전량 HOLD) — 를 연속값 축으로 해소한다.
+  > 
+  > ## 변경
+  > 
+  > - **엔진 seam**: `EvaluateOptions.axisOverrides` — composite 직전 축 교체(미지정/빈 객체 = 비트 동일, 일봉 경로 무접촉·무회귀 테스트 고정)
+  > - **`lib/signal/intradayAxes.ts` 신설**:
+  >   - volume = 직전 40봉 log-거래량 **z-score**(0~3 가중 = AXIS_SCALE 정렬, 레거시 `VOLUME_SURGE_*` 키는 1.5배 충족 시 병행 방출 → 트리거·attribution 호환)
+  >   - volatility = 당일 **VWAP σ-거리**(0~2 가중, 추세확인형 — 평균회귀 밴드터치는 과거 백테스트 역예측이라 교체)
+  >   - 산출 불가(룩백 미달·σ=0)면 null → 레거시 축 유지 (엡실론 가드 포함)
+  > - **graded 동의도**: 동의 축 비율 → 축 기울기 가중평균(0~1), limitedData 0.6 캡 재적용
+  > - **`BacktestOptions.evaluate` 훅**: 하네스(diag·live)가 라이브와 같은 `evaluateIntradaySignal` 사용 — 정적 opts로는 봉마다 동적인 graded 축 표현 불가(A/B 측정 전제)
+  > - **PRIOR_DAYS 1→3** (`INTRADAY_PRIOR_DAYS` env): z-score 워밍업용. structureLookback 불변. 콜드캐시 페치 증가 유의(toss 병행 권장)
+  > 
+  > ## 오프라인 A/B (12종목 fixtures, RUN_INTRADAY_DIAG=1)
+  > 
+  > | 지표 | legacy | graded |
+  > |---|---|---|
+  > | volatility 축 비중립 | 12% (sd 4.7) | **95% (sd 27.6)** |
+  > | volume 축 비중립 | 18% | **44%** |
+  > | 동의도 0.5 박제 비율 | 70% | **5%** |
+  > | 15분봉 trig 적중/PF/평균 | 38.3% / 0.86 / −0.125% | **41.8% / 0.98 / −0.018%** |
+  > | 5분봉 everyBar 적중/PF | 36.9% / 0.66 | 37.4% / 0.63 |
+  > | 3분봉 trig 적중 | 35.6% | 37.1% |
+  > 
+  > → **박제 해소 목표 달성**(AC-8), 거래 지표 무회귀(15분봉 개선). 게이트 수치는 참고 지표(PRD §6 — 엣지 증명이 목표 아님).
+  > 
+  > ## ⚠️ 행동 변경
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
+  - PR-3a: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지
+  - PR-4: 장중 실검증 — graded 축의 preGate 스킵률·LLM 콜 볼륨 실측
+
+
 ### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-2 — 틱 자가채점 루프(intraday_tick_labels) + 캘리브레이션 패널 (#314)
 
 - **slug**: `intraday-tick-labels` · **author**: @HY0118

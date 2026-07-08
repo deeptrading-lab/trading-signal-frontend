@@ -14,7 +14,8 @@ import { backtest, type BacktestOptions } from "@/lib/signal/backtest/run";
 import { computeMetrics } from "@/lib/signal/backtest/metrics";
 import { computeAttribution } from "@/lib/signal/backtest/attribution";
 import { resampleMinuteCandles } from "@/lib/api/kis/minuteChartChunked";
-import { resolveIntradayProfile } from "@/lib/signal/intradayProfile";
+import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
+import { evaluateSignal } from "@/lib/signal/engine";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type { BacktestTrade, BacktestMetrics } from "@/lib/types/signal";
 
@@ -90,10 +91,62 @@ describe.skipIf(!ENABLED)("분봉 게이트 진단(오프라인 스윕)", () => 
       console.log(fmt("ATR barrier(c0.4)", computeMetrics(pooledTrades(byTicker, tf, {
         signal: signalOpts(tf, false), barrier: atrBarrier(tf), entry: { mode: "trigger", cooldownDays: COOLDOWN_BARS }, costPct: 0.4,
       }))));
+      // 4b) graded 축(evaluate 훅 = 라이브 evaluateIntradaySignal, regime 0=veto 없음) — PR-1b A/B.
+      console.log(fmt("graded trig(c0.4)", computeMetrics(pooledTrades(byTicker, tf, {
+        evaluate: (slice) => evaluateIntradaySignal(slice, tf, 0),
+        barrier: structureBarrier(tf), entry: { mode: "trigger", cooldownDays: COOLDOWN_BARS }, costPct: 0.4,
+      }))));
+      console.log(fmt("graded every(c0.4)", computeMetrics(pooledTrades(byTicker, tf, {
+        evaluate: (slice) => evaluateIntradaySignal(slice, tf, 0),
+        barrier: structureBarrier(tf), entry: { mode: "everyBar" }, costPct: 0.4,
+      }))));
       // 5) 롱/숏 분리 — gross 엣지가 방향 편향(down 샘플 숏)인지 확인. gross(c0)로 봐야 방향 효과가 보임.
       const base = pooledTrades(byTicker, tf, trigStruct(0, false));
       console.log(fmt("  └ LONG only(gross)", computeMetrics(base.filter((t) => t.action === "BUY"))));
       console.log(fmt("  └ SHORT only(gross)", computeMetrics(base.filter((t) => t.action === "SELL"))));
+    }
+
+    // 4c) 축 분산 — legacy vs graded 의 volume/volatility 축점수 표준편차·비중립 비율(50 박제 해소 증명).
+    {
+      const tf = 5;
+      const profile = resolveIntradayProfile(tf);
+      const legacyScores: Record<string, number[]> = { volume: [], volatility: [] };
+      const gradedScores: Record<string, number[]> = { volume: [], volatility: [] };
+      const legacyConf: number[] = [];
+      const gradedConf: number[] = [];
+      for (const ticker of TICKERS) {
+        const oneMin = byTicker[ticker];
+        if (!oneMin) continue;
+        const candles = resampleMinuteCandles(oneMin, tf);
+        for (let i = profile.minBars; i < candles.length; i += 5) {
+          const slice = candles.slice(0, i + 1);
+          const legacy = evaluateSignal(slice, {
+            indicators: profile.indicators, softMinBars: profile.softMinBars, minBars: profile.minBars, regimeFilter: false,
+          });
+          const graded = evaluateIntradaySignal(slice, tf, 0);
+          for (const axis of ["volume", "volatility"] as const) {
+            legacyScores[axis].push(legacy.axes.find((a) => a.axis === axis)?.score ?? 50);
+            gradedScores[axis].push(graded.axes.find((a) => a.axis === axis)?.score ?? 50);
+          }
+          legacyConf.push(legacy.confidence);
+          gradedConf.push(graded.confidence);
+        }
+      }
+      const stat = (xs: number[]) => {
+        const mean = xs.reduce((s, v) => s + v, 0) / Math.max(xs.length, 1);
+        const sd = Math.sqrt(xs.reduce((s, v) => s + (v - mean) ** 2, 0) / Math.max(xs.length, 1));
+        const nonNeutral = xs.filter((v) => Math.abs(v - 50) > 1).length / Math.max(xs.length, 1);
+        return `sd ${sd.toFixed(1)} | 비중립 ${(nonNeutral * 100).toFixed(0)}%`;
+      };
+      console.log(`\n========== 5분 축 분산 (legacy vs graded, n=${legacyConf.length}) ==========`);
+      console.log(`  volume     legacy: ${stat(legacyScores.volume)}  →  graded: ${stat(gradedScores.volume)}`);
+      console.log(`  volatility legacy: ${stat(legacyScores.volatility)}  →  graded: ${stat(gradedScores.volatility)}`);
+      const confStat = (xs: number[]) => {
+        const mean = xs.reduce((s, v) => s + v, 0) / Math.max(xs.length, 1);
+        const pinned = xs.filter((v) => Math.abs(v - 0.5) < 0.01).length / Math.max(xs.length, 1);
+        return `평균 ${mean.toFixed(2)} | 0.5박제 ${(pinned * 100).toFixed(0)}%`;
+      };
+      console.log(`  동의도     legacy: ${confStat(legacyConf)}  →  graded: ${confStat(gradedConf)}`);
     }
 
     // 5) attribution — 5분 base(net0.4), 풀링. 룰별 예측력(적중률 오름차순=역예측 먼저).

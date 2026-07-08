@@ -200,9 +200,16 @@ export async function createPaperTradingSession(
   return toDetail(entry);
 }
 
-export async function patchPaperTradingSessionStatus(
+/**
+ * 세션 부분 수정 — 상태 전환 및/또는 판단 주기 변경. 주기는 세션 중에도 바꿀 수 있고, 다음 틱 창
+ * 계산이 `session.tickIntervalMinutes` 를 매번 읽으므로 **다음 틱부터 자동 반영**된다(스케줄러 무변경).
+ */
+export async function patchPaperTradingSession(
   sessionId: string,
-  status: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">,
+  patch: {
+    status?: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">;
+    tickIntervalMinutes?: number;
+  },
 ): Promise<PaperTradingSessionDetail | null> {
   await ensureHydrated();
   const entry = getStore().sessions.get(sessionId);
@@ -212,8 +219,15 @@ export async function patchPaperTradingSessionStatus(
   const now = new Date().toISOString();
   entry.session = {
     ...entry.session,
-    status,
-    endedAt: status === "completed" ? now : entry.session.endedAt,
+    ...(patch.status !== undefined
+      ? {
+          status: patch.status,
+          endedAt: patch.status === "completed" ? now : entry.session.endedAt,
+        }
+      : {}),
+    ...(patch.tickIntervalMinutes !== undefined
+      ? { tickIntervalMinutes: patch.tickIntervalMinutes }
+      : {}),
     updatedAt: now,
   };
   void persistPaperSession(entry.session, entry.positions);
@@ -224,6 +238,14 @@ export async function patchPaperTradingSessionStatus(
     scheduleSessionTickLabeling(entry.session, [...entry.ticks]);
   }
   return toDetail(entry);
+}
+
+/** 상태만 전환(스케줄러 자동 완료 등 기존 호출부 호환 래퍼). */
+export async function patchPaperTradingSessionStatus(
+  sessionId: string,
+  status: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">,
+): Promise<PaperTradingSessionDetail | null> {
+  return patchPaperTradingSession(sessionId, { status });
 }
 
 export async function runPaperTradingSessionTick(
