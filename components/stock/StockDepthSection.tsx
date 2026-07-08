@@ -15,7 +15,9 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils/cn";
+import { DURATION, EASE } from "@/lib/motion/tokens";
 import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
 import { SegmentedTabs } from "@/components/analyze/SegmentedTabs";
@@ -39,6 +41,7 @@ export function StockDepthSection({
   className?: string;
 }) {
   const isUltraWide = useMediaQuery(PEEK_DOCK_QUERY);
+  const reduced = useReducedMotion();
   const [tab, setTab] = useState<DepthTab>("orderbook");
 
   if (isUltraWide) {
@@ -50,12 +53,23 @@ export function StockDepthSection({
           onChange={setTab}
           ariaLabel={`${ORDERBOOK_COPY.title} · ${TRADES_COPY.title}`}
         />
-        {/* 활성 탭만 마운트 — 비활성 패널 폴링 정지. 헤더는 탭이 라벨링하므로 숨김. */}
-        {tab === "orderbook" ? (
-          <OrderbookPanel ticker={ticker} variant="full" hideHeader />
-        ) : (
-          <TradeStrengthPanel ticker={ticker} variant="full" hideHeader />
-        )}
+        {/* 활성 탭만 마운트 — 비활성 패널 폴링 정지. 헤더는 탭이 라벨링하므로 숨김.
+            전환은 짧은 크로스페이드(mode="wait" — 이전 패널이 사라진 뒤 새 패널 진입, 레이아웃 튐 없음). */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            initial={reduced ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+            transition={{ duration: DURATION.fast, ease: EASE.standard }}
+          >
+            {tab === "orderbook" ? (
+              <OrderbookPanel ticker={ticker} variant="full" hideHeader />
+            ) : (
+              <TradeStrengthPanel ticker={ticker} variant="full" hideHeader />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }
