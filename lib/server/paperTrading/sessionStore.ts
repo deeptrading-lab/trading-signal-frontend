@@ -13,6 +13,7 @@ import {
   persistPaperTick,
 } from "@/lib/server/paperTrading/persistence";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
+import { scheduleSessionTickLabeling } from "@/lib/server/intraday/tickLabels";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
   CreatePaperTradingSessionRequest,
@@ -207,6 +208,7 @@ export async function patchPaperTradingSessionStatus(
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
 
+  const wasCompleted = entry.session.status === "completed";
   const now = new Date().toISOString();
   entry.session = {
     ...entry.session,
@@ -215,6 +217,12 @@ export async function patchPaperTradingSessionStatus(
     updatedAt: now,
   };
   void persistPaperSession(entry.session, entry.positions);
+  // 틱 자가채점(intraday-decision-overhaul PR-2) — 완료 **전이** 시 그날 분봉으로 라벨링.
+  // 마감 스윕(tickScheduler)·수동 PATCH 모두 이 함수를 지나므로 여기 한 곳이 완료 훅의 choke point.
+  // fire-and-forget + 내부 never-throw — 모의투자 흐름을 절대 막지 않는다(관측 전용).
+  if (status === "completed" && !wasCompleted) {
+    scheduleSessionTickLabeling(entry.session, [...entry.ticks]);
+  }
   return toDetail(entry);
 }
 
