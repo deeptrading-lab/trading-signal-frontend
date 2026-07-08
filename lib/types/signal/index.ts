@@ -119,6 +119,13 @@ export type EvaluateOptions = {
    * 문제를 막는다. 미지정 시 `HIGHER_LOW_LOOKBACK`(30).
    */
   trendHigherLowLookback?: number;
+  /**
+   * 축 대체 주입 — 인트라데이 graded 축(거래량 z-score·VWAP σ-거리)이 이진 임계 축
+   * (volume/volatility)을 composite **직전**에 교체한다(PRD intraday-decision-overhaul PR-1b).
+   * 점수·액션·동의도가 교체 축으로 계산되고 `axes` 로도 교체본이 반환된다.
+   * 미지정/빈 객체 = 비트 동일(무회귀) — 일봉 경로는 사용하지 않는다.
+   */
+  axisOverrides?: Partial<Record<AxisKey, AxisScore>>;
 };
 
 // ───────────────────────── 백테스트 ─────────────────────────
