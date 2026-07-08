@@ -252,6 +252,16 @@ export const queryConfig = {
       gcTime: 30 * MINUTE,
     },
   },
+  intraday: {
+    /**
+     * 틱 자가채점 라벨 집계 — 라벨링 실행/세션 완료 시에만 변한다. 실행 후 invalidate 가
+     * 갱신을 담당하므로 staleTime 은 넉넉히(scorecard summary 와 동일 정책).
+     */
+    tickLabelSummary: {
+      staleTime: 5 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
+  },
   paperTrading: {
     // perf: 5s→30s 상향 — 페이퍼트레이딩 세션은 틱이 분 단위라 5s 폴링 stale 재검증은 과함.
     sessions: {
