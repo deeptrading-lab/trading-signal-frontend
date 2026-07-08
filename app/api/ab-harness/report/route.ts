@@ -4,7 +4,8 @@
  * 분석 실행(POST /api/stock/ai-analysis)과 달리 Vercel 가드 없음(읽기만).
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireAdminApi } from "@/lib/server/auth/apiGuard";
 import { compareSession } from "@/lib/server/ai/abHarness/compare";
 import {
   jsonWithDataSource,
@@ -12,7 +13,11 @@ import {
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
-export async function GET(req: Request): Promise<Response> {
+export async function GET(req: NextRequest): Promise<Response> {
+  // A/B 토큰·비용 진단은 dev/ops 전용 — admin+ 무조건 요구.
+  const denied = await requireAdminApi(req);
+  if (denied) return denied;
+
   const session = new URL(req.url).searchParams.get("session")?.trim();
   if (!session) {
     return NextResponse.json(

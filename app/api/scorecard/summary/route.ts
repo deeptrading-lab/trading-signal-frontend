@@ -8,7 +8,8 @@
  * - Vercel 가드 없음 → prod 동작(분석 실행만 로컬 전용). 미설정이면 configured:false + 빈 집계.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   getAllScorecardRows,
   isScorecardStoreConfigured,
@@ -24,7 +25,11 @@ import type { ScorecardSummaryResponse } from "@/lib/types/scorecard/scorecard";
 
 const FALLBACK_TIMEOUT_MESSAGE = "채점 집계 조회가 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+  // 성적표는 admin 전용(환경 무관) — /dashboard/scorecard 페이지 게이트와 정합.
+  const denied = await requireAdminApi(request);
+  if (denied) return denied;
+
   const configured = isScorecardStoreConfigured();
   if (!configured) {
     const payload: ScorecardSummaryResponse = {

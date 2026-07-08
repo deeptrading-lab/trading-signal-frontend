@@ -6,7 +6,8 @@
  * - 데이터 소량이라 SQL view/RPC 대신 BFF 에서 JS group-by.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   getAgentUsageRows,
   type AgentUsageRecord,
@@ -57,7 +58,11 @@ function buildSummary(rows: AgentUsageRecord[]): AgentUsageSummary {
   };
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+  // 토큰 사용량·비용 대시보드(/analyze) — 운영정보라 prod 만 admin+(로컬 전체).
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   try {
     const rows = await withTimeout(getAgentUsageRows(ROW_LIMIT), 5_000);
     if (rows === null) {

@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   PAPER_TRADING_DEFAULT_INITIAL_CASH,
 } from "@/lib/server/paperTrading/constants";
@@ -14,7 +15,11 @@ import type {
   PaperTradingSessionsResponse,
 } from "@/lib/types/paperTrading/paperTrading";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+  // 단타(모의투자) 세션 원장 — prod 만 admin+(로컬 전체), /intraday 페이지 게이트와 정합.
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   const payload: PaperTradingSessionsResponse = {
     sessions: await listPaperTradingSessions(),
     generatedAt: new Date().toISOString(),
@@ -22,7 +27,10 @@ export async function GET(): Promise<Response> {
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   try {
     const body = (await request.json()) as Partial<CreatePaperTradingSessionRequest>;
     const validation = validateCreateSessionRequest(body);
