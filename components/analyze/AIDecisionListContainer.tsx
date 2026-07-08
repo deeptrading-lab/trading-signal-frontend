@@ -30,7 +30,6 @@ import {
   RESULTS_SEARCH_EMPTY_BODY,
   RESULTS_SEARCH_EMPTY_TITLE,
   RESULTS_SEARCH_PLACEHOLDER,
-  resultsCount,
   USAGE_REFRESH,
   USAGE_RETRY,
 } from "@/lib/copy/analyze/labels";
@@ -122,11 +121,10 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
 
   return (
     <div className="flex flex-col gap-md">
-      {/* 개수 + 새로고침 — 탭 줄 우측 슬롯으로 portal(검색 필터 반영 개수 유지). 모바일은 아이콘만. */}
+      {/* 새로고침 — 탭 줄 우측 슬롯으로 portal. (종목 개수 표기는 제거 — 불필요, 사용자 요청.) */}
       {toolbarSlot &&
         createPortal(
           <>
-            <span className="text-caption text-text-muted">{resultsCount(filtered.length + filteredInflight.length)}</span>
             {/* 새로고침 — 모바일은 셸 공통 pull-to-refresh 로 대체하고 숨긴다. PC(md+)만 버튼 유지. */}
             <button
               type="button"

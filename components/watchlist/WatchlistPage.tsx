@@ -46,22 +46,23 @@ export function WatchlistPage({
 }: WatchlistPageProps) {
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
-      <div className="flex items-center gap-sm">
-        {/* 페이지 타이틀 — 모바일은 하단 탭이 현재 화면을 알려주므로 시각 숨김(문서 아웃라인용 h1 유지),
-         *  데스크탑(md+)에서만 노출. 새로고침 버튼은 그대로 유지. */}
-        <h1 className="sr-only md:not-sr-only inline-flex items-center gap-sm text-h2 text-text-strong">
+      {/* 문서 아웃라인용 접근성 제목(홈과 동일 — 항상 sr-only, absolute 라 flex 슬롯 없음).
+       *  이로써 모바일에서 검색이 홈처럼 상단 패딩에 바로 붙어 페이지 간 상단 여백이 통일된다. */}
+      <h1 className="sr-only">{WATCHLIST_PAGE_TITLE}</h1>
+      {/* 시각 헤더(제목 + 새로고침) — md+ 에서만 렌더(모바일은 빈 행이 상단 여백을 밀지 않게 미렌더).
+       *  모바일 새로고침은 pull-to-refresh(셸 공통)로 대체. */}
+      <div className="hidden md:flex items-center gap-sm">
+        <span className="inline-flex items-center gap-sm text-h2 text-text-strong">
           <Star
             className="h-5 w-5 text-chart-signal fill-chart-signal"
             aria-hidden="true"
           />
           {WATCHLIST_PAGE_TITLE}
-        </h1>
-        {/* 새로고침 버튼 — 모바일은 pull-to-refresh(위→아래 드래그, 셸 공통)로 대체하고 숨긴다.
-            PC(md+)는 터치 제스처가 없어 버튼 유지. */}
+        </span>
         {canRefresh ? (
           <button
             type="button"
-            className="ml-auto hidden md:inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
+            className="ml-auto inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
