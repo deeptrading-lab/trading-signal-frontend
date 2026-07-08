@@ -89,6 +89,8 @@ export function AIAnalysisPanel({
     isRunning || final != null || agents.some((a) => a.status !== "pending");
   // 재열기 트레이 헤더 배지 — 진행 중(running) 슬롯 수.
   const runningTabCount = tabs.filter((t) => t.isRunning).length;
+  // 재열기 트레이 hover — 핀 ↔ 상세 카드 부드러운 전환(카드는 비호버 시 언마운트=오프스크린 스크롤 방지).
+  const [trayHover, setTrayHover] = useState(false);
   const shouldLoadPreviousDecision = isOpen && isAllPending && !isRunning && !error;
   const {
     data: previousDecisionData,
@@ -157,15 +159,20 @@ export function AIAnalysisPanel({
             animate={{ x: 0 }}
             exit={{ x: 64 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="group fixed right-0 top-1/2 -translate-y-1/2 z-[70]"
+            className="fixed right-0 top-1/2 -translate-y-1/2 z-[70]"
+            onMouseEnter={() => setTrayHover(true)}
+            onMouseLeave={() => setTrayHover(false)}
           >
-            {/* 컴팩트 핀(기본) — hover 시 숨김. 클릭/터치 시 분석 패널 열기(키보드 접근 폴백).
-                AI 시그니처 — 재열기 핀은 gradient-ai 정체성을 유지(브랜드 강조 지점). */}
+            {/* 컴팩트 핀(기본) — hover 시 페이드아웃하며 상세 카드로 부드럽게 전환. 클릭/터치 시 패널 열기.
+                AI 시그니처 — gradient-ai 정체성 유지(브랜드 강조 지점). 반경 lg(과한 라운드 완화). */}
             <button
               type="button"
               onClick={() => open()}
               aria-label={COPY.panel.reopenPin(tabs.length)}
-              className="gradient-ai-bg flex flex-col items-center gap-1 rounded-l-xl px-sm py-md shadow-overlay transition hover:brightness-110 cursor-pointer group-hover:hidden"
+              className={cn(
+                "gradient-ai-bg flex flex-col items-center gap-1 rounded-l-lg px-sm py-md shadow-overlay cursor-pointer transition-opacity duration-150",
+                trayHover ? "opacity-0 pointer-events-none" : "opacity-100 hover:brightness-110",
+              )}
             >
               {runningTabCount > 0
                 ? <Loader2 size={16} className="animate-spin" />
@@ -179,64 +186,76 @@ export function AIAnalysisPanel({
               <span className="text-caption font-bold tabular-nums leading-none px-1.5 py-0.5 rounded-pill bg-surface/20">{tabs.length}</span>
             </button>
 
-            {/* 상세 카드(hover) — 헤더 + 종목별 행. 떠있는 면 → surface-elevated + overlay 그림자. */}
-            <div
-              role="group"
-              aria-label={COPY.panel.title}
-              className="hidden w-52 max-h-[70vh] overflow-y-auto rounded-l-xl border border-r-0 border-border-line bg-surface-elevated shadow-overlay group-hover:block"
-            >
-              {/* 트레이 헤더 — 라벨 + 진행 중 개수 배지 */}
-              <div className="flex items-center gap-1.5 px-md py-sm border-b border-border-line">
-                <Sparkles size={13} className="text-accent-vivid" />
-                <span className="text-caption font-bold text-text-muted">{COPY.panel.title}</span>
-                {runningTabCount > 0 && (
-                  <span className="ml-auto text-caption font-bold tabular-nums px-1.5 py-0.5 rounded-pill bg-accent-vivid-soft text-accent-vivid">
-                    {runningTabCount}
-                  </span>
-                )}
-              </div>
+            {/* 상세 카드(hover) — 우측에서 슬라이드+페이드로 나오며 종목명 노출. 비호버 시 언마운트
+                (오프스크린 카드 상시 렌더로 인한 가로스크롤 방지). 세로 중앙 정렬은 래퍼가, 슬라이드는 내부가. */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <AnimatePresence>
+                {trayHover && (
+                  <motion.div
+                    key="reopen-card"
+                    role="group"
+                    aria-label={COPY.panel.title}
+                    initial={{ opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 24 }}
+                    transition={{ type: "spring", damping: 26, stiffness: 260 }}
+                    className="w-52 max-h-[70vh] overflow-y-auto rounded-l-lg border border-r-0 border-border-line bg-surface-elevated shadow-overlay"
+                  >
+                    {/* 트레이 헤더 — 라벨 + 진행 중 개수 배지 */}
+                    <div className="flex items-center gap-1.5 px-md py-sm border-b border-border-line">
+                      <Sparkles size={13} className="text-accent-vivid" />
+                      <span className="text-caption font-bold text-text-muted">{COPY.panel.title}</span>
+                      {runningTabCount > 0 && (
+                        <span className="ml-auto text-caption font-bold tabular-nums px-1.5 py-0.5 rounded-pill bg-accent-vivid-soft text-accent-vivid">
+                          {runningTabCount}
+                        </span>
+                      )}
+                    </div>
 
-              {/* 행 목록 */}
-              <div className="py-1">
-                {tabs.map((t) => (
-                  <div key={t.ticker} className="group/row relative">
-                    <button
-                      type="button"
-                      onClick={() => switchTab(t.ticker)}
-                      aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
-                      className="flex w-full items-center gap-sm px-md py-sm text-left transition-colors hover:bg-surface-muted cursor-pointer"
-                    >
-                      {t.isRunning
-                        ? <Loader2 size={14} className="shrink-0 animate-spin text-accent-vivid" />
-                        : <Sparkles size={14} className="shrink-0 text-accent-vivid" />
-                      }
-                      <span className="min-w-0 flex-1 truncate text-body-sm-strong text-text-strong">
-                        {t.name ?? t.ticker}
-                      </span>
-                      {/* 진행수 — 비실행(닫기 ×) 행은 hover 시 페이드아웃해 ×에 자리를 내준다. */}
-                      <span
-                        className={cn(
-                          "shrink-0 text-caption font-bold tabular-nums text-text-muted",
-                          !t.isRunning && "transition-opacity group-hover/row:opacity-0",
-                        )}
-                      >
-                        {t.doneCount}/{t.agentCount}
-                      </span>
-                    </button>
-                    {/* 닫기 × — 비실행(완료/에러) 슬롯만. 진행수 자리에 hover 시 노출. */}
-                    {!t.isRunning && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
-                        aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-surface-muted hover:text-text-strong cursor-pointer"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    {/* 행 목록 */}
+                    <div className="py-1">
+                      {tabs.map((t) => (
+                        <div key={t.ticker} className="group/row relative">
+                          <button
+                            type="button"
+                            onClick={() => switchTab(t.ticker)}
+                            aria-label={COPY.panel.reopen(t.name ?? t.ticker)}
+                            className="flex w-full items-center gap-sm px-md py-sm text-left transition-colors hover:bg-surface-muted cursor-pointer"
+                          >
+                            {t.isRunning
+                              ? <Loader2 size={14} className="shrink-0 animate-spin text-accent-vivid" />
+                              : <Sparkles size={14} className="shrink-0 text-accent-vivid" />
+                            }
+                            <span className="min-w-0 flex-1 truncate text-body-sm-strong text-text-strong">
+                              {t.name ?? t.ticker}
+                            </span>
+                            {/* 진행수 — 비실행(닫기 ×) 행은 hover 시 페이드아웃해 ×에 자리를 내준다. */}
+                            <span
+                              className={cn(
+                                "shrink-0 text-caption font-bold tabular-nums text-text-muted",
+                                !t.isRunning && "transition-opacity group-hover/row:opacity-0",
+                              )}
+                            >
+                              {t.doneCount}/{t.agentCount}
+                            </span>
+                          </button>
+                          {/* 닫기 × — 비실행(완료/에러) 슬롯만. 진행수 자리에 hover 시 노출. */}
+                          {!t.isRunning && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); dismissSlot(t.ticker); }}
+                              aria-label={COPY.panel.dismissTab(t.name ?? t.ticker)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-surface-muted hover:text-text-strong cursor-pointer"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         )}
