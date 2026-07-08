@@ -36,8 +36,9 @@ import type {
   ProfileMenuKey,
 } from "@/lib/types/profile/menuItems";
 
-/** 관리자 메뉴로 분리할 항목(admin 이상만) — 신호 성적표·AI 모의투자는 운영 도구라 일반 유저 미노출. */
-const ADMIN_ONLY_KEYS = new Set<ProfileMenuKey>(["SCORECARD", "PAPER_TRADING"]);
+/** 관리자 메뉴로 분리할 항목(admin 이상만) — 신호 성적표는 운영 도구라 일반 유저 미노출.
+ *  (AI 모의투자는 은퇴 — 단타 /intraday 로 일원화.) */
+const ADMIN_ONLY_KEYS = new Set<ProfileMenuKey>(["SCORECARD"]);
 
 export default async function ProfileRoutePage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;

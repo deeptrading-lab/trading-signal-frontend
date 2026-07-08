@@ -23,12 +23,8 @@ export const PROFILE_MENU_ITEMS_MOCK: ProfileMenuItems = [
     variant: "default",
     href: "/dashboard/scorecard",
   },
-  {
-    key: "PAPER_TRADING",
-    iconName: "Bot",
-    variant: "default",
-    href: "/dashboard/paper-trading",
-  },
+  // AI 모의투자(PAPER_TRADING) 메뉴는 은퇴 — 단타(/intraday)가 세션 단일 소스가 되어 목록·상세를
+  // 모두 담당(상세는 /intraday/[sessionId]). 프로필 메뉴에서 제거.
   { key: "LOGOUT", iconName: "LogOut", variant: "danger" },
 ];
 
