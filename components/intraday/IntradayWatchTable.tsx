@@ -11,6 +11,7 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { ChevronDown, ExternalLink, History, Loader2, Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
@@ -102,10 +103,20 @@ function daySummary(
   };
 }
 
+/** 펼침 시 행 진입 애니(페이드+살짝 아래로 슬라이드). 마운트 시 1회 — 폴링 리렌더엔 재발화 안 함. */
+const ROW_ENTER = {
+  initial: { opacity: 0, y: -4 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
+} as const;
+
 /** 그룹 내부 컬럼 헤더 행 — 날짜를 펼쳤을 때 그 그룹 안에 표시(전역 thead 대신 그룹별). */
 function GroupColumnHeader() {
   return (
-    <tr className="border-b border-border-line text-caption text-text-muted">
+    <motion.tr
+      {...ROW_ENTER}
+      className="border-b border-border-line text-caption text-text-muted"
+    >
       <th className="py-sm pl-lg pr-md text-left font-normal">{T.colStock}</th>
       <th className="py-sm pr-md text-right font-normal">{T.colPrice}</th>
       <th className="py-sm pr-md text-right font-normal">{T.colChange}</th>
@@ -120,7 +131,7 @@ function GroupColumnHeader() {
       <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
       <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
       <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
-    </tr>
+    </motion.tr>
   );
 }
 
@@ -613,7 +624,8 @@ function WatchRow({
 
   return (
     <>
-      <tr
+      <motion.tr
+        {...ROW_ENTER}
         onClick={() => {
           onSelect?.(item.ticker);
           setExpanded((v) => !v);
@@ -823,7 +835,7 @@ function WatchRow({
             </button>
           </div>
         </td>
-      </tr>
+      </motion.tr>
 
       {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
       {expanded ? (
