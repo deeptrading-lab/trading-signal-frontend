@@ -1,15 +1,15 @@
 /**
- * 루트 proxy — 앱 전체 단일 공유 비밀번호 게이트 (Edge 런타임).
+ * 루트 proxy — 앱 전체 Google 로그인 게이트 (Edge 런타임).
  *
  * Next 16: `middleware` 파일 컨벤션이 `proxy` 로 리네임됨(동작·Edge 런타임 동일).
  * 파일명 `proxy.ts` + named export `proxy` + `config` matcher 유지.
  *
- * PRD `app-password-gate` §3.1 / AC-1~4 / AC-13, `user-login-auth` §3.6 / AC-4·5·15:
- *   - 게이트 활성 조건: **(OAuth 구성) 또는 (APP_PASSWORD 설정)**. 둘 다 미설정이면 통과(앱 공개, dev 무마찰).
- *     `NODE_ENV==="production"` + 둘 다 미설정이면 경고 로그 1회(모듈 로드 시점, 요청마다 스팸 금지).
- *   - 세션 쿠키(`app_auth`) 를 `verifySession`(HMAC + exp) 으로 검증. 유효하면 통과.
- *     ⚠️ 판정은 boolean `verifySession` 만 — **네트워크 I/O·role 조회 0**(AC-15). 신원 세션(v=2)도
- *     비밀번호 세션(v=1)도 유효 서명+미만료면 통과(폴백 공존, AC-5). role 방어는 각 라우트가 담당.
+ * PRD `user-login-auth` §3.6 / AC-4·5·15 (비밀번호 로그인 폐지 — Google 전용):
+ *   - 게이트 활성 조건: **OAuth(Google) 구성**. 미설정이면 통과(앱 공개, dev 무마찰).
+ *     `NODE_ENV==="production"` + 미설정이면 경고 로그 1회(모듈 로드 시점, 요청마다 스팸 금지).
+ *   - 세션 쿠키(`app_auth`) 를 `verifySession`(HMAC + exp + v=2) 으로 검증. 유효하면 통과.
+ *     ⚠️ 판정은 boolean `verifySession` 만 — **네트워크 I/O·role 조회 0**(AC-15). 신원 세션(v=2)만
+ *     유효(과거 비밀번호 v=1 세션은 거부 → 재로그인 강제). role 방어는 각 라우트가 담당.
  *   - 미인증 분기:
  *       · 페이지 → `/login?next=<원경로>` 307 리다이렉트(next 는 same-origin 절대경로만, open-redirect 차단).
  *       · `/api/*`(인증 API 제외) → 401 JSON `{ error: "unauthorized" }`(리다이렉트 X, axios 친화).
@@ -126,13 +126,16 @@ function isOAuthConfigured(): boolean {
   );
 }
 
-/** 게이트 활성 = (OAuth 구성) 또는 (APP_PASSWORD 설정). 둘 다 미설정이면 비활성(앱 공개). */
+/**
+ * 게이트 활성 = OAuth(Google 로그인) 구성됨. 미설정이면 비활성(앱 공개, 로컬/CI 무마찰).
+ * (비밀번호 로그인 폐지 — 과거 `APP_PASSWORD` 항 제거. 게이트는 Google OAuth 로만 켜진다.)
+ */
 function isGateActive(): boolean {
-  return isOAuthConfigured() || Boolean(process.env.APP_PASSWORD);
+  return isOAuthConfigured();
 }
 
 export async function proxy(request: NextRequest) {
-  // 게이트 비활성(OAuth·비밀번호 둘 다 미설정) → 즉시 통과(앱 공개). 로컬/CI 마찰 0.
+  // 게이트 비활성(OAuth 미설정) → 즉시 통과(앱 공개). 로컬/CI 마찰 0.
   if (!isGateActive()) {
     return NextResponse.next();
   }
@@ -199,9 +202,9 @@ export const config = {
   matcher: ["/((?!_next/static|_next/image|api/stock/ai-analysis$).*)"],
 };
 
-/* 프로덕션 + 게이트 비활성(OAuth·비밀번호 둘 다 미설정) 경고 — 모듈 로드 시 1회(요청마다 스팸 금지). */
+/* 프로덕션 + 게이트 비활성(OAuth 미설정) 경고 — 모듈 로드 시 1회(요청마다 스팸 금지). */
 if (process.env.NODE_ENV === "production" && !isGateActive()) {
   console.warn(
-    "[auth] 게이트 비활성 — 프로덕션에서 앱이 공개됩니다. Google OAuth(GOOGLE_OAUTH_*) 또는 APP_PASSWORD/APP_AUTH_SECRET 를 Vercel 환경변수에 설정하세요.",
+    "[auth] 게이트 비활성 — 프로덕션에서 앱이 공개됩니다. Google OAuth(GOOGLE_OAUTH_*) + APP_AUTH_SECRET 를 Vercel 환경변수에 설정하세요.",
   );
 }

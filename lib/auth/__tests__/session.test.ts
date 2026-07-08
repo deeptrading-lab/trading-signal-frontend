@@ -10,10 +10,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { signSession, verifySession } from "../session";
+import { signSession, signIdentitySession, verifySession } from "../session";
 import { SESSION_MAX_AGE_SECONDS } from "../constants";
 
 const ORIGINAL_SECRET = process.env.APP_AUTH_SECRET;
+
+/** 유효 세션 = v=2(Google 신원)만. v=1(비밀번호)은 폐지 후 거부되므로 정상 토큰 팩토리는 v=2 사용. */
+const IDENTITY = { sub: "google-123", email: "a@b.com", role: "user" as const };
 
 describe("lib/auth/session", () => {
   beforeEach(() => {
@@ -25,17 +28,24 @@ describe("lib/auth/session", () => {
     else process.env.APP_AUTH_SECRET = ORIGINAL_SECRET;
   });
 
-  it("정상 토큰 — sign → verify true (round-trip)", async () => {
+  it("정상 토큰(v=2 신원) — sign → verify true (round-trip)", async () => {
     const now = Date.now();
-    const token = await signSession(now);
+    const token = await signIdentitySession(IDENTITY, now);
     expect(token).toBeTruthy();
     expect(token).toContain(".");
     await expect(verifySession(token, now)).resolves.toBe(true);
   });
 
+  it("v=1(비밀번호) 세션 — 서명이 유효해도 거부(비밀번호 로그인 폐지 → 재로그인 강제)", async () => {
+    const now = Date.now();
+    const legacy = (await signSession(now)) as string;
+    expect(legacy).toContain(".");
+    await expect(verifySession(legacy, now)).resolves.toBe(false);
+  });
+
   it("[AC-8] 만료 토큰 — exp 경과 시 false (쿠키 maxAge 무관)", async () => {
     const issued = Date.now();
-    const token = await signSession(issued);
+    const token = await signIdentitySession(IDENTITY, issued);
     // 발급 + 30일 + 1초 → exp 경과.
     const afterExpiry = issued + (SESSION_MAX_AGE_SECONDS + 1) * 1000;
     await expect(verifySession(token, afterExpiry)).resolves.toBe(false);
@@ -43,7 +53,7 @@ describe("lib/auth/session", () => {
 
   it("[AC-8] 위조 토큰 — sig 변조 시 false", async () => {
     const now = Date.now();
-    const token = (await signSession(now)) as string;
+    const token = (await signIdentitySession(IDENTITY, now)) as string;
     const [body] = token.split(".");
     const forged = `${body}.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`;
     await expect(verifySession(forged, now)).resolves.toBe(false);
@@ -77,7 +87,7 @@ describe("lib/auth/session", () => {
   it("시크릿 회전 — 다른 secret 으로 발급된 토큰은 검증 실패 (전체 무효화)", async () => {
     const now = Date.now();
     process.env.APP_AUTH_SECRET = "secret-A";
-    const token = await signSession(now);
+    const token = await signIdentitySession(IDENTITY, now);
     process.env.APP_AUTH_SECRET = "secret-B";
     await expect(verifySession(token, now)).resolves.toBe(false);
   });

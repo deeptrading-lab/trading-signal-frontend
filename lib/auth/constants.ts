@@ -17,9 +17,10 @@ export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 2_592_000 = 30일.
 
 /**
  * 토큰 payload 버전.
- *   - `1` = 공유 비밀번호 세션(`signSession`, 신원 없음). 하위호환으로 계속 유효(PRD user-login-auth AC-5).
- *   - `2` = Google 로그인 신원 세션(`signIdentitySession`, `sub`/`email`/`role` 포함).
- * `verifySession`/`readSession` 은 버전을 강제하지 않는다(둘 다 유효) — 향후 무효화 키로만 사용.
+ *   - `1` = 구 공유 비밀번호 세션(`signSession`, 신원 없음). **비밀번호 로그인 폐지 → 거부**
+ *     (`verifySession`/`readSession` 이 v!==2 를 무효 처리, 남은 30일 쿠키 강제 재로그인).
+ *     `signSession` 은 이 v=1 거부 동작을 검증하는 테스트에서만 사용된다(프로덕션 발급 경로 없음).
+ *   - `2` = Google 로그인 신원 세션(`signIdentitySession`, `sub`/`email`/`role` 포함) — 유일한 유효 버전.
  */
 export const SESSION_TOKEN_VERSION = 1;
 
