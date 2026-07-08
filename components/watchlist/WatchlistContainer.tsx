@@ -74,16 +74,11 @@ export function WatchlistContainer() {
   // 데이터가 아직 없고 fetch 중일 때만 스켈레톤(이전 데이터 있으면 표 유지=placeholderData).
   const showSkeleton = !isEmpty && query.isPending && quotes.length === 0;
   const showError = !isEmpty && query.isError && quotes.length === 0;
-  // 상단 새로고침 — 표가 떠 있을 때만(빈/초기 로딩/전체 에러 카드 분기 제외).
-  const canRefresh = !isEmpty && !showSkeleton && !showError;
 
   return (
-    <WatchlistPage
-      onRefresh={() => query.refetch()}
-      isRefreshing={query.isFetching}
-      canRefresh={canRefresh}
-    >
-      {/* 상단 인라인 검색 — 별 버튼으로 추가/제거(여러 개 연속 추가, 바깥 클릭 시에만 닫힘). */}
+    <WatchlistPage>
+      {/* 상단 인라인 검색 — 별 버튼으로 추가/제거. (새로고침 버튼 제거: 브라우저 리로드/페이지
+          이동 시 자동 재페치되고 모바일은 pull-to-refresh 라 사실상 중복.) */}
       <WatchlistSearch
         hasTicker={hasTicker}
         addTicker={addTicker}
