@@ -3,7 +3,7 @@ import { Home } from "lucide-react";
 import { BrandLockup } from "@/components/layout/BrandLockup";
 import {
   NOT_FOUND_TITLE,
-  NOT_FOUND_DESCRIPTION,
+  NOT_FOUND_DESCRIPTION_LINES,
   NOT_FOUND_HOME_CTA,
 } from "@/lib/copy/layout/navCopy";
 
@@ -21,7 +21,11 @@ export function NotFoundView() {
       <div className="flex flex-col items-center gap-sm">
         <h1 className="text-display text-text-strong">{NOT_FOUND_TITLE}</h1>
         <p className="max-w-[360px] text-body-md text-text-muted">
-          {NOT_FOUND_DESCRIPTION}
+          {NOT_FOUND_DESCRIPTION_LINES.map((line) => (
+            <span key={line} className="block">
+              {line}
+            </span>
+          ))}
         </p>
       </div>
       <Link
