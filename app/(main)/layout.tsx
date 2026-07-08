@@ -24,10 +24,12 @@
 
 "use client";
 
+import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { MobilePullToRefresh } from "@/components/layout/MobilePullToRefresh";
 import { WorkbenchSessionProvider } from "@/hooks/workbench/useWorkbenchSession";
 import { AIAnalysisProvider } from "@/hooks/stock/aiAnalysisProvider";
 import { GlobalAIAnalysis } from "@/components/stock/GlobalAIAnalysis";
@@ -76,6 +78,8 @@ export default function MainLayout({
   const pathname = usePathname();
   // usePathname 은 SSR/클라 초기 렌더 동일값 → hydration mismatch 0.
   const isWhiteSurface = isWhiteSurfaceRoute(pathname);
+  // 모바일 pull-to-refresh 가 붙는 스크롤 컨테이너(main) 참조.
+  const mainRef = useRef<HTMLElement>(null);
   return (
     <WorkbenchSessionProvider>
       <AIAnalysisProvider>
@@ -93,8 +97,10 @@ export default function MainLayout({
            *  추가로 `+ spacing.lg`(14px) — 마지막 카드와 BottomNav 사이 숨 쉴 여백(카드 간 gap-lg 와 동일 리듬).
            *  md+ 에서는 BottomNav 미렌더 → 하단 콘텐츠가 뷰포트 바닥에 딱 붙지 않도록 `md:pb-2xl`(24px) 여백. */}
           <main
+            ref={mainRef}
             className={cn(
-              "flex-1 overflow-y-auto pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom)+theme(spacing.lg))] md:pb-2xl main-area scrollbar-hide-mobile",
+              // overscroll-y-contain — 모바일 pull-to-refresh 가 네이티브 바운스와 안 싸우게(스크롤 체이닝 차단).
+              "flex-1 overflow-y-auto overscroll-y-contain pb-[calc(theme(spacing.navbar-h)+env(safe-area-inset-bottom)+theme(spacing.lg))] md:pb-2xl main-area scrollbar-hide-mobile",
               // 홈 한정 — main-area 의 surface-muted(회색) 대신 surface(흰색)로 덮는다(카드리스 화이트).
               isWhiteSurface && "bg-surface",
             )}
@@ -102,6 +108,8 @@ export default function MainLayout({
             {children}
           </main>
         </div>
+        {/* 모바일 위→아래 드래그 새로고침(셸 공통) — 페이지별 새로고침 버튼을 모바일에서 대체. */}
+        <MobilePullToRefresh scrollElRef={mainRef} />
         <BottomNav />
         {/* AI 분석 패널·재열기 탭 — 셸에 두어 페이지 이동에도 백그라운드 분석이 끊기지 않게 한다. */}
         <GlobalAIAnalysis />
