@@ -6933,6 +6933,45 @@
   - PR-3a~c: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지 / preGate 교차 트리거 / CLI 신뢰성
   - PR-4: 장중 실검증(5분 주기 표준) + env 컷 캘리브레이션
 
+### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-1a — 구조 미확보 시 ATR 폴백 TP/SL (#309)
+
+- **slug**: `intraday-atr-fallback` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/309
+- **요약**: feat(intraday): 단타 판단 고도화 PR-1a — 구조 미확보 시 ATR 폴백 TP/SL
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 시리즈 PRD `docs/prd/intraday-decision-overhaul.md` §3 PR-1a. 전수 감사에서 **RRR null 77%**(구조 barrier 미확보)가 사후 게이트·결정론 폴백의 모든 매수를 자동 봉쇄하던 갭을 ATR 비대칭 폴백으로 해소한다.
+  > 
+  > ## 변경
+  > 
+  > - `buildIntradayLevels`: `structureBarrierAt` null → **TP=종가+3×ATR(14) · SL=종가−1.5×ATR** (손익비 정확히 2.0), `tpSource/slSource: "atr"` — 스냅샷에 출처 영속
+  > - `lib/signal/levels/atr.ts` 신설: ATR 계산·폴백 배수를 백테스트(`label.ts`)와 라이브가 **공유**(백테스트 best 파라미터와 라이브 어긋남 방지, label.ts 행동 무변경 리팩터)
+  > - 안전 가드: ATR 워밍업 미달(15봉 미만)·완전 평탄봉(ATR=0)은 기존처럼 null 유지
+  > - `IntradayLevels.tpSource` 문서에 atr 소스 추가 — 소비처는 프롬프트 raw 문자열뿐(전수 확인, UI 카피맵 없음)
+  > 
+  > ## ⚠️ 행동 변경 (첫 행동 변경 PR — PRD §7-2)
+  > 
+  > 결정론 폴백(`deriveFromSignal`)의 canBuy 가 RRR 조건을 충족하는 틱이 늘어난다. 안전핀은 전부 유지: 시장경보 게이트·약세 레짐 veto·15:00 신규금지·일일손실킬·목표 +5% 캡(사후 게이트)·익절/손절 forced-exit.
+  > 
+  > ## 검증
+  > 
+  > - 신규 테스트 5종 (`intradayLevels.test.ts`): AC-5 폴백 정확값(TP 10,300/SL 9,850/rrr 2.0), AC-6 구조 존재 시 무변경, 워밍업 미달 null, ATR=0 미적용, 큰 ATR TP(+9%)도 사후 게이트 +5% 캡 확인
+  > - 기존 tripleBarrier 백테스트 테스트 무회귀(공유 유틸 추출 검증)
+  > - 전체 vitest **1058 passed** / tsc 클린
+  > 
+  > ## 다음 작업
+  > 
+  > - PR-1b: graded 축(거래량 z-score·VWAP σ) + `axisOverrides` seam + 백테스트 evaluate 훅 + PRIOR_DAYS 1→3
+  > - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
+  > - PR-3a: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-1b: graded 축(거래량 z-score·VWAP σ) + `axisOverrides` seam + 백테스트 evaluate 훅 + PRIOR_DAYS 1→3
+  - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
+  - PR-3a: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지
+
+
 ### 2026-07-08 — feat(signal): 단타 판단 고도화 PR-1b — graded 축(거래량 z-score·VWAP σ) + axisOverrides seam (#311)
 
 - **slug**: `intraday-graded-axes` · **author**: @HY0118

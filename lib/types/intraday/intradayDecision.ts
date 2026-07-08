@@ -21,7 +21,7 @@ export interface IntradayLevels {
   /** 구조 기반 익절/손절 후보가(structureBarrier). */
   tpPrice: number | null;
   slPrice: number | null;
-  /** TP/SL 소스(hvn=매물대 / swing=박스 / ma). */
+  /** TP/SL 소스(hvn=매물대 / swing=박스 / ma / atr=구조 미확보 시 변동성 폴백). */
   tpSource: string | null;
   slSource: string | null;
   /** 손익비 (tp-진입)/(진입-sl). */
