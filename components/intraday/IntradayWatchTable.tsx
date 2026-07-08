@@ -47,8 +47,12 @@ import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
-/** 주기 드랍다운 기본값(분) — 초단타 기본. */
-const DEFAULT_INTERVAL_MIN = 2;
+/**
+ * 주기 드랍다운 기본값(분) — 5분 = 캘리브레이션 표준(PRD intraday-decision-overhaul §10-4).
+ * 2분(1분봉)은 노이즈 최대 + LLM 체인(최악 ~75s) 지연과 부정합이라 기본에서 제외 —
+ * 드롭다운에서 여전히 선택 가능(실험용).
+ */
+const DEFAULT_INTERVAL_MIN = 5;
 
 const T = P.table;
 
