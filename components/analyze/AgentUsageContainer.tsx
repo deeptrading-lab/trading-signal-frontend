@@ -109,9 +109,10 @@ export function AgentUsageContainer() {
         />
         <div className="flex items-center gap-md">
           <span className="text-caption text-text-muted">{usageRunCount(data.runCount)}</span>
+          {/* 새로고침 — 모바일은 셸 공통 pull-to-refresh 로 대체하고 숨긴다. PC(md+)만 버튼 유지. */}
           <button
             type="button"
-            className="inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
+            className="hidden md:inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
             onClick={() => refetch()}
             disabled={isFetching}
           >

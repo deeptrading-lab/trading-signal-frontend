@@ -127,10 +127,11 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
         createPortal(
           <>
             <span className="text-caption text-text-muted">{resultsCount(filtered.length + filteredInflight.length)}</span>
+            {/* 새로고침 — 모바일은 셸 공통 pull-to-refresh 로 대체하고 숨긴다. PC(md+)만 버튼 유지. */}
             <button
               type="button"
               aria-label={USAGE_REFRESH}
-              className="inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
+              className="hidden md:inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
               onClick={() => refetch()}
               disabled={isFetching}
             >

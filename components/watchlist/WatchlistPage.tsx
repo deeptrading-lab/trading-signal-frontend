@@ -56,10 +56,12 @@ export function WatchlistPage({
           />
           {WATCHLIST_PAGE_TITLE}
         </h1>
+        {/* 새로고침 버튼 — 모바일은 pull-to-refresh(위→아래 드래그, 셸 공통)로 대체하고 숨긴다.
+            PC(md+)는 터치 제스처가 없어 버튼 유지. */}
         {canRefresh ? (
           <button
             type="button"
-            className="ml-auto inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
+            className="ml-auto hidden md:inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}

@@ -161,10 +161,11 @@
     @apply outline-none border-critical shadow-[0_0_0_3px_theme(colors.critical-soft)];
   }
   /* input-search — 홈 종목 검색 큰 입력. 부모 wrapper 가 ring/shadow/rounded 로 경계를
-   * 그리므로 자체 border/shadow 는 제거하고 흰 배경(surface)·좌측 아이콘 공간(pl-10)·
-   * 56px 높이만 둔다. `.input` 토큰을 `!` 로 덮던 7개 오버라이드(W1) 대체. */
+   * 그리므로 자체 border/shadow 는 제거하고 흰 배경(surface)·좌측 아이콘 공간·높이만 둔다.
+   * 모바일은 PC 대비 살짝 컴팩트(h-12·text-sm·pl-9), md+ 는 큰 입력(h-14·text-base·pl-10).
+   * `.input` 토큰을 `!` 로 덮던 7개 오버라이드(W1) 대체. */
   .input-search {
-    @apply w-full h-14 pl-10 pr-md bg-surface text-text-strong rounded-md text-base outline-none;
+    @apply w-full h-12 md:h-14 pl-9 md:pl-10 pr-md bg-surface text-text-strong rounded-md text-sm md:text-base outline-none;
     font-family: inherit;
   }
   .input-search::placeholder {
