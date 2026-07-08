@@ -98,9 +98,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 const VARIANT_CLASS: Record<ToastVariant, string> = {
-  error: "bg-critical text-white",
-  success: "bg-text-strong text-white",
-  info: "bg-text-strong text-white",
+  // ★ text-surface(테마 반전 토큰) 사용 — text-white(고정 흰색)는 다크에서 배경 토큰(text-strong·
+  //   critical)이 밝게 뒤집힐 때 대비가 무너진다. surface 는 배경과 함께 반전돼 항상 읽힌다
+  //   (라이트=어두운 배경+흰 글자 / 다크=밝은 배경+어두운 글자).
+  error: "bg-critical text-surface",
+  success: "bg-text-strong text-surface",
+  info: "bg-text-strong text-surface",
 };
 
 function ToastViewport({
