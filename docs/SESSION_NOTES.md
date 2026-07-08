@@ -605,3 +605,39 @@ A·F·B 모든 즉시 가능 트랙 종결. 다음 세션은 P2 누적 follow-up
 - Signals 화면 (`app/(main)/signals/page.tsx`) 미존재 — PRD AC-15 의 "/signals" 진입 항목이 본 저장소 main 에 부재. PRD `signal-algorithm` 진입 시 함께 신설 권고.
 
 ---
+
+## 2026-07-09 — 단타 AI 판단 고도화 시리즈 완주 (intraday-decision-overhaul, 6 PR)
+
+### 처리한 일
+
+- **전수 데이터 감사**: Supabase `paper_trading_ticks` 2,199틱(21세션·19종목) 전수 분석 —
+  judge LLM 942회 실행 전량 HOLD, 실제 체결 8건은 전부 CLI 실패 폴백 산(94%가 빈 응답).
+  근본원인 4개 확정: ①이진 volume/volatility 축→동의도 50% 박제 ②RRR null 77%(ATR 폴백 미배선)
+  ③구조 TP 1.5% vs 프롬프트 "2~5%" 보상 미스매치 ④HOLD 편향 프롬프트+신호·위험거부 융합.
+  오픈소스 리서치(TradingAgents·FinMem·FinPos·메타라벨링)가 독립적으로 동일 결론.
+- **PR 시리즈 6개 구현·게이트·머지** (상세는 PRD `docs/prd/intraday-decision-overhaul.md` §10):
+  #307 실패 관측성 → #309 ATR 폴백 → #311 graded 축(A/B: 동의도 박제 70%→5%) →
+  #314 틱 자가채점 루프+캘리브레이션 패널 → #315 judge 점수화(conviction 컷 65/40)+폴백 진입 금지 →
+  #318 preGate 교차 트리거 4종. 각 PR = QA 리포트 + 적대 리뷰(코멘트 fallback) 통과.
+- **라벨 백필 실행**: `docs/sql/intraday-tick-labels.sql` 수동 실행(사용자) 후 완료 세션 8개
+  1,130틱 라벨 → **베이스라인 확보: 무선별 진입 승률 ~25%·−0.24%/틱**(HOLD가 대체로 옳았음),
+  레거시 신호점수 밴드 무예측력 확인.
+
+### 결정·합의 사항
+
+- judge 역할 = **점수 출력 + 코드 컷**(프롬프트 완화는 포함, 메타라벨링은 라벨 축적 후 Phase 5 후보).
+- 캘리브레이션 자세 = **데이터 수집 우선**(컷 낮게 시작, 세션당 왕복 2~5회 목표, 안전핀 전량 유지).
+- PRD 정식 트랙 + 단일 PR 룰 일시 해제(시리즈), 게이트 통과 PR 일괄 머지 승인.
+- **judge 실패 ≠ 의도 밖 체결**(사용자 요구) — 실패 시 폴백 신규 진입 금지로 구현(AC-11).
+
+### 다음 세션 시작 포인트
+
+- **PR-4 장중 실검증**: 평일 09:00~ 5분 주기 세션 → conviction 버킷 승률 vs 25% 베이스라인
+  (`/intraday` 패널) → env 컷(`INTRADAY_BUY_CONVICTION_MIN` 등) 무코드 튜닝.
+- **PR-3c CLI 신뢰성**: 장중 ~1주 `agentDiagnostics` failureKind 분포 축적 후 재시도 정책 설계.
+
+### 미결·블록
+
+- 리뷰 후속 메모(비차단): UNRESOLVED 일시장애 고착·장중 수동완료 premature NEUTRAL·
+  v1 레거시 일몰(PR-4 후)·부분청산 쿨다운 발동·volumeZSurge 방향 중립 — PRD §10-5 목록 참조.
+- prod 무영향(단타 스케줄러·CLI는 로컬 전용, Vercel no-op).
