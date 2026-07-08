@@ -459,9 +459,11 @@ function fromConvictionSchema(
         : null,
     entryPositionPct: action === "BUY" ? convictionEntryPositionPct(conviction) : null,
     sellRatioPct: action === "SELL" ? 100 : null, // 확신 컷 청산은 전량(보수적).
-    targetPrice: num(d.targetPrice),
-    stopPrice: num(d.stopPrice),
-    invalidationPrice: num(d.invalidationPrice),
+    // BUY 인데 LLM 이 가격 레벨을 비우면 구조/ATR 레벨로 백필 — TP/SL 없는 포지션 개시 방지
+    // (cli-agent 경로엔 포지션 하드스톱이 없어 forced-exit 트리거가 유일한 자동 청산선, 리뷰 F-1).
+    targetPrice: num(d.targetPrice) ?? (action === "BUY" ? ctx.levels.tpPrice : null),
+    stopPrice: num(d.stopPrice) ?? (action === "BUY" ? ctx.levels.slPrice : null),
+    invalidationPrice: num(d.invalidationPrice) ?? (action === "BUY" ? ctx.levels.slPrice : null),
     expectedHoldingMinutes: num(d.expectedHoldingMinutes),
     rationale: typeof d.rationale === "string" ? d.rationale : "",
     riskNotes: normalizeRiskNotes(d.riskNotes),

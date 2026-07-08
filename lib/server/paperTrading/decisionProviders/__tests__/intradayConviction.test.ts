@@ -187,6 +187,32 @@ describe("확신 컷 플로우 — v2 점수가 실제 BUY 를 만든다 (AC-10�
     expect(decision.targetAllocations).toHaveLength(0);
     expect(decision.convictionScore).toBe(60); // HOLD 여도 점수는 영속(58점 노이즈 방지)
   });
+
+  it("80점 BUY 인데 LLM 이 TP/SL 을 비우면 구조/ATR 레벨로 백필(무방비 포지션 차단, 리뷰 F-1)", async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ text: "분석 노트", usage })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          convictionScore: 80,
+          targetPrice: null,
+          stopPrice: null,
+          invalidationPrice: null,
+          expectedHoldingMinutes: 30,
+          rationale: "레벨 누락 응답.",
+          riskNotes: [],
+        }),
+        usage,
+      });
+
+    const { decision, intraday } = await decideIntradayWithCli(input());
+
+    // 평탄 픽스처의 ATR 폴백 레벨(TP 10,300 / SL 9,850)로 백필 — forced-exit 트리거 확보.
+    expect(intraday.action).toBe("BUY");
+    expect(intraday.targetPrice).toBe(10_300);
+    expect(intraday.stopPrice).toBe(9_850);
+    expect(decision.invalidationPrice).toBe(9_850);
+    expect(decision.targetPrice).toBe(10_300);
+  });
 });
 
 describe("재진입 쿨다운 플로우 (PRD §9 q2)", () => {
