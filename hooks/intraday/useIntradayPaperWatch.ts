@@ -53,15 +53,12 @@ export function useIntradayPaperWatch() {
     return map;
   }, [cliSessions]);
 
-  // 진행중(running) 세션 종목 — 워치 로컬 상태와 무관하게 **표에 자동 상주**시킨다(피드백:
-  // 페이지 이동 후에도 표 유지). 일시정지·완료 세션은 상주 대상이 아니라 ✕ 로 표에서 뺄 수
-  // 있다(피드백) — 세션 기록은 남고, 같은 종목을 다시 추가하면 그 세션의 재개 버튼으로 이어진다.
+  // 표 자동 상주 대상 — cli-agent 세션 **전량(상태 무관)**. running·일시정지·완료 모두 DB 기준으로
+  // 항상 표에 상주시켜, 브라우저별 localStorage 나 running 여부와 무관하게 **모든 세션이 보이게** 한다
+  // (AI 모의투자 목록과 동등 — 단일 소스). 세션 없는 워치 행만 ✕ 로 뺄 수 있고, 세션 행은 상주.
+  // 틱 폴링 대상은 runningSessionIds(=running)가 별도로 담당(상주 ≠ 틱).
   const activeStocks = useMemo(
-    () =>
-      cliSessions
-        .filter((session) => session.status === "running")
-        .map(intradaySessionStock)
-        .filter((stock) => stock.ticker),
+    () => cliSessions.map(intradaySessionStock).filter((stock) => stock.ticker),
     [cliSessions],
   );
 
