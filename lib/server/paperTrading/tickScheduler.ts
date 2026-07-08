@@ -167,6 +167,49 @@ export async function closeOutRunningSessionsAtClose(now: Date = new Date()): Pr
   }
 }
 
+/** 크로스데이 스윕 중첩 방지. */
+let staleCloseOutRunning = false;
+
+/** KST(거래일) YYYY-MM-DD 키 — 세션 시작일과 오늘을 같은 기준으로 비교. */
+function kstDateKey(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
+/**
+ * **밀린 이전-거래일 running 세션을 시간대 무관하게 완료 처리**한다(서버 다운타임 복구용).
+ *
+ * `closeOutRunningSessionsAtClose` 는 평일 15:41~23:59 에만 발화하므로, dev 서버가 그 창에 꺼져
+ * 있었으면(퇴근·주말) 세션이 계속 running 으로 남아 UI 에 "진행중"으로 상주하고 다음 거래일
+ * 스케줄러가 크로스데이로 다시 틱한다. 이 스윕은 **세션 시작일(KST)이 오늘보다 이전**이면
+ * 시간·요일과 무관하게 완료로 확정 → 서버가 언제 다시 켜지든(아침·주말 복귀) 잔여 세션이 정리된다.
+ * (오늘 프리마켓에 만든 세션은 시작일=오늘이라 건드리지 않는다. 15:20 전량 청산이 지나 포지션 없음.)
+ *
+ * 테스트를 위해 export(now 주입). 반환: 완료한 세션 수(-1 = 중첩으로 미실행).
+ */
+export async function closeOutStaleCrossdaySessions(now: Date = new Date()): Promise<number> {
+  if (staleCloseOutRunning) return -1;
+  staleCloseOutRunning = true;
+  try {
+    const todayKey = kstDateKey(now);
+    const stale = selectSchedulableSessions(await listPaperTradingSessions()).filter(
+      (session) => kstDateKey(new Date(session.startedAt)) < todayKey,
+    );
+    if (stale.length === 0) return 0;
+    for (const session of stale) {
+      try {
+        await patchPaperTradingSessionStatus(session.id, "completed");
+      } catch (error) {
+        // 개별 실패는 다음 사이클 재시도 — 다른 세션 종료를 막지 않는다.
+        log.warn(`밀린 이전 날 세션 완료 실패 session=${session.id.slice(0, 8)}`, error);
+      }
+    }
+    log(`밀린 이전-거래일 running 단타 세션 ${stale.length}건 완료 처리(다운타임 복구)`);
+    return stale.length;
+  } finally {
+    staleCloseOutRunning = false;
+  }
+}
+
 /** 서버 부팅 시 1회 기동(멱등). Vercel no-op. */
 export function startIntradayTickScheduler(): void {
   const g = globalThis as GlobalWithFlag;
@@ -174,13 +217,15 @@ export function startIntradayTickScheduler(): void {
   if (isVercelEnv()) return; // 서버리스: 타이머 미유지 + CLI 부재.
   g[STARTED_KEY] = true;
   log(
-    `단타 자동 틱 스케줄러 시작 — 60초 체크 · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료`,
+    `단타 자동 틱 스케줄러 시작 — 60초 체크 · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료 · 밀린 이전날 세션 상시 정리`,
   );
-  // 매 사이클: 장중이면 틱, 마감 후면 종료 스윕(시간대가 겹치지 않아 둘 중 하나만 실행된다).
-  const cycle = () => {
-    void runScheduledIntradayTicks();
-    void closeOutRunningSessionsAtClose();
+  // 매 사이클(순차): ① 밀린 이전-거래일 세션부터 종료(크로스데이 틱 방지) → ② 장중이면 오늘
+  // 세션 틱 → ③ 마감 후(15:41+)면 오늘 세션 종료 스윕. ②③ 은 시간대가 겹치지 않아 둘 중 하나만 실행.
+  const cycle = async () => {
+    await closeOutStaleCrossdaySessions();
+    await runScheduledIntradayTicks();
+    await closeOutRunningSessionsAtClose();
   };
-  setInterval(cycle, POLL_MS);
-  cycle();
+  void cycle();
+  setInterval(() => void cycle(), POLL_MS);
 }

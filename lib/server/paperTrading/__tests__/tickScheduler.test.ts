@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   closeOutRunningSessionsAtClose,
+  closeOutStaleCrossdaySessions,
   runScheduledIntradayTicks,
   runWithLimit,
   selectSchedulableSessions,
 } from "@/lib/server/paperTrading/tickScheduler";
-import { resetPaperTradingStoreForTest } from "@/lib/server/paperTrading/sessionStore";
+import {
+  getPaperTradingSessionDetail,
+  resetPaperTradingStoreForTest,
+  seedPaperTradingSessionForTest,
+} from "@/lib/server/paperTrading/sessionStore";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 
 function session(over: Partial<PaperTradingSession>): PaperTradingSession {
@@ -100,5 +105,24 @@ describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", 
   it("마감 후(15:41+)이고 대상 세션이 없으면 0", async () => {
     resetPaperTradingStoreForTest();
     expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:41:00.000Z"))).toBe(0); // 금 15:41 KST
+  });
+});
+
+describe("closeOutStaleCrossdaySessions (밀린 이전-거래일 세션 정리)", () => {
+  it("시작일이 오늘보다 이전인 running 세션을 시간·요일 무관하게 완료한다", async () => {
+    resetPaperTradingStoreForTest();
+    // 7/3(금) 11:00 KST 시작 세션. 서버가 마감 창(15:41~23:59)에 꺼져 있어 종료 못 함.
+    seedPaperTradingSessionForTest(session({ id: "old", startedAt: "2026-07-03T02:00:00.000Z" }));
+    // now = 7/6(월) 05:00 KST — 마감 창도 장중도 아닌 이른 아침이지만 밀린 세션은 정리돼야 한다.
+    expect(await closeOutStaleCrossdaySessions(new Date("2026-07-05T20:00:00.000Z"))).toBe(1);
+    expect((await getPaperTradingSessionDetail("old"))?.session.status).toBe("completed");
+  });
+
+  it("시작일이 오늘(프리마켓 포함)이면 건드리지 않는다(0)", async () => {
+    resetPaperTradingStoreForTest();
+    // 7/6(월) 08:30 KST 프리마켓 생성 — 개장 전이라 아직 살아있어야 한다.
+    seedPaperTradingSessionForTest(session({ id: "today", startedAt: "2026-07-05T23:30:00.000Z" }));
+    expect(await closeOutStaleCrossdaySessions(new Date("2026-07-05T23:40:00.000Z"))).toBe(0); // 7/6 08:40 KST
+    expect((await getPaperTradingSessionDetail("today"))?.session.status).toBe("running");
   });
 });
