@@ -278,7 +278,14 @@ export function IntradayWatchTable({
                           >
                             {T.groupSummaryReturn} {sum.totalPnl > 0 ? "+" : ""}
                             {formatMoney(sum.totalPnl)}원
-                            {sum.aggReturnPct != null && ` · ${formatPct(sum.aggReturnPct)}`}
+                            {sum.aggReturnPct != null && (
+                              <>
+                                {/* 괄호 기호만 muted — 금액·% 는 손익 색 유지(가독성 폴리시). */}
+                                <span className="text-text-muted">(</span>
+                                {formatPct(sum.aggReturnPct)}
+                                <span className="text-text-muted">)</span>
+                              </>
+                            )}
                           </span>
                           {(sum.wins > 0 || sum.losses > 0) && (
                             <span className="text-text-muted">{T.groupWinLoss(sum.wins, sum.losses)}</span>
