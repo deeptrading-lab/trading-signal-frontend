@@ -10,29 +10,11 @@
 import type { StockDailyCandle } from "@/lib/api/kis/types";
 import type { BarrierLabel, BarrierOptions } from "@/lib/types/signal";
 import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
+// ATR 계산·폴백 배수는 라이브 단타 레벨(buildIntradayLevels)과 공유 — lib/signal/levels/atr.ts 로 추출.
+import { atrAt, ATR_FALLBACK_TP_MULT, ATR_FALLBACK_SL_MULT } from "@/lib/signal/levels/atr";
 
 const DEFAULT_HORIZON = 20;
 const DEFAULT_ATR_MULT = 2;
-const ATR_PERIOD = 14;
-/** structure 모드 폴백용 ATR 비대칭 배수 (기존 best 파라미터). */
-const FALLBACK_TP_MULT = 3;
-const FALLBACK_SL_MULT = 1.5;
-
-/** fromIdx 종가까지의 직전 ATR_PERIOD True Range 평균. 데이터 부족 시 null. */
-function atrAt(candles: StockDailyCandle[], fromIdx: number): number | null {
-  if (fromIdx < ATR_PERIOD) return null;
-  let sum = 0;
-  for (let j = fromIdx - ATR_PERIOD + 1; j <= fromIdx; j++) {
-    const c = candles[j];
-    const prevClose = candles[j - 1].close;
-    sum += Math.max(
-      c.high - c.low,
-      Math.abs(c.high - prevClose),
-      Math.abs(c.low - prevClose),
-    );
-  }
-  return sum / ATR_PERIOD;
-}
 
 export type BarrierOutcome = {
   label: BarrierLabel;
@@ -78,8 +60,8 @@ export function tripleBarrier(
       // ATR 비대칭 폴백 (기존 best 파라미터).
       const atr = atrAt(candles, fromIdx);
       if (atr === null) return null;
-      tpPrice = dir === 1 ? entry + atr * FALLBACK_TP_MULT : entry - atr * FALLBACK_TP_MULT;
-      slPrice = dir === 1 ? entry - atr * FALLBACK_SL_MULT : entry + atr * FALLBACK_SL_MULT;
+      tpPrice = dir === 1 ? entry + atr * ATR_FALLBACK_TP_MULT : entry - atr * ATR_FALLBACK_TP_MULT;
+      slPrice = dir === 1 ? entry - atr * ATR_FALLBACK_SL_MULT : entry + atr * ATR_FALLBACK_SL_MULT;
     }
   } else if (opts.tpPct != null && opts.slPct != null) {
     // 명시 % 모드.
