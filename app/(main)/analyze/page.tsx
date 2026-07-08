@@ -19,9 +19,16 @@
 
 import { Suspense } from "react";
 import { AnalyzeTabsContainer } from "@/components/analyze/AnalyzeTabsContainer";
+import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
+import { hasServerRole } from "@/lib/auth/serverGuard";
+import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 import { ANALYZE_PAGE_TITLE } from "@/lib/copy/analyze/labels";
 
-export default function AnalyzePage() {
+export default async function AnalyzePage() {
+  // 토큰비용·판정원장(운영정보) — prod(Vercel)는 admin 이상만, 로컬은 전체(/intraday 규칙과 동일).
+  if (isVercelRuntime() && !(await hasServerRole("admin"))) {
+    return <AccessDeniedView />;
+  }
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
       {/* 페이지 타이틀 — 모바일은 하단 탭이 현재 화면을 알려주므로 시각 숨김(문서 아웃라인용 h1 유지),

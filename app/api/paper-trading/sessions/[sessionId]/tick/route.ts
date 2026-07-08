@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import { getPaperTradingAiCliGate } from "@/lib/server/paperTrading/aiCliGate";
 import {
   getPaperTradingSessionDetail,
@@ -10,7 +11,11 @@ type RouteContext = {
   params: Promise<{ sessionId: string }>;
 };
 
-export async function POST(request: Request, context: RouteContext): Promise<Response> {
+export async function POST(request: NextRequest, context: RouteContext): Promise<Response> {
+  // 재판단(틱) 실행 — prod 만 admin+(로컬 전체). cliGate 는 로컬 CLI 게이트지 role 이 아님.
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   const { sessionId } = await context.params;
   try {
     const existing = await getPaperTradingSessionDetail(sessionId);

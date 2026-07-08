@@ -8,7 +8,8 @@
  * - 분석 실행(POST /api/stock/ai-analysis)과 달리 Vercel 가드 없음 → prod 에서도 읽기 동작.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   getAllAIDecisions,
   isAIDecisionStoreConfigured,
@@ -76,7 +77,11 @@ function buildTokensByTicker(
   return out;
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+  // AI 판정 원장 + 종목별 토큰 합(/analyze) — 운영정보라 prod 만 admin+(로컬 전체).
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   try {
     const [decisions, usageRows, activeJobs] = await withTimeout(
       Promise.all([

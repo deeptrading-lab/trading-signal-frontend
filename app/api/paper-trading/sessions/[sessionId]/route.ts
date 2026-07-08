@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   getPaperTradingSessionDetail,
   patchPaperTradingSessionStatus,
@@ -9,7 +10,11 @@ type RouteContext = {
   params: Promise<{ sessionId: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext): Promise<Response> {
+export async function GET(request: NextRequest, context: RouteContext): Promise<Response> {
+  // 세션 상세 — prod 만 admin+(로컬 전체), /intraday/[sessionId] 페이지 게이트와 정합.
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   const { sessionId } = await context.params;
   const payload = await getPaperTradingSessionDetail(sessionId);
   if (!payload) {
@@ -18,7 +23,10 @@ export async function GET(_request: Request, context: RouteContext): Promise<Res
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function PATCH(request: Request, context: RouteContext): Promise<Response> {
+export async function PATCH(request: NextRequest, context: RouteContext): Promise<Response> {
+  const denied = await requireProdAdminApi(request);
+  if (denied) return denied;
+
   const { sessionId } = await context.params;
   try {
     const body = (await request.json()) as Partial<PatchPaperTradingSessionRequest>;
