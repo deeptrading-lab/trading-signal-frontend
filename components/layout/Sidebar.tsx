@@ -33,6 +33,7 @@ import { usePathname } from "next/navigation";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
 import { getVisibleNavItems, isNavItemActive } from "@/components/layout/navItems";
+import { useMe } from "@/hooks/auth/useMe";
 import {
   NAV_BRAND_LABEL,
   NAV_SIDEBAR_COLLAPSE_ARIA,
@@ -46,6 +47,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const stockNavBinding = useStockNavClick();
   const { collapsed, toggle } = useSidebarCollapsed();
+  // prod 에서 운영 도구(단타) 메뉴는 admin 이상만 — 로컬은 전체(getVisibleNavItems 내부 분기).
+  const { isAdmin } = useMe();
 
   return (
     <aside
@@ -90,7 +93,7 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav flex-1" aria-label="메뉴">
-        {getVisibleNavItems().map((item) => {
+        {getVisibleNavItems(isAdmin).map((item) => {
           const Icon = item.icon;
           const active = isNavItemActive(item.path, pathname);
           return (

@@ -21,12 +21,15 @@ import { usePathname } from "next/navigation";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { getVisibleNavItems, isNavItemActive } from "@/components/layout/navItems";
 import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
+import { useMe } from "@/hooks/auth/useMe";
 import { cn } from "@/lib/utils/cn";
 
 export function BottomNav() {
   const { isMobile } = useBreakpoint();
   const pathname = usePathname();
   const stockNavBinding = useStockNavClick();
+  // prod 에서 운영 도구(단타) 메뉴는 admin 이상만 — 로컬은 전체(getVisibleNavItems 내부 분기).
+  const { isAdmin } = useMe();
 
   if (!isMobile) return null;
 
@@ -35,7 +38,7 @@ export function BottomNav() {
       className="bottom-nav fixed inset-x-0 bottom-0 z-[50]"
       aria-label="하단 메뉴"
     >
-      {getVisibleNavItems().map((item) => {
+      {getVisibleNavItems(isAdmin).map((item) => {
         const Icon = item.icon;
         const active = isNavItemActive(item.path, pathname);
         return (
