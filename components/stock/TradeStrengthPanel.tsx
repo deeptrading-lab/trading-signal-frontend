@@ -29,22 +29,25 @@ import type { TapeTrade, TradeStrength } from "@/lib/types/stock/trades";
 
 export interface TradeStrengthPanelProps {
   ticker: string;
-  /** compact = /intraday 단타(밀도 최대·10건) · full = /stock 종목상세(약간의 여백·30건). 기본 full. */
+  /** compact = /intraday 단타(밀도 최대) · full = /stock 종목상세(약간의 여백). 테이프 20건. 기본 full. */
   variant?: "compact" | "full";
   /** 지면 판단(선택 종목 없으면 false). 기본 true. */
   enabled?: boolean;
+  /** 제목 헤더 숨김 — 상위 탭이 이미 라벨을 그릴 때(초광폭 탭 모드). 기본 false. */
+  hideHeader?: boolean;
   className?: string;
 }
 
 /** 지면별 폴링 주기(ms) — 단타 촘촘·상세 느슨(OrderbookPanel 과 동일 정책). */
 const REFETCH_MS = { compact: 3_000, full: 10_000 } as const;
-/** 테이프 표시 건수 — compact 10 · full 30(DESIGN R4). */
-const TAPE_LIMIT = { compact: 10, full: 30 } as const;
+/** 테이프 표시 건수 — compact 19 · full 20(옆 호가창 20단계와 높이 균형, 과다 나열 방지). */
+const TAPE_LIMIT = { compact: 19, full: 20 } as const;
 
 export function TradeStrengthPanel({
   ticker,
   variant = "full",
   enabled = true,
+  hideHeader = false,
   className,
 }: TradeStrengthPanelProps) {
   const { isMobile } = useBreakpoint();
@@ -67,11 +70,13 @@ export function TradeStrengthPanel({
       )}
       aria-label={C.title}
     >
-      <header className="flex items-center justify-between">
-        <h2 className={cn("text-text-strong", compact ? "text-label-sm" : "text-h2")}>
-          {C.title}
-        </h2>
-      </header>
+      {!hideHeader ? (
+        <header className="flex items-center justify-between">
+          <h2 className={cn("text-text-strong", compact ? "text-label-sm" : "text-h2")}>
+            {C.title}
+          </h2>
+        </header>
+      ) : null}
 
       {isLoading && !result ? (
         <TradesSkeleton compact={compact} rows={TAPE_LIMIT[variant]} />

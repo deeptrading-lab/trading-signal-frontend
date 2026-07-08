@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { StockHeader } from "./StockHeader";
 import { StockChartSkeleton } from "./StockChartSkeleton";
@@ -23,8 +23,9 @@ import { SignalSummary } from "./SignalSummary";
 import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
-import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
-import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
+import { StockDepthSection } from "@/components/stock/StockDepthSection";
+import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
+import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
 import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
@@ -50,6 +51,34 @@ const StockDailyChart = dynamic(
   { ssr: false, loading: () => <StockChartSkeleton /> },
 );
 
+// ── 초광폭 호가·체결강도 도크 치수(런타임 실측 — Tailwind 토큰 대상 아님, StockPeekDock 관례 동일) ──
+/** 도크 최소 폭(px) — ≈1920px + 사이드바 펼침에서 콘텐츠 우측 여백에 겹침 없이 들어가는 치수. */
+const DEPTH_DOCK_MIN_WIDTH = 240;
+/** 도크 최대 폭(px) — 초광폭에서도 과하게 커지지 않도록 상한("안크게"). */
+const DEPTH_DOCK_MAX_WIDTH = 300;
+/** 콘텐츠 우측 끝 ~ 도크 좌측 간격(px) — `ml-md` 와 동기. */
+const DEPTH_DOCK_GAP = 10;
+/** 도크 우측 ~ main 우측(세로 스크롤바 포함) 최소 여백(px). */
+const DEPTH_DOCK_EDGE = 16;
+/** 콘텐츠 컨테이너 최대 폭(px) — `spacing.main-max-w` 토큰과 동기(여백 산출용 레이아웃 상수). */
+const MAIN_MAX_W = 1152;
+
+/**
+ * 도크 폭 실측 — `<main>`(overflow-y-auto) 안에서 중앙 정렬된 콘텐츠(1152px) 우측 여백에 맞춘다.
+ * 좌측 앵커는 CSS `left-full`(콘텐츠 우측 끝) + `ml-md` 라 여기선 폭만 계산해 `[MIN,MAX]` 클램프.
+ * 사이드바 펼침/접힘·초광폭 정도에 따라 여백이 달라지므로 뷰포트가 아니라 main rect 로 산출한다.
+ */
+function measureDepthDockWidth(): number {
+  if (typeof document === "undefined") return DEPTH_DOCK_MIN_WIDTH;
+  const rect = document.querySelector("main")?.getBoundingClientRect();
+  if (!rect) return DEPTH_DOCK_MIN_WIDTH;
+  const contentRight = rect.left + Math.min(rect.width, (rect.width + MAIN_MAX_W) / 2);
+  const available = rect.right - contentRight - DEPTH_DOCK_GAP - DEPTH_DOCK_EDGE;
+  return Math.round(
+    Math.min(DEPTH_DOCK_MAX_WIDTH, Math.max(DEPTH_DOCK_MIN_WIDTH, available)),
+  );
+}
+
 export function StockPageLayout({ ticker }: { ticker: string }) {
   const { openFor } = useAIAnalysisContext();
   const openAIAnalysis = () => openFor(ticker);
@@ -62,6 +91,17 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   const [chartType, setChartType] = useState<ChartType>(DEFAULT_CHART_TYPE);
   // 오버레이 옵션(이평선·매물대·볼린저·VWAP·거래량 이평) — 이평선만 기본 ON, 드롭다운 체크박스로 토글. localStorage 지속.
   const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
+
+  // 초광폭(콘텐츠 우측 여백이 큼) — 호가·체결강도를 차트 우측에 도크로 띄운다(그 미만은 차트 아래 2단).
+  const isUltraWide = useMediaQuery(PEEK_DOCK_QUERY);
+  const [dockWidth, setDockWidth] = useState(DEPTH_DOCK_MIN_WIDTH);
+  useEffect(() => {
+    if (!isUltraWide) return;
+    const measure = () => setDockWidth(measureDepthDockWidth());
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [isUltraWide]);
 
   function handleIntervalChange(next: MainInterval) {
     setChartInterval(next);
@@ -89,20 +129,26 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       {/* ── 항시(T4): 시세 헤더 ── */}
       <StockHeader ticker={ticker} onAIAnalysis={openAIAnalysis} />
 
-      {/* ── 항시: 가격 차트(플랫, 봉 단위 선택) — 시맨틱 <section> 은 자식(ChartShell)이 소유, 래퍼는 헤어라인만 ── */}
-      <div className="mt-lg border-t border-border-line pt-lg">
+      {/* ── 항시: 가격 차트 — 초광폭이면 우측 여백에 호가·체결강도 도크를 절대배치로 띄운다. ── */}
+      <div className="relative mt-lg border-t border-border-line pt-lg">
         <StockDailyChart ticker={ticker} {...chartControls} />
+        {isUltraWide ? (
+          // 콘텐츠 우측 끝(left-full) + gap 앵커, 폭은 실측(우측 여백에 맞춤). 차트와 함께 스크롤.
+          <aside
+            className="absolute left-full top-lg ml-md"
+            style={{ width: dockWidth }}
+          >
+            <StockDepthSection ticker={ticker} />
+          </aside>
+        ) : null}
       </div>
 
-      {/* ── 항시: 호가창(매수/매도 잔량) — 차트·수급 인접, variant="full"(느슨한 폴링). ── */}
-      <div className="mt-lg border-t border-border-line pt-lg">
-        <OrderbookPanel ticker={ticker} variant="full" />
-      </div>
-
-      {/* ── 항시: 체결강도 + 체결 테이프(틱룰 추정) — 호가 인접, variant="full"(느슨한 폴링). ── */}
-      <div className="mt-lg border-t border-border-line pt-lg">
-        <TradeStrengthPanel ticker={ticker} variant="full" />
-      </div>
+      {/* ── 초광폭 아님: 차트 아래 호가창(좌)·체결강도(우) 2단(모바일 세로 스택). ── */}
+      {!isUltraWide ? (
+        <div className="mt-lg border-t border-border-line pt-lg">
+          <StockDepthSection ticker={ticker} />
+        </div>
+      ) : null}
 
       {/* ── 항시: 컴팩트 시그널 요약(플랫) — 시맨틱 <section> 은 자식(SignalSummary)이 소유 ── */}
       <div className="mt-lg border-t border-border-line pt-lg">
