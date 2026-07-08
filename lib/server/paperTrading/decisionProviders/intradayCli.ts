@@ -16,6 +16,7 @@ import {
   formatIntradayFeatures,
 } from "@/lib/signal/intradayFeatures";
 import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
+import { atrAt, ATR_FALLBACK_TP_MULT, ATR_FALLBACK_SL_MULT } from "@/lib/signal/levels/atr";
 import {
   FLOW_ANALYST_SYSTEM,
   JUDGE_SYSTEM,
@@ -110,7 +111,7 @@ function toDecisionSignal(s: SignalResult): DecisionSignal {
   };
 }
 
-/** 구조 barrier + 최근 룩백 박스로 정량 레벨 산출. */
+/** 구조 barrier(+미확보 시 ATR 폴백) + 최근 룩백 박스로 정량 레벨 산출. */
 export function buildIntradayLevels(
   minuteCandles: StockMinuteCandle[],
   lastClose: number,
@@ -127,8 +128,25 @@ export function buildIntradayLevels(
     minRRR: MIN_RRR,
   });
 
-  const tpPrice = barrier?.tpPrice ?? null;
-  const slPrice = barrier?.slPrice ?? null;
+  let tpPrice = barrier?.tpPrice ?? null;
+  let slPrice = barrier?.slPrice ?? null;
+  let tpSource: string | null = barrier?.tpSource ?? null;
+  let slSource: string | null = barrier?.slSource ?? null;
+
+  // 구조 barrier 미확보(매물대·스윙 부재 or RRR<1.5) → ATR 비대칭 폴백.
+  // 전수 감사(2,199틱)에서 RRR null 77% 가 사후 게이트·폴백의 매수를 자동 봉쇄하던 갭
+  // (PRD intraday-decision-overhaul PR-1a). 배수는 백테스트 best 파라미터를 label.ts 와
+  // 공유(lib/signal/levels/atr.ts) — TP 3×ATR / SL 1.5×ATR = 손익비 정확히 2.0.
+  if (!barrier && lastClose > 0) {
+    const atr = atrAt(minuteCandles, minuteCandles.length - 1);
+    if (atr != null && atr > 0) {
+      tpPrice = lastClose + atr * ATR_FALLBACK_TP_MULT;
+      slPrice = lastClose - atr * ATR_FALLBACK_SL_MULT;
+      tpSource = "atr";
+      slSource = "atr";
+    }
+  }
+
   const rrr =
     tpPrice != null && slPrice != null && lastClose - slPrice > 0
       ? (tpPrice - lastClose) / (lastClose - slPrice)
@@ -140,8 +158,8 @@ export function buildIntradayLevels(
     boxLow,
     tpPrice,
     slPrice,
-    tpSource: barrier?.tpSource ?? null,
-    slSource: barrier?.slSource ?? null,
+    tpSource,
+    slSource,
     rrr,
     tpPct: tpPrice != null && lastClose > 0 ? ((tpPrice - lastClose) / lastClose) * 100 : null,
     slPct: slPrice != null && lastClose > 0 ? ((slPrice - lastClose) / lastClose) * 100 : null,
