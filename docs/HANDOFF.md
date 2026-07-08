@@ -7013,3 +7013,43 @@
   - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
   - PR-3a: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지
   - PR-4: 장중 실검증 — graded 축의 preGate 스킵률·LLM 콜 볼륨 실측
+
+### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-3a — judge 확신 점수화(convictionScore) + 결정론 컷·사이징 + 폴백 진입 금지 (#315)
+
+- **slug**: `intraday-conviction-judge` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/315
+- **요약**: feat(intraday): 단타 판단 고도화 PR-3a — judge 확신 점수화(convictionScore) + 결정론 컷·사이징 + 폴백 진입 금지
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PRD [intraday-decision-overhaul](docs/prd/intraday-decision-overhaul.md) **PR-3a — judge 점수화(시리즈 센터피스)**. judge LLM 942회 실행 실질 100% HOLD("모호하면 HOLD" 편향 + 신호생성·위험거부 융합)를 해체한다: judge 는 **방향 확신 점수(convictionScore 0~100)만** 내고, BUY/SELL 컷·사이징은 **결정론 코드**가 담당. judge 실패 시 폴백은 신규 진입 불가(보유 관리만). AC-10·AC-11·AC-12 대응.
+  > 
+  > ## 변경
+  > 
+  > - **judge 스키마 v2 + 듀얼 normalize**: `convictionScore` 유한 숫자면 v2(컷·사이징·표시 enum 전부 서버 파생), 아니면 v1 레거시 파싱 유지(전환기 호환) + 근사 확신 합성(BUY→70/SELL→30/HOLD→50)·`judgeSchema` 마커.
+  > - **결정론 컷·사이징**(`deriveActionFromConviction`·`convictionEntryPositionPct`·`convictionToConfidence` 순수 export): BUY≥65 / 보유 중 SELL≤40(전량), 사이징 `clamp(20+(확신−컷)×2, 20, 80)`, 표시 신뢰도 |Δ50|→HIGH/MEDIUM/LOW. env `INTRADAY_BUY_CONVICTION_MIN`/`INTRADAY_SELL_CONVICTION_MAX` (PM 권고 65/40, §9 q1) — PR-4 에서 무코드 튜닝.
+  > - **재진입 쿨다운**: `ticksSinceLastExit`(마지막 SELL 체결 틱 기준) < `INTRADAY_REENTRY_COOLDOWN_TICKS`(기본 2틱=10분, §9 q2)면 신규 BUY 차단 — 사전·사후 게이트 공유, 사유 별도 기록("재진입 쿨다운 — 청산 후 N틱 대기").
+  > - **폴백 신규 진입 금지(AC-11)**: judge 실패 시 `deriveFromSignal` 에 noNewEntry 강제 — 보호 SELL·직전 목표/손절 유지·forced-exit 무변경. 사유 "AI 판단 응답 실패 — 신규 진입 금지(보유 관리만)". preGate 스킵 경로는 구조상 BUY 불가(신호 HOLD 전제) 확인, 무변경.
+  > - **conviction 영속 + 에코**: `PaperTradingDecision.convictionScore`/`judgeSchema`(payload jsonb, 무마이그레이션) → `buildPreviousEcho` → `[직전 틱 내 결정] ... 확신 N점` 프롬프트 주입("58점 거의 매수"의 무상태 노이즈 제거, §8).
+  > - **JUDGE_SYSTEM v2 재작성**: 역할="점수는 정직하게, 안전핀은 서버 게이트"(신호생성·위험거부 분리) · HOLD 편향 문구 삭제·"50 고정 금지, 전 대역 사용" · 고정 2~5% 목표 → 구조 TP/ATR 레벨 상대화(LLM-HOLD 이유 A 87% 대응) · 캔들·구조 해석/판단 주기 가이드 유지 · atr 소스 "(ATR 추정)" 표기(리뷰 N2).
+  > - **표시 호환(AC-12)**: 파생 action/confidence 로 카피맵·Slack 포매터·IntradayReadCard·틱 시트 전부 무변경.
+  > - **PR-1b 리뷰 후속**: `LIMITED_DATA_CONFIDENCE_CAP` export·공유(리터럴 0.6 제거), `SignalResult.confidence` graded 의미 doc, `RULE_LABEL` graded 키 4종 라벨.
+  > - **안전핀 무변경**: 경보 게이트·레짐 veto·RRR<1.5·TP/SL clamp·+5% 캡·15:00·손실킬·forced-exit·maxPositionPct 캡 전부 기존 로직·순서 유지.
+  > 
+  > ## 검증
+  > 
+  > - `npx vitest run` **1,111 passed** (3 skipped — live 게이트), 신규/갱신 테스트 ~40건: 컷 경계 65/64(AC-10)·사이징·enum 파생·듀얼 normalize·env 오버라이드(resetModules)·쿨다운 강등/해제·**AC-11 플로우**(신호 BUY+손익비 2.0 에서 judge 실패 → HOLD, 스냅샷으로 전제 증명)·보호 청산 유지·에코 라운드트립·파생 BUY 위 경보/+5% 캡 발화.
+  > - `npx tsc --noEmit` 클린.
+  > - 행동 변경: judge 성공 시 확신 컷 기반 거래 시작 / judge 실패 시 폴백 매수 0. 장중 실검증은 PR-4.
+  > 
+  > ## 다음 작업
+  > 
+  > - PR-3b: preGate 교차 트리거(VWAP 재탈환·ORB 돌파·volume z≥2 — crossing 이벤트 시맨틱, callLlm 만 유발)
+  > - PR-3c: CLI 신뢰성 — PR-0 텔레메트리 1주 축적 후(AGENT_TIMEOUT env 화·타임아웃 예산 불변식·failureKind 별 재시도 정책)
+  > - PR-4: 장중 실검증 — 5분 주기 표준 세션, 버킷 승률로 컷(INTRADAY_BUY_CONVICTION_MIN 등) 캘리브레이션
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-3b: preGate 교차 트리거(VWAP 재탈환·ORB 돌파·volume z≥2 — crossing 이벤트 시맨틱, callLlm 만 유발)
+  - PR-3c: CLI 신뢰성 — PR-0 텔레메트리 1주 축적 후(AGENT_TIMEOUT env 화·타임아웃 예산 불변식·failureKind 별 재시도 정책)
+  - PR-4: 장중 실검증 — 5분 주기 표준 세션, 버킷 승률로 컷(INTRADAY_BUY_CONVICTION_MIN 등) 캘리브레이션
