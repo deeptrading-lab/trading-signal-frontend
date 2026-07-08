@@ -29,6 +29,8 @@ export interface OrderbookPanelProps {
   variant?: "compact" | "full";
   /** 지면 판단(선택 종목 없으면 false). 기본 true. */
   enabled?: boolean;
+  /** 제목 헤더 숨김 — 상위 탭이 이미 라벨을 그릴 때(초광폭 탭 모드). 기본 false. */
+  hideHeader?: boolean;
   className?: string;
 }
 
@@ -41,6 +43,7 @@ export function OrderbookPanel({
   ticker,
   variant = "full",
   enabled = true,
+  hideHeader = false,
   className,
 }: OrderbookPanelProps) {
   const { isMobile } = useBreakpoint();
@@ -62,16 +65,18 @@ export function OrderbookPanel({
       )}
       aria-label={C.title}
     >
-      <header className="flex items-center justify-between">
-        <h2
-          className={cn(
-            "text-text-strong",
-            compact ? "text-label-sm" : "text-h2",
-          )}
-        >
-          {C.title}
-        </h2>
-      </header>
+      {!hideHeader ? (
+        <header className="flex items-center justify-between">
+          <h2
+            className={cn(
+              "text-text-strong",
+              compact ? "text-label-sm" : "text-h2",
+            )}
+          >
+            {C.title}
+          </h2>
+        </header>
+      ) : null}
 
       {isLoading && !orderbook ? (
         <OrderbookSkeleton compact={compact} />
