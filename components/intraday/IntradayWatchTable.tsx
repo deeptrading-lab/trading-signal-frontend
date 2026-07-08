@@ -393,7 +393,15 @@ function MenuPanel({
 
 // ─── 주기 셀렉트 ──────────────────────────────────────────────────────────────
 
-function IntervalSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function IntervalSelect({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const menu = useFixedMenu(rootRef);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -411,7 +419,8 @@ function IntervalSelect({ value, onChange }: { value: number; onChange: (v: numb
         aria-haspopup="listbox"
         aria-expanded={menu.open}
         aria-label={T.colInterval}
-        className="inline-flex h-7 cursor-pointer items-center gap-xs rounded-md border border-border-line bg-surface-base pl-sm pr-xs text-caption text-text-strong tabular-nums transition-colors hover:bg-surface-muted"
+        disabled={disabled}
+        className="inline-flex h-7 cursor-pointer items-center gap-xs rounded-md border border-border-line bg-surface-base pl-sm pr-xs text-caption text-text-strong tabular-nums transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => menu.toggle(buttonRef.current)}
       >
         {value}분
@@ -577,7 +586,7 @@ function WatchRow({
   const [tab, setTab] = useState<"chart" | "orders">("chart");
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
-  const { detail, isPatching, setStatus } = usePaperTradingSession(session?.id ?? "");
+  const { detail, isPatching, setStatus, setInterval } = usePaperTradingSession(session?.id ?? "");
   const { data: providers } = useQueryAIProviders();
   const read = useMutationIntradayRead();
   const provider = providers?.available[0];
@@ -698,10 +707,19 @@ function WatchRow({
           )}
         </td>
 
-        {/* 판단 주기 — 미시작이면 드랍다운, 시작 후엔 세션 주기 표시 */}
+        {/* 판단 주기 — 미시작=드랍다운(시작값) / 진행·일시정지=드랍다운(세션 중 변경, 다음 틱부터 반영)
+            / 완료=정적 텍스트. 변경 중(isPatching)엔 비활성. */}
         <td className="py-sm pr-md text-center">
           {current ? (
-            <span className="tabular-nums text-text-muted">{current.tickIntervalMinutes}분</span>
+            current.status === "completed" ? (
+              <span className="tabular-nums text-text-muted">{current.tickIntervalMinutes}분</span>
+            ) : (
+              <IntervalSelect
+                value={current.tickIntervalMinutes}
+                onChange={(v) => void setInterval(v)}
+                disabled={isPatching}
+              />
+            )
           ) : (
             <IntervalSelect value={intervalMin} onChange={setIntervalMin} />
           )}

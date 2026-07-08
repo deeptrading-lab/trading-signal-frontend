@@ -30,6 +30,11 @@ export function usePaperTradingSession(sessionId: string) {
       patchMutation
         .mutateAsync({ status })
         .catch(() => toast.error(PAPER_STATUS_CHANGE_ERROR)),
+    // 판단 주기 변경(세션 중) — 다음 틱부터 반영. 실패 토스트 + rejection 삼킴.
+    setInterval: (tickIntervalMinutes: number) =>
+      patchMutation
+        .mutateAsync({ tickIntervalMinutes })
+        .catch(() => toast.error(PAPER_STATUS_CHANGE_ERROR)),
     refetch: query.refetch,
   };
 }
