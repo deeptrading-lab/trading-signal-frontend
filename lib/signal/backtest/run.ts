@@ -14,6 +14,7 @@ import type {
   BarrierOptions,
   EntryOptions,
   EvaluateOptions,
+  SignalResult,
 } from "@/lib/types/signal";
 import { evaluateSignal } from "../engine";
 import {
@@ -40,6 +41,13 @@ export type BacktestOptions = {
    * 분봉 백테스트는 프로파일 minBars(예: 5분 100)를 주입해 일봉 상수에 묶이지 않게 한다.
    */
   warmupBars?: number;
+  /**
+   * 신호 평가 함수 주입 — 미지정 시 `evaluateSignal(slice, opts.signal)`(무회귀).
+   * 인트라데이 하네스가 graded 축·프로파일이 결합된 `evaluateIntradaySignal` 을 바인딩해
+   * 백테스트가 라이브와 **같은 평가**를 쓰게 한다 — 정적 EvaluateOptions 로는 봉마다 동적인
+   * graded 축(axisOverrides)을 표현할 수 없어서 함수 주입이 필요(PR-1b before/after 측정 전제).
+   */
+  evaluate?: (pastCandles: StockDailyCandle[]) => SignalResult;
 };
 
 const BULL = new Set<string>(STRONG_BULL_TRIGGERS);
@@ -61,7 +69,8 @@ export function backtest(
 
   // i = 워밍업 확보 시점부터, 미래 봉이 최소 1개 남는 n-2 까지.
   for (let i = warmup - 1; i < n - 1; i++) {
-    const result = evaluateSignal(candles.slice(0, i + 1), opts.signal);
+    const past = candles.slice(0, i + 1);
+    const result = opts.evaluate ? opts.evaluate(past) : evaluateSignal(past, opts.signal);
     if (!result.warmupOk || result.action === "HOLD") continue;
 
     const dir = result.action === "BUY" ? 1 : -1;

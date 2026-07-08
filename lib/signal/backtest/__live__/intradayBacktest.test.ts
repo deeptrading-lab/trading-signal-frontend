@@ -119,7 +119,7 @@ describe.skipIf(!ENABLED)("분봉 검증 게이트 (bake-off)", () => {
       const { backtest } = await import("@/lib/signal/backtest/run");
       const { computeMetrics } = await import("@/lib/signal/backtest/metrics");
       const { resampleMinuteCandles } = await import("@/lib/api/kis/minuteChartChunked");
-      const { resolveIntradayProfile } = await import("@/lib/signal/intradayProfile");
+      const { resolveIntradayProfile, evaluateIntradaySignal } = await import("@/lib/signal/intradayProfile");
       await ensureToken();
 
       type T = import("@/lib/types/signal").BacktestTrade;
@@ -139,12 +139,9 @@ describe.skipIf(!ENABLED)("분봉 검증 게이트 (bake-off)", () => {
           }
 
           const result = backtest(candles, {
-            signal: {
-              indicators: profile.indicators,
-              softMinBars: profile.softMinBars,
-              minBars: profile.minBars,
-              regimeFilter: false, // setup 순수 엣지 측정(라이브는 일봉 레짐 veto 추가)
-            },
+            // 라이브와 같은 평가(graded 축 포함) — evaluate 훅 바인딩(PR-1b). dailyRegime 0 =
+            // veto 없음(setup 순수 엣지 측정, 라이브는 일봉 레짐 veto 추가 — 기존 regimeFilter:false 등가).
+            evaluate: (slice) => evaluateIntradaySignal(slice, tf, 0),
             barrier: {
               mode: "structure",
               horizonDays: HORIZON_BARS[tf], // 분봉에선 '봉' 단위 호라이즌

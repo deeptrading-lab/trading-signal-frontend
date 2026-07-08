@@ -12,6 +12,7 @@
  */
 
 import { evaluateSignal } from "./engine";
+import { gradedConfidence, gradedVolumeAxis, gradedVwapAxis } from "./intradayAxes";
 import type { StockDailyCandle, StockMinuteCandle } from "@/lib/api/kis/types";
 import type {
   EvaluateOptions,
@@ -119,6 +120,16 @@ export function evaluateIntradaySignal(
   dailyRegime: RuleDirection = 0,
 ): SignalResult {
   const profile = resolveIntradayProfile(timeframe);
+
+  // graded 축(거래량 z-score·VWAP σ) — 산출 가능할 때만 교체, 미확보(룩백 미달·σ=0)면
+  // 해당 축은 레거시 이진 룰 유지(PR-1b). 일봉 경로는 이 함수에 안 오므로 무접촉.
+  const volumeAxis = gradedVolumeAxis(candles);
+  const volatilityAxis = gradedVwapAxis(candles);
+  const axisOverrides = {
+    ...(volumeAxis ? { volume: volumeAxis } : {}),
+    ...(volatilityAxis ? { volatility: volatilityAxis } : {}),
+  };
+
   const opts: EvaluateOptions = {
     indicators: profile.indicators,
     softMinBars: profile.softMinBars,
@@ -126,8 +137,17 @@ export function evaluateIntradaySignal(
     regimeOverride: dailyRegime,
     regimeFilter: true,
     trendHigherLowLookback: profile.structureLookback,
+    ...(Object.keys(axisOverrides).length > 0 ? { axisOverrides } : {}),
   };
-  return evaluateSignal(candles, opts);
+  const result = evaluateSignal(candles, opts);
+
+  // graded 동의도 — "동의 축 비율"(이진 축 2개 만성 중립 → 50% 박제)을 축 기울기 가중평균으로
+  // 교체. 엔진의 limitedData 상한(0.6)은 동일하게 재적용(장기추세 미확보 과신 방지 무회귀).
+  if (result.warmupOk) {
+    const graded = gradedConfidence(result.axes);
+    result.confidence = result.limitedData ? Math.min(graded, 0.6) : graded;
+  }
+  return result;
 }
 
 /**

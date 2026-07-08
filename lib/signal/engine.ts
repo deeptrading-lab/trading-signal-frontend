@@ -53,13 +53,19 @@ export function evaluateSignal(
   // 모멘텀은 추세 방향을 레짐 게이트로 받는다(역추세 신호 감쇠).
   const momentumHits = evaluateMomentum(ctx, trendAxis.direction);
 
-  const axes: AxisScore[] = [
+  const computedAxes: AxisScore[] = [
     trendAxis,
     aggregateAxis("momentum", momentumHits),
     aggregateAxis("volume", evaluateVolume(ctx)),
     // 변동성도 추세를 레짐 게이트로 받는다(역추세 밴드 터치 = 평균회귀 매수 감쇠).
     aggregateAxis("volatility", evaluateVolatility(ctx, trendAxis.direction)),
   ];
+
+  // 인트라데이 graded 축 주입 seam — 캘러가 계산한 축으로 composite 직전에 교체.
+  // 미지정/빈 객체면 비트 동일(무회귀) — 일봉 경로는 항상 미지정(PR-1b).
+  const axes = opts?.axisOverrides
+    ? computedAxes.map((a) => opts.axisOverrides?.[a.axis] ?? a)
+    : computedAxes;
 
   const { action: rawAction, score, confidence: rawConfidence } = composite(axes, opts);
 
