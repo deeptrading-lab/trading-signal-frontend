@@ -68,6 +68,14 @@ export type PaperTradingDecision = {
    * 전부 성공한 틱은 미기록 — 행동·payload 무변경.
    */
   agentDiagnostics?: import("@/lib/types/intraday/intradayDecision").IntradayTickAgentDiagnostics;
+  /**
+   * judge 방향 확신 점수(0~100, 50=중립) — 단타 cli-agent 만. payload(jsonb)로 영속돼
+   * 다음 틱 에코(buildPreviousEcho)와 버킷 승률 캘리브레이션의 원장 근거가 된다(PR-3a).
+   * v1 레거시 응답은 근사 합성값(BUY→70/SELL→30/HOLD→50). 결정론 폴백은 미기록.
+   */
+  convictionScore?: number | null;
+  /** judge 응답 스키마("v2"=점수화/"v1"=레거시 action 직접 출력) — 근사 합성 구분 마커. */
+  judgeSchema?: "v1" | "v2";
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**

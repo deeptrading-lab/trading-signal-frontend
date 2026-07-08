@@ -45,6 +45,11 @@ export interface IntradayPositionView {
 /** 직전 틱 결정 요약 — "열린 거래 관리" 연속성 인식용. */
 export interface IntradayDecisionEcho {
   action: IntradayAction;
+  /**
+   * 직전 확신 점수(0~100) — 미영속 시 "58점 거의 매수"가 맨 HOLD 로 에코돼 무상태 노이즈가
+   * 되는 것을 막는다(PRD intraday-decision-overhaul §8). 구 틱·폴백 틱은 null.
+   */
+  convictionScore?: number | null;
   targetPrice: number | null;
   stopPrice: number | null;
   invalidationPrice: number | null;
@@ -116,6 +121,18 @@ export interface IntradayDecisionLlm {
   /** 한국어 개조식 1~2문장. */
   rationale: string;
   riskNotes: string[];
+  /**
+   * judge 방향 확신 점수(0~100, 50=중립·초과=상승 확신) — v2 스키마의 원본 출력이며
+   * action/confidence/사이징은 이 점수에서 서버가 결정론으로 파생한다(PR-3a).
+   * v1 레거시 파싱은 근사 합성(BUY→70/SELL→30/HOLD→50 — 점수 의미가 약한 추정치).
+   * 결정론 폴백(LLM 미관여)은 null/미기록.
+   */
+  convictionScore?: number | null;
+  /**
+   * judge 응답 스키마 판별 — "v2"=convictionScore 점수화 / "v1"=action 직접 출력(전환기 호환).
+   * 캘리브레이션 집계에서 근사 합성(v1)을 구분하기 위한 마커.
+   */
+  judgeSchema?: "v1" | "v2";
 }
 
 /**

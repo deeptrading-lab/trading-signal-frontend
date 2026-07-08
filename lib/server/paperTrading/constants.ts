@@ -43,6 +43,35 @@ export function deriveIntradayTimeframe(intervalMinutes: number): number {
 }
 /** 단타 익절 목표 캡(%) — 과욕 차단(사후 게이트). */
 export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = 5;
+/**
+ * judge 확신 점수(convictionScore 0~100) 결정론 컷 — LLM 은 점수만 내고, BUY/SELL 판정은
+ * 코드가 한다(PRD intraday-decision-overhaul PR-3a: judge 942회 실질 100% HOLD 의 해체).
+ * 초기값 65/40 은 PM 권고(§9 q1 — LLM 점수가 5단위로 군집해 60은 모달 BUY 가 됨).
+ * env 라 PR-4 장중 실검증에서 무코드 튜닝.
+ */
+export const PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN = envInt(
+  "INTRADAY_BUY_CONVICTION_MIN",
+  65,
+  50,
+  90,
+);
+/** 보유 중 확신이 이 값 이하로 떨어지면 전량 청산(SELL) — 위 컷과 쌍(히스테리시스 밴드). */
+export const PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX = envInt(
+  "INTRADAY_SELL_CONVICTION_MAX",
+  40,
+  10,
+  50,
+);
+/**
+ * 청산 후 재진입 쿨다운(틱 수) — 컷 경계 진동이 왕복비용(~0.28%)을 갉아먹는 churn 방지 +
+ * "하루 왕복 2~5회" 목표 장치(PRD §9 q2 — 기본 2틱 = 5분 주기 기준 10분 대기).
+ */
+export const PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS = envInt(
+  "INTRADAY_REENTRY_COOLDOWN_TICKS",
+  2,
+  0,
+  10,
+);
 /** 세션 일일 손실 kill(%) — 도달 시 신규 진입 차단(관리/청산만). */
 export const PAPER_TRADING_DAILY_LOSS_KILL_PCT = -3;
 /** 장 막판 강제 청산 시각(KST "HH:mm") — 단타는 오버나잇 보유 없음. */

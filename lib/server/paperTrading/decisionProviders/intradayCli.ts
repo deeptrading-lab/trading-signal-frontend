@@ -1,9 +1,11 @@
 /**
  * 단타 경량 에이전트 그룹 decision provider (intraday-scalping-agent §3-4).
  *
- * 흐름: 결정론 시그널·레벨 계산 → 룰 사전게이트 → ①흐름·세력 분석가(CLI) → ②진입·청산 판단가(CLI,
- * JSON) → 룰 사후게이트(clamp/demote) → IntradayDecision → PaperTradingDecision 어댑터.
- * 전부 로컬 CLI(구독, API 토큰 미사용). 실패/타임아웃·Vercel 은 결정론 폴백(fail-soft).
+ * 흐름: 결정론 시그널·레벨 계산 → 룰 사전게이트 → ①흐름·세력 분석가(CLI) → ②판단가(CLI,
+ * convictionScore 0~100 JSON) → 결정론 컷·사이징(action/비중 파생, PR-3a) → 룰 사후게이트
+ * (clamp/demote) → IntradayDecision → PaperTradingDecision 어댑터.
+ * 전부 로컬 CLI(구독, API 토큰 미사용). 실패/타임아웃·Vercel 은 결정론 폴백(fail-soft) —
+ * 단, judge 실패 폴백은 신규 진입 불가(보유 관리만, AC-11).
  */
 
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
@@ -18,6 +20,11 @@ import {
 import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
 import { atrAt, ATR_FALLBACK_TP_MULT, ATR_FALLBACK_SL_MULT } from "@/lib/signal/levels/atr";
 import {
+  PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN,
+  PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX,
+  PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS,
+} from "@/lib/server/paperTrading/constants";
+import {
   FLOW_ANALYST_SYSTEM,
   JUDGE_SYSTEM,
   buildFlowAnalystUser,
@@ -31,8 +38,10 @@ import type {
   PaperTradingRiskMode,
 } from "@/lib/types/paperTrading/paperTrading";
 import type {
+  IntradayAction,
   IntradayAgentDiagnostics,
   IntradayAgentFailureKind,
+  IntradayConfidence,
   IntradayContext,
   IntradayDecision,
   IntradayDecisionEcho,
@@ -78,6 +87,13 @@ export interface IntradayCliInput {
   previousDecision: IntradayDecisionEcho | null;
   /** 일일 손실 한도 도달(스케줄러/세션) — 신규 진입 차단. */
   dailyLossKill: boolean;
+  /**
+   * 마지막 청산(SELL 체결) 틱 이후 경과 틱 수 — 재진입 쿨다운 판정 입력(PR-3a).
+   * `INTRADAY_REENTRY_COOLDOWN_TICKS` 미만이면 신규 BUY 를 차단한다(청산 직후 컷 경계
+   * 진동으로 왕복비용 0.28% 를 반복 지불하는 churn 방지). null/미지정 = 청산 이력 없음
+   * (on-demand read 등 세션 밖 호출 포함) → 쿨다운 미적용.
+   */
+  ticksSinceLastExit?: number | null;
   riskMode: PaperTradingRiskMode;
   maxPositionPct: number;
   provider?: AIAnalysisProvider;
@@ -227,9 +243,13 @@ export interface PreGate {
   reason?: string;
 }
 
-/** 사전 게이트 — LLM 호출 전 룰. 15:00+·일일손실=신규진입 금지, 변화없음=LLM 스킵. */
-export function evaluatePreGate(ctx: IntradayContext, dailyLossKill: boolean): PreGate {
-  const noNewEntry = ctx.nowHhmm >= NO_NEW_ENTRY_AFTER || dailyLossKill;
+/** 사전 게이트 — LLM 호출 전 룰. 15:00+·일일손실·재진입 쿨다운=신규진입 금지, 변화없음=LLM 스킵. */
+export function evaluatePreGate(
+  ctx: IntradayContext,
+  dailyLossKill: boolean,
+  reentryCooldown = false,
+): PreGate {
+  const noNewEntry = ctx.nowHhmm >= NO_NEW_ENTRY_AFTER || dailyLossKill || reentryCooldown;
   const flat = !ctx.position;
 
   // 무포지션 + 분봉 HOLD + 직전도 HOLD → 변화 없음, LLM 호출 생략(비용 절감).
@@ -252,6 +272,7 @@ export function applyPostGate(
   llm: IntradayDecisionLlm,
   ctx: IntradayContext,
   noNewEntry: boolean,
+  reentryCooldown = false,
 ): { decision: IntradayDecisionLlm; adjustments: string[] } {
   const adj: string[] = [];
   const d: IntradayDecisionLlm = { ...llm };
@@ -270,16 +291,22 @@ export function applyPostGate(
   //    LLM 이 #205 프롬프트 주입을 무시하고 BUY 를 내도 자동 체결 루프가 진입하지 못하게 막는다.
   if (hasEntryBlockingWarning(ctx))
     demoteToHold("거래소 시장경보(정리매매·투자위험) 발효 — 신규 진입 차단 → 관망");
-  // 1. 15:00+/일일손실: 신규 BUY 차단.
+  // 1. 재진입 쿨다운 — 쿨다운도 noNewEntry 에 합산되지만, generic 문구(장 막판/일일손실)가
+  //    실제 원인을 가리지 않도록 먼저 검사해 사유를 구분 기록한다(PR-3a).
+  if (reentryCooldown)
+    demoteToHold(
+      `재진입 쿨다운 — 청산 후 ${PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS}틱 대기`,
+    );
+  // 2. 15:00+/일일손실: 신규 BUY 차단.
   if (noNewEntry) demoteToHold("장 막판(15:00 이후)이거나 일일 손실 한도 도달 — 신규 진입 차단 → 관망");
-  // 2. 약세 일봉 레짐 veto.
+  // 3. 약세 일봉 레짐 veto.
   if (ctx.signal.regime === -1)
     demoteToHold("일봉 큰 흐름이 약세 — 하락 국면 역행 매수 차단 → 관망");
-  // 3. 손익비(RRR)<1.5: 진입 보류.
+  // 4. 손익비(RRR)<1.5: 진입 보류.
   if (d.action === "BUY" && (lv.rrr == null || lv.rrr < MIN_RRR))
     demoteToHold("손익비 1.5 미만 — 먹을 공간 대비 손절 폭이 커서 진입 보류 → 관망");
 
-  // 4. TP/SL 을 구조 barrier 밖으로 못 넓힘 + 과욕(+5%) 캡.
+  // 5. TP/SL 을 구조 barrier 밖으로 못 넓힘 + 과욕(+5%) 캡.
   if (d.action === "BUY") {
     if (lv.tpPrice != null && d.targetPrice != null && d.targetPrice > lv.tpPrice) {
       d.targetPrice = lv.tpPrice;
@@ -358,6 +385,43 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
   };
 }
 
+// ─── 확신 점수 → 결정론 컷·사이징 (순수, 테스트 대상 — PR-3a) ─────────────────
+
+/**
+ * 결정론 컷 — 확신 점수(0~100) → 액션. "LLM 의 언어적 신중함을 체결 경로에서 제거"의 핵심:
+ * judge 는 점수만 내고 사자/팔자 판정은 여기서 한다. 컷 임계는 env(PR-4 에서 무코드 튜닝).
+ * SELL 은 보유 중일 때만(무포지션 공매도 없음) — 전량 청산으로 매핑된다.
+ */
+export function deriveActionFromConviction(
+  conviction: number,
+  hasPosition: boolean,
+): IntradayAction {
+  if (conviction >= PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN) return "BUY";
+  if (hasPosition && conviction <= PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX) return "SELL";
+  return "HOLD";
+}
+
+/**
+ * 결정론 사이징 — BUY 진입 목표 비중(%). 컷 기준점에서 20%로 시작해 확신 1점당 +2%p,
+ * 20~80 clamp(서버 maxPositionPct 상한 캡은 toPaperTradingDecision 이 추가 적용).
+ * 기본 컷 65 기준: 65→20 / 80→50 / 95이상→80.
+ */
+export function convictionEntryPositionPct(conviction: number): number {
+  const raw = 20 + (conviction - PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN) * 2;
+  return Math.min(80, Math.max(20, raw));
+}
+
+/**
+ * 표시용 신뢰도 파생 — |확신−50| 를 기존 3단계 enum 으로 접어 카피맵·Slack·ReadCard·틱 시트를
+ * 무파괴 유지한다(AC-12). ≥25→HIGH / ≥10→MEDIUM / 그 외 LOW.
+ */
+export function convictionToConfidence(conviction: number): IntradayConfidence {
+  const dist = Math.abs(conviction - 50);
+  if (dist >= 25) return "HIGH";
+  if (dist >= 10) return "MEDIUM";
+  return "LOW";
+}
+
 // ─── LLM 응답 정규화 ──────────────────────────────────────────────────────────
 
 function num(v: unknown): number | null {
@@ -370,9 +434,55 @@ function clampOrNull(v: number | null, min: number, max: number): number | null 
   return Math.min(max, Math.max(min, v));
 }
 
-function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
+function normalizeRiskNotes(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 3) : [];
+}
+
+/**
+ * v2(convictionScore) 응답 → 판단 필드 파생 — action/confidence/진입 구간/사이징을 전부
+ * 결정론(컷·사이징·|Δ50| 매핑)으로 채운다. LLM 산은 점수·가격 레벨·서사뿐.
+ */
+function fromConvictionSchema(
+  d: Record<string, unknown>,
+  ctx: IntradayContext,
+): IntradayDecisionLlm {
+  const conviction = Math.round(clampOrNull(num(d.convictionScore), 0, 100)!);
+  const hasPosition = ctx.position != null && ctx.position.quantity > 0;
+  const action = deriveActionFromConviction(conviction, hasPosition);
+  return {
+    action,
+    confidence: convictionToConfidence(conviction),
+    // 진입 구간 — 폴백(deriveFromSignal)과 동일한 현재가 근방 파생(-0.1%~+0.2%).
+    entryZone:
+      action === "BUY"
+        ? { low: Math.round(ctx.price * 0.999), high: Math.round(ctx.price * 1.002) }
+        : null,
+    entryPositionPct: action === "BUY" ? convictionEntryPositionPct(conviction) : null,
+    sellRatioPct: action === "SELL" ? 100 : null, // 확신 컷 청산은 전량(보수적).
+    targetPrice: num(d.targetPrice),
+    stopPrice: num(d.stopPrice),
+    invalidationPrice: num(d.invalidationPrice),
+    expectedHoldingMinutes: num(d.expectedHoldingMinutes),
+    rationale: typeof d.rationale === "string" ? d.rationale : "",
+    riskNotes: normalizeRiskNotes(d.riskNotes),
+    convictionScore: conviction,
+    judgeSchema: "v2",
+  };
+}
+
+/**
+ * judge 응답 정규화 — 듀얼 스키마(PR-3a 전환기 호환).
+ * `convictionScore` 가 유한 숫자면 v2(점수화) 경로, 아니면 v1 레거시(action 직접 출력) 경로.
+ * v1 은 기존 파싱 그대로 두되 근사 확신(BUY→70/SELL→30/HOLD→50)을 합성해 에코·집계
+ * 일관성을 유지한다(점수 의미가 약한 추정치 — judgeSchema:"v1" 마커로 구분).
+ * 테스트를 위해 export (CLI 없이 순수 파싱·파생 검증).
+ */
+export function normalizeLlm(parsed: unknown, ctx: IntradayContext): IntradayDecisionLlm | null {
   if (!parsed || typeof parsed !== "object") return null;
   const d = parsed as Record<string, unknown>;
+
+  if (num(d.convictionScore) != null) return fromConvictionSchema(d, ctx);
+
   const action = d.action;
   if (action !== "BUY" && action !== "HOLD" && action !== "SELL") return null;
 
@@ -396,9 +506,9 @@ function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
     invalidationPrice: num(d.invalidationPrice),
     expectedHoldingMinutes: num(d.expectedHoldingMinutes),
     rationale: typeof d.rationale === "string" ? d.rationale : "",
-    riskNotes: Array.isArray(d.riskNotes)
-      ? d.riskNotes.filter((x): x is string => typeof x === "string").slice(0, 3)
-      : [],
+    riskNotes: normalizeRiskNotes(d.riskNotes),
+    convictionScore: action === "BUY" ? 70 : action === "SELL" ? 30 : 50,
+    judgeSchema: "v1",
   };
 }
 
@@ -521,6 +631,9 @@ export function toPaperTradingDecision(
     // 청산 트리거(virtualExecution forced-exit): 손절가 우선, 없으면 무효화가.
     invalidationPrice: intraday.stopPrice ?? intraday.invalidationPrice ?? null,
     targetPrice: intraday.targetPrice ?? null,
+    // 확신 점수 영속 — 다음 틱 에코(buildPreviousEcho)·버킷 캘리브레이션 원장. 폴백 틱은 미기록.
+    ...(intraday.convictionScore != null ? { convictionScore: intraday.convictionScore } : {}),
+    ...(intraday.judgeSchema ? { judgeSchema: intraday.judgeSchema } : {}),
     intradaySnapshot: snapshot,
     source: "cli-agent",
   };
@@ -566,8 +679,13 @@ export async function decideIntradayWithCli(
     return { decision: toPaperTradingDecision(intraday, input, snapshot), intraday };
   };
 
+  // 재진입 쿨다운 — 청산 후 N틱 미경과면 신규 BUY 차단(사전·사후 게이트 공유, PR-3a).
+  const reentryCooldown =
+    input.ticksSinceLastExit != null &&
+    input.ticksSinceLastExit < PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS;
+
   // 사전 게이트. (forceAgents=on-demand 판단 카드는 변화없음 스킵을 무시하고 항상 에이전트 호출)
-  const pre = evaluatePreGate(ctx, input.dailyLossKill);
+  const pre = evaluatePreGate(ctx, input.dailyLossKill, reentryCooldown);
   if (!pre.callLlm && !input.forceAgents) {
     return finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", undefined, [
       pre.reason ?? "규칙 사전 점검으로 AI 호출 생략",
@@ -660,7 +778,7 @@ export async function decideIntradayWithCli(
         input.abortSignal,
         () => {},
       );
-      llm = normalizeLlm(parseLooseJson(r2.text));
+      llm = normalizeLlm(parseLooseJson(r2.text), ctx);
       judgeUsage = r2.usage;
       if (!llm) {
         const trimmed = r2.text.trim();
@@ -696,17 +814,20 @@ export async function decideIntradayWithCli(
   };
 
   if (!llm) {
+    // judge 실패 = 폴백 신규 진입 금지(AC-11 — "judge 실패 ≠ 의도 밖 체결"). noNewEntry 를 강제해
+    // 폴백이 새 포지션을 열지 못하게 한다 — 보유 관리(보호 SELL·직전 목표/손절 유지·forced-exit)만.
+    // 감사에서 실체결 8건 전부가 이 폴백 경로에서 발생했던 사고 구조를 차단한다.
     return withDiagnostics(
       withModels(
-        finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
-          "AI 판단 응답 실패 — 지표 계산으로 대신 결정",
+        finalize(deriveFromSignal(ctx, true), "intraday-fallback", analystNote, [
+          "AI 판단 응답 실패 — 신규 진입 금지(보유 관리만)",
         ]),
         { analyst: analystNote !== "", judge: false },
       ),
     );
   }
 
-  const gated = applyPostGate(llm, ctx, pre.noNewEntry);
+  const gated = applyPostGate(llm, ctx, pre.noNewEntry, reentryCooldown);
   return withDiagnostics(
     withModels(
       finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments),

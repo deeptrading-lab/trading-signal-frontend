@@ -9,6 +9,10 @@ import {
   evaluatePreGate,
   applyPostGate,
   deriveFromSignal,
+  deriveActionFromConviction,
+  convictionEntryPositionPct,
+  convictionToConfidence,
+  normalizeLlm,
   intradayEffort,
   toPaperTradingDecision,
 } from "../intradayCli";
@@ -126,6 +130,147 @@ describe("evaluatePreGate", () => {
     });
     expect(evaluatePreGate(c, false).callLlm).toBe(false);
   });
+  it("재진입 쿨다운 → noNewEntry (구조 이벤트 LLM 관통도 차단)", () => {
+    expect(evaluatePreGate(ctx(), false, true).noNewEntry).toBe(true);
+    const c = ctx({
+      signal: signal({ action: "HOLD" }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+      structureEvent: "전고 돌파 진행",
+    });
+    expect(evaluatePreGate(c, false, true).callLlm).toBe(false);
+  });
+});
+
+// ─── 확신 점수 결정론 컷·사이징 (PR-3a, AC-10) ────────────────────────────────
+
+describe("deriveActionFromConviction (결정론 컷)", () => {
+  it("컷 경계 — 65(기본 컷)→BUY, 64→HOLD (AC-10)", () => {
+    expect(deriveActionFromConviction(65, false)).toBe("BUY");
+    expect(deriveActionFromConviction(64, false)).toBe("HOLD");
+  });
+  it("보유 중 — 40(기본 컷)→SELL, 41→HOLD", () => {
+    expect(deriveActionFromConviction(40, true)).toBe("SELL");
+    expect(deriveActionFromConviction(41, true)).toBe("HOLD");
+  });
+  it("무포지션 낮은 확신은 SELL 아님(공매도 없음) → HOLD", () => {
+    expect(deriveActionFromConviction(10, false)).toBe("HOLD");
+  });
+  it("보유 중 높은 확신 → BUY(추가 매수)", () => {
+    expect(deriveActionFromConviction(80, true)).toBe("BUY");
+  });
+});
+
+describe("convictionEntryPositionPct (결정론 사이징)", () => {
+  it("컷 기준점 65→20%, 80→50%, 95→80%", () => {
+    expect(convictionEntryPositionPct(65)).toBe(20);
+    expect(convictionEntryPositionPct(80)).toBe(50);
+    expect(convictionEntryPositionPct(95)).toBe(80);
+  });
+  it("상한 clamp — 100점도 80% 캡", () => {
+    expect(convictionEntryPositionPct(100)).toBe(80);
+  });
+  it("하한 clamp — 컷 미만 값이 와도 20% 바닥", () => {
+    expect(convictionEntryPositionPct(50)).toBe(20);
+  });
+});
+
+describe("convictionToConfidence (표시용 신뢰도 파생, AC-12)", () => {
+  it("|Δ50| ≥ 25 → HIGH (75, 25)", () => {
+    expect(convictionToConfidence(75)).toBe("HIGH");
+    expect(convictionToConfidence(25)).toBe("HIGH");
+  });
+  it("|Δ50| ≥ 10 → MEDIUM (60, 40)", () => {
+    expect(convictionToConfidence(60)).toBe("MEDIUM");
+    expect(convictionToConfidence(40)).toBe("MEDIUM");
+  });
+  it("|Δ50| < 10 → LOW (55, 50)", () => {
+    expect(convictionToConfidence(55)).toBe("LOW");
+    expect(convictionToConfidence(50)).toBe("LOW");
+  });
+});
+
+// ─── 듀얼 스키마 normalize (PR-3a) ────────────────────────────────────────────
+
+describe("normalizeLlm — v2(convictionScore) / v1(레거시) 듀얼 스키마", () => {
+  const v2 = (convictionScore: number, over: Record<string, unknown> = {}) => ({
+    convictionScore,
+    targetPrice: 10_400,
+    stopPrice: 9_850,
+    invalidationPrice: 9_850,
+    expectedHoldingMinutes: 30,
+    rationale: "점수 테스트.",
+    riskNotes: ["유의"],
+    ...over,
+  });
+
+  it("v2 무포지션 80점 → BUY 파생(사이징 50%·진입구간 현재가 근방·HIGH·마커)", () => {
+    const r = normalizeLlm(v2(80), ctx());
+    expect(r).toMatchObject({
+      action: "BUY",
+      confidence: "HIGH",
+      entryPositionPct: 50,
+      sellRatioPct: null,
+      convictionScore: 80,
+      judgeSchema: "v2",
+    });
+    // deriveFromSignal 과 동일한 진입 구간 파생(-0.1%~+0.2%).
+    expect(r?.entryZone).toEqual({ low: 9_990, high: 10_020 });
+    expect(r?.targetPrice).toBe(10_400);
+  });
+
+  it("v2 보유 중 30점 → SELL 전량(sellRatioPct=100) 파생", () => {
+    const holding = ctx({
+      position: { avgEntryPrice: 9_900, quantity: 10, unrealizedPnlPct: 1, heldMinutes: 20, allocationPct: 40 },
+    });
+    const r = normalizeLlm(v2(30), holding);
+    expect(r).toMatchObject({ action: "SELL", sellRatioPct: 100, entryZone: null, entryPositionPct: null });
+  });
+
+  it("v2 55점 → HOLD(진입 필드 null·LOW)", () => {
+    const r = normalizeLlm(v2(55), ctx());
+    expect(r).toMatchObject({ action: "HOLD", confidence: "LOW", entryZone: null, entryPositionPct: null });
+  });
+
+  it("v2 범위 밖 점수는 0~100 clamp 후 파생(140→100→BUY·80% 캡)", () => {
+    const r = normalizeLlm(v2(140), ctx());
+    expect(r).toMatchObject({ action: "BUY", convictionScore: 100, entryPositionPct: 80 });
+  });
+
+  it("v1 레거시(action 직접) → 기존 파싱 유지 + 근사 확신 합성 + v1 마커", () => {
+    const r = normalizeLlm(
+      {
+        action: "BUY",
+        confidence: "HIGH",
+        entryZone: { low: 9_990, high: 10_020 },
+        entryPositionPct: 35,
+        sellRatioPct: null,
+        targetPrice: 10_400,
+        stopPrice: 9_850,
+        invalidationPrice: 9_850,
+        expectedHoldingMinutes: 60,
+        rationale: "레거시.",
+        riskNotes: [],
+      },
+      ctx(),
+    );
+    expect(r).toMatchObject({
+      action: "BUY",
+      confidence: "HIGH", // v1 은 LLM confidence 그대로(파생 아님)
+      entryPositionPct: 35,
+      convictionScore: 70, // BUY→70 근사 합성
+      judgeSchema: "v1",
+    });
+    expect(normalizeLlm({ action: "SELL", sellRatioPct: 50 }, ctx())?.convictionScore).toBe(30);
+    expect(normalizeLlm({ action: "HOLD" }, ctx())?.convictionScore).toBe(50);
+  });
+
+  it("쓰레기 입력 → null (문자열·빈 객체·미정의 action)", () => {
+    expect(normalizeLlm("그냥 텍스트", ctx())).toBeNull();
+    expect(normalizeLlm(null, ctx())).toBeNull();
+    expect(normalizeLlm({}, ctx())).toBeNull();
+    expect(normalizeLlm({ action: "MAYBE" }, ctx())).toBeNull();
+    expect(normalizeLlm({ convictionScore: "높음" }, ctx())).toBeNull(); // 숫자 아님 + action 없음
+  });
 });
 
 describe("applyPostGate", () => {
@@ -183,6 +328,35 @@ describe("applyPostGate", () => {
   it("경보 활성 + SELL 은 영향 없음 (AC-6)", () => {
     const r = applyPostGate(buyLlm({ action: "SELL" }), ctx({ warnings: [warn("INVESTMENT_RISK")] }), false);
     expect(r.decision.action).toBe("SELL");
+  });
+
+  // ── 재진입 쿨다운 (PR-3a) ──
+  it("재진입 쿨다운이면 BUY → HOLD, generic 문구가 아닌 쿨다운 사유 기록", () => {
+    const r = applyPostGate(buyLlm(), ctx(), true, true);
+    expect(r.decision.action).toBe("HOLD");
+    expect(r.adjustments.join()).toContain("재진입 쿨다운");
+    expect(r.adjustments.join()).not.toContain("장 막판");
+  });
+  it("재진입 쿨다운은 SELL 에 영향 없음(보유 관리 유지)", () => {
+    const r = applyPostGate(buyLlm({ action: "SELL" }), ctx(), true, true);
+    expect(r.decision.action).toBe("SELL");
+  });
+
+  // ── 파생 BUY(v2 확신 컷) 위에서도 안전핀이 그대로 발화 (AC-12 호환) ──
+  it("v2 파생 BUY 도 시장경보 강등이 발화한다", () => {
+    const c = ctx({ warnings: [warn("LIQUIDATION_TRADING")] });
+    const derived = normalizeLlm({ convictionScore: 80, targetPrice: 10_400, stopPrice: 9_850 }, c)!;
+    expect(derived.action).toBe("BUY");
+    const r = applyPostGate(derived, c, false);
+    expect(r.decision.action).toBe("HOLD");
+    expect(r.adjustments.join()).toContain("시장경보");
+  });
+  it("v2 파생 BUY 도 +5% 목표 캡이 발화한다", () => {
+    const c = ctx({ price: 10_000, levels: levels({ tpPrice: 12_000, rrr: 3 }) });
+    const derived = normalizeLlm({ convictionScore: 80, targetPrice: 11_000, stopPrice: 9_850 }, c)!;
+    const r = applyPostGate(derived, c, false);
+    expect(r.decision.action).toBe("BUY");
+    expect(r.decision.targetPrice).toBe(10_500);
   });
 });
 
@@ -304,5 +478,20 @@ describe("toPaperTradingDecision (AI 분할 매수·분할 매도)", () => {
   it("정량 스냅샷 — 미전달(mock/구 경로)이면 미기록", () => {
     const d = toPaperTradingDecision(intraday({ action: "HOLD" }), { ...base, position });
     expect(d.intradaySnapshot).toBeUndefined();
+  });
+
+  it("확신 점수 영속 — convictionScore·judgeSchema 가 payload 에 실린다(에코·캘리브레이션 원장)", () => {
+    const d = toPaperTradingDecision(
+      intraday({ action: "HOLD", convictionScore: 58, judgeSchema: "v2" }),
+      { ...base, position },
+    );
+    expect(d.convictionScore).toBe(58);
+    expect(d.judgeSchema).toBe("v2");
+  });
+
+  it("확신 점수 — 폴백(미기록)이면 payload 키 자체가 없다(경량 유지)", () => {
+    const d = toPaperTradingDecision(intraday({ action: "HOLD" }), { ...base, position });
+    expect("convictionScore" in d).toBe(false);
+    expect("judgeSchema" in d).toBe(false);
   });
 });
