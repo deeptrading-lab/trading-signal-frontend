@@ -35,6 +35,7 @@ function usage(over: Partial<AgentUsage> = {}): AgentUsage {
   };
 }
 
+// v1 레거시 스키마(action 직접 출력) — PR-3a 듀얼 normalize 의 전환기 호환 경로를 함께 검증한다.
 const VALID_JUDGE_JSON = JSON.stringify({
   action: "HOLD",
   confidence: "MEDIUM",
@@ -99,7 +100,8 @@ describe("agentDiagnostics — 실패 관측성 (PR-0)", () => {
     const { decision, intraday } = await decideIntradayWithCli(input());
 
     expect(intraday.source).toBe("intraday-fallback");
-    expect(decision.gateAdjustments).toContain("AI 판단 응답 실패 — 지표 계산으로 대신 결정");
+    // PR-3a: judge 실패 폴백은 신규 진입 금지(보유 관리만) — 사유 문구도 함께 교체.
+    expect(decision.gateAdjustments).toContain("AI 판단 응답 실패 — 신규 진입 금지(보유 관리만)");
     expect(decision.agentDiagnostics?.analyst).toMatchObject({ failureKind: "empty", attempts: 1 });
     expect(decision.agentDiagnostics?.judge).toMatchObject({ failureKind: "empty", attempts: 2 });
     // 실패 시도의 usage 유실 수정 — 진단에 남는다.
@@ -186,5 +188,8 @@ describe("agentDiagnostics — 실패 관측성 (PR-0)", () => {
     expect(decision.agentDiagnostics).toBeUndefined();
     expect(decision.judgeUsage?.measured).toBe(true);
     expect(decision.analystNote).toBe("분석 노트");
+    // v1 레거시 응답 — 근사 합성 확신(HOLD→50) + 스키마 마커가 payload 에 영속(PR-3a).
+    expect(decision.judgeSchema).toBe("v1");
+    expect(decision.convictionScore).toBe(50);
   });
 });

@@ -11,7 +11,7 @@
  * 주기 세트는 백테스트(검증 게이트)로 재보정할 잠정값이며, 3/5/15분 bake-off 후 확정한다.
  */
 
-import { evaluateSignal } from "./engine";
+import { evaluateSignal, LIMITED_DATA_CONFIDENCE_CAP } from "./engine";
 import { gradedConfidence, gradedVolumeAxis, gradedVwapAxis } from "./intradayAxes";
 import type { StockDailyCandle, StockMinuteCandle } from "@/lib/api/kis/types";
 import type {
@@ -142,10 +142,12 @@ export function evaluateIntradaySignal(
   const result = evaluateSignal(candles, opts);
 
   // graded 동의도 — "동의 축 비율"(이진 축 2개 만성 중립 → 50% 박제)을 축 기울기 가중평균으로
-  // 교체. 엔진의 limitedData 상한(0.6)은 동일하게 재적용(장기추세 미확보 과신 방지 무회귀).
+  // 교체. 엔진의 limitedData 상한은 동일하게 재적용(장기추세 미확보 과신 방지 무회귀).
   if (result.warmupOk) {
     const graded = gradedConfidence(result.axes);
-    result.confidence = result.limitedData ? Math.min(graded, 0.6) : graded;
+    result.confidence = result.limitedData
+      ? Math.min(graded, LIMITED_DATA_CONFIDENCE_CAP)
+      : graded;
   }
   return result;
 }

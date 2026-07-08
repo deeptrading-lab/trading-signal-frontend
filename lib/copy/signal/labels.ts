@@ -70,10 +70,16 @@ export const RULE_LABEL: Record<string, string> = {
   VOLUME_SURGE_UP: "상승 + 거래량 급증(동반 강세)",
   VOLUME_SURGE_DOWN: "하락 + 거래량 급증(동반 약세)",
   VOLUME_DRY: "거래량 위축(관망)",
+  // 거래량 — 분봉 graded 축(거래량 z-score, intradayAxes)
+  VOLUME_Z_UP: "상승 + 평균 대비 거래량 우위",
+  VOLUME_Z_DOWN: "하락 + 평균 대비 거래량 우위",
   // 변동성
   BOLL_LOWER_TOUCH: "볼린저 하단 터치(과매도)",
   BOLL_UPPER_TOUCH: "볼린저 상단 터치(과열)",
   BOLL_SQUEEZE: "볼린저 스퀴즈(변동성 수축)",
+  // 변동성 — 분봉 graded 축(당일 VWAP σ-거리, intradayAxes)
+  VWAP_ABOVE: "현재가 VWAP 위(당일 매수 우위)",
+  VWAP_BELOW: "현재가 VWAP 아래(당일 매도 우위)",
 };
 
 /** 규칙키→라벨, 미정의 키는 키 자체로 폴백. */

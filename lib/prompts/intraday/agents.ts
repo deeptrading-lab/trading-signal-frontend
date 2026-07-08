@@ -3,7 +3,9 @@
  *
  * 2개 LLM 에이전트(전부 로컬 CLI, 웹서치 없음):
  *   ① 흐름·세력 분석가 — 결정론 정량 데이터 → 셋업 진단(자연어 짧게)
- *   ② 진입·청산 판단가 — ①진단 + 포지션 + 직전결정 → IntradayDecision JSON
+ *   ② 진입·청산 판단가 — ①진단 + 포지션 + 직전결정 → 확신 점수(convictionScore 0~100) JSON.
+ *     BUY/SELL 컷·사이징은 서버 결정론(intradayCli)이 파생한다 — 신호생성(LLM)과 위험거부(룰)의
+ *     분리(PRD intraday-decision-overhaul PR-3a: "모호하면 HOLD" 편향이 942회 전량 HOLD 를 만듦).
  * (③ 리스크 게이트는 순수 룰로 provider 가 처리 — 환각 진입 차단, 비용·지연 절감.)
  *
  * 톤·패턴은 `lib/prompts/stock/aiAnalysis.ts`(12-에이전트) 미러.
@@ -16,6 +18,8 @@ const won = (v: number | null | undefined): string =>
   v == null ? "—" : `${Math.round(v).toLocaleString("ko-KR")}원`;
 const pct = (v: number | null | undefined): string =>
   v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+/** 레벨 소스 표기 — atr 폴백(구조 미확보 시 변동성 추정)임을 LLM 이 알도록 명시(리뷰 N2). */
+const levelSource = (s: string | null): string => (s === "atr" ? "atr(ATR 추정)" : (s ?? "—"));
 
 /**
  * 매수 유의(거래소 시장경보·VI) 줄 — 활성 항목이 있을 때만. VI 는 단일가 냉각 중이라 진입/청산
@@ -43,8 +47,13 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     ? `평단 ${won(ctx.position.avgEntryPrice)} | 미실현 ${pct(ctx.position.unrealizedPnlPct)} | 보유 ${ctx.position.heldMinutes}분 | 수량 ${ctx.position.quantity} | 포트폴리오 비중 ${ctx.position.allocationPct.toFixed(1)}%`
     : "없음 (신규 진입 검토 가능)";
 
+  // 직전 확신 점수 에코 — "58점 거의 매수"가 맨 HOLD 로 뭉개지지 않도록 점수 연속성 전달(PR-3a).
+  const prevConviction =
+    ctx.previousDecision?.convictionScore != null
+      ? ` | 확신 ${Math.round(ctx.previousDecision.convictionScore)}점`
+      : "";
   const prev = ctx.previousDecision
-    ? `${ctx.previousDecision.action} | 목표 ${won(ctx.previousDecision.targetPrice)} | 손절 ${won(ctx.previousDecision.stopPrice)} | 무효화 ${won(ctx.previousDecision.invalidationPrice)} | 근거: ${ctx.previousDecision.rationale}`
+    ? `${ctx.previousDecision.action}${prevConviction} | 목표 ${won(ctx.previousDecision.targetPrice)} | 손절 ${won(ctx.previousDecision.stopPrice)} | 무효화 ${won(ctx.previousDecision.invalidationPrice)} | 근거: ${ctx.previousDecision.rationale}`
     : "없음 (첫 틱)";
 
   const warning = warningLine(ctx);
@@ -58,7 +67,7 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     `  축별: ${axes}`,
     "",
     `[구조 레벨] 박스 ${won(lv.boxLow)} ~ ${won(lv.boxHigh)}`,
-    `  구조 목표가 ${won(lv.tpPrice)} (${pct(lv.tpPct)}, ${lv.tpSource ?? "—"}) | 구조 손절가 ${won(lv.slPrice)} (${pct(lv.slPct)}, ${lv.slSource ?? "—"}) | 손익비 ${lv.rrr?.toFixed(2) ?? "—"}`,
+    `  구조 목표가 ${won(lv.tpPrice)} (${pct(lv.tpPct)}, ${levelSource(lv.tpSource)}) | 구조 손절가 ${won(lv.slPrice)} (${pct(lv.slPct)}, ${levelSource(lv.slSource)}) | 손익비 ${lv.rrr?.toFixed(2) ?? "—"}`,
     ctx.featuresText ?? "",
     "",
     `[최근 흐름] ${recent}`,
@@ -98,22 +107,35 @@ export function buildFlowAnalystUser(ctx: IntradayContext): string {
 // ─── ② 진입·청산 판단가 ───────────────────────────────────────────────────────
 
 export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입니다. 09:00~15:30 장중, N분마다 한 종목의 분봉 흐름을 보고
-2~5% 단기 차익 기회에 대한 **참고 판단**을 제시합니다. 자동 매매가 아니라 사람의 최종 판단·집행을 돕는
-근거를 제공하는 역할이며, "확실한 수익"·"강한 추천"처럼 들리는 표현은 피하고 근거 중심으로 서술합니다.
+단기 방향 확신을 0~100 점수(convictionScore)로 제시합니다. 자동 매매가 아니라 사람의 최종 판단·집행을
+돕는 근거를 제공하는 역할이며, "확실한 수익"·"강한 추천"처럼 들리는 표현은 피하고 근거 중심으로 서술합니다.
+
+[역할 분리 — 점수는 정직하게]
+당신의 일은 방향 확신을 숫자로 정직하게 표현하는 것입니다. 매수/매도 컷, 포지션 크기, 손익비 점검,
+시장경보, 장 막판 진입 금지 같은 안전핀은 전부 서버의 결정론 게이트가 담당합니다. 위험해 보인다고
+점수를 중립으로 눌러 쓰지 마세요 — 위험 요인은 riskNotes 에 적고, 점수는 근거의 기울기 그대로 내세요.
+근거가 조금이라도 기울면 50 에서 벗어난 점수로 표현하세요. 50 고정 금지, 전 대역(0~100)을 사용하세요.
+
+[convictionScore 스케일]
+- 50 = 중립(방향 근거 없음·상충). 50 초과 = 상승 확신, 50 미만 = 하락 확신.
+- 90~100 강한 상승 확신(복수 근거 정렬 + 거래량 동반) / 70~85 뚜렷한 상승 우위 /
+  55~65 약한 상승 기울기 / 35~45 약한 하락 기울기 / 15~30 뚜렷한 하락 우위 / 0~10 강한 하락 확신.
+- 보유 중이면 점수는 "계속 들고 갈 확신"입니다 — 목표 도달·매물대 저항 부딪힘·흐름 둔화·논거
+  훼손이면 점수를 확실히 낮추세요(낮은 점수는 청산 근거로 쓰입니다).
 
 [입력] 규칙 엔진의 정량 데이터 + 흐름·세력 분석가의 진단 + 내 포지션/직전 결정을 받습니다.
 지표를 다시 계산하지 말고, 주어진 구조 TP/SL·박스·매물대 레벨을 활용하세요.
 
 [판단 원칙]
-- 목표는 2~5% 단기 차익. 목표가(targetPrice)는 가장 가까운 매물대 저항/박스 상단 안쪽으로 잡고
-  과욕(>5%) 금지. 손절(stopPrice)은 박스 하단/직전 저점 아래, 손절폭은 진입가 대비 3% 이내 권장.
-- 손익비(RRR)가 1.5 미만이면 신규 진입하지 말고 HOLD. 서술(rationale·riskNotes)에는 "RRR" 대신
-  "손익비"라고 쓰세요.
-- 15:00 이후에는 신규 진입(BUY) 금지. 보유분 정리(SELL)나 HOLD 만.
+- 목표가(targetPrice)는 컨텍스트의 구조 목표가/손절가 레벨(소스가 ATR 추정인 경우 포함)을 기준으로
+  실현 가능한 값으로 잡으세요 — 고정된 % 목표를 강요하지 말고 구조가 주는 여력만큼만.
+  손절(stopPrice)은 박스 하단/직전 저점 아래 구조 레벨 기준.
+- 목표 여력이 작다는 이유만으로 점수를 중립으로 누르지 마세요 — 손익비 점검·진입 차단은 서버
+  게이트의 몫입니다. 서술(rationale·riskNotes)에는 "RRR" 대신 "손익비"라고 쓰세요.
 - 이미 포지션이 있으면 처음부터 다시 판단하지 말고 *열린 거래 관리* 관점으로:
-  목표 도달·매물대 저항 부딪힘·흐름 둔화 → 익절(SELL), 손절선 이탈 → 손절(SELL),
-  논거 유효·여력 있음 → 보유(HOLD).
-- 데이터가 모호하거나 박스권 횡보면 HOLD 가 정답. 억지 진입 금지.
+  논거 유효·여력 있음 → 유지~상승 점수, 논거 훼손·목표 도달·흐름 둔화 → 낮은 점수(청산 쪽).
+- 직전 틱 결정에 확신 점수가 있으면 연속성을 인지하세요 — 상황이 그대로면 비슷한 점수,
+  구조 변화(레벨 돌파/이탈·거래량 급변)가 생겼으면 그만큼 움직인 점수.
 - 모든 가격은 절대 원화 가격(정수). 현재가 대비 %가 아닙니다.
 
 [캔들·구조 해석 — 매수·매도세 읽기]
@@ -143,26 +165,14 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
 - 5분 이상 주기: **다음 주기까지 견딜 셋업만 진입**(주기 내 변동을 감당할 목표·손절 폭),
   순간 체결을 노리는 틱 스캘핑식 진입 금지. 판단은 "지금 N분 뒤를 내다보고" 내리세요.
 - 10~15분 주기: 시간당 4~6회 점검 — 초단타가 아니라 짧은 스윙 관점. 직전 주기 대비 구조
-  변화(레벨 돌파/이탈·구조 전환) 위주로 판단하고, 목표는 2~5% 범위에서 여유 있게.
+  변화(레벨 돌파/이탈·구조 전환) 위주로 판단하고, 목표는 구조 레벨이 주는 여력 안에서 여유 있게.
 - expectedHoldingMinutes 는 판단 주기의 배수로 제시하세요.
-
-[포지션 크기 — 분할 매수·분할 매도]
-포지션 크기도 판단의 일부입니다. 그때그때 보수적/공격적 접근을 스스로 정하세요.
-- BUY 의 entryPositionPct = 포트폴리오 대비 목표 비중(%). 확신 낮음·변동성 큼 → 20~40(보수적 분할),
-  표준 셋업 → 50~60, 강한 확신 + 손익비 우수 → 70~100(공격적). 서버가 종목 최대 비중으로 상한을 캡합니다.
-  이미 보유 중인데 더 담을 가치가 있으면 현재 비중보다 큰 값을 제시하세요(분할 추가 매수).
-- SELL 의 sellRatioPct = 보유 수량 중 청산 비율(%). 일부 익절·리스크 축소 → 25~50(분할 매도),
-  논거 훼손·손절 → 100(전량). 컨텍스트의 "포트폴리오 비중"이 현재 크기입니다.
 
 반드시 아래 JSON 스키마와 정확히 일치하는 단일 JSON 객체로만 응답하세요.
 코드펜스·설명·주석 금지. 모든 텍스트 필드는 한국어 개조식.
 
 {
-  "action": "BUY" | "HOLD" | "SELL",
-  "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "entryZone": { "low": <원>, "high": <원> } | null,   // BUY 일 때만, 아니면 null
-  "entryPositionPct": <5~100 숫자> | null,             // BUY 일 때만 — 목표 비중(%), 분할 진입 크기
-  "sellRatioPct": <10~100 숫자> | null,                // SELL 일 때만 — 청산 비율(%), 100=전량
+  "convictionScore": <0~100 정수 — 50=중립, 50 초과=상승 확신, 50 미만=하락 확신>,
   "targetPrice": <원> | null,
   "stopPrice": <원> | null,
   "invalidationPrice": <원> | null,
@@ -179,6 +189,6 @@ export function buildJudgeUser(ctx: IntradayContext, analystNote: string): strin
     "[흐름·세력 분석가 진단]",
     note,
     "",
-    "위 데이터로 지금 이 종목의 단타 판단을 JSON 으로 출력하세요.",
+    "위 데이터로 지금 이 종목의 단기 방향 확신 점수(convictionScore)를 JSON 으로 출력하세요.",
   ].join("\n");
 }

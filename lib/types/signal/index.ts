@@ -46,7 +46,12 @@ export type SignalResult = {
   action: SignalAction;
   /** 0~100 종합 점수 (축 가중평균). */
   score: number;
-  /** 0~1 동의도 — 종합 방향에 동의하는 축 비율. */
+  /**
+   * 0~1 동의도 — 종합 방향에 동의하는 축 비율.
+   * ⚠️ 분봉 graded 경로(`evaluateIntradaySignal`)는 **축 기울기 크기의 가중평균**으로 교체된다
+   * (이진 축 만성 중립로 인한 50% 박제 해소 — PR-1b). 의미는 "방향 합의 강도 0~1"로 동일하게
+   * 읽되, 값 분포가 연속적이다. limitedData 캡(LIMITED_DATA_CONFIDENCE_CAP)은 양쪽 동일 적용.
+   */
   confidence: number;
   axes: AxisScore[];
   /** 평가 기준 봉 날짜 (마지막 캔들, YYYY-MM-DD). */

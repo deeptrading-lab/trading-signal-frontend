@@ -106,17 +106,36 @@ function ptActionToIntraday(action: string): IntradayAction {
   return "HOLD";
 }
 
-function buildPreviousEcho(existingTicks: PaperTradingTick[]): IntradayDecisionEcho | null {
+/** 직전 틱 결정 → 에코 — 확신 점수를 함께 실어 "58점 거의 매수"가 맨 HOLD 로 뭉개지지 않게
+ * 한다(무상태 노이즈 방지, PR-3a). 테스트를 위해 export (순수). */
+export function buildPreviousEcho(existingTicks: PaperTradingTick[]): IntradayDecisionEcho | null {
   const last = existingTicks.at(-1);
   if (!last) return null;
   const d = last.decision;
   return {
     action: ptActionToIntraday(d.action),
+    convictionScore: d.convictionScore ?? null,
     targetPrice: d.targetPrice ?? null,
     stopPrice: d.invalidationPrice ?? null,
     invalidationPrice: d.invalidationPrice ?? null,
     rationale: d.rationale,
   };
+}
+
+/**
+ * 마지막 청산(SELL 체결) 틱 이후 경과 틱 수 — 재진입 쿨다운 판정 입력(PR-3a).
+ * 직전 틱에서 청산했으면 0. 청산 이력이 없으면 null(쿨다운 미적용). 테스트를 위해 export (순수).
+ */
+export function ticksSinceLastExit(
+  existingTicks: PaperTradingTick[],
+  ticker: string,
+): number | null {
+  for (let i = existingTicks.length - 1; i >= 0; i--) {
+    if (existingTicks[i].orders.some((o) => o.ticker === ticker && o.side === "SELL")) {
+      return existingTicks.length - 1 - i;
+    }
+  }
+  return null;
 }
 
 function resolveSessionAiProvider(session: PaperTradingSession): AIAnalysisProvider {
@@ -208,6 +227,7 @@ export async function resolveIntradayTickDecision(
     position,
     previousDecision,
     dailyLossKill,
+    ticksSinceLastExit: ticksSinceLastExit(args.existingTicks, stock.ticker),
     riskMode: session.riskMode,
     maxPositionPct: session.maxPositionPct,
     provider: resolveSessionAiProvider(session),
