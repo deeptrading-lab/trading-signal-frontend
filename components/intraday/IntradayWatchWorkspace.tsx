@@ -22,6 +22,7 @@ import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
+import { IntradayCalibrationPanel } from "@/components/intraday/IntradayCalibrationPanel";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import {
   INTRADAY_PAPER_COPY as P,
@@ -225,6 +226,9 @@ export function IntradayWatchWorkspace() {
           />
         </>
       )}
+
+      {/* 판단 캘리브레이션(관리자) — 틱 자가채점 라벨 요약·백필 실행. 노출 규칙은 페이지와 동일. */}
+      <IntradayCalibrationPanel />
     </div>
   );
 }

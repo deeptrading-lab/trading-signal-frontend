@@ -13,6 +13,7 @@ import {
   persistPaperTick,
 } from "@/lib/server/paperTrading/persistence";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
+import { scheduleSessionTickLabeling } from "@/lib/server/intraday/tickLabels";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
   CreatePaperTradingSessionRequest,
@@ -199,23 +200,52 @@ export async function createPaperTradingSession(
   return toDetail(entry);
 }
 
-export async function patchPaperTradingSessionStatus(
+/**
+ * 세션 부분 수정 — 상태 전환 및/또는 판단 주기 변경. 주기는 세션 중에도 바꿀 수 있고, 다음 틱 창
+ * 계산이 `session.tickIntervalMinutes` 를 매번 읽으므로 **다음 틱부터 자동 반영**된다(스케줄러 무변경).
+ */
+export async function patchPaperTradingSession(
   sessionId: string,
-  status: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">,
+  patch: {
+    status?: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">;
+    tickIntervalMinutes?: number;
+  },
 ): Promise<PaperTradingSessionDetail | null> {
   await ensureHydrated();
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
 
+  const wasCompleted = entry.session.status === "completed";
   const now = new Date().toISOString();
   entry.session = {
     ...entry.session,
-    status,
-    endedAt: status === "completed" ? now : entry.session.endedAt,
+    ...(patch.status !== undefined
+      ? {
+          status: patch.status,
+          endedAt: patch.status === "completed" ? now : entry.session.endedAt,
+        }
+      : {}),
+    ...(patch.tickIntervalMinutes !== undefined
+      ? { tickIntervalMinutes: patch.tickIntervalMinutes }
+      : {}),
     updatedAt: now,
   };
   void persistPaperSession(entry.session, entry.positions);
+  // 틱 자가채점(intraday-decision-overhaul PR-2) — 완료 **전이** 시 그날 분봉으로 라벨링.
+  // 마감 스윕(tickScheduler)·수동 PATCH 모두 이 함수를 지나므로 여기 한 곳이 완료 훅의 choke point.
+  // fire-and-forget + 내부 never-throw — 모의투자 흐름을 절대 막지 않는다(관측 전용).
+  if (status === "completed" && !wasCompleted) {
+    scheduleSessionTickLabeling(entry.session, [...entry.ticks]);
+  }
   return toDetail(entry);
+}
+
+/** 상태만 전환(스케줄러 자동 완료 등 기존 호출부 호환 래퍼). */
+export async function patchPaperTradingSessionStatus(
+  sessionId: string,
+  status: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">,
+): Promise<PaperTradingSessionDetail | null> {
+  return patchPaperTradingSession(sessionId, { status });
 }
 
 export async function runPaperTradingSessionTick(

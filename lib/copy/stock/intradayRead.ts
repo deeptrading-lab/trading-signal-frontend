@@ -5,6 +5,11 @@
  */
 
 import type { IntradayAction } from "@/lib/types/intraday/intradayDecision";
+import type {
+  IntradayScoreBand,
+  IntradayTickLabelSource,
+  RunIntradayTickLabelsResponse,
+} from "@/lib/types/intraday/tickLabels";
 
 export const INTRADAY_READ_COPY = {
   title: "장중 단타 판단",
@@ -139,6 +144,18 @@ export const INTRADAY_PAPER_COPY = {
     chartEmpty: "당일 분봉이 아직 없어요.",
     chartError: "분봉을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
     ordersNoSession: "모의 세션이 없어요 — 모의 시작을 누르면 여기에 체결이 기록돼요.",
+    /* 날짜별 그룹 헤더 — 세션 시작일 기준(오늘/어제/그 외 M/D) + 건수 + 당일 요약. */
+    groupToday: "오늘",
+    groupYesterday: "어제",
+    groupCount: (n: number) => `${n}건`,
+    groupToggleAria: (label: string) => `${label} 그룹 접기/펼치기`,
+    /* 당일 요약 — 합산 수익률 접두어 · 승/패 · 진행중. */
+    groupSummaryReturn: "합산",
+    groupWinLoss: (w: number, l: number) => `${w}승 ${l}패`,
+    groupRunning: (n: number) => `진행 ${n}`,
+    /* 전체 그룹 접기/펼치기 컨트롤. */
+    groupExpandAll: "모두 펼치기",
+    groupCollapseAll: "모두 접기",
   },
 
   /* 상세 시트 — 카드 클릭 시 체결 내역·거래별 손익. */
@@ -163,4 +180,54 @@ export const INTRADAY_PAPER_COPY = {
     gatePrefix: "룰 조정",
     close: "닫기",
   },
+} as const;
+
+/** 관리자 캘리브레이션 패널(틱 자가채점 라벨) 카피 — intraday-decision-overhaul PR-2. */
+export const INTRADAY_CALIBRATION_COPY = {
+  title: "판단 캘리브레이션",
+  badge: "관리자",
+  subtitle:
+    "저장된 판단 틱을 그날 이후 분봉과 대조해 '그 레벨로 진입했다면'의 결과를 채점해요 (관망 틱은 반사실 라벨).",
+  run: "라벨링 실행",
+  running: "라벨링 중…",
+  runHint: "완료 세션을 한 번에 최대 3개씩 채점해요 — 남은 세션이 있으면 다시 눌러 이어가요.",
+  result: (r: RunIntradayTickLabelsResponse) =>
+    r.configured
+      ? `확정 ${r.labeled}건 · 미확정 ${r.unresolved}건 · 세션 ${r.sessions}개 처리${
+          r.remaining > 0 ? ` · ${r.remaining}개 세션 남음` : " · 전부 최신 상태예요"
+        }`
+      : "라벨 저장소(Supabase)가 설정되지 않아 실행하지 못했어요.",
+  loading: "라벨 집계를 불러오는 중…",
+  error: "라벨 집계를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+  empty: "아직 라벨이 없어요 — 라벨링 실행을 누르면 완료된 세션부터 채점을 시작해요.",
+  unconfigured: "라벨 저장소(Supabase)가 설정되지 않았어요 — 로컬 env 를 확인해 주세요.",
+  staleNote:
+    "KIS 과거 분봉은 최근 며칠만 조회돼요 — 오래된 세션 틱은 '미확정'이 정상이에요. 익절·손절 동시 터치 봉은 손절로 집계(보수적)해요.",
+  totalLabel: "누적 라벨",
+  table: {
+    colBucket: "출처 × 판단",
+    colWin: "익절",
+    colLoss: "손절",
+    colNeutral: "만료",
+    colUnresolved: "미확정",
+    colAvgReturn: "평균수익률",
+  },
+  source: {
+    "intraday-cli": "AI 판단",
+    "intraday-fallback": "결정론 폴백",
+  } satisfies Record<IntradayTickLabelSource, string>,
+  actionLabel: {
+    BUY: "매수",
+    INCREASE: "추가매수",
+    REDUCE: "부분청산",
+    EXIT: "전량청산",
+    SELL: "매도",
+    HOLD: "관망",
+  } as Record<string, string>,
+  bandsTitle: "시그널 점수대별",
+  band: {
+    lt40: "40 미만",
+    b40to60: "40~60",
+    gte60: "60 이상",
+  } satisfies Record<IntradayScoreBand, string>,
 } as const;

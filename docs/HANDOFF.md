@@ -7014,6 +7014,51 @@
   - PR-3a: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지
   - PR-4: 장중 실검증 — graded 축의 preGate 스킵률·LLM 콜 볼륨 실측
 
+
+### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-2 — 틱 자가채점 루프(intraday_tick_labels) + 캘리브레이션 패널 (#314)
+
+- **slug**: `intraday-tick-labels` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/314
+- **요약**: feat(intraday): 단타 판단 고도화 PR-2 — 틱 자가채점 루프(intraday_tick_labels) + 캘리브레이션 패널
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PRD `intraday-decision-overhaul` **PR-2 — 틱 자가채점 루프**(§3 PR-2, §5 AC-9, §9 q3).
+  > 
+  > 영속된 모의 단타 틱(`decision.intradaySnapshot`)을 그날 이후 분봉 경로와 대조해 **WIN / LOSS / NEUTRAL / UNRESOLVED** 로 채점하고 신규 `intraday_tick_labels` 테이블에 멱등 upsert 한다. **HOLD 틱도 스냅샷 구조 레벨로 "만약 그 레벨로 진입했다면"의 반사실(counterfactual) 라벨**을 남겨, conviction 컷·임계값 캘리브레이션(PR-3a/PR-4)의 ground truth 를 만든다. 기존 ~2,199틱 코퍼스는 `/intraday` 관리자 패널의 "라벨링 실행" 반복 클릭으로 백필한다.
+  > 
+  > **트레이딩 루프 행동 변경 0** — 라벨링은 관측 전용이며, 세션 완료 훅은 fire-and-forget + never-throw.
+  > 
+  > ## 변경
+  > 
+  > - **SQL** `docs/sql/intraday-tick-labels.sql` — `tick_id` PK + 필터 최소 컬럼 + `payload` jsonb(시그널 score/action/confidence·rrr·tp/sl·기준가·**conviction placeholder**), (session_id)/(ticker) 인덱스, RLS service-role 전용. ⚠️ **Supabase SQL Editor 수동 1회 실행 필요**(선례 동일, 미생성 시 fail-soft skip).
+  > - **라벨링 엔진** `lib/server/intraday/tickLabels.ts`
+  >   - `labelTick` — 진입가=`snapshot.basePrice`, TP/SL=LLM 결정가(`targetPrice`/`invalidationPrice`) 우선·null 이면 스냅샷 구조 레벨(HOLD 반사실). 판단 스탬프(KST) **초과** 봉만 당일 15:20(강제 청산 창 상수 파생)까지 워크, 봉 내 TP·SL 동시 터치는 **손절 우선**(`tripleBarrier` 보수 규칙 미러 — 절대가 배리어·basePrice 진입·벽시계 horizon 이라 직접 재사용 대신 로컬 워커, 사유 주석).
+  >   - `labelSessionTicks` — (ticker, KST 일자)당 분봉 1회 페치(`fetchTodayMinuteCandles`/`fetchMinuteCandlesForDate`, timeframe=`deriveIntradayTimeframe`), `on_conflict=tick_id` merge-duplicates 멱등 upsert(persistence.ts 관례 — supabaseConfig/4s 타임아웃/warnOnce). KIS·Supabase 미설정 → 무저장 skip(never-throw).
+  >   - `summarizeLabels`/`bucketizeLabels` — 출처×액션 버킷(WIN/LOSS/NEUTRAL/UNRESOLVED 카운트+평균수익률) + 시그널 점수대 밴드(<40/40~60/60+), 페이지네이션 캡 20k 후 클라이언트 집계.
+  >   - 출처 복원 — `IntradayDecision.source` 미영속이라 **judge 성공 시에만 기록되는 `judgeModel` 존재 여부**로 intraday-cli/fallback 파생.
+  > - **완료 훅** — `sessionStore.patchPaperTradingSessionStatus` 완료 **전이** 시 `scheduleSessionTickLabeling` fire-and-forget(프로세스당 세션 1회 가드). 마감 스윕(`closeOutRunningSessionsAtClose`)·수동 PATCH 모두 이 함수를 지나는 공통 choke point(§9 q3 — 완료 전이 시 라벨링, 부분 장중 라벨 없음).
+  > - **BFF** `POST /api/intraday/labels/run`(완료 세션 최근순 최대 N=3·캡 10, 기존 라벨 tick_id dedupe, `remaining` 보고) + `GET /api/intraday/labels/summary`. 게이트 `requireProdAdminApi`(prod=admin+·로컬 전체 — /intraday 페이지·paper-trading 라우트 정합).
+  > - **UI** `components/intraday/IntradayCalibrationPanel.tsx` — /intraday 하단 카드리스 패널(버킷 표+점수대 밴드+실행 버튼 loading+인라인 결과), `useTickLabels` 도메인 훅 + `hooks/query` 페칭 훅 + `lib/api/intraday/labels.ts`, queryKeys/queryConfig 단일 위치, `INTRADAY_CALIBRATION_COPY` 한글 카피. 신규 토큰 0.
+  > 
+  > ## 검증
+  > 
+  > - `npx vitest run` — **1094 passed | 3 skipped (130 files)**, 신규 36건(엔진 26 + 라우트 10: WIN/LOSS/동시터치 손절우선/만료/UNRESOLVED/HOLD 반사실/멱등 upsert/dedupe/집계 수학/403 게이트).
+  > - `npx tsc --noEmit` — clean. `npm run lint` — clean.
+  > - ⚠️ **KIS 과거 분봉은 최근 며칠만 조회 가능** — 오래된 코퍼스 틱의 UNRESOLVED 는 기대 동작(코드 주석·UI staleNote 명시). 실데이터 백필·버킷 검증은 로컬 dev(KIS+Supabase env)에서 "라벨링 실행"으로 수행.
+  > 
+  > ## 다음 작업
+  > 
+  > - [ ] Supabase SQL Editor 에서 `docs/sql/intraday-tick-labels.sql` 수동 1회 실행 → 로컬 dev 에서 "라벨링 실행" 반복 클릭으로 기존 코퍼스 백필(AC-9 실데이터 확인)
+  > - [ ] PR-3a judge 점수화 — convictionScore 스키마(듀얼 normalize)·env 컷(BUY≥65/SELL≤40)·사이징·재진입 쿨다운·judge 실패 시 폴백 신규 진입 금지(라벨 payload `conviction` placeholder 배선)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] Supabase SQL Editor 에서 `docs/sql/intraday-tick-labels.sql` 수동 1회 실행 → 로컬 dev 에서 "라벨링 실행" 반복 클릭으로 기존 코퍼스 백필(AC-9 실데이터 확인)
+  - [ ] PR-3a judge 점수화 — convictionScore 스키마(듀얼 normalize)·env 컷(BUY≥65/SELL≤40)·사이징·재진입 쿨다운·judge 실패 시 폴백 신규 진입 금지(라벨 payload `conviction` placeholder 배선)
+  - [ ] PR-3b preGate 교차 트리거 — VWAP 재탈환·ORB 돌파·volume z≥2(crossing 이벤트 시맨틱)
+  - [ ] PR-4 장중 실검증 — 5분 주기 표준 세션 + 라벨 버킷 승률로 env 컷 튜닝
+
+
 ### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-3a — judge 확신 점수화(convictionScore) + 결정론 컷·사이징 + 폴백 진입 금지 (#315)
 
 - **slug**: `intraday-conviction-judge` · **author**: @HY0118
