@@ -7,7 +7,8 @@
  * 포지션 현황, **체결 내역 표(비용·실현손익·판단 메모)**, 판단 타임라인(최신순, 진단·룰 조정).
  * 정리한 것: 목표 수익률/달성률 카드(단타에 무의미한 파생값), 최신 판단 별도 카드(타임라인
  * 최신 항목과 중복), cli-agent 세션의 "지금 재판단"(자동 틱이 담당 — mock 세션에만 노출).
- * 뒤로가기는 단타 워치(/intraday) — 구 목록 페이지(/dashboard/paper-trading)는 레거시.
+ * 라우트는 `/intraday/[sessionId]`(단타 목록의 "전체화면" 진입점). 뒤로가기는 단타 워치(/intraday).
+ * (구 `/dashboard/paper-trading` 목록/상세는 은퇴 — 단타로 일원화.)
  */
 
 import Link from "next/link";

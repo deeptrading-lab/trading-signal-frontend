@@ -614,7 +614,7 @@ function WatchRow({
           <div className="flex items-center justify-end gap-xs">
             {current ? (
               <Link
-                href={`/dashboard/paper-trading/${current.id}`}
+                href={`/intraday/${current.id}`}
                 className={ICON_BTN}
                 aria-label={P.detailLink}
                 title={P.detailLink}
