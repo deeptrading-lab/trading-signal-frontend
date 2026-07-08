@@ -6889,3 +6889,46 @@
   - (머지 후 후속) `STRONG_BULL_TRIGGERS`/`STRONG_BEAR_TRIGGERS`에 `macdConverge`/`higherLowBase` 키 추가 여부 — QA 백테스트에서 `HIGHER_LOW_BASE`가 표본이 클수록(47→242) 더 강한 양의 예측력(+0.55%→+0.97%)을 보였으므로, 트리거 승격을 별도 PRD/PR로 검토할 근거가 될 수 있음.
   - (머지 후 후속) `AXIS_SCALE`(momentum=9, trend=11) 상향 여부 — 이번 백테스트에서 조기 포화로 인한 명백한 왜곡은 관찰되지 않았으나(pooled 지표 개선), 라이브 운영 중 포화 빈도를 계속 관찰.
   - 리뷰어: QA 리포트(`docs/qa/signal-reversal-rules.md`)의 AC-10 HD현대 재현 결과(`HIGHER_LOW_BASE` 미발화가 look-ahead 안전 설계상 정상임) 및 분봉 발화율 비교표 확인 요청.
+
+### 2026-07-08 — feat(intraday): 단타 판단 고도화 PR-0 — 실패 관측성(agentDiagnostics) + PRD (#307)
+
+- **slug**: `intraday-decision-overhaul` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/307
+- **요약**: feat(intraday): 단타 판단 고도화 PR-0 — 실패 관측성(agentDiagnostics) + PRD
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 단타 AI 판단 고도화 시리즈(PRD `docs/prd/intraday-decision-overhaul.md`)의 첫 PR. **행동 무변경** — 에이전트 CLI 실패의 원문·사유를 틱 payload 로 영속해, 지금까지 소급 진단이 불가했던 실패(2,199틱 감사에서 125틱, 94%가 빈 응답)를 다음 장중부터 데이터로 답할 수 있게 한다.
+  > 
+  > ## 배경 (전수 감사 핵심)
+  > 
+  > - judge LLM 942회 실행 → 실질 100% HOLD. 실제 체결 8건은 전부 CLI 실패 폴백에서 발생.
+  > - 실패 원문이 어디에도 저장되지 않아(`parseLooseJson` 후 폐기) 원인 분석 불가 → 본 PR 이 그 갭을 막는다.
+  > 
+  > ## 변경
+  > 
+  > - `IntradayAgentDiagnostics`/`IntradayTickAgentDiagnostics` 타입 신설 (`lib/types/intraday/intradayDecision.ts`)
+  > - `PaperTradingDecision.agentDiagnostics?` — payload jsonb 탑승, DB 마이그레이션 0
+  > - `decideIntradayWithCli`: 분석가·판단가 실패 캡처 — failureKind(empty/parse/timeout/abort/error), attempts, rawTextHead(2KB 캡, parse 실패 원문), errorMessage(300자), 실패 시도 usage 보존(기존엔 유실)
+  > - 재시도 병합: 마지막 실패 기준 + 앞선 실패의 원문·usage 이월 / 재시도 끝 성공은 `recovered: true`
+  > - 전부 성공 틱은 미기록 — 행동·payload 완전 무변경
+  > 
+  > ## 검증
+  > 
+  > - 신규 테스트 6종 (`intradayCliDiagnostics.test.ts`): AC-1 빈응답×2, AC-2 비-JSON 2KB 절단, AC-3 재시도 회복(+judgeModel 성공 의미 유지), AC-4 전부 성공 미기록, timeout 분류, 병합 이월
+  > - 전체 vitest **1053 passed** / tsc 클린
+  > 
+  > ## 다음 작업
+  > 
+  > - PR-1a: ATR 폴백 TP/SL — `buildIntradayLevels` 구조 null 시 ATR(14)×3/1.5 (RRR null 77% 해소)
+  > - PR-1b: graded 축(거래량 z-score·VWAP σ) + `axisOverrides` seam + 백테스트 evaluate 훅
+  > - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
+  > - PR-3a~c: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지 / preGate 교차 트리거 / CLI 신뢰성
+  > - PR-4: 장중 실검증(5분 주기 표준) + env 컷 캘리브레이션
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-1a: ATR 폴백 TP/SL — `buildIntradayLevels` 구조 null 시 ATR(14)×3/1.5 (RRR null 77% 해소)
+  - PR-1b: graded 축(거래량 z-score·VWAP σ) + `axisOverrides` seam + 백테스트 evaluate 훅
+  - PR-2: 틱 자가채점 루프(intraday_tick_labels) + /intraday 캘리브레이션 대시보드
+  - PR-3a~c: judge 점수화(convictionScore)·결정론 컷·폴백 진입 금지 / preGate 교차 트리거 / CLI 신뢰성
+  - PR-4: 장중 실검증(5분 주기 표준) + env 컷 캘리브레이션

@@ -5,7 +5,7 @@
  * 실행에 직접 필요하고, 3-액션이면 충분하며, 보유시간이 분 단위다.
  */
 
-import type { DecisionSignal } from "@/lib/types/stock/aiAnalysis";
+import type { AgentUsage, DecisionSignal } from "@/lib/types/stock/aiAnalysis";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 export type IntradayAction = "BUY" | "HOLD" | "SELL";
@@ -153,6 +153,38 @@ export interface IntradaySnapshot {
   levels: IntradayLevels;
   /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") 발생 여부 — 없으면 null. 돌파 참여 분석용. */
   structureEvent: string | null;
+}
+
+/**
+ * 에이전트 CLI 실패 종류 (PRD intraday-decision-overhaul PR-0).
+ * empty=정상 종료했지만 빈 응답 / parse=텍스트는 왔으나 JSON 파싱 실패(원문 보존) /
+ * timeout·abort·error=호출 예외(에러 name 으로 분류).
+ */
+export type IntradayAgentFailureKind = "empty" | "parse" | "timeout" | "abort" | "error";
+
+/**
+ * 에이전트 1개(분석가/판단가)의 호출 진단 — 실패(또는 재시도 후 회복) 시에만 기록.
+ * 성공-무재시도 틱은 미기록(payload 경량 유지). 재시도가 있었으면 **마지막 실패 기준**이되,
+ * 앞선 실패의 rawTextHead·usage 는 뒤 실패에 없으면 이월 보존한다(파싱 실패 원문이 가장 귀한 진단).
+ */
+export interface IntradayAgentDiagnostics {
+  failureKind: IntradayAgentFailureKind;
+  /** 총 시도 횟수(재시도 포함). */
+  attempts: number;
+  /** 실패 응답 원문 앞부분(최대 2KB) — parse 실패 진단용. empty/예외는 미기록. */
+  rawTextHead?: string;
+  /** 예외 메시지("name: message", 최대 300자). */
+  errorMessage?: string;
+  /** 실패 시도의 토큰 사용량 — 성공 시도의 usage 는 기존 judgeUsage/analystUsage 로 간다(의미 유지). */
+  usage?: AgentUsage;
+  /** 재시도 끝에 최종 성공했는가 — true 면 결정은 LLM 산(진단은 실패 시도 기록). */
+  recovered?: boolean;
+}
+
+/** 틱 판단의 에이전트 진단 묶음 — `PaperTradingDecision.agentDiagnostics` 로 영속(payload jsonb). */
+export interface IntradayTickAgentDiagnostics {
+  analyst?: IntradayAgentDiagnostics;
+  judge?: IntradayAgentDiagnostics;
 }
 
 /** 최종 단타 결정 — LLM 부분 + 서버 메타. */
