@@ -10,7 +10,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
@@ -159,18 +158,14 @@ export function IntradayWatchWorkspace() {
 
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
-      <header className="flex items-center gap-sm">
-        <Zap className="h-2xl w-2xl text-accent-vivid" aria-hidden="true" />
-        <div className="flex flex-col">
-          <h1 className="text-h1 text-text-strong">{W.title}</h1>
-          <p className="text-caption text-text-muted">{W.subtitle}</p>
+      {/* 문서 아웃라인용 접근성 제목(항상 sr-only) — 시각 타이틀은 전 페이지 공통으로 제거(홈 정합).
+       *  장중 자동 판단 배지만 라이브 상태로 상단에 남긴다(active 일 때만). */}
+      <h1 className="sr-only">{W.title}</h1>
+      {autoActive ? (
+        <div className="flex">
+          <Badge variant="info">{P.autoTicking}</Badge>
         </div>
-        {autoActive ? (
-          <Badge variant="info" className="ml-auto">
-            {P.autoTicking}
-          </Badge>
-        ) : null}
-      </header>
+      ) : null}
 
       {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}
       <StockSearchPicker

@@ -20,7 +20,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Star, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import {
   WATCHLIST_PAGE_TITLE,
@@ -46,23 +46,14 @@ export function WatchlistPage({
 }: WatchlistPageProps) {
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-lg">
-      {/* 문서 아웃라인용 접근성 제목(홈과 동일 — 항상 sr-only, absolute 라 flex 슬롯 없음).
-       *  이로써 모바일에서 검색이 홈처럼 상단 패딩에 바로 붙어 페이지 간 상단 여백이 통일된다. */}
+      {/* 문서 아웃라인용 접근성 제목(항상 sr-only) — 시각 타이틀은 전 페이지 공통 제거(홈 정합).
+       *  검색이 상단 패딩에 바로 붙는다. 새로고침은 md+ 에서만 우측 상단에 유지(모바일=pull-to-refresh). */}
       <h1 className="sr-only">{WATCHLIST_PAGE_TITLE}</h1>
-      {/* 시각 헤더(제목 + 새로고침) — md+ 에서만 렌더(모바일은 빈 행이 상단 여백을 밀지 않게 미렌더).
-       *  모바일 새로고침은 pull-to-refresh(셸 공통)로 대체. */}
-      <div className="hidden md:flex items-center gap-sm">
-        <span className="inline-flex items-center gap-sm text-h2 text-text-strong">
-          <Star
-            className="h-5 w-5 text-chart-signal fill-chart-signal"
-            aria-hidden="true"
-          />
-          {WATCHLIST_PAGE_TITLE}
-        </span>
-        {canRefresh ? (
+      {canRefresh ? (
+        <div className="hidden md:flex justify-end">
           <button
             type="button"
-            className="ml-auto inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
+            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm bg-transparent text-text-muted transition-colors hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-[0.65]"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={isRefreshing ? WATCHLIST_REFRESHING : WATCHLIST_REFRESH}
@@ -72,8 +63,8 @@ export function WatchlistPage({
               aria-hidden="true"
             />
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       {children}
     </div>
   );
