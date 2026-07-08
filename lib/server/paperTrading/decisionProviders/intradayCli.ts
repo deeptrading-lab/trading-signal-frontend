@@ -30,6 +30,8 @@ import type {
   PaperTradingRiskMode,
 } from "@/lib/types/paperTrading/paperTrading";
 import type {
+  IntradayAgentDiagnostics,
+  IntradayAgentFailureKind,
   IntradayContext,
   IntradayDecision,
   IntradayDecisionEcho,
@@ -382,6 +384,43 @@ function normalizeLlm(parsed: unknown): IntradayDecisionLlm | null {
   };
 }
 
+// ─── 에이전트 호출 진단 (PRD intraday-decision-overhaul PR-0) ─────────────────
+
+/** 실패 원문 보존 상한(2KB) — payload jsonb 비대 방지. */
+const RAW_TEXT_HEAD_MAX = 2048;
+const ERROR_MESSAGE_MAX = 300;
+
+/** 예외 → 실패 종류. invokeAgentCliStream 은 타임아웃/중단에 error.name 을 채운다. */
+function classifyAgentFailure(error: unknown): IntradayAgentFailureKind {
+  const name = (error as { name?: string } | null)?.name;
+  if (name === "TimeoutError") return "timeout";
+  if (name === "AbortError") return "abort";
+  return "error";
+}
+
+function describeAgentError(error: unknown): string {
+  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return text.slice(0, ERROR_MESSAGE_MAX);
+}
+
+/**
+ * 재시도 진단 병합 — 최신 실패가 기준이되, 앞선 실패의 원문(rawTextHead)·usage 는 뒤 실패에
+ * 없으면 이월 보존한다. parse 실패 원문이 가장 귀한 진단이라 empty/예외 재시도로 덮여
+ * 사라지지 않게 하는 장치.
+ */
+function mergeAgentDiagnostics(
+  prev: IntradayAgentDiagnostics | undefined,
+  next: IntradayAgentDiagnostics,
+): IntradayAgentDiagnostics {
+  return {
+    ...next,
+    ...(next.rawTextHead == null && prev?.rawTextHead != null
+      ? { rawTextHead: prev.rawTextHead }
+      : {}),
+    ...(next.usage == null && prev?.usage != null ? { usage: prev.usage } : {}),
+  };
+}
+
 // ─── PaperTradingDecision 어댑터 ──────────────────────────────────────────────
 
 function riskTargetPct(riskMode: PaperTradingRiskMode): number {
@@ -552,8 +591,9 @@ export async function decideIntradayWithCli(
     return result;
   };
 
-  // ① 흐름·세력 분석가 — 실패해도 진단 없이 ②로 진행(분석가는 보조).
+  // ① 흐름·세력 분석가 — 실패해도 진단 없이 ②로 진행(분석가는 보조). 실패는 agentDiagnostics 기록.
   let analystNote = "";
+  let analystDiag: IntradayAgentDiagnostics | undefined;
   try {
     const r1 = await invokeAgentCliStream(
       provider,
@@ -570,13 +610,24 @@ export async function decideIntradayWithCli(
     );
     analystNote = r1.text.trim();
     analystUsage = r1.usage;
-  } catch {
+    // CLI 가 정상 종료했지만 빈 텍스트 — 관측된 실패의 94%가 이 유형(형식불량 아님).
+    if (!analystNote) analystDiag = { failureKind: "empty", attempts: 1, usage: r1.usage };
+  } catch (error) {
     analystNote = "";
+    analystDiag = {
+      failureKind: classifyAgentFailure(error),
+      attempts: 1,
+      errorMessage: describeAgentError(error),
+    };
   }
 
   // ② 진입·청산 판단가 — JSON 파싱이 가끔 실패(~1/3 관측)하므로 1회 재시도 후 결정론 폴백.
+  //    실패 시 원문(rawTextHead)·종류(failureKind)를 남긴다 — "어떤 응답이 왜 실패했나"의 사후 근거.
   let llm: IntradayDecisionLlm | null = null;
+  let judgeDiag: IntradayAgentDiagnostics | undefined;
+  let judgeAttempts = 0;
   for (let attempt = 0; attempt < 2 && !llm; attempt++) {
+    judgeAttempts++;
     try {
       const r2 = await invokeAgentCliStream(
         provider,
@@ -593,23 +644,55 @@ export async function decideIntradayWithCli(
       );
       llm = normalizeLlm(parseLooseJson(r2.text));
       judgeUsage = r2.usage;
-    } catch {
+      if (!llm) {
+        const trimmed = r2.text.trim();
+        judgeDiag = mergeAgentDiagnostics(judgeDiag, {
+          failureKind: trimmed ? "parse" : "empty",
+          attempts: judgeAttempts,
+          ...(trimmed ? { rawTextHead: r2.text.slice(0, RAW_TEXT_HEAD_MAX) } : {}),
+          // 실패 시도의 usage — 성공 시도의 usage 는 기존 judgeUsage 로 간다(유실 수정).
+          usage: r2.usage,
+        });
+      }
+    } catch (error) {
       llm = null;
+      judgeDiag = mergeAgentDiagnostics(judgeDiag, {
+        failureKind: classifyAgentFailure(error),
+        attempts: judgeAttempts,
+        errorMessage: describeAgentError(error),
+      });
     }
   }
+  // 재시도 끝 성공 — 결정은 LLM 산(judgeModel 기록 유지). 실패 시도 기록은 회복 표시와 함께 보존.
+  if (llm && judgeDiag) judgeDiag = { ...judgeDiag, attempts: judgeAttempts, recovered: true };
+
+  // 실패/재시도가 있었던 틱에만 진단 부착 — 전부 성공 틱은 미기록(행동·payload 무변경).
+  const withDiagnostics = (result: IntradayProviderResult): IntradayProviderResult => {
+    if (analystDiag || judgeDiag) {
+      result.decision.agentDiagnostics = {
+        ...(analystDiag ? { analyst: analystDiag } : {}),
+        ...(judgeDiag ? { judge: judgeDiag } : {}),
+      };
+    }
+    return result;
+  };
 
   if (!llm) {
-    return withModels(
-      finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
-        "AI 판단 응답 실패 — 지표 계산으로 대신 결정",
-      ]),
-      { analyst: analystNote !== "", judge: false },
+    return withDiagnostics(
+      withModels(
+        finalize(deriveFromSignal(ctx, pre.noNewEntry), "intraday-fallback", analystNote, [
+          "AI 판단 응답 실패 — 지표 계산으로 대신 결정",
+        ]),
+        { analyst: analystNote !== "", judge: false },
+      ),
     );
   }
 
   const gated = applyPostGate(llm, ctx, pre.noNewEntry);
-  return withModels(
-    finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments),
-    { analyst: analystNote !== "", judge: true },
+  return withDiagnostics(
+    withModels(
+      finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments),
+      { analyst: analystNote !== "", judge: true },
+    ),
   );
 }

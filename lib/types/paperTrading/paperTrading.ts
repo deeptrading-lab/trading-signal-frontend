@@ -61,6 +61,13 @@ export type PaperTradingDecision = {
    * payload(jsonb)로 함께 영속된다(무마이그레이션). mock/existing-ai 는 미설정.
    */
   intradaySnapshot?: import("@/lib/types/intraday/intradayDecision").IntradaySnapshot;
+  /**
+   * 에이전트 CLI 호출 진단 — 단타 cli-agent 만, **실패/재시도가 있었던 틱에만** 기록.
+   * 실패 원문(rawTextHead)·종류(failureKind)·시도 횟수를 payload(jsonb)로 영속해
+   * "어떤 응답이 왜 실패했나"를 사후 데이터로 답한다(PRD intraday-decision-overhaul PR-0).
+   * 전부 성공한 틱은 미기록 — 행동·payload 무변경.
+   */
+  agentDiagnostics?: import("@/lib/types/intraday/intradayDecision").IntradayTickAgentDiagnostics;
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**
