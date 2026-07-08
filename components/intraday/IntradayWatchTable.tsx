@@ -78,6 +78,8 @@ type DaySummary = {
   losses: number;
   running: number;
   aggReturnPct: number | null;
+  /** 그날 세션들의 합산 손익(원) — 평가금액-투자금 합. 벌었으면 +, 잃었으면 −. */
+  totalPnl: number;
 };
 function daySummary(
   items: WatchItem[],
@@ -100,6 +102,7 @@ function daySummary(
     losses,
     running,
     aggReturnPct: totalInit > 0 ? (totalPnl / totalInit) * 100 : null,
+    totalPnl,
   };
 }
 
@@ -263,20 +266,20 @@ export function IntradayWatchTable({
                       <span className="font-normal text-text-muted">{T.groupCount(g.items.length)}</span>
                       {sum.sessions > 0 && (
                         <span className="ml-auto flex items-center gap-md pl-md font-normal tabular-nums">
-                          {sum.aggReturnPct != null && (
-                            <span
-                              className={cn(
-                                "font-bold",
-                                sum.aggReturnPct > 0
-                                  ? "text-signal-up"
-                                  : sum.aggReturnPct < 0
-                                    ? "text-signal-down"
-                                    : "text-text-muted",
-                              )}
-                            >
-                              {T.groupSummaryReturn} {formatPct(sum.aggReturnPct)}
-                            </span>
-                          )}
+                          <span
+                            className={cn(
+                              "font-bold",
+                              sum.totalPnl > 0
+                                ? "text-signal-up"
+                                : sum.totalPnl < 0
+                                  ? "text-signal-down"
+                                  : "text-text-muted",
+                            )}
+                          >
+                            {T.groupSummaryReturn} {sum.totalPnl > 0 ? "+" : ""}
+                            {formatMoney(sum.totalPnl)}원
+                            {sum.aggReturnPct != null && ` · ${formatPct(sum.aggReturnPct)}`}
+                          </span>
                           {(sum.wins > 0 || sum.losses > 0) && (
                             <span className="text-text-muted">{T.groupWinLoss(sum.wins, sum.losses)}</span>
                           )}
