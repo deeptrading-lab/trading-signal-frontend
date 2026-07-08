@@ -12,7 +12,7 @@
  *
  * 테이프 행은 상승틱=빨강(앱 캔들 관례)으로 고정 → 상승틱=매수라 매수는 이미 빨강 → 게이지 매수
  * 세그먼트도 빨강이어야 한 컴포넌트 안에서 색이 일치한다. 색 단독 의존 금지 — 게이지는 항상 "매수 n% ·
- * 매도 m%" 글자를, 근사는 "추정치" 칩을 병기한다(접근성·정직성).
+ * 매도 m%" 글자를 병기한다(접근성). (구 "추정치" 칩은 툴팁이 모바일 미동작이라 제거.)
  *
  * 상태 4종: 로딩(스켈레톤) · 빈 체결(장마감/미지원) · 강도 불명(중립 게이지 + 정상 테이프) · 정상.
  * never-throw 라 에러 UI 는 없다(fail-soft → 빈 체결 카피 흡수).
@@ -108,15 +108,8 @@ function StrengthGauge({
 
   return (
     <div className={cn("flex flex-col", compact ? "gap-xs" : "gap-sm")}>
-      <div className="flex items-center gap-sm">
-        <span className="text-label-sm text-primary">{C.strengthLabel}</span>
-        <span
-          className="rounded-sm bg-accent-soft px-xs py-xs text-caption text-text-muted"
-          title={C.approxTooltip}
-        >
-          {C.approxChip}
-        </span>
-      </div>
+      {/* 상단 라벨 제거 — 탭/헤더가 이미 "체결강도"를 표기(중복), "추정치" 칩은 툴팁이 모바일에서
+          동작 안 해 통째로 제거(사용자 요청). 색 독립성은 아래 "매수/매도 %" 글자가 담당. */}
 
       {/* 누적 가로 바 — 좌 매수(signal-up-soft) · 우 매도(signal-down-soft). 세그먼트는 장식(텍스트 없음). */}
       <div className="flex h-strength-gauge-h w-full overflow-hidden rounded-sm bg-surface-muted">
