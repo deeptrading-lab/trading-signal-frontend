@@ -10,18 +10,16 @@
  * `cookies()`(next/headers) 사용으로 요청별 동적 렌더 — 세션 신원을 서버에서 읽어 즉시 판정한다.
  */
 
-import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
-import { readSession } from "@/lib/auth/session";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { isAtLeast } from "@/lib/auth/roles";
+import { readServerIdentity } from "@/lib/auth/serverGuard";
+import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
 import { AdminUsersPanel } from "@/components/admin/AdminUsersPanel";
 
 export default async function AdminPage() {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  const identity = await readSession(token);
+  const identity = await readServerIdentity();
+  // 관리자 전용 — 권한 미달이면 "접근 권한 없음" 화면(과거 notFound 존재은닉 → 안내 화면 통일).
   if (!isAtLeast(identity?.role, "admin")) {
-    notFound();
+    return <AccessDeniedView />;
   }
 
   // 등급 변경(드롭다운)은 superadmin 만 — admin 은 승인/취소·등급 읽기 전용.

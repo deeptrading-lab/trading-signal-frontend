@@ -10,12 +10,16 @@
  */
 
 import { ScorecardContainer } from "@/components/scorecard/ScorecardContainer";
+import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
+import { hasServerRole } from "@/lib/auth/serverGuard";
 import {
   SCORECARD_PAGE_SUBTITLE,
   SCORECARD_PAGE_TITLE,
 } from "@/lib/copy/scorecard/labels";
 
-export default function ScorecardPage() {
+export default async function ScorecardPage() {
+  // 관리자 전용 — Edge 게이트는 role 을 안 보므로 직접 방어(직접 URL 접근 차단).
+  if (!(await hasServerRole("admin"))) return <AccessDeniedView />;
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
       <header className="flex flex-col gap-xs">

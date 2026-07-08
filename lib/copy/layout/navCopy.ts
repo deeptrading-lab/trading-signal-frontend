@@ -44,6 +44,16 @@ export const HEADER_THEME_TO_DARK_ARIA = "다크 모드로 전환";
 export const HEADER_THEME_TO_LIGHT_ARIA = "라이트 모드로 전환";
 
 export const NOT_FOUND_TITLE = "페이지를 찾을 수 없어요";
-export const NOT_FOUND_DESCRIPTION =
-  "주소가 바뀌었거나 삭제된 페이지일 수 있어요. 홈에서 다시 시작해 보세요.";
+// 문장 단위 줄바꿈 — 좁은 폭에서 문장이 중간에 쪼개지지 않게 각 문장을 한 줄로(뷰가 block 렌더).
+export const NOT_FOUND_DESCRIPTION_LINES = [
+  "주소가 바뀌었거나 삭제된 페이지일 수 있어요.",
+  "홈에서 다시 시작해 보세요.",
+] as const;
 export const NOT_FOUND_HOME_CTA = "홈으로";
+
+// 접근 권한 없음(관리자 전용 라우트를 일반 등급이 직접 URL 로 접근했을 때).
+export const ACCESS_DENIED_TITLE = "접근 권한이 없어요";
+export const ACCESS_DENIED_DESCRIPTION_LINES = [
+  "관리자 전용 페이지예요.",
+  "권한이 필요하면 관리자에게 문의해 주세요.",
+] as const;
