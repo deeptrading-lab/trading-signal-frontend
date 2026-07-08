@@ -29,7 +29,7 @@ import type { TapeTrade, TradeStrength } from "@/lib/types/stock/trades";
 
 export interface TradeStrengthPanelProps {
   ticker: string;
-  /** compact = /intraday 단타(밀도 최대·10건) · full = /stock 종목상세(약간의 여백·30건). 기본 full. */
+  /** compact = /intraday 단타(밀도 최대) · full = /stock 종목상세(약간의 여백). 테이프 20건. 기본 full. */
   variant?: "compact" | "full";
   /** 지면 판단(선택 종목 없으면 false). 기본 true. */
   enabled?: boolean;
@@ -40,8 +40,8 @@ export interface TradeStrengthPanelProps {
 
 /** 지면별 폴링 주기(ms) — 단타 촘촘·상세 느슨(OrderbookPanel 과 동일 정책). */
 const REFETCH_MS = { compact: 3_000, full: 10_000 } as const;
-/** 테이프 표시 건수 — compact 10 · full 15(옆 호가창 20단계와 높이 균형, 과다 나열 방지). */
-const TAPE_LIMIT = { compact: 10, full: 15 } as const;
+/** 테이프 표시 건수 — compact·full 모두 20(옆 호가창 20단계와 높이 균형, 과다 나열 방지). */
+const TAPE_LIMIT = { compact: 20, full: 20 } as const;
 
 export function TradeStrengthPanel({
   ticker,
