@@ -72,7 +72,10 @@ export function AIAnalysisPanel({
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string; highlight?: string } | null>(null);
   const [showProviderChooser, setShowProviderChooser] = useState(false);
   const { data: stockData } = useQueryStockPrice(ticker);
-  const displayName = stockData?.name ?? ticker;
+  // 상단 종목명 — 리스트/openFor 로 이미 넘어온 탭 이름을 우선 사용해 재매칭(시세 로딩 동안 티커
+  // 번호가 잠깐 뜨는 깜빡임)을 없앤다. 다른 진입점(이름 미전달)일 때만 시세 응답 → 티커 폴백.
+  const knownName = tabs.find((t) => t.ticker === ticker)?.name ?? null;
+  const displayName = knownName ?? stockData?.name ?? ticker;
   // verdict-forward 히어로용 결정론 시그널 — 대기 중 4축 채움 + 완료 시 신호강도. warmup 미충족(HOLD
   // 안전폴백)이면 오해 방지로 null 처리(히어로가 확신도/대기 문구로 폴백). SignalSummary 와 동일 데이터.
   const { result: signalResult } = useSignalResult(ticker);
@@ -468,7 +471,7 @@ export function AIAnalysisPanel({
                         // 실시간 스트림·라이브 재분석 없음(로컬 전용 무회귀).
                         <ProdAnalysisQueueCard
                           ticker={ticker}
-                          name={stockData?.name ?? null}
+                          name={knownName ?? stockData?.name ?? null}
                           snapshot={previousDecision}
                           livePrice={stockData?.price ?? null}
                           activeJob={previousDecisionData?.active ?? null}

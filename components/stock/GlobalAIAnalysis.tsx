@@ -29,11 +29,15 @@ const AIAnalysisPanel = dynamic(
 
 export const GlobalAIAnalysis = memo(function GlobalAIAnalysis() {
   const ctx = useAIAnalysisContext();
-  // 탭 ticker 배열을 메모이즈 — 매 렌더 새 배열 생성으로 인한 useQueries 매핑 churn 방지.
-  // (조건부 hook 호출 금지: panelTicker 와 무관하게 항상 호출하고, 빈/불변 배열로 게이트.)
-  const tabTickers = useMemo(() => ctx.tabs.map((t) => t.ticker), [ctx.tabs]);
-  const names = useQueryStockNames(tabTickers);
+  // 이름을 **이미 아는 탭**(리스트/openFor 로 넘어온)은 재조회하지 않는다 — 미상 티커만
+  // useQueryStockNames 로 해석(재매칭 제거). 메모이즈로 useQueries 매핑 churn 방지, 조건부 hook 금지.
+  const unknownTickers = useMemo(
+    () => ctx.tabs.filter((t) => !t.name).map((t) => t.ticker),
+    [ctx.tabs],
+  );
+  const names = useQueryStockNames(unknownTickers);
   if (!ctx.panelTicker) return null;
-  const tabs = ctx.tabs.map((t) => ({ ...t, name: names[t.ticker] ?? t.name }));
+  // 아는 이름 우선, 없을 때만 조회 결과(그래도 없으면 null → 패널이 티커 폴백).
+  const tabs = ctx.tabs.map((t) => ({ ...t, name: t.name ?? names[t.ticker] ?? null }));
   return <AIAnalysisPanel {...ctx} tabs={tabs} ticker={ctx.panelTicker} />;
 });
