@@ -180,13 +180,14 @@ export function StockDailyChart({
 
   const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
 
-  // 클릭 트리거 툴팁 닫기 — recharts 클릭 트리거는 자체 닫기가 없다. 차트(.recharts-wrapper) 밖을
-  //  누르거나 Esc 면 강제로 숨기고(active=false), 봉을 다시 누르면 트리거대로 표시(active=undefined).
+  // 클릭 트리거 툴팁 닫기 — recharts 클릭 트리거는 자체 닫기가 없다. 차트(.recharts-wrapper) 밖 클릭·
+  //  Esc 면 강제 숨김(active=false). **다시 보이는 건 차트 onClick 에서만**(recharts 가 클릭 봉으로
+  //  인덱스 갱신한 뒤 실행 → 이전 봉이 stale 로 재노출되는 것 방지 — mousedown 에서 풀면 갱신 전이라 옛 봉이 뜬다).
   const [forceHideTooltip, setForceHideTooltip] = useState(false);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const el = e.target as Element | null;
-      setForceHideTooltip(!el?.closest?.(".recharts-wrapper"));
+      if (!el?.closest?.(".recharts-wrapper")) setForceHideTooltip(true); // 차트 밖만 닫기
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setForceHideTooltip(true);
@@ -198,6 +199,7 @@ export function StockDailyChart({
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+  const showTooltipOnClick = () => setForceHideTooltip(false); // 봉 클릭 시(인덱스 갱신 후) 표시 허용
   const tooltipActive = forceHideTooltip ? false : undefined;
   // 활성 점(activeDot)은 Tooltip 이 아니라 각 시리즈가 차트 내부 active 인덱스로 그리므로, 닫힘 시
   //  함께 꺼야 점이 남지 않는다. undefined=기본(활성 시 점 표시) / false=점 없음.
@@ -360,7 +362,7 @@ export function StockDailyChart({
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={280}>
           {chartType === "candle" ? (
-            <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={priceMargin}>
+            <ComposedChart data={candleSeries} syncId={SYNC_ID} onClick={showTooltipOnClick} margin={priceMargin}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
               {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
               {aiZoneEls}
@@ -375,13 +377,13 @@ export function StockDailyChart({
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 캔들 위에 표시 */}
               {showBB && (
-                <Line type="monotone" dataKey="bbUpper" stroke={C.bb} strokeWidth={1} dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Line type="monotone" dataKey="bbUpper" stroke={C.bb} strokeWidth={1} dot={false} activeDot={activeDotProp} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               {showBB && (
-                <Line type="monotone" dataKey="bbLower" stroke={C.bb} strokeWidth={1} dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Line type="monotone" dataKey="bbLower" stroke={C.bb} strokeWidth={1} dot={false} activeDot={activeDotProp} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               {showBB && (
-                <Line type="monotone" dataKey="bbMid" stroke={C.bb} strokeWidth={1} strokeDasharray="4 3" dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Line type="monotone" dataKey="bbMid" stroke={C.bb} strokeWidth={1} strokeDasharray="4 3" dot={false} activeDot={activeDotProp} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               {/* 이동평균선(MA 5/20/60/120)·VWAP — 캔들/라인 위에 표시(topmost). 기본 ON=MA */}
               {priceOverlayLines}
@@ -401,7 +403,7 @@ export function StockDailyChart({
               {aiAxisLabelsEl}
             </ComposedChart>
           ) : (
-            <AreaChart data={priceSeries} syncId={SYNC_ID} margin={priceMargin}>
+            <AreaChart data={priceSeries} syncId={SYNC_ID} onClick={showTooltipOnClick} margin={priceMargin}>
               <defs>
                 <linearGradient id="sdcFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={C.fill} stopOpacity={0.3} />
@@ -422,13 +424,13 @@ export function StockDailyChart({
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={forceHideTooltip ? false : { r: 5, strokeWidth: 0 }} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 가격 라인 위에 표시 */}
               {showBB && (
-                <Line type="monotone" dataKey="bbUpper" stroke={C.bb} strokeWidth={1} dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Line type="monotone" dataKey="bbUpper" stroke={C.bb} strokeWidth={1} dot={false} activeDot={activeDotProp} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               {showBB && (
-                <Line type="monotone" dataKey="bbLower" stroke={C.bb} strokeWidth={1} dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Line type="monotone" dataKey="bbLower" stroke={C.bb} strokeWidth={1} dot={false} activeDot={activeDotProp} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               {showBB && (
-                <Line type="monotone" dataKey="bbMid" stroke={C.bb} strokeWidth={1} strokeDasharray="4 3" dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Line type="monotone" dataKey="bbMid" stroke={C.bb} strokeWidth={1} strokeDasharray="4 3" dot={false} activeDot={activeDotProp} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               {/* 이동평균선(MA 5/20/60/120)·VWAP — 캔들/라인 위에 표시(topmost). 기본 ON=MA */}
               {priceOverlayLines}
@@ -455,7 +457,7 @@ export function StockDailyChart({
       <SubLabel label="거래량" />
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={70}>
-          <ComposedChart data={volSeries} syncId={SYNC_ID} margin={subMargin}>
+          <ComposedChart data={volSeries} syncId={SYNC_ID} onClick={showTooltipOnClick} margin={subMargin}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
             <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
@@ -479,7 +481,7 @@ export function StockDailyChart({
           <SubLabel label="MACD (12, 26, 9)" />
           <div className="w-full overflow-hidden">
             <ResponsiveContainer width="100%" height={90}>
-              <ComposedChart data={macdSeries} syncId={SYNC_ID} margin={subMargin}>
+              <ComposedChart data={macdSeries} syncId={SYNC_ID} onClick={showTooltipOnClick} margin={subMargin}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} hide />
                 <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={CHART_AXIS_WIDTH} orientation="right" />
@@ -508,7 +510,7 @@ export function StockDailyChart({
           <SubLabel label="RSI (14)" />
           <div className="w-full overflow-hidden">
             <ResponsiveContainer width="100%" height={80}>
-              <LineChart data={rsiSeries} syncId={SYNC_ID} margin={subMargin}>
+              <LineChart data={rsiSeries} syncId={SYNC_ID} onClick={showTooltipOnClick} margin={subMargin}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} dy={6} hide />
                 <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={CHART_AXIS_WIDTH} orientation="right" />
