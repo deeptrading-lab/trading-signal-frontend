@@ -1,12 +1,16 @@
 import { randomUUID } from "crypto";
 import {
+  PAPER_TRADING_CLOSE_FLATTEN_HHMM,
   PAPER_TRADING_DEFAULT_CASH_BUFFER_PCT,
   PAPER_TRADING_DEFAULT_INITIAL_CASH,
   PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
   PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES,
   PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES,
+  PAPER_TRADING_SESSION_HARD_STOP_PCT,
+  defaultPositionHardStopPct,
 } from "@/lib/server/paperTrading/constants";
-import { addTickWindow, floorToTickWindow } from "@/lib/server/paperTrading/time";
+import { addTickWindow, floorToTickWindow, riskSweepTickWindow } from "@/lib/server/paperTrading/time";
+import { kstHhmm, type IntradayTickResult } from "@/lib/server/paperTrading/intradayTickDecision";
 import {
   loadPersistedPaperTrading,
   persistPaperSession,
@@ -153,6 +157,16 @@ export async function createPaperTradingSession(
     decisionProvider === "cli-agent"
       ? (request.tickIntervalMinutes ?? PAPER_TRADING_INTRADAY_TICK_INTERVAL_MINUTES)
       : PAPER_TRADING_DEFAULT_TICK_INTERVAL_MINUTES;
+  // 하드스톱 스탬프(intraday-stop-slippage C) — 명시 override(포지션 −N% 또는 null=끄기) 존중,
+  // 미지정이면 riskMode 기본(−3/−5/−8). 세션 하드스톱은 명시값 또는 기본 −7. payload jsonb 로 영속.
+  const positionHardStopPct =
+    request.positionHardStopPct !== undefined
+      ? request.positionHardStopPct
+      : defaultPositionHardStopPct(request.riskMode);
+  const sessionHardStopPct =
+    request.sessionHardStopPct !== undefined
+      ? request.sessionHardStopPct
+      : PAPER_TRADING_SESSION_HARD_STOP_PCT;
   const session: PaperTradingSession = {
     id: randomUUID(),
     name: request.name.trim() || "AI 모의투자",
@@ -169,6 +183,8 @@ export async function createPaperTradingSession(
     cashBufferPct: PAPER_TRADING_DEFAULT_CASH_BUFFER_PCT,
     tickIntervalMinutes,
     decisionProvider,
+    positionHardStopPct,
+    sessionHardStopPct,
     aiProvider: decisionProvider === "cli-agent" ? request.aiProvider : undefined,
     // 소유자 스탬프(intraday-session-owner) — 이 서버 운영자로 고정. 공유 Supabase 로 영속(payload
     // 통째 저장)돼 다른 서버의 스케줄러가 own-or-unowned 게이트로 남의 세션을 틱하지 않게 한다.
@@ -318,6 +334,93 @@ async function runTickOnce(
   return toDetail(entry);
 }
 
+/**
+ * A(60초 리스크-only 체크) — 보유 포지션의 청산 조건만 검사하는 경량 스윕(intraday-stop-slippage).
+ *
+ * LLM 5분 틱과 **별개로** 매 60초 사이클에서 호출된다. LLM 을 호출하지 않고(가격 스냅샷만) 세션의
+ * **가장 최근 틱 decision**(동적 손절선=invalidationPrice·익절가=targetPrice) + 하드스톱(runTick 이
+ * 세션 설정에서 주입) + 장막판(15:20)을 검사해, 걸리면 즉시 EXIT 가상 체결하고 리스크 틱을 남긴다.
+ * 트리거가 없으면 **아무 틱도 만들지 않는다**(60초마다 HOLD 틱 스팸 방지 — 무발동은 no-op).
+ *
+ * - LLM 미호출: 내부 리스크 stub resolver 로 runPaperTradingTick 을 재사용(HOLD + forced-exit).
+ * - 무포지션 스킵: 보유 없으면 가격 조회조차 없이 즉시 no-op(멱등 — LLM 이 이미 청산했으면 스킵).
+ * - 창 dedup 안전: 리스크 틱 창은 `riskSweepTickWindow`(초=30)라 5분 LLM 창(초=00)과 절대 겹치지
+ *   않아 중복 EXIT/창 삼킴이 없다. triggeredBy="risk" 로 체결 내역에서도 식별된다.
+ * - 세션 직렬화(tickChain) 공유: LLM 틱과 같은 체인이라 사이클 내 순서(리스크 먼저)·멱등이 보장된다.
+ * - 가격 미신선/조회 실패는 executeVirtualTrade 의 staleness 가드(markOnly)로 무주문 → no-op
+ *   (신선하지 않은 가격으로는 절대 청산하지 않는다).
+ */
+export async function runPaperTradingSessionRiskCheck(
+  sessionId: string,
+  options: { now?: Date; priceSnapshotProvider?: PaperTradingPriceSnapshotProvider } = {},
+): Promise<PaperTradingSessionDetail | null> {
+  await ensureHydrated();
+  const entry = getStore().sessions.get(sessionId);
+  if (!entry) return null;
+  const task = (entry.tickChain ?? Promise.resolve()).then(() => runRiskCheckOnce(entry, options));
+  entry.tickChain = task.then(
+    () => undefined,
+    () => undefined,
+  );
+  return task;
+}
+
+async function runRiskCheckOnce(
+  entry: StoredSession,
+  options: { now?: Date; priceSnapshotProvider?: PaperTradingPriceSnapshotProvider },
+): Promise<PaperTradingSessionDetail> {
+  const session = entry.session;
+  // 리스크 스윕은 running cli-agent 세션의 보유 포지션에만 관여(mock 무영향).
+  if (session.status !== "running" || session.decisionProvider !== "cli-agent") return toDetail(entry);
+  const held = entry.positions.find((position) => position.quantity >= 1);
+  if (!held) return toDetail(entry); // 무포지션 → 가격 조회 없이 즉시 no-op(플랫 스킵).
+
+  const now = options.now ?? new Date();
+  const tickWindowStart = riskSweepTickWindow(now);
+  const lastTick = entry.ticks.at(-1);
+  const flattenAll = kstHhmm(tickWindowStart) >= PAPER_TRADING_CLOSE_FLATTEN_HHMM;
+
+  // 리스크 stub — LLM 없이 HOLD(리밸런싱 없음) + 최근 틱의 동적 손절선/익절가/장막판만 싣는다.
+  // 하드스톱·세션 수익률은 runTick 이 세션 설정에서 주입(LLM 5분 틱과 동일 경로).
+  const riskResolver = async (): Promise<IntradayTickResult> => ({
+    decision: {
+      action: "HOLD",
+      targetAllocationPct: 0,
+      targetAllocations: [],
+      confidence: "LOW",
+      rationale: "60초 리스크 점검 — 청산 조건 미도달.",
+      riskNotes: [],
+      source: "cli-agent",
+    },
+    forcedExit: {
+      targetPrice: lastTick?.decision.targetPrice ?? null,
+      stopPrice: lastTick?.decision.invalidationPrice ?? null,
+      flattenAll,
+    },
+  });
+
+  const result = await runPaperTradingTick({
+    session,
+    positions: entry.positions,
+    existingTicks: entry.ticks,
+    triggeredBy: "risk",
+    tickWindowStart,
+    priceSnapshotProvider: options.priceSnapshotProvider,
+    intradayResolver: riskResolver,
+  });
+
+  // 실제 청산(SELL 체결)이 있을 때만 틱 기록 — 무발동/무신선은 no-op(엔트리 무변경).
+  if (result.tick.orders.length === 0) return toDetail(entry);
+  if (entry.ticks.some((tick) => tick.id === result.tick.id)) return toDetail(entry);
+
+  entry.session = result.session;
+  entry.positions = result.positions;
+  entry.ticks = [...entry.ticks, result.tick];
+  void persistPaperSession(entry.session, entry.positions);
+  void persistPaperTick(result.tick);
+  return toDetail(entry);
+}
+
 export function resetPaperTradingStoreForTest(): void {
   const store = getStore();
   store.sessions.clear();
@@ -326,10 +429,17 @@ export function resetPaperTradingStoreForTest(): void {
   store.hydrated = undefined;
 }
 
-/** 테스트 전용 — 세션을 메모리 스토어에 직접 시드(hydrate 스킵). */
-export function seedPaperTradingSessionForTest(session: PaperTradingSession): void {
+/** 테스트 전용 — 세션(+선택적 포지션·틱)을 메모리 스토어에 직접 시드(hydrate 스킵). */
+export function seedPaperTradingSessionForTest(
+  session: PaperTradingSession,
+  extra: { positions?: PaperTradingPosition[]; ticks?: PaperTradingTick[] } = {},
+): void {
   const store = getStore();
-  store.sessions.set(session.id, { session, positions: [], ticks: [] });
+  store.sessions.set(session.id, {
+    session,
+    positions: extra.positions ?? [],
+    ticks: extra.ticks ?? [],
+  });
   store.hydrated = true;
 }
 

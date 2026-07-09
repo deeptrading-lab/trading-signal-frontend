@@ -163,6 +163,7 @@ function GroupColumnHeader() {
       <th className="py-sm pr-md text-left font-normal">{T.colLast}</th>
       <th className="py-sm pr-md text-right font-normal">{T.colCash}</th>
       <th className="py-sm pr-md text-center font-normal">{T.colInterval}</th>
+      <th className="py-sm pr-md text-center font-normal">{T.colHardStop}</th>
       <th className="py-sm pr-md text-center font-normal">{T.colRead}</th>
       <th className="py-sm pr-md text-center font-normal">{T.colPaper}</th>
       <th className="py-sm pr-lg text-right font-normal" aria-label={T.colManage} />
@@ -215,6 +216,7 @@ export interface IntradayWatchTableProps {
     stock: PaperTradingSelectedStock,
     initialCash: number,
     tickIntervalMinutes: number,
+    positionHardStopPct: number | null,
   ) => Promise<PaperTradingSessionDetail>;
   onRemove: (ticker: string) => void;
 }
@@ -306,7 +308,7 @@ export function IntradayWatchTable({
               <Fragment key={g.dateKey}>
                 {/* 날짜 그룹 헤더 — colSpan 전폭. 좌=접기토글+라벨+건수 / 우=당일 요약(합산 수익률·승/패·진행). */}
                 <tr className="border-b border-border-line bg-surface-muted/40">
-                  <td colSpan={12} className="px-lg py-xs">
+                  <td colSpan={13} className="px-lg py-xs">
                     <button
                       type="button"
                       onClick={() => toggleGroup(g.dateKey)}
@@ -524,6 +526,105 @@ function IntervalSelect({
   );
 }
 
+// ─── 손절 상한(포지션 하드스톱) 셀렉트 ────────────────────────────────────────
+
+/** 손절 상한 선택지(%) — null=끄기. 급락 시 자동 전량 청산 백스톱(intraday-stop-slippage C). */
+const HARD_STOP_OPTIONS: Array<{ value: number | null; label: string; hint: string }> = [
+  { value: -3, label: "−3%", hint: T.hardStopConservative },
+  { value: -5, label: "−5%", hint: T.hardStopStandard },
+  { value: -8, label: "−8%", hint: T.hardStopAggressive },
+  { value: null, label: T.hardStopOff, hint: "" },
+];
+
+/** 손절 상한 라벨(음수 % → "−N%") — 세션 표시·버튼 공용. */
+function hardStopLabel(value: number): string {
+  return `−${Math.abs(value)}%`;
+}
+
+/** 진행/완료 세션의 하드스톱 표시값 — null=끄기, 미기록(레거시)=riskMode 기본(−3/−5/−8). */
+function sessionHardStopLabel(session: PaperTradingSession): string {
+  const value = session.positionHardStopPct;
+  if (value === null) return T.hardStopOff;
+  if (value === undefined) {
+    const fallback =
+      session.riskMode === "conservative" ? -3 : session.riskMode === "aggressive" ? -8 : -5;
+    return hardStopLabel(fallback);
+  }
+  return hardStopLabel(value);
+}
+
+function HardStopSelect({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menu = useFixedMenu(rootRef);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const isOff = value === null;
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative inline-block"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={menu.open}
+        aria-label={T.colHardStop}
+        title={isOff ? T.hardStopOffWarnTitle : T.hardStopTitle}
+        className={cn(
+          "inline-flex h-7 cursor-pointer items-center gap-xs rounded-md border bg-surface-base pl-sm pr-xs text-caption tabular-nums transition-colors hover:bg-surface-muted",
+          isOff ? "border-signal-down/40 text-signal-down" : "border-border-line text-text-strong",
+        )}
+        onClick={() => menu.toggle(buttonRef.current)}
+      >
+        {isOff ? T.hardStopOff : hardStopLabel(value)}
+        <ChevronDown
+          className={cn("size-4 text-text-muted transition-transform", menu.open && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      {menu.open && menu.pos ? (
+        <MenuPanel pos={menu.pos}>
+          {HARD_STOP_OPTIONS.map((opt) => {
+            const selected = opt.value === value;
+            return (
+              <button
+                key={String(opt.value)}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={cn(
+                  "flex w-full cursor-pointer items-center justify-between gap-md px-md py-xs text-left text-body-sm tabular-nums transition-colors hover:bg-surface-muted",
+                  selected
+                    ? "font-medium text-accent-vivid"
+                    : opt.value === null
+                      ? "text-signal-down"
+                      : "text-text-strong",
+                )}
+                onClick={() => {
+                  onChange(opt.value);
+                  menu.close();
+                }}
+              >
+                <span>{opt.label}</span>
+                {opt.hint ? <span className="text-caption text-text-muted">{opt.hint}</span> : null}
+              </button>
+            );
+          })}
+        </MenuPanel>
+      ) : null}
+    </div>
+  );
+}
+
 // ─── 금액 입력 (직접 입력 + 프리셋 드롭다운) ─────────────────────────────────
 
 /** 모의 투자금 빠른 선택 프리셋(원). */
@@ -680,6 +781,8 @@ function WatchRow({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
+  // 손절 상한(포지션 하드스톱) — 기본 −5%(표준). null=끄기(급락 무제한 리스크 경고 동반).
+  const [hardStopPct, setHardStopPct] = useState<number | null>(-5);
   const [startError, setStartError] = useState<string | null>(null);
   // 세션 생성 중 표시·disabled 모두 **이 행 한정**(starting). 전역 isCreating 은 다른 종목 시작까지
   // 막던 버그라 제거 — 세션은 종목당 1개·병렬 허용이므로 각 행은 자기 생성 중에만 잠긴다(사용자 지적).
@@ -724,7 +827,7 @@ function WatchRow({
     setStartError(null);
     setStarting(true);
     try {
-      await onStart({ ticker: item.ticker, name: item.name }, amount, intervalMin);
+      await onStart({ ticker: item.ticker, name: item.name }, amount, intervalMin, hardStopPct);
     } catch (err) {
       setStartError(isApiError(err) ? err.message : P.error);
       setExpanded(true);
@@ -837,6 +940,29 @@ function WatchRow({
             )
           ) : (
             <IntervalSelect value={intervalMin} onChange={setIntervalMin} />
+          )}
+        </td>
+
+        {/* 손절 상한(포지션 하드스톱) — 미시작=셀렉트(끄기 시 경고), 진행/완료=설정값 정적 표시 */}
+        <td className="py-sm pr-md text-center">
+          {current ? (
+            <span
+              className={cn(
+                "tabular-nums",
+                current.positionHardStopPct === null ? "text-signal-down" : "text-text-muted",
+              )}
+            >
+              {sessionHardStopLabel(current)}
+            </span>
+          ) : (
+            <div className="inline-flex flex-col items-center gap-xs">
+              <HardStopSelect value={hardStopPct} onChange={setHardStopPct} />
+              {hardStopPct === null ? (
+                <span className="text-caption text-signal-down" title={T.hardStopOffWarnTitle}>
+                  {T.hardStopOffWarn}
+                </span>
+              ) : null}
+            </div>
           )}
         </td>
 
@@ -973,7 +1099,7 @@ function WatchRow({
       {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
       {expanded ? (
         <tr className="border-t border-border-line">
-          <td colSpan={12} className="bg-surface-muted px-lg py-md">
+          <td colSpan={13} className="bg-surface-muted px-lg py-md">
             <div className="flex flex-col gap-sm">
               {startError ? (
                 <p className="text-caption text-signal-down" role="alert">

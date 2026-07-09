@@ -47,6 +47,24 @@ describe("validateCreateSessionRequest", () => {
       validateCreateSessionRequest({ ...base, decisionProvider: "cli-agent", tickIntervalMinutes: 7 }),
     ).toContain("판단 주기");
   });
+
+  it("손절 상한(하드스톱) — −3/−5/−8·끄기(null)·미지정은 통과", () => {
+    for (const v of [-3, -5, -8, null, undefined]) {
+      expect(validateCreateSessionRequest({ ...base, positionHardStopPct: v })).toBeNull();
+    }
+  });
+
+  it("손절 상한 — 0·양수·범위 밖(−25)은 거절", () => {
+    expect(validateCreateSessionRequest({ ...base, positionHardStopPct: 0 })).toContain("손절 상한");
+    expect(validateCreateSessionRequest({ ...base, positionHardStopPct: 5 })).toContain("손절 상한");
+    expect(validateCreateSessionRequest({ ...base, positionHardStopPct: -25 })).toContain("손절 상한");
+  });
+
+  it("세션 손절 상한도 같은 범위 검증", () => {
+    expect(validateCreateSessionRequest({ ...base, sessionHardStopPct: -7 })).toBeNull();
+    expect(validateCreateSessionRequest({ ...base, sessionHardStopPct: null })).toBeNull();
+    expect(validateCreateSessionRequest({ ...base, sessionHardStopPct: 3 })).toContain("세션 손절 상한");
+  });
 });
 
 describe("deriveIntradayTimeframe (주기 → 분봉 파생)", () => {

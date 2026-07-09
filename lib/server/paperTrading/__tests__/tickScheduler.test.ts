@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   closeOutRunningSessionsAtClose,
   closeOutStaleCrossdaySessions,
+  runIntradayRiskSweep,
   runScheduledIntradayTicks,
   runWithLimit,
   selectSchedulableSessions,
@@ -12,7 +13,12 @@ import {
   seedPaperTradingSessionForTest,
 } from "@/lib/server/paperTrading/sessionStore";
 import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
-import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
+import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
+import type {
+  PaperTradingPosition,
+  PaperTradingSession,
+  PaperTradingTick,
+} from "@/lib/types/paperTrading/paperTrading";
 
 function session(over: Partial<PaperTradingSession>): PaperTradingSession {
   return {
@@ -142,6 +148,138 @@ describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", 
     expect((await getPaperTradingSessionDetail("mine"))?.session.status).toBe("completed");
     expect((await getPaperTradingSessionDetail("legacy"))?.session.status).toBe("completed");
     expect((await getPaperTradingSessionDetail("friend"))?.session.status).toBe("running");
+  });
+});
+
+// ─── A: 60초 리스크-only 스윕 ─────────────────────────────────────────────────
+
+const heldPosition: PaperTradingPosition = {
+  ticker: "005930",
+  name: "삼성전자",
+  quantity: 30,
+  avgEntryPrice: 10_000,
+  lastPrice: 10_000,
+  marketValue: 300_000,
+  unrealizedPnl: 0,
+  unrealizedPnlPct: 0,
+  allocationPct: 30,
+  updatedAt: "2026-07-03T00:55:00.000Z",
+};
+
+/** 최근 틱(동적 손절선=invalidationPrice 9,800) — 리스크 스윕이 여기서 손절선을 읽는다. */
+function lastTickWithStop(): PaperTradingTick {
+  return {
+    id: "seed-tick",
+    sessionId: "pos",
+    tickIndex: 0,
+    status: "executed",
+    triggeredBy: "auto",
+    tickWindowStart: "2026-07-03T00:55:00.000Z",
+    pricedAt: "2026-07-03T00:55:00.000Z",
+    priceFreshnessSeconds: 0,
+    portfolioValueBefore: 1_000_000,
+    portfolioValueAfter: 1_000_000,
+    cashBefore: 700_000,
+    cashAfter: 700_000,
+    returnPctAfter: 0,
+    decision: {
+      action: "BUY",
+      targetAllocationPct: 30,
+      targetAllocations: [{ ticker: "005930", name: "삼성전자", targetAllocationPct: 30, rationale: "진입" }],
+      confidence: "MEDIUM",
+      rationale: "진입",
+      riskNotes: [],
+      targetPrice: 10_400,
+      invalidationPrice: 9_800,
+      source: "cli-agent",
+    },
+    priceSnapshot: [],
+    orders: [],
+    rationale: "진입",
+    guardAdjustments: [],
+    errorMessage: null,
+    createdAt: "2026-07-03T00:55:00.000Z",
+  };
+}
+
+const priceAll = (won: number): PaperTradingPriceSnapshotProvider => async (stocks, _i, at) =>
+  stocks.map((s) => ({ ticker: s.ticker, name: s.name, price: won, changePct: 0, asOf: at, freshnessSeconds: 0 }));
+
+describe("runIntradayRiskSweep (A — 60초 리스크-only 체크)", () => {
+  const marketNow = new Date("2026-07-03T01:00:00.000Z"); // 금 10:00 KST
+
+  it("장외/주말이면 실행하지 않는다(-1)", async () => {
+    resetPaperTradingStoreForTest();
+    expect(await runIntradayRiskSweep(new Date("2026-07-03T12:00:00.000Z"))).toBe(-1); // 21:00 KST
+    expect(await runIntradayRiskSweep(new Date("2026-07-04T01:00:00.000Z"))).toBe(-1); // 토요일
+  });
+
+  it("장중이지만 스케줄 대상 세션이 없으면 0", async () => {
+    resetPaperTradingStoreForTest();
+    expect(await runIntradayRiskSweep(marketNow)).toBe(0);
+  });
+
+  it("보유 포지션이 손절선을 하회하면 EXIT — risk 틱 기록(triggeredBy=risk), 무포지션화", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest(session({ id: "pos", cash: 700_000 }), {
+      positions: [heldPosition],
+      ticks: [lastTickWithStop()],
+    });
+    // 9,700 ≤ 손절선 9,800 → 청산. 1개 세션 검사.
+    expect(await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(9_700) })).toBe(1);
+    const detail = await getPaperTradingSessionDetail("pos");
+    expect(detail?.positions).toHaveLength(0);
+    const riskTick = detail?.ticks.at(-1);
+    expect(riskTick?.triggeredBy).toBe("risk");
+    expect(riskTick?.orders.some((o) => o.side === "SELL")).toBe(true);
+    expect(riskTick?.guardAdjustments.join(" ")).toContain("손절선");
+  });
+
+  it("무포지션 세션은 no-op — 틱을 만들지 않는다(플랫 스킵·중복 EXIT 없음)", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest(session({ id: "flat" }), {
+      positions: [],
+      ticks: [lastTickWithStop()],
+    });
+    await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(9_700) });
+    const detail = await getPaperTradingSessionDetail("flat");
+    expect(detail?.ticks).toHaveLength(1); // 시드 틱 그대로 — 새 틱 없음
+  });
+
+  it("청산 후 재실행하면 무포지션이라 추가 틱을 만들지 않는다(멱등)", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest(session({ id: "pos", cash: 700_000 }), {
+      positions: [heldPosition],
+      ticks: [lastTickWithStop()],
+    });
+    await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(9_700) });
+    const afterFirst = (await getPaperTradingSessionDetail("pos"))?.ticks.length ?? 0;
+    await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(9_700) });
+    const afterSecond = (await getPaperTradingSessionDetail("pos"))?.ticks.length ?? 0;
+    expect(afterSecond).toBe(afterFirst); // 두 번째는 무포지션 no-op
+  });
+
+  it("소유자 게이트 — 다른 운영자 세션은 리스크 검사하지 않는다(포지션 유지)", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest(session({ id: "friend", owner: "friend-op", cash: 700_000 }), {
+      positions: [heldPosition],
+      ticks: [lastTickWithStop()],
+    });
+    expect(await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(9_700) })).toBe(0);
+    const detail = await getPaperTradingSessionDetail("friend");
+    expect(detail?.positions).toHaveLength(1); // 남 세션 미검사 → 청산 안 됨
+  });
+
+  it("가격이 손절선 위면 청산하지 않는다(불필요 EXIT 0)", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest(session({ id: "pos", cash: 700_000 }), {
+      positions: [heldPosition],
+      ticks: [lastTickWithStop()],
+    });
+    await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(10_100) }); // 손절선·하드스톱 미도달
+    const detail = await getPaperTradingSessionDetail("pos");
+    expect(detail?.positions).toHaveLength(1);
+    expect(detail?.ticks).toHaveLength(1);
   });
 });
 

@@ -8,9 +8,29 @@
  */
 
 import {
+  PAPER_TRADING_HARD_STOP_MAX_PCT,
+  PAPER_TRADING_HARD_STOP_MIN_PCT,
+} from "@/lib/server/paperTrading/constants";
+import {
   PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS,
   type CreatePaperTradingSessionRequest,
 } from "@/lib/types/paperTrading/paperTrading";
+
+/**
+ * 하드스톱 % 검증 — `null`(끄기)·`undefined`(미지정)은 허용, 숫자는 [−20, −1] 음수만.
+ * 0·양수·범위 밖은 거절(intraday-stop-slippage C). 끄기 sentinel = null.
+ */
+function validateHardStopPct(value: number | null | undefined, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (
+    !Number.isFinite(value) ||
+    value > PAPER_TRADING_HARD_STOP_MAX_PCT ||
+    value < PAPER_TRADING_HARD_STOP_MIN_PCT
+  ) {
+    return `${label}은 ${PAPER_TRADING_HARD_STOP_MIN_PCT}%~${PAPER_TRADING_HARD_STOP_MAX_PCT}% 사이로 설정하거나 끌 수 있어요.`;
+  }
+  return null;
+}
 
 export function validateCreateSessionRequest(
   body: Partial<CreatePaperTradingSessionRequest>,
@@ -48,5 +68,9 @@ export function validateCreateSessionRequest(
   ) {
     return `판단 주기는 ${PAPER_TRADING_INTRADAY_INTERVAL_OPTIONS.join("·")}분 중에서 선택해 주세요.`;
   }
+  const positionHardStopError = validateHardStopPct(body.positionHardStopPct, "손절 상한");
+  if (positionHardStopError) return positionHardStopError;
+  const sessionHardStopError = validateHardStopPct(body.sessionHardStopPct, "세션 손절 상한");
+  if (sessionHardStopError) return sessionHardStopError;
   return null;
 }

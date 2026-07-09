@@ -19,8 +19,10 @@ import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import {
   listPaperTradingSessions,
   patchPaperTradingSessionStatus,
+  runPaperTradingSessionRiskCheck,
   runPaperTradingSessionTick,
 } from "@/lib/server/paperTrading/sessionStore";
+import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 
 const log = createLogger("intraday-tick");
@@ -154,6 +156,45 @@ export async function runScheduledIntradayTicks(now: Date = new Date()): Promise
   }
 }
 
+/** 리스크 스윕 중첩 방지 — LLM 틱 사이클과 별개 가드(빠른 가격-only 검사라 보통 즉시 끝난다). */
+let riskSweepRunning = false;
+
+/**
+ * A(60초 리스크-only 스윕) — 매 사이클 LLM 5분 틱 **앞**에서 실행(intraday-stop-slippage).
+ *
+ * 스케줄 대상(owner+running+cli-agent)의 보유 포지션을 신선 가격만으로 검사해 동적 손절선/익절가/
+ * 하드스톱/장막판에 걸리면 즉시 EXIT 한다(LLM 호출 0). 개별 세션은 `runPaperTradingSessionRiskCheck`
+ * 가 무포지션·무신선을 no-op 처리하므로 여기선 게이트·소유자 선별·병렬만 담당. 사이클 앞에서 돌아
+ * 청산되면 뒤따르는 LLM 틱은 무포지션으로 보고 중복 EXIT 하지 않는다(같은 tickChain 직렬화).
+ *
+ * 테스트를 위해 export(now·priceSnapshotProvider 주입). 반환: 검사한 세션 수(-1 = 게이트/중첩 미실행).
+ */
+export async function runIntradayRiskSweep(
+  now: Date = new Date(),
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider } = {},
+): Promise<number> {
+  if (riskSweepRunning || !isKstMarketHoursWithCloseGrace(now)) return -1;
+  riskSweepRunning = true;
+  try {
+    const sessions = selectSchedulableSessions(await listPaperTradingSessions());
+    if (sessions.length === 0) return 0;
+    await runWithLimit(sessions, TICK_CONCURRENCY, async (session) => {
+      try {
+        await runPaperTradingSessionRiskCheck(session.id, {
+          now,
+          priceSnapshotProvider: options.priceSnapshotProvider,
+        });
+      } catch (error) {
+        // 개별 세션 실패(가격 조회 오류 등)는 다음 사이클 재시도 — 다른 세션·LLM 틱을 막지 않는다.
+        log.warn(`리스크 점검 실패 session=${session.id.slice(0, 8)}`, error);
+      }
+    });
+    return sessions.length;
+  } finally {
+    riskSweepRunning = false;
+  }
+}
+
 /** 마감 종료 스윕 중첩 방지. */
 let closeOutRunning = false;
 
@@ -238,12 +279,14 @@ export function startIntradayTickScheduler(): void {
   if (isVercelEnv()) return; // 서버리스: 타이머 미유지 + CLI 부재.
   g[STARTED_KEY] = true;
   log(
-    `단타 자동 틱 스케줄러 시작 — 60초 체크 · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료 · 밀린 이전날 세션 상시 정리`,
+    `단타 자동 틱 스케줄러 시작 — 60초 체크(리스크 스윕 + LLM 5분 틱) · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료 · 밀린 이전날 세션 상시 정리`,
   );
-  // 매 사이클(순차): ① 밀린 이전-거래일 세션부터 종료(크로스데이 틱 방지) → ② 장중이면 오늘
-  // 세션 틱 → ③ 마감 후(15:41+)면 오늘 세션 종료 스윕. ②③ 은 시간대가 겹치지 않아 둘 중 하나만 실행.
+  // 매 사이클(순차): ① 밀린 이전-거래일 세션부터 종료(크로스데이 틱 방지) → ②ᴬ 60초 리스크 스윕
+  // (LLM 앞 — 급락 포지션을 ~60초 내 청산) → ② 장중이면 오늘 세션 LLM 틱 → ③ 마감 후(15:41+)면
+  // 오늘 세션 종료 스윕. ②③ 은 시간대가 겹치지 않아 둘 중 하나만 실행. 리스크 스윕은 장중+마감 유예.
   const cycle = async () => {
     await closeOutStaleCrossdaySessions();
+    await runIntradayRiskSweep();
     await runScheduledIntradayTicks();
     await closeOutRunningSessionsAtClose();
   };
