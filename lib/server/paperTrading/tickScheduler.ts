@@ -15,6 +15,7 @@
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
 import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import {
   listPaperTradingSessions,
   patchPaperTradingSessionStatus,
@@ -84,10 +85,30 @@ async function tickWithTimeout(sessionId: string): Promise<void> {
 const STARTED_KEY = "__intradayTickSchedulerStarted";
 type GlobalWithFlag = typeof globalThis & { [STARTED_KEY]?: boolean };
 
-/** 스케줄 대상 — running 단타(cli-agent) 세션 전부(수명 관리는 일시정지/완료 버튼). */
-export function selectSchedulableSessions(sessions: PaperTradingSession[]): PaperTradingSession[] {
+/**
+ * 스케줄 대상 — running 단타(cli-agent) 세션 중 **이 서버가 소유한(또는 미지정) 것**만.
+ *
+ * ★ 소유자 게이트(intraday-session-owner): 공유 Supabase 를 두 로컬 서버가 함께 쓰면 부팅 시 서로의
+ *   세션까지 hydrate 한다. 게이트가 없으면 두 서버가 같은 세션을 **이중 틱**하고 서로의 소유 상태를
+ *   덮어쓴다. 그래서 한 서버는 **자기 소유(`owner === 내 operator`)** + **소유자 미지정(레거시,
+ *   `!owner`)** 세션만 처리하고, **다른 운영자 소유 세션은 건너뛴다**. 미지정을 포함하는 이유는
+ *   소유자 도입 이전 세션을 orphan 으로 남기지 않기 위함(하위호환) — 두 서버가 함께 정리해도 멱등.
+ *
+ * 이 한 곳에 게이트를 두면 틱(runScheduledIntradayTicks)·마감 종료(closeOutRunningSessionsAtClose)·
+ * 밀린 세션 복구(closeOutStaleCrossdaySessions)가 모두 자동으로 own-or-unowned 로 제한된다 —
+ * 서버 A 가 서버 B 의 running 세션을 마감/복구하지 않게(소유자별 수명 관리).
+ *
+ * `operator` 는 테스트 주입용(기본 = 이 서버 운영자). now 주입 패턴과 동일.
+ */
+export function selectSchedulableSessions(
+  sessions: PaperTradingSession[],
+  operator: string = resolveServerOperator(),
+): PaperTradingSession[] {
   return sessions.filter(
-    (session) => session.status === "running" && session.decisionProvider === "cli-agent",
+    (session) =>
+      session.status === "running" &&
+      session.decisionProvider === "cli-agent" &&
+      (!session.owner || session.owner === operator),
   );
 }
 

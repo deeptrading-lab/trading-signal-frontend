@@ -11,6 +11,7 @@ import {
   resetPaperTradingStoreForTest,
   seedPaperTradingSessionForTest,
 } from "@/lib/server/paperTrading/sessionStore";
+import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 
 function session(over: Partial<PaperTradingSession>): PaperTradingSession {
@@ -49,6 +50,29 @@ describe("selectSchedulableSessions", () => {
       session({ id: "d", decisionProvider: "mock" }),
     ]);
     expect(picked.map((s) => s.id)).toEqual(["a"]);
+  });
+
+  it("소유자 게이트 — 내 소유·미지정(레거시)은 포함, 다른 운영자 소유는 제외", () => {
+    const me = resolveServerOperator();
+    const picked = selectSchedulableSessions([
+      session({ id: "mine", owner: me }),
+      session({ id: "legacy" }), // owner 미지정 → 하위호환 포함
+      session({ id: "friend", owner: "friend-op" }), // 다른 운영자 → 제외
+      session({ id: "mock", decisionProvider: "mock", owner: me }), // provider 로 이미 제외
+    ]);
+    expect(picked.map((s) => s.id).sort()).toEqual(["legacy", "mine"]);
+  });
+
+  it("operator 인자 주입 시 그 기준으로 필터(테스트 주입)", () => {
+    const picked = selectSchedulableSessions(
+      [
+        session({ id: "a", owner: "op-a" }),
+        session({ id: "b", owner: "op-b" }),
+        session({ id: "c" }), // 미지정 → 포함
+      ],
+      "op-b",
+    );
+    expect(picked.map((s) => s.id).sort()).toEqual(["b", "c"]);
   });
 });
 
@@ -105,6 +129,19 @@ describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", 
   it("마감 후(15:41+)이고 대상 세션이 없으면 0", async () => {
     resetPaperTradingStoreForTest();
     expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:41:00.000Z"))).toBe(0); // 금 15:41 KST
+  });
+
+  it("소유자 게이트 — 내 소유·미지정만 완료하고 다른 운영자 세션은 running 유지", async () => {
+    resetPaperTradingStoreForTest();
+    const me = resolveServerOperator();
+    seedPaperTradingSessionForTest(session({ id: "mine", owner: me }));
+    seedPaperTradingSessionForTest(session({ id: "legacy" })); // owner 미지정
+    seedPaperTradingSessionForTest(session({ id: "friend", owner: "friend-op" }));
+    // 금 15:41 KST — 마감 스윕 발화. 내 것 2건만 완료, 친구 세션은 그의 서버 몫으로 남긴다.
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:41:00.000Z"))).toBe(2);
+    expect((await getPaperTradingSessionDetail("mine"))?.session.status).toBe("completed");
+    expect((await getPaperTradingSessionDetail("legacy"))?.session.status).toBe("completed");
+    expect((await getPaperTradingSessionDetail("friend"))?.session.status).toBe("running");
   });
 });
 

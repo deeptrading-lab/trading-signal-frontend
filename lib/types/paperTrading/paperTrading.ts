@@ -145,6 +145,13 @@ export type PaperTradingSession = {
   decisionProvider: PaperTradingDecisionProvider;
   /** 단타 cli-agent 실행에 사용할 로컬 AI CLI. 기존 세션은 미기록일 수 있어 optional. */
   aiProvider?: PaperTradingAiProvider;
+  /**
+   * 이 세션을 만든 서버 운영자(operator) 식별자 — 공유 Supabase 다중 서버에서 소유자 구분 +
+   * 소유자별 틱/마감/복구 게이트의 키(intraday-session-owner). 생성 시 `resolveServerOperator()`
+   * 로 스탬프한다. **레거시/소유자 이관 전 세션은 미기록(undefined)** — 게이트는 own-or-unowned
+   * 규칙으로 미기록 세션도 계속 처리(하위호환, orphan 방지).
+   */
+  owner?: string;
   mode: PaperTradingMode;
   lastTickWindowStart: string | null;
   startedAt: string;
@@ -233,6 +240,11 @@ export type CreatePaperTradingSessionRequest = {
 
 export type PaperTradingSessionsResponse = {
   sessions: PaperTradingSession[];
+  /**
+   * 이 응답을 서빙한 서버의 운영자 식별자 — 클라가 "내 세션"(session.owner === currentOperator)을
+   * 판정해 배지·"내 세션만" 필터에 쓴다. 구 클라이언트는 이 필드가 없어도(undefined) 동작(하위호환).
+   */
+  currentOperator: string;
   generatedAt: string;
 };
 
