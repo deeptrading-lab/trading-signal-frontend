@@ -22,7 +22,7 @@
 
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -179,6 +179,26 @@ export function StockDailyChart({
   );
 
   const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
+
+  // 클릭 트리거 툴팁 닫기 — recharts 클릭 트리거는 자체 닫기가 없다. 차트(.recharts-wrapper) 밖을
+  //  누르거나 Esc 면 강제로 숨기고(active=false), 봉을 다시 누르면 트리거대로 표시(active=undefined).
+  const [forceHideTooltip, setForceHideTooltip] = useState(false);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as Element | null;
+      setForceHideTooltip(!el?.closest?.(".recharts-wrapper"));
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setForceHideTooltip(true);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  const tooltipActive = forceHideTooltip ? false : undefined;
 
   // 멀티데이 분봉 x축 눈금(날짜 경계) 유무 — 있으면 그 눈금만(interval=0), 없으면 recharts 자동(양끝 보존).
   const xAxisInterval = xTicks ? 0 : "preserveStartEnd";
@@ -348,7 +368,7 @@ export function StockDailyChart({
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip trigger="click" content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
+              <Tooltip trigger="click" active={tooltipActive} content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 캔들 위에 표시 */}
               {showBB && (
@@ -395,7 +415,7 @@ export function StockDailyChart({
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
+              <Tooltip trigger="click" active={tooltipActive} contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 가격 라인 위에 표시 */}
               {showBB && (
@@ -436,7 +456,7 @@ export function StockDailyChart({
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
             <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
-            <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipVol} labelStyle={labelStyle} />
+            <Tooltip trigger="click" active={tooltipActive} contentStyle={tooltipStyle} formatter={fmtTooltipVol} labelStyle={labelStyle} />
             <Bar dataKey="volume" maxBarSize={6} isAnimationActive={false}>
               {volSeries.map((entry, i) => (
                 <Cell key={i} fill={entry.isUp ? C.volUp : C.volDown} />
@@ -461,7 +481,7 @@ export function StockDailyChart({
                 <XAxis dataKey="date" {...axisProps} hide />
                 <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={CHART_AXIS_WIDTH} orientation="right" />
                 <ReferenceLine y={0} stroke={C.refMid} strokeOpacity={0.5} />
-                <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipMACD} labelStyle={labelStyle} />
+                <Tooltip trigger="click" active={tooltipActive} contentStyle={tooltipStyle} formatter={fmtTooltipMACD} labelStyle={labelStyle} />
                 <Bar dataKey="histogram" maxBarSize={4} isAnimationActive={false}>
                   {macdSeries.map((entry, i) => (
                     <Cell key={i} fill={(entry.histogram ?? 0) >= 0 ? C.histUp : C.histDown} />
@@ -492,7 +512,7 @@ export function StockDailyChart({
                 <ReferenceLine y={70} stroke={C.refOB} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "70", position: "right", fill: C.refOB, fontSize: 10 }} />
                 <ReferenceLine y={30} stroke={C.refOS} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "30", position: "right", fill: C.refOS, fontSize: 10 }} />
                 <ReferenceLine y={50} stroke={C.refMid} strokeOpacity={0.4} />
-                <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipRSI} labelStyle={labelStyle} />
+                <Tooltip trigger="click" active={tooltipActive} contentStyle={tooltipStyle} formatter={fmtTooltipRSI} labelStyle={labelStyle} />
                 <Line type="monotone" dataKey="rsi" stroke={C.rsiLine} strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
