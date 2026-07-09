@@ -289,6 +289,113 @@ describe("executeVirtualTrade 빈 targetAllocations 계약 (리뷰 #1 — HOLD �
   });
 });
 
+describe("executeVirtualTrade 하드스톱 (intraday-stop-slippage B)", () => {
+  const held: PaperTradingPosition = {
+    ticker: "005930",
+    name: "삼성전자",
+    quantity: 10,
+    avgEntryPrice: 100_000,
+    lastPrice: 100_000,
+    marketValue: 1_000_000,
+    unrealizedPnl: 0,
+    unrealizedPnlPct: 0,
+    allocationPct: 50,
+    updatedAt: price.asOf,
+  };
+  const holdDecision: PaperTradingDecision = {
+    action: "HOLD",
+    targetAllocationPct: 0,
+    targetAllocations: [],
+    confidence: "LOW",
+    rationale: "유지",
+    riskNotes: [],
+    source: "cli-agent",
+  };
+
+  it("포지션 손실률이 하드스톱(−5%) 이하면 EXIT — 동적 손절선 미설정이어도 청산", () => {
+    const result = executeVirtualTrade({
+      cash: 0,
+      positions: [held],
+      decision: holdDecision,
+      // 94,000 = −6% → 하드스톱(−5%) 발동. 동적 손절선(stopPrice)은 미설정.
+      priceSnapshot: [{ ...price, price: 94_000 }],
+      forcedExit: { stopPrice: null, targetPrice: null, flattenAll: false, positionHardStopPct: -5 },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).toContain("포지션 손실 한도(-5%)");
+  });
+
+  it("세션 수익률이 세션 하드스톱(−7%) 이하면 전량 flatten", () => {
+    const result = executeVirtualTrade({
+      cash: 0,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 99_000 }], // 포지션은 −1%(하드스톱 미도달)
+      forcedExit: {
+        stopPrice: null,
+        targetPrice: null,
+        flattenAll: false,
+        positionHardStopPct: -5,
+        sessionHardStopPct: -7,
+        sessionReturnPct: -8, // 세션 −8% → 세션 하드스톱 발동
+      },
+    });
+    expect(result.positions).toHaveLength(0);
+    expect(result.guardAdjustments.join(" ")).toContain("세션 손실 한도(-7%)");
+  });
+
+  it("'끄기'(positionHardStopPct null)면 하드스톱 미발동 — 동적 손절선은 그대로 작동", () => {
+    // 끄기 + 동적 손절선 있음: 손절선 이탈은 여전히 청산.
+    const withStop = executeVirtualTrade({
+      cash: 0,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 96_000 }],
+      forcedExit: { stopPrice: 97_000, targetPrice: null, flattenAll: false, positionHardStopPct: null },
+    });
+    expect(withStop.positions).toHaveLength(0);
+    expect(withStop.guardAdjustments.join(" ")).toContain("손절선");
+
+    // 끄기 + 동적 손절선 없음: −6% 급락이어도 하드스톱이 꺼져 있어 청산하지 않는다.
+    const noStop = executeVirtualTrade({
+      cash: 0,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 94_000 }],
+      forcedExit: { stopPrice: null, targetPrice: null, flattenAll: false, positionHardStopPct: null },
+    });
+    expect(noStop.positions).toHaveLength(1);
+    expect(noStop.guardAdjustments.join(" ")).not.toContain("손실 한도");
+  });
+
+  it("정상(급락 없음) 흐름에서는 하드스톱 미발동 — 무주문(AC-5 회귀 0)", () => {
+    const result = executeVirtualTrade({
+      cash: 0,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 101_000 }], // +1%
+      forcedExit: { stopPrice: 90_000, targetPrice: 120_000, flattenAll: false, positionHardStopPct: -5, sessionHardStopPct: -7, sessionReturnPct: 1 },
+    });
+    expect(result.positions).toHaveLength(1);
+    expect(result.orders).toHaveLength(0);
+  });
+
+  it("관측성(AC-7) — 손절 청산 시 설정 손절선 vs 실체결가 갭을 guardAdjustments 에 기록", () => {
+    const result = executeVirtualTrade({
+      cash: 0,
+      positions: [held],
+      decision: holdDecision,
+      priceSnapshot: [{ ...price, price: 95_000 }],
+      // 슬리피지 10bp → 매도 체결가 95,000×(1−0.001)=94,905. 손절선 97,000 대비 갭 기록.
+      forcedExit: { stopPrice: 97_000, targetPrice: null, flattenAll: false, positionHardStopPct: -5 },
+      costs: { feeBpPerSide: 0, sellTaxBp: 0, slippageBp: 10 },
+    });
+    const note = result.guardAdjustments.join(" ");
+    expect(note).toContain("손절선 97,000원 대비 실체결 94,905원");
+    expect(note).toMatch(/대비 실체결/);
+  });
+});
+
 describe("executeVirtualTrade 거래 비용 모델 (단타 cli-agent)", () => {
   // 검산 쉬운 값: 수수료 10bp/편도, 매도 제세금 20bp, 슬리피지 10bp/편도.
   const costs = { feeBpPerSide: 10, sellTaxBp: 20, slippageBp: 10 };

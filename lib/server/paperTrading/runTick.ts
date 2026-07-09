@@ -1,5 +1,9 @@
 import { randomUUID } from "crypto";
-import { PAPER_TRADING_INTRADAY_COSTS } from "@/lib/server/paperTrading/constants";
+import {
+  PAPER_TRADING_INTRADAY_COSTS,
+  resolvePositionHardStopPct,
+  resolveSessionHardStopPct,
+} from "@/lib/server/paperTrading/constants";
 import { decideWithMockProvider } from "@/lib/server/paperTrading/decisionProviders/mock";
 import {
   getLivePriceSnapshot,
@@ -85,7 +89,22 @@ export async function runPaperTradingTick(
       abortSignal: input.abortSignal,
     });
     decision = resolved.decision;
-    forcedExit = resolved.forcedExit;
+    // 하드스톱(포지션 −N% / 세션 −M%)을 세션 설정에서 forced-exit 에 주입 — LLM 5분 틱과 A(60초
+    // 리스크 스윕)가 같은 백스톱을 공유하는 단일 지점(intraday-stop-slippage B). resolveForcedExit
+    // 가 세션 하드스톱 판정에 쓰도록 신선 마크 기준 세션 수익률도 함께 싣는다. mock 경로는 무영향.
+    forcedExit = resolved.forcedExit
+      ? {
+          ...resolved.forcedExit,
+          positionHardStopPct: resolvePositionHardStopPct(input.session),
+          sessionHardStopPct: resolveSessionHardStopPct(input.session),
+          sessionReturnPct:
+            input.session.initialCash > 0
+              ? ((markedPortfolioValue - input.session.initialCash) /
+                  input.session.initialCash) *
+                100
+              : 0,
+        }
+      : resolved.forcedExit;
   } else {
     decision = decideWithMockProvider({
       positions: input.positions,

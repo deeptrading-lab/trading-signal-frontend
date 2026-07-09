@@ -34,6 +34,15 @@ export type VirtualExecutionInput = {
     stopPrice?: number | null;
     /** 장 막판 전량 청산(15:20). */
     flattenAll?: boolean;
+    /**
+     * 포지션 손실 하드스톱(%, 음수) — 보유 포지션의 `unrealizedPnlPct ≤ 값` 이면 EXIT
+     * (intraday-stop-slippage B). `null`/미지정 = 미적용. cli-agent 만 주입(mock 무영향).
+     */
+    positionHardStopPct?: number | null;
+    /** 세션 손실 하드스톱(%, 음수) — `sessionReturnPct ≤ 값` 이면 전량 flatten. `null`/미지정=미적용. */
+    sessionHardStopPct?: number | null;
+    /** 판정용 세션 수익률(신선 마크 기준, %) — 호출측(runTick/리스크 스윕)이 주입. 세션 하드스톱 입력. */
+    sessionReturnPct?: number;
   };
 };
 
@@ -59,10 +68,10 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
 
   const markedPositions = markPositions(input.positions, input.priceSnapshot);
 
-  // 단타 청산 트리거(리스크 룰 우선) — 익절/손절/장막판 도달 시 결정을 EXIT 로 덮어쓴다.
+  // 단타 청산 트리거(리스크 룰 우선) — 익절/손절/하드스톱/장막판 도달 시 결정을 EXIT 로 덮어쓴다.
   const forced = resolveForcedExit(input.forcedExit, markedPositions, price);
-  const decision = forced ?? input.decision;
-  if (forced) guardAdjustments.push(forced.rationale);
+  const decision = forced?.decision ?? input.decision;
+  if (forced) guardAdjustments.push(forced.decision.rationale);
 
   const portfolioBefore = input.cash + sumMarketValue(markedPositions);
   if (portfolioBefore <= 0) {
@@ -199,46 +208,93 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
     });
   }
 
+  // 관측성(AC-7) — 손절/포지션 하드스톱 청산 시, 설정 손절선 대비 실체결가 갭(슬리피지)을 기록.
+  // 다스코류(손절선을 건너뛴 장대음봉)의 실현 슬리피지를 데이터로 추적하기 위함.
+  if (forced?.stopReference != null) {
+    const exitOrder = orders.find((order) => order.side === "SELL");
+    if (exitOrder) {
+      const ref = forced.stopReference;
+      const gapPct = ref > 0 ? ((exitOrder.price - ref) / ref) * 100 : 0;
+      guardAdjustments.push(
+        `손절선 ${ref.toLocaleString("ko-KR")}원 대비 실체결 ${exitOrder.price.toLocaleString("ko-KR")}원 ` +
+          `(${gapPct >= 0 ? "+" : ""}${gapPct.toFixed(1)}%)`,
+      );
+    }
+  }
+
   const portfolioAfter = nextCash + sumMarketValue(nextPositions);
   const allocatedPositions = withAllocations(nextPositions, portfolioAfter);
 
   return buildResult(nextCash, allocatedPositions, orders, portfolioAfter, guardAdjustments, null);
 }
 
+/** forced-exit 판정 결과 — EXIT 결정 + 관측용 손절 기준선(슬리피지 노트). */
+type ForcedExitResolution = {
+  decision: PaperTradingDecision;
+  /**
+   * 손절 관측 기준선(절대 원) — 동적 손절선/포지션 하드스톱 청산일 때만 채운다(익절·장막판·세션
+   * 하드스톱은 null). `executeVirtualTrade` 가 실체결가와 비교해 슬리피지 갭을 guardAdjustments 에 남긴다.
+   */
+  stopReference: number | null;
+};
+
 /**
- * 단타 청산 트리거 판정 — 보유 포지션이 익절/손절/장막판에 도달하면 전량 EXIT 결정을 만든다.
- * 트리거 없으면 null(원 결정 유지). 단타(cli-agent) 외 경로는 forcedExit 미지정 → 항상 null.
+ * 단타 청산 트리거 판정 — 보유 포지션이 아래 조건에 도달하면 전량 EXIT 결정을 만든다(우선순위 순):
+ *  ① 장막판 flatten → ② 세션 하드스톱(포트폴리오 손실) → ③ 동적 손절선(intended stop) →
+ *  ④ 포지션 하드스톱(백스톱) → ⑤ 익절 목표가.
+ * ③ 을 ④ 보다 먼저 보는 이유: 사용자가 설정한 손절선이 슬리피지 관측의 기준(다스코 5,420원)이고,
+ * 하드스톱은 동적 손절선이 없거나 더 느슨할 때의 백스톱이기 때문. 트리거 없으면 null(원 결정 유지).
+ * 단타(cli-agent) 외 경로는 forcedExit 미지정 → 항상 null. positionHardStopPct/sessionHardStopPct
+ * 가 null/미지정이면 해당 하드스톱만 건너뛴다(동적 손절선은 유지 — "끄기" 안전 규약).
  */
 function resolveForcedExit(
   forcedExit: VirtualExecutionInput["forcedExit"],
   positions: PaperTradingPosition[],
   price: PaperTradingPriceSnapshot | undefined,
-): PaperTradingDecision | null {
+): ForcedExitResolution | null {
   if (!forcedExit || !price) return null;
   const held = positions.find((p) => p.quantity >= 1);
   if (!held) return null;
 
   const last = price.price;
+  const posHard = forcedExit.positionHardStopPct;
+  const sesHard = forcedExit.sessionHardStopPct;
   let reason: string | null = null;
+  let stopReference: number | null = null;
+
   if (forcedExit.flattenAll) {
     reason = "장 막판 강제 청산(오버나잇 보유 없음).";
-  } else if (forcedExit.targetPrice != null && last >= forcedExit.targetPrice) {
-    reason = `익절 목표가(${Math.round(forcedExit.targetPrice).toLocaleString("ko-KR")}원) 도달로 가상 청산합니다.`;
+  } else if (
+    sesHard != null &&
+    forcedExit.sessionReturnPct != null &&
+    forcedExit.sessionReturnPct <= sesHard
+  ) {
+    reason = `세션 손실 한도(${sesHard}%) 도달로 전량 청산합니다.`;
   } else if (forcedExit.stopPrice != null && last <= forcedExit.stopPrice) {
     reason = `손절선(${Math.round(forcedExit.stopPrice).toLocaleString("ko-KR")}원) 이탈로 가상 청산합니다.`;
+    stopReference = Math.round(forcedExit.stopPrice);
+  } else if (posHard != null && held.unrealizedPnlPct <= posHard) {
+    reason = `포지션 손실 한도(${posHard}%) 도달로 가상 청산합니다.`;
+    // 하드스톱 기준선 = 평단 × (1 + 하드스톱%/100) — 손절선 미설정 청산의 관측 기준.
+    stopReference = Math.round(held.avgEntryPrice * (1 + posHard / 100));
+  } else if (forcedExit.targetPrice != null && last >= forcedExit.targetPrice) {
+    reason = `익절 목표가(${Math.round(forcedExit.targetPrice).toLocaleString("ko-KR")}원) 도달로 가상 청산합니다.`;
   }
   if (!reason) return null;
 
   return {
-    action: "EXIT",
-    targetAllocationPct: 0,
-    targetAllocations: [
-      { ticker: held.ticker, name: held.name, targetAllocationPct: 0, rationale: reason },
-    ],
-    confidence: "HIGH",
-    rationale: reason,
-    riskNotes: [],
-    source: "cli-agent",
+    decision: {
+      action: "EXIT",
+      targetAllocationPct: 0,
+      targetAllocations: [
+        { ticker: held.ticker, name: held.name, targetAllocationPct: 0, rationale: reason },
+      ],
+      confidence: "HIGH",
+      rationale: reason,
+      riskNotes: [],
+      source: "cli-agent",
+    },
+    stopReference,
   };
 }
 
