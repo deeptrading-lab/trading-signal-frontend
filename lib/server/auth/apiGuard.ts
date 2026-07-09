@@ -53,3 +53,16 @@ export async function requireProdAdminApi(
   if (!isVercelEnv()) return null;
   return (await isAdminRequest(request)) ? null : forbidden();
 }
+
+async function isSuperadminRequest(request: NextRequest): Promise<boolean> {
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const identity = await readSession(token);
+  return isAtLeast(identity?.role, "superadmin");
+}
+
+/** superadmin 미만이면 403(환경 무관) — **파괴적 작업**(저장 분석 결과 삭제 등) 전용 최상위 가드. */
+export async function requireSuperadminApi(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  return (await isSuperadminRequest(request)) ? null : forbidden();
+}
