@@ -38,7 +38,6 @@ import {
   ReferenceLine,
   ReferenceArea,
   ResponsiveContainer,
-  Customized,
   DefaultZIndexes,
 } from "recharts";
 import type { ReactElement } from "react";
@@ -72,7 +71,7 @@ import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag } from "./chart/LastPriceTag";
-import { makeAiAxisLabels } from "./chart/AiLevelAxisLabels";
+import { AiLevelAxisLabels } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
@@ -308,17 +307,9 @@ export function StockDailyChart({
       />,
     );
   }
-  // 우측 가격 축 라벨(현재가 태그처럼) — 전 레벨 픽셀 y 를 모아 충돌 해소. Customized 로 y-스케일 확보.
+  // 우측 가격 축 라벨(현재가 태그처럼) — 전 레벨 픽셀 y 를 모아 충돌 해소. v3 스케일 훅 사용(직접 자식).
   const aiAxisLabelsEl = ai ? (
-    <Customized
-      key="ai-axis-labels"
-      component={makeAiAxisLabels(ai, lastClose, {
-        target: C.stroke,
-        reentry: C.refMid,
-        stop: C.down,
-        surface: C.surface,
-      })}
-    />
+    <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} />
   ) : null;
 
   // 최신가 알약과 겹치는 가장 가까운 y축 눈금을 숨길 가격 임계값 — 보이는 가격 폭의 ~10%.
