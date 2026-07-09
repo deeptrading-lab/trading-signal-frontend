@@ -103,17 +103,32 @@ export function AiLevelAxisLabels({
   }
   if (labels.length === 0) return null;
 
-  // 충돌 해소 — 이상 y(y0) 오름차순 후 최소 간격 확보하며 아래로 밀기. 현재가 알약 회피.
+  // 충돌 해소 — 이상 y(y0) 오름차순 후 최소 간격 확보. 현재가 알약(별도 컴포넌트) 밴드 회피.
   const currentY = lastClose != null ? yScale(lastClose) : null;
+  const minY = top + BOX_H / 2;
+  const maxY = bottom - BOX_H / 2;
   labels.sort((a, b) => a.y0 - b.y0);
+  // 1) 위→아래로 밀며 GAP 확보 + 현재가 밴드 회피(하단 경계는 여기서 우선 클램프).
   let prevY = -Infinity;
   for (const l of labels) {
     let y = Math.max(l.y0, prevY + GAP);
     if (currentY != null && Math.abs(y - currentY) < GAP) y = currentY + GAP;
-    l.y = y;
-    prevY = y;
+    l.y = Math.min(y, maxY);
+    prevY = l.y;
   }
-  for (const l of labels) l.y = Math.min(Math.max(l.y, top + BOX_H / 2), bottom - BOX_H / 2);
+  // 2) 하단에 몰린 라벨 겹침 방지 — 아래→위로 GAP 재보장(맨 아래를 maxY 에 고정하고 위로 분리).
+  //    (기존엔 각 라벨을 독립적으로 bottom 에 클램프해 여러 레벨이 같은 y 로 눌려 겹쳤다.)
+  let ceil = maxY;
+  for (let i = labels.length - 1; i >= 0; i--) {
+    labels[i].y = Math.min(labels[i].y, ceil);
+    ceil = labels[i].y - GAP;
+  }
+  // 3) 상단 경계 클램프(2번이 위로 밀어 top 을 넘긴 드문 경우) — 위→아래로 GAP 보장.
+  let floor = minY;
+  for (const l of labels) {
+    l.y = Math.max(l.y, floor);
+    floor = l.y + GAP;
+  }
 
   return (
     <g pointerEvents="none">
