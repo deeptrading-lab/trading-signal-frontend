@@ -212,3 +212,31 @@ export async function upsertAIDecision(input: {
 
   return { ok: true, skipped: false };
 }
+
+/**
+ * 저장된 AI 분석 결과 삭제(레거시 정리 등) — ticker PK 로 1행 삭제. Supabase 미설정이면 skipped.
+ * ⚠️ 파괴적 — 라우트에서 superadmin 가드(requireSuperadminApi) 필수.
+ */
+export async function deleteAIDecision(ticker: string): Promise<DecisionStoreWriteResult> {
+  const config = supabaseConfig();
+  if (!config) return { ok: true, skipped: true, reason: "not_configured" };
+
+  const url = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
+  url.searchParams.set("ticker", `eq.${ticker}`);
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { ...headers(config.key), Prefer: "return=minimal" },
+  }).catch((error: unknown) => ({
+    ok: false,
+    status: 0,
+    text: async () => (error instanceof Error ? error.message : String(error)),
+  }));
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, skipped: false, error: `Supabase delete 실패 status=${res.status} ${text}` };
+  }
+
+  return { ok: true, skipped: false };
+}

@@ -14,12 +14,21 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MoreVertical, RefreshCw } from "lucide-react";
+import { MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
+import { useMe } from "@/hooks/auth/useMe";
+import { useMutationDeleteAIDecision } from "@/hooks/query/useMutationDeleteAIDecision";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { ReanalyzeConfirmDialog } from "./ReanalyzeConfirmDialog";
-import { CARD_MENU_LABEL, REANALYZE_LABEL, REANALYZE_RUNNING } from "@/lib/copy/analyze/labels";
+import { DeleteDecisionConfirmDialog } from "./DeleteDecisionConfirmDialog";
+import {
+  CARD_MENU_LABEL,
+  DELETE_LABEL,
+  DELETE_RUNNING,
+  REANALYZE_LABEL,
+  REANALYZE_RUNNING,
+} from "@/lib/copy/analyze/labels";
 
 interface AIDecisionCardMenuProps {
   item: AIDecisionListItem;
@@ -29,10 +38,13 @@ interface AIDecisionCardMenuProps {
 
 export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
   const { openFor, isTickerRunning } = useAIAnalysisContext();
+  const { isSuperadmin } = useMe();
+  const deleteMutation = useMutationDeleteAIDecision();
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [pos, setPos] = useState<{
     top: number;
     right: number;
@@ -145,6 +157,25 @@ export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
                 <RefreshCw size={14} aria-hidden="true" className={cn(runningThis && "animate-spin")} />
                 {runningThis ? REANALYZE_RUNNING : REANALYZE_LABEL}
               </button>
+              {/* 삭제 — superadmin 전용(레거시 정리). 파괴적이라 critical 색 + 확인 다이얼로그. */}
+              {isSuperadmin && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDeleting(true);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-xs px-md py-sm rounded-sm text-left text-body-sm-strong text-critical transition-colors cursor-pointer",
+                    "hover:bg-critical-soft disabled:cursor-not-allowed disabled:opacity-60",
+                  )}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  {deleteMutation.isPending ? DELETE_RUNNING : DELETE_LABEL}
+                </button>
+              )}
             </div>
           </>,
           document.body,
@@ -155,6 +186,17 @@ export function AIDecisionCardMenu({ item, name }: AIDecisionCardMenuProps) {
           name={name}
           onConfirm={handleConfirm}
           onCancel={() => setConfirming(false)}
+        />
+      )}
+
+      {deleting && (
+        <DeleteDecisionConfirmDialog
+          name={name}
+          busy={deleteMutation.isPending}
+          onConfirm={() => {
+            deleteMutation.mutate(item.ticker, { onSettled: () => setDeleting(false) });
+          }}
+          onCancel={() => setDeleting(false)}
         />
       )}
     </>

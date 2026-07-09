@@ -21,3 +21,8 @@ export async function fetchAIDecisionList(): Promise<AIDecisionListResponse> {
   );
   return response.data;
 }
+
+/** 저장 분석 결과 삭제 — superadmin 전용(BFF 가 requireSuperadminApi 로 재방어). */
+export async function deleteAIAnalysisDecision(ticker: string): Promise<void> {
+  await httpClient.delete(`/stock/ai-analysis/decisions/${encodeURIComponent(ticker)}`);
+}

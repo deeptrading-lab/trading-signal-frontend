@@ -74,6 +74,15 @@ export const REANALYZE_CONFIRM_HINT =
 export const REANALYZE_CONFIRM_OK = "확인";
 export const REANALYZE_CONFIRM_CANCEL = "취소";
 
+/** 케밥 메뉴 삭제 항목 — superadmin 전용(레거시 결과 정리). */
+export const DELETE_LABEL = "삭제";
+export const DELETE_RUNNING = "삭제 중…";
+export const DELETE_CONFIRM_TITLE = "분석 결과를 삭제할까요?";
+export const deleteConfirmDesc = (name: string): string =>
+  `${name}의 저장된 분석 결과가 영구 삭제돼요. 되돌릴 수 없어요.`;
+export const DELETE_CONFIRM_OK = "삭제";
+export const DELETE_CONFIRM_CANCEL = "취소";
+
 export const USAGE_LOADING = "토큰 사용량을 불러오는 중…";
 export const USAGE_ERROR = "토큰 사용량을 불러오지 못했어요.";
 export const USAGE_RETRY = "다시 시도";
