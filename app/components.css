@@ -399,6 +399,20 @@
     --tw-prose-th-borders: var(--fs-border-line);
     --tw-prose-td-borders: var(--fs-border-line);
   }
+  /* --tw-prose-* 변수가 일부 요소(헤딩·강조·링크·표 헤더)에서 안 먹는 케이스 방어 — 토큰색 직접 강제.
+     (다크에서 헤딩/강조만 검게 남던 문제. 요소 셀렉터로 높은 특이성 + var(--fs-*) 자동 스왑.) */
+  .markdown-content :is(h1, h2, h3, h4, h5, h6),
+  .markdown-content strong,
+  .markdown-content b,
+  .markdown-content th {
+    color: var(--fs-text-strong);
+  }
+  .markdown-content a {
+    color: var(--fs-accent-vivid);
+  }
+  .markdown-content code {
+    color: var(--fs-accent-vivid);
+  }
 
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
   .price-bar-track {
