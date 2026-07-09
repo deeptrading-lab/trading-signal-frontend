@@ -71,7 +71,7 @@ import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag } from "./chart/LastPriceTag";
-import { AiLevelAxisLabels } from "./chart/AiLevelAxisLabels";
+import { AiLevelAxisLabels, aiLabelMaxWidth } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
@@ -307,7 +307,11 @@ export function StockDailyChart({
       />,
     );
   }
-  // 우측 가격 축 라벨(현재가 태그처럼 축 위에) — 전 레벨 픽셀 y 를 모아 충돌 해소(v3 스케일 훅, 직접 자식).
+  // 우측 축 라벨(y축서 시작해 오른쪽 확장) — 라벨이 축 폭보다 길면 그 넘침분만큼 margin.right 예약해
+  //  잘리지 않게. 전 레벨 픽셀 y 를 모아 충돌 해소(v3 스케일 훅, 직접 자식).
+  const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - CHART_AXIS_WIDTH + 4) : 0;
+  const priceMargin = { top: 5, right: 4 + aiOverflow, left: 0, bottom: 0 };
+  const subMargin = { top: 0, right: 4 + aiOverflow, left: 0, bottom: 0 };
   const aiAxisLabelsEl = ai ? (
     <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} />
   ) : null;
@@ -333,7 +337,7 @@ export function StockDailyChart({
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={280}>
           {chartType === "candle" ? (
-            <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
+            <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={priceMargin}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
               {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
               {aiZoneEls}
@@ -344,7 +348,7 @@ export function StockDailyChart({
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
+              <Tooltip trigger="click" content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 캔들 위에 표시 */}
               {showBB && (
@@ -374,7 +378,7 @@ export function StockDailyChart({
               {aiAxisLabelsEl}
             </ComposedChart>
           ) : (
-            <AreaChart data={priceSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
+            <AreaChart data={priceSeries} syncId={SYNC_ID} margin={priceMargin}>
               <defs>
                 <linearGradient id="sdcFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={C.fill} stopOpacity={0.3} />
@@ -391,7 +395,7 @@ export function StockDailyChart({
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
+              <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 가격 라인 위에 표시 */}
               {showBB && (
@@ -428,11 +432,11 @@ export function StockDailyChart({
       <SubLabel label="거래량" />
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={70}>
-          <ComposedChart data={volSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+          <ComposedChart data={volSeries} syncId={SYNC_ID} margin={subMargin}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
             <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
-            <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipVol} labelStyle={labelStyle} />
+            <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipVol} labelStyle={labelStyle} />
             <Bar dataKey="volume" maxBarSize={6} isAnimationActive={false}>
               {volSeries.map((entry, i) => (
                 <Cell key={i} fill={entry.isUp ? C.volUp : C.volDown} />
@@ -452,12 +456,12 @@ export function StockDailyChart({
           <SubLabel label="MACD (12, 26, 9)" />
           <div className="w-full overflow-hidden">
             <ResponsiveContainer width="100%" height={90}>
-              <ComposedChart data={macdSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+              <ComposedChart data={macdSeries} syncId={SYNC_ID} margin={subMargin}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} hide />
                 <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={CHART_AXIS_WIDTH} orientation="right" />
                 <ReferenceLine y={0} stroke={C.refMid} strokeOpacity={0.5} />
-                <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipMACD} labelStyle={labelStyle} />
+                <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipMACD} labelStyle={labelStyle} />
                 <Bar dataKey="histogram" maxBarSize={4} isAnimationActive={false}>
                   {macdSeries.map((entry, i) => (
                     <Cell key={i} fill={(entry.histogram ?? 0) >= 0 ? C.histUp : C.histDown} />
@@ -481,14 +485,14 @@ export function StockDailyChart({
           <SubLabel label="RSI (14)" />
           <div className="w-full overflow-hidden">
             <ResponsiveContainer width="100%" height={80}>
-              <LineChart data={rsiSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+              <LineChart data={rsiSeries} syncId={SYNC_ID} margin={subMargin}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} dy={6} hide />
                 <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={CHART_AXIS_WIDTH} orientation="right" />
                 <ReferenceLine y={70} stroke={C.refOB} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "70", position: "right", fill: C.refOB, fontSize: 10 }} />
                 <ReferenceLine y={30} stroke={C.refOS} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "30", position: "right", fill: C.refOS, fontSize: 10 }} />
                 <ReferenceLine y={50} stroke={C.refMid} strokeOpacity={0.4} />
-                <Tooltip contentStyle={tooltipStyle} formatter={fmtTooltipRSI} labelStyle={labelStyle} />
+                <Tooltip trigger="click" contentStyle={tooltipStyle} formatter={fmtTooltipRSI} labelStyle={labelStyle} />
                 <Line type="monotone" dataKey="rsi" stroke={C.rsiLine} strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>

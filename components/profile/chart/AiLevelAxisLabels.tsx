@@ -15,7 +15,6 @@
 import { useYAxisScale, usePlotArea } from "recharts";
 import { useChartThemeContext } from "./ChartThemeContext";
 import { formatNumber } from "@/lib/utils/formatMoney";
-import { CHART_AXIS_WIDTH } from "../stockChartConfig";
 import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 
 interface PlacedLabel {
@@ -41,6 +40,23 @@ function estimateWidth(text: string): number {
   return w;
 }
 
+function levelLabelTexts(levels: AiVerdictLevels): string[] {
+  const texts: string[] = [];
+  if (levels.target) {
+    texts.push(
+      `${levels.target.role === "target" ? "목표" : "재진입"} ${formatNumber(levels.target.price, { digits: 0 })}`,
+    );
+  }
+  texts.push(`손절 ${formatNumber(levels.stop.price, { digits: 0 })}`);
+  return texts;
+}
+
+/** 가장 넓은 라벨 알약의 픽셀 폭 — 상위(StockDailyChart)가 우측 여백(넘침분) 예약에 쓴다. */
+export function aiLabelMaxWidth(levels: AiVerdictLevels): number {
+  const maxText = levelLabelTexts(levels).reduce((m, t) => Math.max(m, estimateWidth(t)), 0);
+  return Math.ceil(maxText) + PAD_X * 2;
+}
+
 export function AiLevelAxisLabels({
   levels,
   lastClose,
@@ -54,8 +70,7 @@ export function AiLevelAxisLabels({
 
   if (!yScale || !plot) return null;
 
-  const plotRight = plot.x + plot.width;
-  const axisRight = plotRight + CHART_AXIS_WIDTH; // 현재가 태그와 같은 우측 축 끝(우정렬 기준)
+  const plotRight = plot.x + plot.width; // y축 라인(플롯 우측 끝) — 알약 시작점(좌정렬)
   const top = plot.y;
   const bottom = plot.y + plot.height;
 
@@ -104,14 +119,14 @@ export function AiLevelAxisLabels({
     <g pointerEvents="none">
       {labels.map((l, i) => {
         const boxW = Math.ceil(estimateWidth(l.text)) + PAD_X * 2;
-        const boxX = axisRight - boxW;
+        const boxX = plotRight; // 시작점=y축, 길면 오른쪽(축 바깥)으로 확장(우측 여백은 상위가 예약)
         const boxY = l.y - BOX_H / 2;
         const nudged = Math.abs(l.y - l.y0) > 1;
         return (
           <g key={i}>
-            {/* 밀렸으면 실제 선 높이(y0) → 알약(y) 짧은 세로 연결선(알약 좌측 끝). */}
+            {/* 밀렸으면 실제 선 높이(y0) → 알약(y) 짧은 세로 연결선(y축 라인 위). */}
             {nudged ? (
-              <line x1={boxX} y1={l.y0} x2={boxX} y2={l.y} stroke={l.fill} strokeWidth={1} strokeOpacity={0.55} />
+              <line x1={plotRight} y1={l.y0} x2={plotRight} y2={l.y} stroke={l.fill} strokeWidth={1} strokeOpacity={0.55} />
             ) : null}
             {/* 현재가 태그와 동일 톤 — 레벨색 채움 + 차트면 녹아웃 테두리(뒤 UI 비침 차단). */}
             <rect
@@ -126,9 +141,9 @@ export function AiLevelAxisLabels({
               strokeWidth={1.5}
             />
             <text
-              x={axisRight - PAD_X}
+              x={boxX + PAD_X}
               y={l.y}
-              textAnchor="end"
+              textAnchor="start"
               dominantBaseline="central"
               fill={l.textColor}
               fontSize={11}
