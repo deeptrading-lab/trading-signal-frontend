@@ -293,7 +293,7 @@ export function StockDailyChart({
             y1={Math.min(lastClose, ai.target.price)}
             y2={Math.max(lastClose, ai.target.price)}
             fill={C.stroke}
-            fillOpacity={0.07}
+            fillOpacity={0.11}
             stroke="none"
             ifOverflow="extendDomain"
           />,
@@ -305,7 +305,7 @@ export function StockDailyChart({
           y1={Math.min(lastClose, ai.stop.price)}
           y2={Math.max(lastClose, ai.stop.price)}
           fill={C.down}
-          fillOpacity={0.07}
+          fillOpacity={0.11}
           stroke="none"
           ifOverflow="extendDomain"
         />,
