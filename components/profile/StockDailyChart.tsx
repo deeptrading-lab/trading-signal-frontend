@@ -281,6 +281,8 @@ export function StockDailyChart({
   //    정확한 숫자 라벨은 차트 밖 배너 레전드에 두어(y축 태그 겹침 회피) 차트는 시각만 깔끔하게.
   //    ifOverflow="extendDomain" 로 목표/손절이 보이는 범위 밖이면 y도메인이 자동 확장된다.
   const ai = showAiLevels && aiLevels ? aiLevels : null;
+  // AI 오버레이 모드일 때만 현재가 알약에 "현재가" 접두 — AI 레벨(목표/재진입/손절)과 나란히 놓여 구분 필요.
+  const lastPriceLabel = ai ? "현재가" : undefined;
   const aiZoneEls: ReactElement[] = [];
   const aiLineEls: ReactElement[] = [];
   if (ai) {
@@ -340,7 +342,9 @@ export function StockDailyChart({
   //  잘리지 않게. AI 레벨 라벨과 현재가 알약 둘 다 좌정렬·우확장이라 각자 넘침분의 최댓값을 예약한다.
   const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - CHART_AXIS_WIDTH + 4) : 0;
   const lastPriceOverflow =
-    lastClose != null ? Math.max(0, lastPriceTagWidth(lastClose) - CHART_AXIS_WIDTH + 4) : 0;
+    lastClose != null
+      ? Math.max(0, lastPriceTagWidth(lastClose, lastPriceLabel) - CHART_AXIS_WIDTH + 4)
+      : 0;
   const rightReserve = Math.max(aiOverflow, lastPriceOverflow);
   const priceMargin = { top: 5, right: 4 + rightReserve, left: 0, bottom: 0 };
   const subMargin = { top: 0, right: 4 + rightReserve, left: 0, bottom: 0 };
@@ -405,7 +409,7 @@ export function StockDailyChart({
                   strokeDasharray="4 3"
                   strokeOpacity={0.55}
                   zIndex={DefaultZIndexes.axis + 1}
-                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} label={lastPriceLabel} />}
                 />
               )}
               {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
@@ -452,7 +456,7 @@ export function StockDailyChart({
                   strokeDasharray="4 3"
                   strokeOpacity={0.55}
                   zIndex={DefaultZIndexes.axis + 1}
-                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} label={lastPriceLabel} />}
                 />
               )}
               {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
