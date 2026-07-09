@@ -91,14 +91,14 @@ export function AiVerdictStrip({ levels, decision, show, onToggle }: AiVerdictSt
         </button>
       </div>
 
-      {/* 2행 — 레벨 레전드(정확한 가격) + 손익비. 토글 ON 일 때만. */}
+      {/* 2행 — 레벨 레전드(정확한 가격) + 손익비. 토글 ON 일 때만. 값이 핵심이라 한 단계 키움. */}
       {show ? (
-        <div className="flex flex-wrap items-center gap-x-md gap-y-xs text-caption tabular-nums">
+        <div className="flex flex-wrap items-center gap-x-md gap-y-xs text-body-sm tabular-nums">
           {rows.map((row) => (
             <span key={row.role} className="inline-flex items-center gap-xs">
-              <span className={cn("h-2 w-2 rounded-pill", ROLE_DOT[row.role])} aria-hidden="true" />
+              <span className={cn("h-2.5 w-2.5 rounded-pill", ROLE_DOT[row.role])} aria-hidden="true" />
               <span className="text-text-muted">{ROLE_LABEL[row.role]}</span>
-              <span className="font-medium text-text-strong">{formatMoney(row.price)}</span>
+              <span className="font-bold text-text-strong">{formatMoney(row.price)}</span>
               <span className="text-text-muted">({fmtPct(row.pct)})</span>
             </span>
           ))}
