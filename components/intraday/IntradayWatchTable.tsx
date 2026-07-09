@@ -195,6 +195,11 @@ export interface IntradayWatchTableProps {
   sessionByTicker: Map<string, PaperTradingSession>;
   /** 티커별 활성 매수 유의(경보·VI) — 빈 맵/미제공이면 칩 미표시(fail-soft). */
   warningsByTicker?: Record<string, StockWarningItem[]>;
+  /**
+   * 이 서버 운영자(operator) — 세션 소유자 배지 판정용. `session.owner === currentOperator` 면
+   * "나" 배지, 다르면 상대 운영자 라벨(muted). 미제공/구 응답이면 배지 미표시(하위호환).
+   */
+  currentOperator?: string;
   /** 호가창을 볼 선택 종목(단일) — 행 클릭으로 전환. */
   selectedTicker?: string | null;
   onSelect?: (ticker: string) => void;
@@ -220,6 +225,7 @@ export function IntradayWatchTable({
   quotesLoading = false,
   sessionByTicker,
   warningsByTicker,
+  currentOperator,
   selectedTicker,
   onSelect,
   expandedDateKeys,
@@ -359,6 +365,7 @@ export function IntradayWatchTable({
                       quotesLoading={quotesLoading}
                       session={sessionByTicker.get(item.ticker) ?? null}
                       warnings={warningsByTicker?.[item.ticker]}
+                      currentOperator={currentOperator}
                       selected={selectedTicker === item.ticker}
                       onSelect={onSelect}
                       onStart={onStart}
@@ -617,12 +624,42 @@ function changeTone(value: number): string {
   return "text-text-muted";
 }
 
+/** 세션 소유자 배지 — 내 서버 세션은 "나"(accent), 다른 서버 세션은 운영자 라벨(muted). 미지정/무세션·구 응답이면 미표시. */
+function OwnerBadge({
+  owner,
+  currentOperator,
+}: {
+  owner: string | undefined;
+  currentOperator?: string;
+}) {
+  if (!owner) return null;
+  if (currentOperator && owner === currentOperator) {
+    return (
+      <span
+        title={P.owner.mineTitle}
+        className="rounded-pill bg-accent-soft px-xs text-caption font-medium text-accent-vivid"
+      >
+        {P.owner.mine}
+      </span>
+    );
+  }
+  return (
+    <span
+      title={P.owner.otherTitle(owner)}
+      className="inline-block max-w-[6rem] truncate rounded-pill bg-surface-muted px-xs text-caption text-text-muted"
+    >
+      {owner}
+    </span>
+  );
+}
+
 function WatchRow({
   item,
   quote,
   quotesLoading,
   session,
   warnings,
+  currentOperator,
   selected,
   onSelect,
   onStart,
@@ -633,6 +670,7 @@ function WatchRow({
   quotesLoading: boolean;
   session: PaperTradingSession | null;
   warnings: StockWarningItem[] | undefined;
+  currentOperator?: string;
   selected?: boolean;
   onSelect?: (ticker: string) => void;
   onStart: IntradayWatchTableProps["onStart"];
@@ -713,6 +751,7 @@ function WatchRow({
           <div className="flex items-center gap-xs whitespace-nowrap">
             <span className="text-body-sm-strong text-text-strong">{item.name}</span>
             <StockWarningBadges warnings={warnings} max={1} size="sm" />
+            <OwnerBadge owner={current?.owner} currentOperator={currentOperator} />
             {current ? (
               stalled ? (
                 <Badge variant="warn" title={P.stalledHint}>

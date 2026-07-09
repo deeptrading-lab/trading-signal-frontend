@@ -4,6 +4,7 @@ import {
   PAPER_TRADING_DEFAULT_INITIAL_CASH,
 } from "@/lib/server/paperTrading/constants";
 import { getPaperTradingAiCliGate } from "@/lib/server/paperTrading/aiCliGate";
+import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import {
   createPaperTradingSession,
   listPaperTradingSessions,
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const payload: PaperTradingSessionsResponse = {
     sessions: await listPaperTradingSessions(),
+    // 클라가 "내 세션"(session.owner === currentOperator)을 판정해 소유자 배지·"내 세션만" 필터에 쓴다.
+    currentOperator: resolveServerOperator(),
     generatedAt: new Date().toISOString(),
   };
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });

@@ -73,7 +73,7 @@ export function filterPastSessions(
 }
 
 export function useIntradayPaperWatch() {
-  const { sessions, isCreating, create } = usePaperTradingSessions();
+  const { sessions, currentOperator, isCreating, create } = usePaperTradingSessions();
 
   // 렌더 중 Date.now 직접 호출을 피하려고 마운트 시점의 KST 오늘 키를 memoize 한다.
   // 자정이 지나면 새로고침/재방문으로 갱신되는 화면이라 이 정도면 충분하다.
@@ -140,6 +140,8 @@ export function useIntradayPaperWatch() {
     todaySessionStocks,
     pastSessions,
     runningSessionIds,
+    /** 이 서버 운영자 — 표 소유자 배지·"내 세션만" 필터 판정용(구 응답이면 undefined). */
+    currentOperator,
     isCreating,
     start,
   };

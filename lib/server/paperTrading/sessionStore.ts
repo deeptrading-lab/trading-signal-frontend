@@ -13,6 +13,7 @@ import {
   persistPaperTick,
 } from "@/lib/server/paperTrading/persistence";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
+import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import { scheduleSessionTickLabeling } from "@/lib/server/intraday/tickLabels";
 import { isoToKstDate } from "@/lib/api/toss/kst";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
@@ -169,6 +170,10 @@ export async function createPaperTradingSession(
     tickIntervalMinutes,
     decisionProvider,
     aiProvider: decisionProvider === "cli-agent" ? request.aiProvider : undefined,
+    // 소유자 스탬프(intraday-session-owner) — 이 서버 운영자로 고정. 공유 Supabase 로 영속(payload
+    // 통째 저장)돼 다른 서버의 스케줄러가 own-or-unowned 게이트로 남의 세션을 틱하지 않게 한다.
+    // 모든 provider 에 스탬프(mock 은 스케줄 대상이 아니라 무해, 규칙 일관).
+    owner: resolveServerOperator(),
     mode: "live-paper",
     lastTickWindowStart: null,
     startedAt: now,
