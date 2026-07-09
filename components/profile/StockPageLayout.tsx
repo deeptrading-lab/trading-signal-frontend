@@ -108,6 +108,15 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("ai") === "1") setShowAiLevels(true);
   }, []);
+  // 토글 ↔ URL(?ai=1) 동기화 — "차트보기"로 진입하든 수동 토글이든 표시 상태가 URL 에 일관되게 반영돼
+  //   새로고침·공유·뒤로가기에서 보존된다. history.replaceState 로 소프트 갱신(Next 재페치·스크롤 없음).
+  const handleToggleAi = (next: boolean) => {
+    setShowAiLevels(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("ai", "1");
+    else url.searchParams.delete("ai");
+    window.history.replaceState(null, "", url);
+  };
 
   // 초광폭(콘텐츠 우측 여백이 큼) — 호가·체결강도를 차트 우측에 도크로 띄운다(그 미만은 차트 아래 2단).
   const isUltraWide = useMediaQuery(PEEK_DOCK_QUERY);
@@ -154,7 +163,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
             levels={aiLevels}
             decision={savedDecision}
             show={showAiLevels}
-            onToggle={setShowAiLevels}
+            onToggle={handleToggleAi}
           />
         ) : null}
         <StockDailyChart

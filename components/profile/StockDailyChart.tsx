@@ -70,7 +70,7 @@ import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
-import { LastPriceTag } from "./chart/LastPriceTag";
+import { LastPriceTag, lastPriceTagWidth } from "./chart/LastPriceTag";
 import { AiLevelAxisLabels, aiLabelMaxWidth } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
@@ -281,6 +281,8 @@ export function StockDailyChart({
   //    정확한 숫자 라벨은 차트 밖 배너 레전드에 두어(y축 태그 겹침 회피) 차트는 시각만 깔끔하게.
   //    ifOverflow="extendDomain" 로 목표/손절이 보이는 범위 밖이면 y도메인이 자동 확장된다.
   const ai = showAiLevels && aiLevels ? aiLevels : null;
+  // AI 오버레이 모드일 때만 현재가 알약에 "현재가" 접두 — AI 레벨(목표/재진입/손절)과 나란히 놓여 구분 필요.
+  const lastPriceLabel = ai ? "현재가" : undefined;
   const aiZoneEls: ReactElement[] = [];
   const aiLineEls: ReactElement[] = [];
   if (ai) {
@@ -337,10 +339,15 @@ export function StockDailyChart({
     );
   }
   // 우측 축 라벨(y축서 시작해 오른쪽 확장) — 라벨이 축 폭보다 길면 그 넘침분만큼 margin.right 예약해
-  //  잘리지 않게. 전 레벨 픽셀 y 를 모아 충돌 해소(v3 스케일 훅, 직접 자식).
+  //  잘리지 않게. AI 레벨 라벨과 현재가 알약 둘 다 좌정렬·우확장이라 각자 넘침분의 최댓값을 예약한다.
   const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - CHART_AXIS_WIDTH + 4) : 0;
-  const priceMargin = { top: 5, right: 4 + aiOverflow, left: 0, bottom: 0 };
-  const subMargin = { top: 0, right: 4 + aiOverflow, left: 0, bottom: 0 };
+  const lastPriceOverflow =
+    lastClose != null
+      ? Math.max(0, lastPriceTagWidth(lastClose, lastPriceLabel) - CHART_AXIS_WIDTH + 4)
+      : 0;
+  const rightReserve = Math.max(aiOverflow, lastPriceOverflow);
+  const priceMargin = { top: 5, right: 4 + rightReserve, left: 0, bottom: 0 };
+  const subMargin = { top: 0, right: 4 + rightReserve, left: 0, bottom: 0 };
   const aiAxisLabelsEl = ai ? (
     <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} />
   ) : null;
@@ -353,8 +360,12 @@ export function StockDailyChart({
       : priceSeries.map((p) => p.price);
   const priceSpan = plotVals.length ? Math.max(...plotVals) - Math.min(...plotVals) : 0;
   const tickHideThreshold = priceSpan > 0 ? priceSpan * 0.1 : 0;
+  // 알약이 박히는 가격들(최신가 + AI 목표/재진입·손절)의 근처 y축 눈금을 숨겨 겹침 제거.
+  const hidePrices = [lastClose, ai?.target?.price, ai?.stop?.price].filter(
+    (v): v is number => v != null,
+  );
   const priceTick = (
-    <PriceAxisTick tickFill={C.axisTick} hideNear={lastClose} hideThreshold={tickHideThreshold} />
+    <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} />
   );
 
   return (
@@ -398,7 +409,7 @@ export function StockDailyChart({
                   strokeDasharray="4 3"
                   strokeOpacity={0.55}
                   zIndex={DefaultZIndexes.axis + 1}
-                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} label={lastPriceLabel} />}
                 />
               )}
               {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
@@ -445,7 +456,7 @@ export function StockDailyChart({
                   strokeDasharray="4 3"
                   strokeOpacity={0.55}
                   zIndex={DefaultZIndexes.axis + 1}
-                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} label={lastPriceLabel} />}
                 />
               )}
               {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
