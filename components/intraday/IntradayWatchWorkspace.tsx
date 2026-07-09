@@ -20,7 +20,11 @@ import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsB
 import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
 import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
-import { IntradayWatchTable } from "@/components/intraday/IntradayWatchTable";
+import {
+  IntradayWatchTable,
+  groupWatchItemsByDate,
+  type WatchDateGroup,
+} from "@/components/intraday/IntradayWatchTable";
 import { IntradayCalibrationPanel } from "@/components/intraday/IntradayCalibrationPanel";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { todayKstDate } from "@/lib/api/toss/kst";
@@ -105,6 +109,27 @@ export function buildPastSessionRows(sessions: PaperTradingSession[]): {
   return { rows, sessionByTicker };
 }
 
+/**
+ * 펼친 날짜 그룹들의 티커를 중복 없이(그룹 순서 보존) 모은다 — 과거 시세 지연로드 대상 계산용.
+ * 접힌 그룹은 제외해 한 번에 부르는 티커 수를 오늘+펼친 과거로만 제한한다(30 soft cap 조용한 절단 방지).
+ */
+export function collectTickersForDateKeys(
+  groups: WatchDateGroup[],
+  expandedDateKeys: ReadonlySet<string>,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    if (!expandedDateKeys.has(group.dateKey)) continue;
+    for (const item of group.items) {
+      if (seen.has(item.ticker)) continue;
+      seen.add(item.ticker);
+      out.push(item.ticker);
+    }
+  }
+  return out;
+}
+
 export function IntradayWatchWorkspace() {
   const [watch, setWatch] = useState<Watch[]>([]);
   const [todayKey] = useState(() => todayKstDate());
@@ -146,13 +171,47 @@ export function IntradayWatchWorkspace() {
 
   const pastView = useMemo(() => buildPastSessionRows(pastSessions), [pastSessions]);
 
-  const rowTickers = rows.map((item) => item.ticker);
-  const pastTickers = pastView.rows.map((item) => item.ticker);
-  const quoteTickers = useMemo(
-    () => [...new Set([...rowTickers, ...pastTickers])],
-    [rowTickers, pastTickers],
+  const rowTickers = useMemo(() => rows.map((item) => item.ticker), [rows]);
+
+  // 오늘 표 시세 — 항상 오늘 행만 조회(≤ soft cap 유지). 이전엔 오늘+과거 전체를 한 번에 넘겨
+  // 30개 초과 시 route soft cap 이 뒤쪽을 조용히 잘라 일부 행이 "—" 로 떴다(근본 원인). 과거 시세는
+  // 아래에서 **펼친 날짜 그룹만** 지연로드한다.
+  const { data: todayQuotes = [], isLoading: todayQuotesLoading } =
+    useQueryWatchlist(rowTickers);
+
+  // 과거 표 — 세션 시작일(KST) 기준 날짜 그룹. 기본은 가장 최근 과거 날짜 하나만 펼침(표와 동일 규칙).
+  // 펼침 상태를 여기서 소유해야 "펼친 그룹만 시세 조회" 를 계산할 수 있어 표를 controlled 로 쓴다.
+  const pastGroups = useMemo(
+    () => groupWatchItemsByDate(pastView.rows, pastView.sessionByTicker, todayKey),
+    [pastView, todayKey],
   );
-  const { data: quotes = [] } = useQueryWatchlist(quoteTickers);
+  const pastMostRecentKey = pastGroups[0]?.dateKey;
+  const [pastExpandOverride, setPastExpandOverride] = useState<Record<string, boolean>>({});
+  const expandedPastDateKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const group of pastGroups) {
+      const expanded =
+        pastExpandOverride[group.dateKey] ?? group.dateKey === pastMostRecentKey;
+      if (expanded) set.add(group.dateKey);
+    }
+    return set;
+  }, [pastGroups, pastExpandOverride, pastMostRecentKey]);
+  const expandedPastTickers = useMemo(
+    () => collectTickersForDateKeys(pastGroups, expandedPastDateKeys),
+    [pastGroups, expandedPastDateKeys],
+  );
+  // 펼친 과거 그룹 시세만 별도 조회 — 그룹을 펼칠 때만 요청되고, 불러오는 동안 그 행들엔 스켈레톤.
+  const { data: pastQuotes = [], isFetching: pastQuotesLoading } = useQueryWatchlist(
+    expandedPastTickers,
+    { enabled: expandedPastTickers.length > 0 },
+  );
+  const togglePastGroup = (dateKey: string) =>
+    setPastExpandOverride((o) => ({
+      ...o,
+      [dateKey]: !(o[dateKey] ?? dateKey === pastMostRecentKey),
+    }));
+  const setAllPastGroups = (expanded: boolean, dateKeys: string[]) =>
+    setPastExpandOverride(Object.fromEntries(dateKeys.map((k) => [k, expanded])));
 
   // 호가창을 볼 선택 종목(단일 — 다종목 동시 호가 폴링 금지, PRD q4). 행 클릭으로 전환하고,
   // 선택이 비었거나 목록에서 사라지면 첫 행으로 자동 수렴.
@@ -167,18 +226,19 @@ export function IntradayWatchWorkspace() {
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
   const watching = new Set(rowTickers);
 
-  // 가시 티커(워치 행 + 추천 후보) union 으로 경보를 1회 배치 조회 — 티커별 칩에 내려준다.
+  // 가시 티커(오늘 행 + 펼친 과거 그룹 + 추천 후보) union 으로 경보를 1회 배치 조회 — 티커별 칩에 내려준다.
+  // 과거는 시세와 동일하게 펼친 그룹만 포함해 배치 크기를 줄인다(접힌 과거 행은 펼칠 때 편입).
   // 토스 키 없으면 빈 맵(fail-soft), 60s 캐시. 순서 무관 정규화는 훅 queryKey 가 담당.
   const warningTickers = useMemo(
     () => [
       ...new Set([
         ...rowTickers,
-        ...pastTickers,
+        ...expandedPastTickers,
         ...flowCandidates.map((c) => c.ticker),
         ...volumeCandidates.map((c) => c.ticker),
       ]),
     ],
-    [rowTickers, pastTickers, flowCandidates, volumeCandidates],
+    [rowTickers, expandedPastTickers, flowCandidates, volumeCandidates],
   );
   const { data: warningsData } = useQueryStockWarningsBatch(warningTickers);
   const warningsByTicker: WarningsByTicker = warningsData?.warnings ?? {};
@@ -243,7 +303,8 @@ export function IntradayWatchWorkspace() {
               이전엔 표 옆/아래 도킹이라 좁은 창서 표가 밀렸다(사용자 지적) → 펼침 내부로 이동. */}
           <IntradayWatchTable
             items={rows}
-            quotes={quotes}
+            quotes={todayQuotes}
+            quotesLoading={todayQuotesLoading}
             sessionByTicker={sessionByTicker}
             warningsByTicker={warningsByTicker}
             selectedTicker={selectedTicker}
@@ -264,9 +325,13 @@ export function IntradayWatchWorkspace() {
           </div>
           <IntradayWatchTable
             items={pastView.rows}
-            quotes={quotes}
+            quotes={pastQuotes}
+            quotesLoading={pastQuotesLoading}
             sessionByTicker={pastView.sessionByTicker}
             warningsByTicker={warningsByTicker}
+            expandedDateKeys={expandedPastDateKeys}
+            onToggleGroup={togglePastGroup}
+            onSetAllGroups={setAllPastGroups}
             onStart={start}
             onRemove={() => undefined}
           />

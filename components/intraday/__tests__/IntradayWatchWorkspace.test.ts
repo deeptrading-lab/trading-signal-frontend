@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPastSessionRows,
+  collectTickersForDateKeys,
   intradayWatchStorageKey,
   toggleWatchItem,
   type Watch,
 } from "@/components/intraday/IntradayWatchWorkspace";
+import type { WatchDateGroup } from "@/components/intraday/IntradayWatchTable";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 
 function session(overrides: Partial<PaperTradingSession>): PaperTradingSession {
@@ -73,5 +75,42 @@ describe("IntradayWatchWorkspace helpers", () => {
     expect(view.rows.map((item) => item.ticker)).toEqual(["005930", "000660"]);
     expect(view.sessionByTicker.get("005930")?.id).toBe("old-1");
     expect(view.sessionByTicker.get("000660")?.id).toBe("old-2");
+  });
+});
+
+describe("collectTickersForDateKeys", () => {
+  const groups: WatchDateGroup[] = [
+    {
+      dateKey: "2026-07-08",
+      items: [
+        { ticker: "005930", name: "삼성전자" },
+        { ticker: "000660", name: "SK하이닉스" },
+      ],
+    },
+    {
+      dateKey: "2026-07-07",
+      items: [
+        { ticker: "000660", name: "SK하이닉스" },
+        { ticker: "402340", name: "SK스퀘어" },
+      ],
+    },
+  ];
+
+  it("펼친 날짜 그룹의 티커만 모은다(접힌 그룹 제외)", () => {
+    const result = collectTickersForDateKeys(groups, new Set(["2026-07-08"]));
+    expect(result).toEqual(["005930", "000660"]);
+  });
+
+  it("여러 그룹이 펼쳐지면 그룹 순서를 보존하고 티커 중복은 제거한다", () => {
+    const result = collectTickersForDateKeys(
+      groups,
+      new Set(["2026-07-08", "2026-07-07"]),
+    );
+    // 000660 은 두 그룹에 모두 있지만 한 번만(첫 등장 순서).
+    expect(result).toEqual(["005930", "000660", "402340"]);
+  });
+
+  it("펼친 그룹이 없으면 빈 배열(지연로드 요청 0)", () => {
+    expect(collectTickersForDateKeys(groups, new Set())).toEqual([]);
   });
 });

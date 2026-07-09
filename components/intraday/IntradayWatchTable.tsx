@@ -23,6 +23,7 @@ import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
 import { IntradayPaperDetailSheet } from "@/components/intraday/IntradayPaperDetailSheet";
 import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { isPaperSessionStalled } from "@/lib/utils/paperTradingStale";
 import {
   INTRADAY_PAPER_COPY as P,
@@ -64,6 +65,33 @@ function kstDateKey(iso: string | null | undefined): string | null {
   if (!Number.isFinite(ms)) return null;
   // en-CA 로케일 = YYYY-MM-DD. Asia/Seoul(거래일) 기준으로 그룹·정렬한다.
   return new Date(ms).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
+type WatchItem = { ticker: string; name: string };
+
+/** 날짜 그룹 1개 — 세션 시작일(KST) 키 + 그 날 워치 행들. */
+export type WatchDateGroup = { dateKey: string; items: WatchItem[] };
+
+/**
+ * 워치 행을 세션 시작일(KST) 기준으로 그룹핑(최신 날짜 먼저). 세션 없는 워치 행(검색 추가)은 오늘로.
+ * 표 렌더와 워크스페이스의 "펼친 과거 그룹 시세 지연로드" 계산이 같은 그룹핑을 공유하도록 순수 함수로 분리.
+ */
+export function groupWatchItemsByDate(
+  items: WatchItem[],
+  sessionByTicker: Map<string, PaperTradingSession>,
+  todayKey: string,
+): WatchDateGroup[] {
+  const map = new Map<string, WatchItem[]>();
+  for (const item of items) {
+    const session = sessionByTicker.get(item.ticker);
+    const key = (session && kstDateKey(session.startedAt ?? session.createdAt)) || todayKey;
+    const list = map.get(key) ?? [];
+    list.push(item);
+    map.set(key, list);
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([dateKey, groupItems]) => ({ dateKey, items: groupItems }));
 }
 
 /** 그룹 헤더 라벨 — 오늘/어제/그 외 M/D. */
@@ -155,18 +183,29 @@ const BTN_TONAL = `${BTN_BASE} border-0 bg-accent-vivid/10 text-accent-vivid hov
 const ICON_BTN =
   "inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-base hover:text-text-strong cursor-pointer disabled:opacity-40";
 
-type WatchItem = { ticker: string; name: string };
-
 export interface IntradayWatchTableProps {
   items: WatchItem[];
-  /** 배치 시세(현재가·등락률) — 없으면 해당 셀 "—". */
+  /** 배치 시세(현재가·등락률) — 없으면 해당 셀 "—" (로딩 중이면 스켈레톤). */
   quotes: WatchlistQuote[];
+  /**
+   * 시세를 아직 불러오는 중인지 — 과거 그룹은 펼칠 때 지연로드하므로, 아직 없는 행에 "—" 대신
+   * 스켈레톤을 보여주기 위한 신호. 미제공이면 없는 시세는 곧장 "—".
+   */
+  quotesLoading?: boolean;
   sessionByTicker: Map<string, PaperTradingSession>;
   /** 티커별 활성 매수 유의(경보·VI) — 빈 맵/미제공이면 칩 미표시(fail-soft). */
   warningsByTicker?: Record<string, StockWarningItem[]>;
   /** 호가창을 볼 선택 종목(단일) — 행 클릭으로 전환. */
   selectedTicker?: string | null;
   onSelect?: (ticker: string) => void;
+  /**
+   * 그룹 펼침 제어(controlled) — 워크스페이스가 "펼친 과거 그룹만 시세 지연로드" 하려면 펼침 상태를
+   * 상위에서 소유해야 한다. 셋(+토글/전체 콜백)을 넘기면 controlled, 미제공이면 표 내부 상태(기본
+   * = 가장 최근 날짜만 펼침)로 동작한다(오늘 표는 그대로 uncontrolled).
+   */
+  expandedDateKeys?: ReadonlySet<string>;
+  onToggleGroup?: (dateKey: string) => void;
+  onSetAllGroups?: (expanded: boolean, dateKeys: string[]) => void;
   onStart: (
     stock: PaperTradingSelectedStock,
     initialCash: number,
@@ -178,10 +217,14 @@ export interface IntradayWatchTableProps {
 export function IntradayWatchTable({
   items,
   quotes,
+  quotesLoading = false,
   sessionByTicker,
   warningsByTicker,
   selectedTicker,
   onSelect,
+  expandedDateKeys,
+  onToggleGroup,
+  onSetAllGroups,
   onStart,
   onRemove,
 }: IntradayWatchTableProps) {
@@ -193,30 +236,34 @@ export function IntradayWatchTable({
   );
 
   // 세션 시작일 기준 날짜 그룹(최신 날짜 먼저). 세션 없는 워치 행(검색 추가)은 오늘 그룹으로.
-  const groups = useMemo(() => {
-    const map = new Map<string, WatchItem[]>();
-    for (const item of items) {
-      const session = sessionByTicker.get(item.ticker);
-      const key =
-        (session && kstDateKey(session.startedAt ?? session.createdAt)) || todayKey;
-      const list = map.get(key) ?? [];
-      list.push(item);
-      map.set(key, list);
-    }
-    return [...map.entries()]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([dateKey, groupItems]) => ({ dateKey, items: groupItems }));
-  }, [items, sessionByTicker, todayKey]);
+  const groups = useMemo(
+    () => groupWatchItemsByDate(items, sessionByTicker, todayKey),
+    [items, sessionByTicker, todayKey],
+  );
 
-  // 그룹 펼침 — 기본은 **가장 최근 날짜 하나만** 펼침(그 외 접힘), 헤더 클릭으로 개별 토글.
+  // 그룹 펼침 — controlled(상위 소유) 이면 넘어온 셋/콜백을, 아니면 표 내부 상태를 쓴다.
+  // 내부 기본은 **가장 최근 날짜 하나만** 펼침(그 외 접힘), 헤더 클릭으로 개별 토글.
+  const controlled = expandedDateKeys !== undefined;
   const [expandOverride, setExpandOverride] = useState<Record<string, boolean>>({});
   const mostRecentKey = groups[0]?.dateKey;
   const isExpanded = (key: string) =>
-    expandOverride[key] ?? key === mostRecentKey;
-  const toggleGroup = (key: string) =>
+    controlled
+      ? expandedDateKeys.has(key)
+      : (expandOverride[key] ?? key === mostRecentKey);
+  const toggleGroup = (key: string) => {
+    if (controlled) {
+      onToggleGroup?.(key);
+      return;
+    }
     setExpandOverride((o) => ({ ...o, [key]: !isExpanded(key) }));
-  const setAllGroups = (expanded: boolean) =>
+  };
+  const setAllGroups = (expanded: boolean) => {
+    if (controlled) {
+      onSetAllGroups?.(expanded, groups.map((g) => g.dateKey));
+      return;
+    }
     setExpandOverride(Object.fromEntries(groups.map((g) => [g.dateKey, expanded])));
+  };
 
   return (
     <div className="flex flex-col">
@@ -309,6 +356,7 @@ export function IntradayWatchTable({
                       key={item.ticker}
                       item={item}
                       quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
+                      quotesLoading={quotesLoading}
                       session={sessionByTicker.get(item.ticker) ?? null}
                       warnings={warningsByTicker?.[item.ticker]}
                       selected={selectedTicker === item.ticker}
@@ -572,6 +620,7 @@ function changeTone(value: number): string {
 function WatchRow({
   item,
   quote,
+  quotesLoading,
   session,
   warnings,
   selected,
@@ -581,6 +630,7 @@ function WatchRow({
 }: {
   item: WatchItem;
   quote: WatchlistQuote | null;
+  quotesLoading: boolean;
   session: PaperTradingSession | null;
   warnings: StockWarningItem[] | undefined;
   selected?: boolean;
@@ -677,7 +727,13 @@ function WatchRow({
           </div>
         </td>
         <td className="py-sm pr-md text-right tabular-nums text-text-strong">
-          {quote ? formatMoney(quote.price) : T.none}
+          {quote ? (
+            formatMoney(quote.price)
+          ) : quotesLoading ? (
+            <Skeleton variant="line" className="ml-auto mb-0 w-16" />
+          ) : (
+            T.none
+          )}
         </td>
         <td
           className={cn(
@@ -685,7 +741,13 @@ function WatchRow({
             quote ? changeTone(quote.changePercent) : "text-text-muted",
           )}
         >
-          {quote ? formatPct(quote.changePercent) : T.none}
+          {quote ? (
+            formatPct(quote.changePercent)
+          ) : quotesLoading ? (
+            <Skeleton variant="line" className="ml-auto mb-0 w-12" />
+          ) : (
+            T.none
+          )}
         </td>
         <td
           className={cn(
