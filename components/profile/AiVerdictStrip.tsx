@@ -65,19 +65,29 @@ export function AiVerdictStrip({ levels, decision, show, onToggle }: AiVerdictSt
         <span className="text-text-muted">
           신뢰도 {CONFIDENCE_LABEL[decision.confidence]} · {decision.time_horizon}
         </span>
+        {/* 실제 스위치(트랙+노브) — 켜짐/꺼짐이 시각적으로 명확. 라벨은 고정. */}
         <button
           type="button"
           role="switch"
           aria-checked={show}
+          aria-label="차트에 판정 레벨 표시"
           onClick={() => onToggle(!show)}
-          className={cn(
-            "ml-auto inline-flex cursor-pointer items-center gap-xs rounded-pill px-sm py-0.5 text-caption font-medium transition-colors",
-            show
-              ? "bg-accent-vivid text-surface"
-              : "border border-border-line bg-surface text-text-muted hover:text-text-strong",
-          )}
+          className="ml-auto inline-flex cursor-pointer items-center gap-sm text-caption font-medium text-text-strong"
         >
-          {show ? "차트에 표시 중" : "차트에 표시"}
+          <span>차트에 표시</span>
+          <span
+            className={cn(
+              "relative inline-flex h-4 w-7 items-center rounded-pill transition-colors",
+              show ? "bg-accent-vivid" : "bg-border-line",
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-3 w-3 rounded-pill bg-surface shadow-sm transition-transform",
+                show ? "translate-x-[14px]" : "translate-x-[2px]",
+              )}
+            />
+          </span>
         </button>
       </div>
 

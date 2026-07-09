@@ -18,8 +18,7 @@
  *    선택(ProviderChooser→start) 경로로 위임한다. prod(enqueue) 저장모드는 ProdAnalysisQueueCard 담당.
  */
 
-import Link from "next/link";
-import { LineChart, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { formatRelativeTime } from "@/lib/utils/formatRelativeTime";
@@ -104,17 +103,6 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
           />
         </div>
         <VerdictDetails data={snapshot.decision} />
-      </div>
-
-      {/* 차트와 함께 보기 — 종목 상세로 이동(?ai=1 → 판정 가격 레벨 오버레이 자동 ON). 저장 결과는
-          항상 PM 완료 상태라 상시 노출. 라우트 변경으로 이 패널은 자동 접힘(셸 동작). */}
-      <div className="flex">
-        <Link
-          href={`/stock/${snapshot.ticker}?ai=1`}
-          className="inline-flex items-center gap-1.5 rounded-pill border border-border-line px-lg py-1.5 text-caption font-bold text-text-strong transition-colors hover:bg-surface-muted cursor-pointer"
-        >
-          <LineChart size={13} aria-hidden="true" /> 차트와 함께 보기
-        </Link>
       </div>
 
       {/* valid(신선) — 하단 subtle 재분석 행. 일반 사용자엔 "AI 분석" 총칭(엔진/모델은 아래 관리자 전용 캡션). */}

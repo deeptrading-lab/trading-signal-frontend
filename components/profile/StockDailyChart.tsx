@@ -71,6 +71,7 @@ import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag } from "./chart/LastPriceTag";
+import { AiLevelTag } from "./chart/AiLevelTag";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
@@ -281,17 +282,19 @@ export function StockDailyChart({
         />,
       );
     }
-    // 선: 목표/재진입 + 손절. 목표=상승색 / 재진입=중립 / 손절=하락색. 라벨 없음(배너 레전드가 담당).
+    // 선 + 좌측 라벨 태그(역할명+가격, 현재가 우측 태그와 공간 분리). 목표=상승색 / 재진입=중립 / 손절=하락색.
     if (ai.target) {
+      const targetColor = ai.target.role === "target" ? C.stroke : C.refMid;
+      const targetLabel = ai.target.role === "target" ? "목표" : "재진입";
       aiLineEls.push(
         <ReferenceLine
           key="ai-target"
           y={ai.target.price}
-          stroke={ai.target.role === "target" ? C.stroke : C.refMid}
+          stroke={targetColor}
           strokeWidth={1.5}
-          strokeDasharray="5 3"
-          strokeOpacity={0.85}
+          strokeDasharray="6 3"
           ifOverflow="extendDomain"
+          label={<AiLevelTag label={targetLabel} price={ai.target.price} color={targetColor} bgColor={C.surface} />}
         />,
       );
     }
@@ -301,9 +304,9 @@ export function StockDailyChart({
         y={ai.stop.price}
         stroke={C.down}
         strokeWidth={1.5}
-        strokeDasharray="5 3"
-        strokeOpacity={0.85}
+        strokeDasharray="6 3"
         ifOverflow="extendDomain"
+        label={<AiLevelTag label="손절" price={ai.stop.price} color={C.down} bgColor={C.surface} />}
       />,
     );
   }
