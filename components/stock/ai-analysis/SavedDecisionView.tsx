@@ -72,6 +72,7 @@ export function SavedDecisionView({ snapshot, livePrice, onReanalyze }: SavedDec
               {COPY.savedMode.staleBanner(
                 reason,
                 livePrice != null ? formatNumber(livePrice) : null,
+                formatRelativeTime(snapshot.updatedAt),
               )}
             </p>
           </div>
