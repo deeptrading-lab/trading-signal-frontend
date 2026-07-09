@@ -7140,3 +7140,44 @@
   - PR-3c: CLI 신뢰성 — PR-0 텔레메트리 장중 축적 후(AGENT_TIMEOUT env화·타임아웃 예산 불변식·failureKind별 재시도 정책)
   - PR-4: 장중 실검증 — 5분 주기 표준 세션, 왕복 2~5회/일 목표, 버킷 승률로 env 컷 캘리브레이션
   - Supabase `intraday-tick-labels.sql` 수동 실행 + 기존 코퍼스 백필(PR-2 라벨 루프 활성화)
+
+### 2026-07-09 — fix(intraday): 세션 목록 현재가 '—' 수정(30 soft cap 절단) + 시세 지연로드 (#325)
+
+- **slug**: `fix/intraday-watchlist-softcap` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/325
+- **요약**: fix(intraday): 세션 목록 현재가 '—' 수정(30 soft cap 절단) + 시세 지연로드
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경 (근본 원인)
+  > 
+  > `/intraday`(AI 단타) 세션 목록에서 일부 세션 행의 **현재가/등락률이 "—"** 로 뜨는 버그.
+  > 
+  > - `IntradayWatchWorkspace` 가 `quoteTickers = [...new Set([...오늘 티커, ...전체 과거 티커])]` 를 만들어 **하나의** `useQueryWatchlist` 로 넘겼다.
+  > - `/api/watchlist` route 는 요청당 **soft cap 30**(`SOFT_CAP`, `unique.slice(0, SOFT_CAP)`)이 있어 31번째부터 **조용히 절단**한다(`X-Watchlist-Truncated` 헤더만 통지 → 클라 `getWatchlist` 는 무시).
+  > - 오늘 16 + 과거 19 = 유니크 32 > 30 → 뒤쪽 2+ 티커가 응답에서 빠져 그 행이 "—".
+  > - **어떤 티커가 잘리는지 비결정적**(클라 localStorage `watch` 순서 의존) — 특정 브라우저에선 SK하이닉스/SK스퀘어가, 다른 기기에선 다른 종목이 빠짐.
+  > - KIS `fetchIntstockMultprice` 자체는 전 티커를 정상 반환(라이브 확인) — 순수하게 combined 리스트의 30 cap 문제.
+  > 
+  > ## 변경
+  > 
+  > - **오늘 기본 페치**: 오늘 표 시세는 항상 **오늘 행만** 조회(`useQueryWatchlist(rowTickers)`) → 정상 사용에서 요청이 cap 이하로 유지되며 "—" 버그가 직접 해소.
+  > - **과거 그룹 펼침 지연로드**: 과거 표는 **펼친 날짜 그룹의 티커만** 별도 조회(`useQueryWatchlist(expandedPastTickers, { enabled })`). 기본은 가장 최근 과거 날짜 1개 그룹만 펼침(표 규칙 유지).
+  > - **로딩 UI**: 과거 그룹을 펼쳐 시세를 불러오는 동안 그 행의 현재가/등락률 셀에 **스켈레톤**(`components/ui/Skeleton`, `isFetching`). 표 전체를 막지 않고 로딩 행만.
+  > - **`getWatchlist` 청크(방어)**: 30 초과 입력을 30단위로 나눠 `Promise.all` 후 입력 순서대로 병합. 각 청크 ≤ cap → 절단 0. 30 이하는 단일 요청 무변경(관심종목 기능엔 no-op). generic `chunk` 헬퍼(`lib/utils/chunk.ts`) 신설.
+  > - **경보 배치 스코프 축소**: `warningTickers` union 도 `전체 과거` → `펼친 과거`로 좁혀 토스 경보 배치 호출 축소(별 endpoint, 60s 캐시).
+  > 
+  > ### 설계 선택 / 근거
+  > 
+  > - **펼침 상태 리프트**: "펼친 과거 그룹만 조회" 를 계산하려면 워크스페이스가 펼침 상태를 알아야 해서, 과거 표를 **controlled** 로 전환(`expandedDateKeys`/`onToggleGroup`/`onSetAllGroups`). 표의 기본-펼침 규칙(가장 최근 1개)은 워크스페이스가 그대로 재현. **오늘 표는 그대로 uncontrolled**(그룹 1개·항상 펼침이라 리프트 불필요).
+  > - **그룹핑 순수 함수화**: 날짜 그룹핑을 `groupWatchItemsByDate`(순수·export)로 분리해 표 렌더와 워크스페이스의 지연로드 계산이 **동일 그룹핑을 공유**(드리프트 방지).
+  > - **과거 로딩 신호 = `isFetching`**: `keepPreviousData` 로 이미 로드된 행은 유지되고, 새로 펼친 그룹의 아직 없는 행만 스켈레톤(quote null && isFetching). 오늘 표는 `isLoading`(초기 1회만) 사용해 폴링/티커변경 시 스켈레톤 깜빡임 없음.
+  > - **폴링(`useIntradayPaperRefresh`) 무변경**: 세션 데이터만 30초 무효화하고 watchlist 쿼리는 건드리지 않는 기존 동작 그대로 보존(회귀 0). 과거 시세는 펼칠 때 요청 + `staleTime` 로 충분(완료 세션은 공격적 폴링 불필요).
+  > - "오늘" 요약(자금가중 합산·승/패·진행중)은 세션 데이터 기반이라 시세 분리와 무관 — 영향 없음(확인).
+  > 
+  > ## 검증
+  > 
+  > Turbopack 이 심볼릭 `node_modules` 를 거부하는 알려진 함정 때문에 **라이브 브라우저 구동은 스킵**하고, vitest/tsc/lint + 정독으로 검증했다. 논리적으로 확인: 오늘-기본 페치는 정상 사용에서 ≤cap → 절단 없음, 청크는 >cap 케이스(모두 펼치기)를 커버.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **PR B: 세션 소유자 구분 + 소유자별 틱 게이트 + 백필** — 본 PR 머지 후 착수(같은 컴포넌트 `IntradayWatchWorkspace`/`IntradayWatchTable` 를 접촉하므로 충돌 방지 목적으로 분리).
+  - 월요일 장중 라이브에서 오늘 표 시세 + 과거 그룹 펼침 시 스켈레톤->시세 전환 실측 확인(브라우저 구동 스킵분).
