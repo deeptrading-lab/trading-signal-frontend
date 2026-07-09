@@ -5,6 +5,7 @@ import {
   resetPaperTradingStoreForTest,
   resolveNextTickWindow,
   runPaperTradingSessionTick,
+  seedPaperTradingSessionForTest,
 } from "@/lib/server/paperTrading/sessionStore";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
@@ -156,6 +157,55 @@ describe("cli-agent 세션 생성 (intraday-paper-watch)", () => {
     const second = await createPaperTradingSession(request, { priceSnapshotProvider: testPriceProvider });
     expect(second.session.id).toBe(first.session.id);
     expect((await listPaperTradingSessions()).length).toBe(1);
+  });
+
+  it("KST 날짜가 바뀌면 같은 종목의 이전 running 세션이 있어도 새 단타 세션을 만든다", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest({
+      id: "yesterday",
+      name: "단타 모의 · 삼성전자",
+      status: "running",
+      tickers: ["005930"],
+      stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+      initialCash: 1_000_000,
+      targetReturnPct: 5,
+      cash: 1_000_000,
+      portfolioValue: 1_000_000,
+      returnPct: 0,
+      riskMode: "balanced",
+      maxPositionPct: 50,
+      cashBufferPct: 10,
+      tickIntervalMinutes: 5,
+      decisionProvider: "cli-agent",
+      aiProvider: "codex",
+      mode: "live-paper",
+      lastTickWindowStart: null,
+      startedAt: "2026-07-08T01:00:00.000Z", // 2026-07-08 10:00 KST.
+      endedAt: null,
+      createdAt: "2026-07-08T01:00:00.000Z",
+      updatedAt: "2026-07-08T01:00:00.000Z",
+    });
+
+    const detail = await createPaperTradingSession({
+      name: "단타 모의 · 삼성전자",
+      tickers: ["005930"],
+      stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+      initialCash: 1_000_000,
+      targetReturnPct: 5,
+      riskMode: "balanced",
+      decisionProvider: "cli-agent",
+      aiProvider: "codex",
+    }, {
+      now: new Date("2026-07-09T00:30:00.000Z"), // 2026-07-09 09:30 KST.
+      priceSnapshotProvider: testPriceProvider,
+    });
+
+    expect(detail.session.id).not.toBe("yesterday");
+    expect(detail.session.startedAt).toBe("2026-07-09T00:30:00.000Z");
+    expect((await listPaperTradingSessions()).map((session) => session.id).sort()).toEqual([
+      "yesterday",
+      detail.session.id,
+    ].sort());
   });
 
   it("요청 주기(2분)가 있으면 세션에 그대로 반영된다", async () => {

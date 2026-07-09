@@ -1,15 +1,17 @@
 /**
  * useIntradayPaperWatch — 단타워치 ↔ AI 모의투자(cli-agent) 세션 연결 훅. intraday-paper-watch.
  *
- * 워치의 각 종목에 대응하는 cli-agent 세션을 매핑하고(종목당 1세션, running·최신 우선),
- * "모의 단타 시작"(세션 생성)·진행중 세션 종목(`activeStocks` — 표 자동 상주용)·화면 갱신
- * 폴링 대상(running 세션 id)을 제공한다. 틱 발화는 서버 스케줄러(tickScheduler) 전담.
+ * 오늘(KST) 워치의 각 종목에 대응하는 cli-agent 세션을 매핑하고,
+ * "모의 단타 시작"(세션 생성)·오늘 세션 종목(`todaySessionStocks` — 표 자동 보존용)·화면 갱신
+ * 폴링 대상(오늘 running 세션 id)을 제공한다. 과거 세션은 오늘 구성 목록에 섞지 않는다.
+ * 틱 발화는 서버 스케줄러(tickScheduler) 전담.
  */
 
 "use client";
 
 import { useMemo } from "react";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
+import { isoToKstDate, todayKstDate } from "@/lib/api/toss/kst";
 import type {
   PaperTradingSelectedStock,
   PaperTradingSession,
@@ -34,39 +36,87 @@ function pickBetter(a: PaperTradingSession, b: PaperTradingSession): PaperTradin
   return a.updatedAt >= b.updatedAt ? a : b;
 }
 
+function isSessionStartedOnKstDate(session: PaperTradingSession, dateKey: string): boolean {
+  return isoToKstDate(session.startedAt ?? session.createdAt) === dateKey;
+}
+
+export function buildTodaySessionByTicker(
+  sessions: PaperTradingSession[],
+  todayKey: string,
+): Map<string, PaperTradingSession> {
+  const map = new Map<string, PaperTradingSession>();
+  for (const session of sessions) {
+    if (!isSessionStartedOnKstDate(session, todayKey)) continue;
+    const ticker = intradaySessionStock(session).ticker;
+    if (!ticker) continue;
+    const prev = map.get(ticker);
+    map.set(ticker, prev ? pickBetter(prev, session) : session);
+  }
+  return map;
+}
+
+export function buildTodaySessionStocks(
+  sessions: PaperTradingSession[],
+  todayKey: string,
+): PaperTradingSelectedStock[] {
+  return sessions
+    .filter((session) => isSessionStartedOnKstDate(session, todayKey))
+    .map(intradaySessionStock)
+    .filter((stock) => stock.ticker);
+}
+
+export function filterPastSessions(
+  sessions: PaperTradingSession[],
+  todayKey: string,
+): PaperTradingSession[] {
+  return sessions.filter((session) => !isSessionStartedOnKstDate(session, todayKey));
+}
+
 export function useIntradayPaperWatch() {
   const { sessions, isCreating, create } = usePaperTradingSessions();
+
+  // 렌더 중 Date.now 직접 호출을 피하려고 마운트 시점의 KST 오늘 키를 memoize 한다.
+  // 자정이 지나면 새로고침/재방문으로 갱신되는 화면이라 이 정도면 충분하다.
+  const todayKey = useMemo(() => todayKstDate(), []);
 
   const cliSessions = useMemo(
     () => sessions.filter((session) => session.decisionProvider === "cli-agent"),
     [sessions],
   );
 
-  const sessionByTicker = useMemo(() => {
-    const map = new Map<string, PaperTradingSession>();
-    for (const session of cliSessions) {
-      const ticker = intradaySessionStock(session).ticker;
-      if (!ticker) continue;
-      const prev = map.get(ticker);
-      map.set(ticker, prev ? pickBetter(prev, session) : session);
-    }
-    return map;
-  }, [cliSessions]);
+  // 행의 "이미 모의투자 중" 판정은 오늘(KST) 세션만 본다. 과거 running 세션이 남아 있어도
+  // 오늘 같은 종목을 새로 시작할 수 있어야 한다.
+  const sessionByTicker = useMemo(
+    () => buildTodaySessionByTicker(cliSessions, todayKey),
+    [cliSessions, todayKey],
+  );
 
-  // 표 자동 상주 대상 — cli-agent 세션 **전량(상태 무관)**. running·일시정지·완료 모두 DB 기준으로
-  // 항상 표에 상주시켜, 브라우저별 localStorage 나 running 여부와 무관하게 **모든 세션이 보이게** 한다
-  // (AI 모의투자 목록과 동등 — 단일 소스). 세션 없는 워치 행만 ✕ 로 뺄 수 있고, 세션 행은 상주.
-  // 틱 폴링 대상은 runningSessionIds(=running)가 별도로 담당(상주 ≠ 틱).
-  const activeStocks = useMemo(
-    () => cliSessions.map(intradaySessionStock).filter((stock) => stock.ticker),
-    [cliSessions],
+  // 표 자동 보존 대상 — 오늘(KST) cli-agent 세션만. 과거 세션은 히스토리일 뿐 오늘 신규 구성 목록에
+  // 끌어오지 않는다. 브라우저가 달라도 오늘 시작한 세션 종목은 표에서 사라지지 않게 보존한다.
+  const todaySessionStocks = useMemo(
+    () => buildTodaySessionStocks(cliSessions, todayKey),
+    [cliSessions, todayKey],
   );
 
   // 화면 갱신 폴링 대상 — running 세션 전부(활성 세션은 항상 표에 있으므로 곧 보이는 행).
   // 틱 발화는 서버 스케줄러 전담. 세션 수명은 일시정지/완료로 관리.
   const runningSessionIds = useMemo(
-    () => cliSessions.filter((session) => session.status === "running").map((session) => session.id),
-    [cliSessions],
+    () =>
+      cliSessions
+        .filter(
+          (session) =>
+            session.status === "running" && isSessionStartedOnKstDate(session, todayKey),
+        )
+        .map((session) => session.id),
+    [cliSessions, todayKey],
+  );
+
+  const pastSessions = useMemo(
+    () =>
+      filterPastSessions(cliSessions, todayKey).sort((a, b) =>
+        b.startedAt.localeCompare(a.startedAt),
+      ),
+    [cliSessions, todayKey],
   );
 
   const start = (
@@ -85,5 +135,12 @@ export function useIntradayPaperWatch() {
       tickIntervalMinutes,
     });
 
-  return { sessionByTicker, activeStocks, runningSessionIds, isCreating, start };
+  return {
+    sessionByTicker,
+    todaySessionStocks,
+    pastSessions,
+    runningSessionIds,
+    isCreating,
+    start,
+  };
 }

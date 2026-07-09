@@ -14,6 +14,7 @@ import {
 } from "@/lib/server/paperTrading/persistence";
 import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
 import { scheduleSessionTickLabeling } from "@/lib/server/intraday/tickLabels";
+import { isoToKstDate } from "@/lib/api/toss/kst";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
   CreatePaperTradingSessionRequest,
@@ -114,10 +115,10 @@ export async function getPaperTradingSessionDetail(
 
 export async function createPaperTradingSession(
   request: CreatePaperTradingSessionRequest,
-  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider } = {},
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
 ): Promise<PaperTradingSessionDetail> {
   await ensureHydrated();
-  const now = new Date().toISOString();
+  const now = (options.now ?? new Date()).toISOString();
   const initialCash = sanitizePositiveNumber(
     request.initialCash,
     PAPER_TRADING_DEFAULT_INITIAL_CASH,
@@ -132,14 +133,17 @@ export async function createPaperTradingSession(
       : "mock";
 
   // 생성 멱등 가드(리뷰 #6) — 생성 응답은 첫 틱(CLI 콜) 완료 후라 클라 타임아웃 재클릭이
-  // 가능하다. 같은 종목의 running 단타 세션이 이미 있으면 새로 만들지 않고 그 세션을 돌려준다.
+  // 가능하다. 같은 종목의 "오늘(KST) running" 단타 세션만 재사용한다. 날짜가 바뀐 뒤에도
+  // 어제 세션이 running 으로 남아 있으면 오늘 모의투자 시작을 막지 않아야 한다.
   if (decisionProvider === "cli-agent") {
     const ticker = stocks[0]?.ticker;
+    const todayKey = isoToKstDate(now);
     const existing = Array.from(getStore().sessions.values()).find(
       (entry) =>
         entry.session.decisionProvider === "cli-agent" &&
         entry.session.status === "running" &&
-        (entry.session.stocks[0]?.ticker ?? entry.session.tickers[0]) === ticker,
+        (entry.session.stocks[0]?.ticker ?? entry.session.tickers[0]) === ticker &&
+        isoToKstDate(entry.session.startedAt ?? entry.session.createdAt) === todayKey,
     );
     if (existing) return toDetail(existing);
   }
