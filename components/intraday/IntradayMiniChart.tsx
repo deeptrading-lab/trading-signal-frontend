@@ -40,57 +40,69 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** 체결 마커 삼각형 반너비·높이·여백(px). 캔들(maxBarSize 8)보다 살짝 크게 잡아 눈에 띄게. */
-const MARKER_HALF_W = 5;
-const MARKER_HEIGHT = 9;
-const MARKER_GAP = 2; // 가격 포인트 ↔ 삼각형 꼭짓점 여백
-const MARKER_LABEL_GAP = 8; // 삼각형 밑변 ↔ B/S 글자 중심 여백
+/**
+ * 체결 마커(원형 핀) 치수(px) — 캔들(maxBarSize 8)과 확실히 구분되게 꽉 찬 색 원 + 흰 글자.
+ * 꼬리(삼각형)가 정확한 체결가를 가리키고 원은 그 바깥에 떠서 같은 색 캔들 사이에서도 안 묻힌다.
+ */
+const MARKER_GAP = 2; // 가격 포인트 ↔ 꼬리 꼭짓점 여백
+const MARKER_TAIL_H = 10; // 꼬리 높이(A1 — 눈에 띄게 키움)
+const MARKER_TAIL_W = 6; // 꼬리 반너비
+const MARKER_RADIUS = 9; // 배지 원 반지름
 
 /**
- * 체결 마커 기하 — 매수는 가격 아래에서 위로 찌르는 삼각형(꼭짓점=가격쪽), 매도는 가격 위에서
- * 아래로. 글자(B/S)는 삼각형 바깥쪽(매수=아래, 매도=위)에 배치. 순수 함수(테스트 대상).
+ * 체결 마커 기하 — 매수는 가격 아래(꼬리가 위로 찌름), 매도는 가격 위(꼬리 아래로). 꼬리 삼각형
+ * 꼭짓점이 체결가를 가리키고, 그 바깥에 배지 원(중심 circleY)을 띄운다. 순수 함수(테스트 대상).
  */
 export function tradeMarkerGeometry(
   cx: number,
   cy: number,
   side: "BUY" | "SELL",
-): { points: string; labelX: number; labelY: number } {
+): { tailPoints: string; circleX: number; circleY: number; radius: number } {
   const dir = side === "BUY" ? 1 : -1; // +1 = 가격 아래(매수), -1 = 가격 위(매도)
-  const tipY = cy + dir * MARKER_GAP;
-  const baseY = cy + dir * (MARKER_GAP + MARKER_HEIGHT);
+  const tipY = cy + dir * MARKER_GAP; // 꼬리 꼭짓점(체결가 쪽)
+  const tailBaseY = cy + dir * (MARKER_GAP + MARKER_TAIL_H); // 꼬리 밑변(원과 맞닿음)
   return {
-    points: `${cx},${tipY} ${cx - MARKER_HALF_W},${baseY} ${cx + MARKER_HALF_W},${baseY}`,
-    labelX: cx,
-    labelY: cy + dir * (MARKER_GAP + MARKER_HEIGHT + MARKER_LABEL_GAP),
+    tailPoints: `${cx},${tipY} ${cx - MARKER_TAIL_W},${tailBaseY} ${cx + MARKER_TAIL_W},${tailBaseY}`,
+    circleX: cx,
+    circleY: cy + dir * (MARKER_GAP + MARKER_TAIL_H + MARKER_RADIUS),
+    radius: MARKER_RADIUS,
   };
 }
 
+/** 배지 원 흰색 링 두께(px) — 채도 높은 원을 캔들과 완전히 분리해 버튼처럼 도드라지게. */
+const MARKER_RING_WIDTH = 2;
+
 /**
  * recharts ReferenceDot `shape` 커스텀 마커 — cx/cy 는 recharts 가 주입(x/y → 픽셀 좌표).
- * 삼각형 화살표 + B/S 글자. 색은 캔들 테마 재사용(매수 빨강 stroke / 매도 파랑 down).
+ * 원형 핀(꼬리 삼각형 + 꽉 찬 색 원 + 흰 링 + 흰 B/S 글자). 원 색은 캔들 테마 재사용(매수 빨강
+ * stroke / 매도 파랑 down). 흰 링·흰 글자는 다크/라이트 모두에서 채도 높은 원 위 대비를 보장한다.
  */
 function IntradayTradeMarker(props: {
   cx?: number;
   cy?: number;
   side: "BUY" | "SELL";
   color: string;
-  surface: string;
 }) {
-  const { cx, cy, side, color, surface } = props;
+  const { cx, cy, side, color } = props;
   if (cx == null || cy == null) return null;
-  const { points, labelX, labelY } = tradeMarkerGeometry(cx, cy, side);
+  const { tailPoints, circleX, circleY, radius } = tradeMarkerGeometry(cx, cy, side);
   return (
     <g>
-      <polygon points={points} fill={color} stroke={surface} strokeWidth={1} />
-      <text
-        x={labelX}
-        y={labelY}
+      <polygon points={tailPoints} fill={color} />
+      <circle
+        cx={circleX}
+        cy={circleY}
+        r={radius}
         fill={color}
-        stroke={surface}
-        strokeWidth={2.5}
-        paintOrder="stroke"
-        fontSize={10}
-        fontWeight={700}
+        stroke="#ffffff"
+        strokeWidth={MARKER_RING_WIDTH}
+      />
+      <text
+        x={circleX}
+        y={circleY}
+        fill="#ffffff"
+        fontSize={11}
+        fontWeight={800}
         textAnchor="middle"
         dominantBaseline="central"
       >
@@ -172,12 +184,11 @@ export function IntradayMiniChart({
                 key={`${marker.x}-${index}`}
                 x={marker.x}
                 y={marker.price}
-                // 점 대신 화살표+B/S — 매수 빨강(stroke)·매도 파랑(down), 글자에 surface 헤일로.
+                // 점 대신 원형 핀(꼬리+원+흰 링+흰 글자) — 매수 B 빨강·매도 S 파랑.
                 shape={
                   <IntradayTradeMarker
                     side={marker.side}
                     color={marker.side === "BUY" ? theme.C.stroke : theme.C.down}
-                    surface={theme.C.surface}
                   />
                 }
               />
