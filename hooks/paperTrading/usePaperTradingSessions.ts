@@ -8,6 +8,8 @@ export function usePaperTradingSessions() {
 
   return {
     sessions: query.data?.sessions ?? [],
+    /** 이 응답을 서빙한 서버 운영자 — "내 세션" 배지·필터 판정용. 구 응답/미로드면 undefined. */
+    currentOperator: query.data?.currentOperator,
     isLoading: query.isLoading,
     isError: query.isError,
     isCreating: createMutation.isPending,

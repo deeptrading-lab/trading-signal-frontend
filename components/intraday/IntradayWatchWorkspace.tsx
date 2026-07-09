@@ -130,14 +130,40 @@ export function collectTickersForDateKeys(
   return out;
 }
 
+/**
+ * "내 세션만" 필터 판정 — 다른 운영자가 소유한 세션 행인지(공유 Supabase 다중 서버).
+ * 내 세션·소유자 미지정(레거시)·세션 없는 워치 행은 false(숨기지 않음). currentOperator 미상(구
+ * 응답/미로드)이면 귀속 불가라 항상 false — 아무것도 숨기지 않아 하위호환을 지킨다.
+ */
+export function isForeignOwnedSession(
+  session: PaperTradingSession | undefined,
+  currentOperator: string | undefined,
+): boolean {
+  return !!session?.owner && !!currentOperator && session.owner !== currentOperator;
+}
+
+/** "내 세션만" 토글 상태 localStorage 키 — 날짜 무관 사용자 선호(워치 목록 키와 별개). */
+const MINE_ONLY_STORAGE_KEY = "finsight:intraday-mine-only";
+
+function loadMineOnly(): boolean {
+  try {
+    return window.localStorage.getItem(MINE_ONLY_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function IntradayWatchWorkspace() {
   const [watch, setWatch] = useState<Watch[]>([]);
   const [todayKey] = useState(() => todayKstDate());
   const storageKey = useMemo(() => intradayWatchStorageKey(todayKey), [todayKey]);
   // SSR 불일치 방지 — 마운트 후 localStorage 복원, 복원 전에는 저장하지 않는다.
   const [storageReady, setStorageReady] = useState(false);
+  // "내 세션만" 필터 — 다른 서버 소유 세션 숨김. 기본 OFF. 사용자 선호라 localStorage 로 유지.
+  const [mineOnly, setMineOnly] = useState(false);
   useEffect(() => {
     setWatch(loadStoredWatch(storageKey));
+    setMineOnly(loadMineOnly());
     setStorageReady(true);
   }, [storageKey]);
   useEffect(() => {
@@ -148,11 +174,25 @@ export function IntradayWatchWorkspace() {
       /* 저장 실패는 무시(용량 등) */
     }
   }, [storageKey, watch, storageReady]);
+  useEffect(() => {
+    if (!storageReady) return;
+    try {
+      window.localStorage.setItem(MINE_ONLY_STORAGE_KEY, mineOnly ? "1" : "0");
+    } catch {
+      /* 저장 실패는 무시 */
+    }
+  }, [mineOnly, storageReady]);
 
   const { data: flow, isLoading: flowLoading } = useQueryFlowTop10("today");
   const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
-  const { sessionByTicker, todaySessionStocks, pastSessions, runningSessionIds, start } =
-    useIntradayPaperWatch();
+  const {
+    sessionByTicker,
+    todaySessionStocks,
+    pastSessions,
+    runningSessionIds,
+    currentOperator,
+    start,
+  } = useIntradayPaperWatch();
   // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
   useIntradayPaperRefresh(runningSessionIds);
   const autoActive = runningSessionIds.length > 0;
@@ -171,6 +211,37 @@ export function IntradayWatchWorkspace() {
 
   const pastView = useMemo(() => buildPastSessionRows(pastSessions), [pastSessions]);
 
+  // "내 세션만" 대상이 있는지 — 다른 운영자 소유 세션이 하나라도 있을 때만 토글을 노출(단독 운영 시 무노출).
+  const hasForeignSessions = useMemo(
+    () =>
+      rows.some((r) => isForeignOwnedSession(sessionByTicker.get(r.ticker), currentOperator)) ||
+      pastView.rows.some((r) =>
+        isForeignOwnedSession(pastView.sessionByTicker.get(r.ticker), currentOperator),
+      ),
+    [rows, sessionByTicker, pastView, currentOperator],
+  );
+
+  // "내 세션만" 필터 적용 — 다른 운영자 소유 행만 제거(내 세션·미지정·세션없는 워치 행은 유지).
+  // 표 items 뿐 아니라 과거 그룹핑·시세 지연로드도 같은 필터본을 써 숨긴 행 시세를 부르지 않는다.
+  const visibleRows = useMemo(
+    () =>
+      mineOnly
+        ? rows.filter(
+            (r) => !isForeignOwnedSession(sessionByTicker.get(r.ticker), currentOperator),
+          )
+        : rows,
+    [rows, mineOnly, sessionByTicker, currentOperator],
+  );
+  const visiblePastView = useMemo(() => {
+    if (!mineOnly) return pastView;
+    return {
+      rows: pastView.rows.filter(
+        (r) => !isForeignOwnedSession(pastView.sessionByTicker.get(r.ticker), currentOperator),
+      ),
+      sessionByTicker: pastView.sessionByTicker,
+    };
+  }, [pastView, mineOnly, currentOperator]);
+
   const rowTickers = useMemo(() => rows.map((item) => item.ticker), [rows]);
 
   // 오늘 표 시세 — 항상 오늘 행만 조회(≤ soft cap 유지). 이전엔 오늘+과거 전체를 한 번에 넘겨
@@ -182,8 +253,8 @@ export function IntradayWatchWorkspace() {
   // 과거 표 — 세션 시작일(KST) 기준 날짜 그룹. 기본은 가장 최근 과거 날짜 하나만 펼침(표와 동일 규칙).
   // 펼침 상태를 여기서 소유해야 "펼친 그룹만 시세 조회" 를 계산할 수 있어 표를 controlled 로 쓴다.
   const pastGroups = useMemo(
-    () => groupWatchItemsByDate(pastView.rows, pastView.sessionByTicker, todayKey),
-    [pastView, todayKey],
+    () => groupWatchItemsByDate(visiblePastView.rows, visiblePastView.sessionByTicker, todayKey),
+    [visiblePastView, todayKey],
   );
   const pastMostRecentKey = pastGroups[0]?.dateKey;
   const [pastExpandOverride, setPastExpandOverride] = useState<Record<string, boolean>>({});
@@ -253,9 +324,26 @@ export function IntradayWatchWorkspace() {
       {/* 문서 아웃라인용 접근성 제목(항상 sr-only) — 시각 타이틀은 전 페이지 공통으로 제거(홈 정합).
        *  장중 자동 판단 배지만 라이브 상태로 상단에 남긴다(active 일 때만). */}
       <h1 className="sr-only">{W.title}</h1>
-      {autoActive ? (
-        <div className="flex">
-          <Badge variant="info">{P.autoTicking}</Badge>
+      {autoActive || hasForeignSessions ? (
+        <div className="flex items-center gap-md">
+          {autoActive ? <Badge variant="info">{P.autoTicking}</Badge> : null}
+          {/* 공유 Supabase 다중 서버일 때만 노출 — 다른 서버 소유 세션 숨김 토글. */}
+          {hasForeignSessions ? (
+            <button
+              type="button"
+              onClick={() => setMineOnly((v) => !v)}
+              aria-pressed={mineOnly}
+              title={P.owner.mineOnlyHint}
+              className={cn(
+                "ml-auto inline-flex items-center gap-xs rounded-pill border px-sm py-xs text-caption transition-colors cursor-pointer",
+                mineOnly
+                  ? "border-accent-vivid bg-accent-soft text-accent-vivid"
+                  : "border-border-line text-text-muted hover:bg-surface-muted",
+              )}
+            >
+              {P.owner.mineOnly}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -302,11 +390,12 @@ export function IntradayWatchWorkspace() {
           {/* 워치 표 — 행 펼침 시 차트 탭 아래에 호가창(좌)·체결강도(우)가 함께 뜬다(IntradayWatchTable).
               이전엔 표 옆/아래 도킹이라 좁은 창서 표가 밀렸다(사용자 지적) → 펼침 내부로 이동. */}
           <IntradayWatchTable
-            items={rows}
+            items={visibleRows}
             quotes={todayQuotes}
             quotesLoading={todayQuotesLoading}
             sessionByTicker={sessionByTicker}
             warningsByTicker={warningsByTicker}
+            currentOperator={currentOperator}
             selectedTicker={selectedTicker}
             onSelect={setSelectedTicker}
             onStart={start}
@@ -315,7 +404,7 @@ export function IntradayWatchWorkspace() {
         </>
       )}
 
-      {pastView.rows.length > 0 ? (
+      {visiblePastView.rows.length > 0 ? (
         <section className="flex flex-col gap-sm" aria-label="과거 모의투자 내역">
           <div className="flex items-baseline justify-between gap-md">
             <h2 className="text-body-md font-bold text-text-strong">과거 모의투자 내역</h2>
@@ -324,11 +413,12 @@ export function IntradayWatchWorkspace() {
             </span>
           </div>
           <IntradayWatchTable
-            items={pastView.rows}
+            items={visiblePastView.rows}
             quotes={pastQuotes}
             quotesLoading={pastQuotesLoading}
-            sessionByTicker={pastView.sessionByTicker}
+            sessionByTicker={visiblePastView.sessionByTicker}
             warningsByTicker={warningsByTicker}
+            currentOperator={currentOperator}
             expandedDateKeys={expandedPastDateKeys}
             onToggleGroup={togglePastGroup}
             onSetAllGroups={setAllPastGroups}

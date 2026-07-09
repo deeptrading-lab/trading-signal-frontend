@@ -3,6 +3,7 @@ import {
   buildPastSessionRows,
   collectTickersForDateKeys,
   intradayWatchStorageKey,
+  isForeignOwnedSession,
   toggleWatchItem,
   type Watch,
 } from "@/components/intraday/IntradayWatchWorkspace";
@@ -112,5 +113,29 @@ describe("collectTickersForDateKeys", () => {
 
   it("펼친 그룹이 없으면 빈 배열(지연로드 요청 0)", () => {
     expect(collectTickersForDateKeys(groups, new Set())).toEqual([]);
+  });
+});
+
+describe("isForeignOwnedSession (\"내 세션만\" 필터 판정)", () => {
+  const me = "my-op";
+
+  it("다른 운영자 소유 세션은 숨김 대상(true)", () => {
+    expect(isForeignOwnedSession(session({ owner: "friend-op" }), me)).toBe(true);
+  });
+
+  it("내 소유 세션은 유지(false)", () => {
+    expect(isForeignOwnedSession(session({ owner: me }), me)).toBe(false);
+  });
+
+  it("소유자 미지정(레거시) 세션은 귀속 불가라 유지(false)", () => {
+    expect(isForeignOwnedSession(session({ owner: undefined }), me)).toBe(false);
+  });
+
+  it("세션 없는 워치 행은 유지(false)", () => {
+    expect(isForeignOwnedSession(undefined, me)).toBe(false);
+  });
+
+  it("currentOperator 미상(구 응답/미로드)이면 아무것도 숨기지 않음(false)", () => {
+    expect(isForeignOwnedSession(session({ owner: "friend-op" }), undefined)).toBe(false);
   });
 });

@@ -101,6 +101,14 @@ export const INTRADAY_PAPER_COPY = {
     "AI 보조 분석 기반의 가상 기록이에요 — 실제 주문은 발생하지 않고, 실제 매매 판단·집행은 직접 하세요.",
   ],
   autoTicking: "장중 자동 판단 중",
+  /* 세션 소유자(운영자) 구분 — 공유 Supabase 를 여러 서버가 함께 쓸 때(intraday-session-owner). */
+  owner: {
+    mine: "나",
+    mineTitle: "내 서버가 만든 세션이에요",
+    otherTitle: (op: string) => `다른 서버(${op})가 만든 세션이에요`,
+    mineOnly: "내 세션만",
+    mineOnlyHint: "다른 서버가 만든 세션을 숨겨요",
+  },
   metricReturn: "수익률",
   metricValue: "평가",
   metricCash: "현금",
