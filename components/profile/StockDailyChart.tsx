@@ -36,9 +36,11 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
+  ReferenceArea,
   ResponsiveContainer,
   DefaultZIndexes,
 } from "recharts";
+import type { ReactElement } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useChartData } from "@/hooks/stock/useChartData";
 import {
@@ -63,6 +65,7 @@ import {
   type MaPeriod,
 } from "./stockChartConfig";
 import type { ChartOptions } from "@/lib/store/chart/chartOptions";
+import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 import { useChartTheme, SYNC_ID } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
@@ -120,6 +123,10 @@ export interface StockDailyChartProps {
   onMinutePriorDaysChange: (d: number) => void;
   onChartTypeChange: (t: ChartType) => void;
   onToggleOverlay: (key: keyof ChartOptions) => void;
+  /** AI 판정 가격 레벨(목표/재진입·손절) — 저장 판정에서 파생. null=미표시. */
+  aiLevels?: AiVerdictLevels | null;
+  /** AI 레벨 오버레이 표시 여부(배너 토글). aiLevels 있을 때만 유효. */
+  showAiLevels?: boolean;
 }
 
 export function StockDailyChart({
@@ -139,6 +146,8 @@ export function StockDailyChart({
   onMinutePriorDaysChange,
   onChartTypeChange,
   onToggleOverlay,
+  aiLevels,
+  showAiLevels,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
     useChartData(ticker, interval, days, timeframe, minutePriorDays);
@@ -238,6 +247,67 @@ export function StockDailyChart({
     : true;
   const lastPriceColor = lastUp ? C.stroke : C.down;
 
+  // ── AI 판정 레벨 오버레이 — 저장 판정 있고 토글 ON 일 때만. 존(뒤, 채색)·선(앞)으로 분리.
+  //    정확한 숫자 라벨은 차트 밖 배너 레전드에 두어(y축 태그 겹침 회피) 차트는 시각만 깔끔하게.
+  //    ifOverflow="extendDomain" 로 목표/손절이 보이는 범위 밖이면 y도메인이 자동 확장된다.
+  const ai = showAiLevels && aiLevels ? aiLevels : null;
+  const aiZoneEls: ReactElement[] = [];
+  const aiLineEls: ReactElement[] = [];
+  if (ai) {
+    // 존: 매수계열(target)=리워드(현재가↔목표)+리스크(손절↔현재가) · SELL=리스크만 · 재진입(관망)=존 없이 선만.
+    if (ai.target?.role !== "reentry" && lastClose != null) {
+      if (ai.target?.role === "target") {
+        aiZoneEls.push(
+          <ReferenceArea
+            key="ai-reward"
+            y1={Math.min(lastClose, ai.target.price)}
+            y2={Math.max(lastClose, ai.target.price)}
+            fill={C.stroke}
+            fillOpacity={0.07}
+            stroke="none"
+            ifOverflow="extendDomain"
+          />,
+        );
+      }
+      aiZoneEls.push(
+        <ReferenceArea
+          key="ai-risk"
+          y1={Math.min(lastClose, ai.stop.price)}
+          y2={Math.max(lastClose, ai.stop.price)}
+          fill={C.down}
+          fillOpacity={0.07}
+          stroke="none"
+          ifOverflow="extendDomain"
+        />,
+      );
+    }
+    // 선: 목표/재진입 + 손절. 목표=상승색 / 재진입=중립 / 손절=하락색. 라벨 없음(배너 레전드가 담당).
+    if (ai.target) {
+      aiLineEls.push(
+        <ReferenceLine
+          key="ai-target"
+          y={ai.target.price}
+          stroke={ai.target.role === "target" ? C.stroke : C.refMid}
+          strokeWidth={1.5}
+          strokeDasharray="5 3"
+          strokeOpacity={0.85}
+          ifOverflow="extendDomain"
+        />,
+      );
+    }
+    aiLineEls.push(
+      <ReferenceLine
+        key="ai-stop"
+        y={ai.stop.price}
+        stroke={C.down}
+        strokeWidth={1.5}
+        strokeDasharray="5 3"
+        strokeOpacity={0.85}
+        ifOverflow="extendDomain"
+      />,
+    );
+  }
+
   // 최신가 알약과 겹치는 가장 가까운 y축 눈금을 숨길 가격 임계값 — 보이는 가격 폭의 ~10%.
   // 기본 눈금 수(≈5개, 간격 ~20%)에서는 항상 최신가에 제일 가까운 눈금 하나만 숨겨진다.
   const plotVals =
@@ -261,6 +331,8 @@ export function StockDailyChart({
           {chartType === "candle" ? (
             <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
+              {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
+              {aiZoneEls}
               {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               {/* 볼린저 음영 밴드 — 캔들 뒤(먼저 선언). [하단,상단] 범위 Area. */}
               {showBB && (
@@ -292,6 +364,8 @@ export function StockDailyChart({
                   label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
                 />
               )}
+              {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
+              {aiLineEls}
             </ComposedChart>
           ) : (
             <AreaChart data={priceSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
@@ -302,6 +376,8 @@ export function StockDailyChart({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
+              {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
+              {aiZoneEls}
               {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               {/* 볼린저 음영 밴드 — 가격 라인 뒤(먼저 선언). [하단,상단] 범위 Area. */}
               {showBB && (
@@ -333,6 +409,8 @@ export function StockDailyChart({
                   label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
                 />
               )}
+              {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
+              {aiLineEls}
             </AreaChart>
           )}
         </ResponsiveContainer>
