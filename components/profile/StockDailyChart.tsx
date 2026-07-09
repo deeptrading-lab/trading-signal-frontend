@@ -70,7 +70,7 @@ import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
-import { LastPriceTag } from "./chart/LastPriceTag";
+import { LastPriceTag, lastPriceTagWidth } from "./chart/LastPriceTag";
 import { AiLevelAxisLabels, aiLabelMaxWidth } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
@@ -337,10 +337,13 @@ export function StockDailyChart({
     );
   }
   // 우측 축 라벨(y축서 시작해 오른쪽 확장) — 라벨이 축 폭보다 길면 그 넘침분만큼 margin.right 예약해
-  //  잘리지 않게. 전 레벨 픽셀 y 를 모아 충돌 해소(v3 스케일 훅, 직접 자식).
+  //  잘리지 않게. AI 레벨 라벨과 현재가 알약 둘 다 좌정렬·우확장이라 각자 넘침분의 최댓값을 예약한다.
   const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - CHART_AXIS_WIDTH + 4) : 0;
-  const priceMargin = { top: 5, right: 4 + aiOverflow, left: 0, bottom: 0 };
-  const subMargin = { top: 0, right: 4 + aiOverflow, left: 0, bottom: 0 };
+  const lastPriceOverflow =
+    lastClose != null ? Math.max(0, lastPriceTagWidth(lastClose) - CHART_AXIS_WIDTH + 4) : 0;
+  const rightReserve = Math.max(aiOverflow, lastPriceOverflow);
+  const priceMargin = { top: 5, right: 4 + rightReserve, left: 0, bottom: 0 };
+  const subMargin = { top: 0, right: 4 + rightReserve, left: 0, bottom: 0 };
   const aiAxisLabelsEl = ai ? (
     <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} />
   ) : null;
