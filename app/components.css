@@ -376,27 +376,6 @@
     }
   }
 
-  /* ---------- AI 분석 마크다운 본문 (ai-panel-reskin — CardDetailOverlay) ----------
-   * react-markdown 결과의 prose 색 변수를 토큰으로 오버라이드 — dark: 없이 라이트/다크 자동 전환.
-   * `.markdown-content.prose`(0,2,0)로 typography 플러그인의 `.prose`(0,1,0)를 확실히 이긴다.
-   * theme(colors.*) 은 빌드 시 var(--fs-*) 로 해석돼 다크에서 자동 스왑(‥app/components 의 var(-- 직타 아님).
-   * 배경(th/code)·간격·폰트크기는 호출 측 prose-* 모디파이어(토큰)가 담당. */
-  .markdown-content.prose {
-    --tw-prose-body: theme(colors.text-strong);
-    --tw-prose-headings: theme(colors.text-strong);
-    --tw-prose-bold: theme(colors.text-strong);
-    --tw-prose-links: theme(colors.accent-vivid);
-    --tw-prose-code: theme(colors.accent-vivid);
-    --tw-prose-counters: theme(colors.text-muted);
-    --tw-prose-bullets: theme(colors.text-muted);
-    --tw-prose-quotes: theme(colors.text-muted);
-    --tw-prose-captions: theme(colors.text-muted);
-    --tw-prose-hr: theme(colors.border-line);
-    --tw-prose-quote-borders: theme(colors.border-line);
-    --tw-prose-th-borders: theme(colors.border-line);
-    --tw-prose-td-borders: theme(colors.border-line);
-  }
-
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
   .price-bar-track {
     @apply absolute top-[6px] left-0 right-0 h-[6px] bg-border-line rounded-pill;
@@ -1010,4 +989,41 @@
  * @layer 밖 top-level 에 둔다(skeletonShimmer·wl-star 선례). */
 @keyframes ai-ecg {
   to { stroke-dashoffset: -54; }
+}
+
+/* ---------- AI 분석 마크다운 본문 (ai-panel-reskin — CardDetailOverlay) ----------
+ * react-markdown 결과의 prose 색 변수를 토큰으로 오버라이드 — dark: 없이 라이트/다크 자동 전환.
+ *
+ * ★★ 반드시 @layer 밖(unlayered) 이어야 한다. @tailwindcss/typography 의 `.prose` 규칙
+ *    (`--tw-prose-body: #364153` + `.prose :where(p){color}` 등)은 전부 `@layer utilities` 로
+ *    방출되는데, 이 파일의 `@layer components` 안에 두면 **레이어 순서상 utilities 가 무조건 이겨서**
+ *    (specificity 무관) 오버라이드가 통째로 무시됐다 — 다크에서 본문·헤딩이 검게 남던 실제 원인.
+ *    unlayered 규칙은 모든 @layer 를 이기므로 여기(top-level)에 둔다.
+ * ★ 색은 var(--fs-*) 직타 — theme(colors.*) 는 v4 빌드 시 정적(라이트) 값으로 굳어 다크 flip 안 됨.
+ *    --fs-* CSS 변수는 html.dark 로 자동 스왑되므로 라이트/다크 모두 정상. */
+.markdown-content.prose {
+  --tw-prose-body: var(--fs-text-strong);
+  --tw-prose-headings: var(--fs-text-strong);
+  --tw-prose-bold: var(--fs-text-strong);
+  --tw-prose-links: var(--fs-accent-vivid);
+  --tw-prose-code: var(--fs-accent-vivid);
+  --tw-prose-counters: var(--fs-text-muted);
+  --tw-prose-bullets: var(--fs-text-muted);
+  --tw-prose-quotes: var(--fs-text-muted);
+  --tw-prose-captions: var(--fs-text-muted);
+  --tw-prose-hr: var(--fs-border-line);
+  --tw-prose-quote-borders: var(--fs-border-line);
+  --tw-prose-th-borders: var(--fs-border-line);
+  --tw-prose-td-borders: var(--fs-border-line);
+}
+/* 변수 경로가 막히는 요소(헤딩·강조·링크·표 헤더·코드) 직접 강제 — 역시 unlayered 라야 utilities 를 이긴다. */
+.markdown-content :is(h1, h2, h3, h4, h5, h6),
+.markdown-content strong,
+.markdown-content b,
+.markdown-content th {
+  color: var(--fs-text-strong);
+}
+.markdown-content a,
+.markdown-content code {
+  color: var(--fs-accent-vivid);
 }
