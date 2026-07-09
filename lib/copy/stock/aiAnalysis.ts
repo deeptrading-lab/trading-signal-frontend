@@ -43,9 +43,15 @@ export const COPY = {
   savedMode: {
     /** 재분석 권유 사유 라벨(배너 내부용·접근성). */
     staleReason: SAVED_STALE_REASON,
-    /** 상단 앰버 배너 본문 — 라이브 현재가(있으면) + 사유 + 재분석 권유. */
-    staleBanner: (reason: StaleReason, price: string | null): string =>
-      `${price ? `현재가 ${price} · ` : ""}${SAVED_STALE_REASON[reason]} — 지금 기준으로 다시 분석해 보세요.`,
+    /**
+     * 상단 앰버 배너 본문 — 라이브 현재가(있으면) + 사유 + 재분석 권유.
+     * aged(오래됨)는 경과 시각(relative: "N시간 전"·"N일 전"·"YYYY.MM.DD")을 넣어 "언제 분석했는지"를 보여준다.
+     */
+    staleBanner: (reason: StaleReason, price: string | null, relative?: string): string => {
+      const reasonText =
+        reason === "aged" && relative ? `${relative} 분석이에요` : SAVED_STALE_REASON[reason];
+      return `${price ? `현재가 ${price} · ` : ""}${reasonText} — 지금 기준으로 다시 분석해 보세요.`;
+    },
     /** 앰버 배너 CTA. */
     staleCta: "지금 기준 재분석",
     /** 앰버 배너 접근성 라벨(role=status). */
