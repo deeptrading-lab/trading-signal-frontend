@@ -59,13 +59,15 @@ export function AiLevelAxisLabels({
   const top = plot.y;
   const bottom = plot.y + plot.height;
 
+  // 역할명(목표/재진입/손절)을 붙여 현재가 라벨과 구분한다 — 현재가도 상승 빨강/하락 파랑이라 색만으론
+  // 목표(빨강)·손절(파랑)과 겹친다. 현재가는 가격만 → "목표 24,300" vs "24,300" 로 텍스트 구분.
   const labels: PlacedLabel[] = [];
   if (levels.target) {
     const isTarget = levels.target.role === "target";
     const y0 = yScale(levels.target.price);
     if (y0 != null) {
       labels.push({
-        text: formatNumber(levels.target.price, { digits: 0 }),
+        text: `${isTarget ? "목표" : "재진입"} ${formatNumber(levels.target.price, { digits: 0 })}`,
         // 목표=상승색(빨강, 흰 글자) / 재진입=앰버(밝아서 어두운 글자). 회색은 안 보여서 변경.
         fill: isTarget ? C.stroke : C.signalLine,
         textColor: isTarget ? "#fff" : DARK_ON_LIGHT,
@@ -77,7 +79,7 @@ export function AiLevelAxisLabels({
   const stopY0 = yScale(levels.stop.price);
   if (stopY0 != null) {
     labels.push({
-      text: formatNumber(levels.stop.price, { digits: 0 }),
+      text: `손절 ${formatNumber(levels.stop.price, { digits: 0 })}`,
       fill: C.down,
       textColor: "#fff",
       y0: stopY0,
