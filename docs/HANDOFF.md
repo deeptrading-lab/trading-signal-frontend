@@ -7223,3 +7223,36 @@
   - 오늘 이전 6개 세션 owner 백필(서버 정지 중 Supabase payload.owner 세팅).
   - 친구 서버에 `INTRADAY_OPERATOR` 설정 + 양쪽 재시작 후 라이브 확인(서로의 세션이 상대 배지·"내 세션만" 필터로 분리되는지, 이중 틱 0).
   - PR-4 장중 실검증(평일 09~15:30) — 두 서버 동시 가동 시 각자 자기 세션만 틱하는지.
+
+### 2026-07-09 — feat(intraday): 펼침 차트 체결 마커 점 → 화살표 + B/S (#327)
+
+- **slug**: `feat/intraday-chart-trade-markers` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/327
+- **요약**: feat(intraday): 펼침 차트 체결 마커 점 → 화살표 + B/S
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 단타 목록에서 종목 펼침 시 나오는 당일 분봉 차트의 **가상 체결 마커를 단순 점 → 화살표 + B/S 글자**로 변경(사용자 요청). 매매 방향·구분이 한눈에 들어옵니다.
+  > 
+  > ## 변경
+  > 
+  > - `components/intraday/IntradayMiniChart.tsx`:
+  >   - `ReferenceDot` 점(r=4) → 커스텀 `shape`(삼각형 화살표 + B/S 텍스트)
+  >   - **매수 B**: 빨강(theme.C.stroke), 가격 아래에서 위로 찌르는 삼각형(꼭짓점=가격쪽)
+  >   - **매도 S**: 파랑(theme.C.down), 가격 위에서 아래로
+  >   - 글자에 surface 헤일로(`paintOrder=stroke`)로 캔들 위 가독성
+  >   - 색은 **기존 캔들 테마 재사용**(런타임 resolve 값 그대로) — 다크모드 정합 유지
+  >   - `tradeMarkerGeometry` 순수 헬퍼 추출
+  > 
+  > ## 검증
+  > 
+  > - 신규 테스트 3건(`tradeMarkerGeometry.test.ts`): 매수=가격 아래·꼭짓점 위, 매도=가격 위·꼭짓점 아래, 상하 대칭
+  > - 전체 vitest **1209 passed** / tsc·eslint 클린
+  > - ⚠️ 라이브 브라우저 렌더는 Turbopack 심볼릭 node_modules 함정으로 생략 — ReferenceDot 이 커스텀 shape 에 cx/cy 주입(cloneElement)하는 표준 API 사용, 로직·기하는 테스트로 검증
+  > 
+  > ## 다음 작업
+  > 
+  > - 겹치는 체결(같은 분봉 버킷 다중 체결) 마커 오프셋은 후속 여지(현재 기존 점과 동일하게 겹침)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 겹치는 체결(같은 분봉 버킷 다중 체결) 마커 오프셋은 후속 여지(현재 기존 점과 동일하게 겹침)
