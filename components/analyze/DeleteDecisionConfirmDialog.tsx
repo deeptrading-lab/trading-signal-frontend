@@ -52,7 +52,9 @@ export function DeleteDecisionConfirmDialog({
       <div className="relative flex w-full max-w-[24rem] flex-col gap-md rounded-2xl bg-surface p-lg shadow-lg">
         <div className="flex flex-col gap-xs">
           <h2 className="text-h2 font-bold text-text-strong">{DELETE_CONFIRM_TITLE}</h2>
-          <p className="text-body-sm text-text-muted">{deleteConfirmDesc(name)}</p>
+          <p className="text-body-sm leading-relaxed text-text-muted break-keep">
+            {deleteConfirmDesc(name)}
+          </p>
         </div>
         <div className="flex justify-end gap-xs">
           <button
