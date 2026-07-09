@@ -7181,3 +7181,45 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **PR B: 세션 소유자 구분 + 소유자별 틱 게이트 + 백필** — 본 PR 머지 후 착수(같은 컴포넌트 `IntradayWatchWorkspace`/`IntradayWatchTable` 를 접촉하므로 충돌 방지 목적으로 분리).
   - 월요일 장중 라이브에서 오늘 표 시세 + 과거 그룹 펼침 시 스켈레톤->시세 전환 실측 확인(브라우저 구동 스킵분).
+
+### 2026-07-09 — feat(intraday): 단타 세션 소유자(operator) 구분 + 소유자별 틱 게이트 + 배지/필터 (#326)
+
+- **slug**: `feat/intraday-session-owner` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/326
+- **요약**: feat(intraday): 단타 세션 소유자(operator) 구분 + 소유자별 틱 게이트 + 배지/필터
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 두 사람이 각자 로컬 서버를 띄우고 **하나의 공유 Supabase** 를 함께 쓴다. 세션은 매 틱마다 write-through 로 Supabase 에 upsert 되고, 각 서버는 부팅 시 최근 세션(최대 50개)을 전부 하이드레이트한다. 그런데 틱 스케줄러(`selectSchedulableSessions`)가 스토어의 **모든** running cli-agent 세션을 틱하므로 → 두 서버가 서로의 세션을 **이중 틱**하고 소유 상태를 덮어쓴다. 또 UI 상 어느 세션이 누구 것인지 **구분이 안 된다**.
+  > 
+  > 스케줄러는 요청 없는 `setInterval`(쿠키·로그인 신원 접근 불가)에서 돌기 때문에 소유자 키는 **request-less 로 안정적으로** 얻어야 한다 → 로그인 이메일이 아니라 env(`INTRADAY_OPERATOR`) → `os.hostname()` 폴백으로 해석한다(프로세스 수명 동안 고정, 생성 시 스탬프와 스케줄링 시 비교가 항상 일치).
+  > 
+  > ## 변경
+  > **서버**
+  > - `resolveServerOperator()` 신설(`lib/server/paperTrading/operator.ts`): `env INTRADAY_OPERATOR → os.hostname() → "local"`, 64자 컷. 서버 전용(`os` 는 클라 번들 금지).
+  > - 타입: `PaperTradingSession.owner?` (레거시는 미기록) + `PaperTradingSessionsResponse.currentOperator`.
+  > - `createPaperTradingSession` 이 새 세션에 `owner` 스탬프(payload 통째로 Supabase 영속 → 무마이그레이션). 멱등 재사용 가드는 **기존 owner 유지**(다른 서버 owner 로 덮어쓰지 않음).
+  > - `selectSchedulableSessions` 에 **소유자 게이트**: `running && cli-agent && (내 소유 || 미지정)`. 이 한 곳이 틱(`runScheduledIntradayTicks`)·마감 종료(`closeOutRunningSessionsAtClose`)·밀린 세션 복구(`closeOutStaleCrossdaySessions`) 세 경로를 모두 own-or-unowned 로 제한 → 서버 A 가 서버 B 의 세션을 틱/마감/복구하지 않는다.
+  > - 목록 GET 이 `currentOperator` 반환.
+  > 
+  > **클라이언트**
+  > - `usePaperTradingSessions`·`useIntradayPaperWatch` 가 `currentOperator` 노출.
+  > - `IntradayWatchTable` 각 행에 **소유자 배지**: 내 세션=`나`(accent), 다른 서버=운영자 라벨(muted·truncate), 미지정/무세션은 미표시(하위호환).
+  > - `IntradayWatchWorkspace` **"내 세션만"** 필터 토글: 다른 운영자 소유 세션 숨김. 기본 OFF, localStorage 유지, **다른 서버 소유 세션이 있을 때만 노출**(단독 운영 시 UI 무변경). 오늘·과거 표 + 과거 시세 지연로드에 동일 필터 적용.
+  > 
+  > ## 롤아웃 주의
+  > - **두 서버 모두 pull + 재시작** 해야 게이트가 양쪽에서 성립한다(한쪽만 배포하면 여전히 이중 틱).
+  > - 각자 `INTRADAY_OPERATOR` 를 사람이 읽을 이름으로 설정 권장(미설정 시 hostname 이 배지에 그대로 노출됨).
+  > - **오늘 이전에 만든 세션 6개는 owner 미지정**(레거시) — own-or-unowned 규칙으로 두 서버가 계속 처리(orphan 아님). 정확한 귀속을 원하면 **서버 정지 상태에서** Supabase `paper_trading_sessions.payload.owner` 백필.
+  > 
+  > ## 하위호환
+  > - 레거시(미지정) 세션은 계속 틱됨. 필터 기본 OFF. `currentOperator` 없는 구 클라이언트도 배지·필터가 no-op 로 동작.
+  > - 거래 판단 로직(intradayCli/runTick)·PR #325 시세 페치·스코어카드는 무변경(owner 는 직교 메타데이터 + 스케줄러 게이트).
+  > 
+  > ## 검증
+  > - `npx vitest run` — **1206 passed** / 3 skipped(라이브 백테스트), 신규 14개(operator env/hostname/64컷 · 스케줄러 소유자 게이트 · 생성 owner 스탬프/멱등 유지 · closeOut 소유자 게이트 · isForeignOwnedSession).
+  > - `npx tsc --noEmit` clean · `npx eslint` clean.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 오늘 이전 6개 세션 owner 백필(서버 정지 중 Supabase payload.owner 세팅).
+  - 친구 서버에 `INTRADAY_OPERATOR` 설정 + 양쪽 재시작 후 라이브 확인(서로의 세션이 상대 배지·"내 세션만" 필터로 분리되는지, 이중 틱 0).
+  - PR-4 장중 실검증(평일 09~15:30) — 두 서버 동시 가동 시 각자 자기 세션만 틱하는지.
