@@ -38,6 +38,7 @@ import {
   ReferenceLine,
   ReferenceArea,
   ResponsiveContainer,
+  Customized,
   DefaultZIndexes,
 } from "recharts";
 import type { ReactElement } from "react";
@@ -71,7 +72,7 @@ import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag } from "./chart/LastPriceTag";
-import { AiLevelTag } from "./chart/AiLevelTag";
+import { makeAiAxisLabels } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
@@ -282,19 +283,17 @@ export function StockDailyChart({
         />,
       );
     }
-    // 선 + 좌측 라벨 태그(역할명+가격, 현재가 우측 태그와 공간 분리). 목표=상승색 / 재진입=중립 / 손절=하락색.
+    // 선(라벨 없음). 목표=상승색 / 재진입=중립 / 손절=하락색. 라벨(가격 알약)은 우측 축에 커스텀
+    // 레이어(aiAxisLabelsEl)가 충돌 해소해 그린다.
     if (ai.target) {
-      const targetColor = ai.target.role === "target" ? C.stroke : C.refMid;
-      const targetLabel = ai.target.role === "target" ? "목표" : "재진입";
       aiLineEls.push(
         <ReferenceLine
           key="ai-target"
           y={ai.target.price}
-          stroke={targetColor}
+          stroke={ai.target.role === "target" ? C.stroke : C.refMid}
           strokeWidth={1.5}
           strokeDasharray="6 3"
           ifOverflow="extendDomain"
-          label={<AiLevelTag label={targetLabel} price={ai.target.price} color={targetColor} bgColor={C.surface} />}
         />,
       );
     }
@@ -306,10 +305,21 @@ export function StockDailyChart({
         strokeWidth={1.5}
         strokeDasharray="6 3"
         ifOverflow="extendDomain"
-        label={<AiLevelTag label="손절" price={ai.stop.price} color={C.down} bgColor={C.surface} />}
       />,
     );
   }
+  // 우측 가격 축 라벨(현재가 태그처럼) — 전 레벨 픽셀 y 를 모아 충돌 해소. Customized 로 y-스케일 확보.
+  const aiAxisLabelsEl = ai ? (
+    <Customized
+      key="ai-axis-labels"
+      component={makeAiAxisLabels(ai, lastClose, {
+        target: C.stroke,
+        reentry: C.refMid,
+        stop: C.down,
+        surface: C.surface,
+      })}
+    />
+  ) : null;
 
   // 최신가 알약과 겹치는 가장 가까운 y축 눈금을 숨길 가격 임계값 — 보이는 가격 폭의 ~10%.
   // 기본 눈금 수(≈5개, 간격 ~20%)에서는 항상 최신가에 제일 가까운 눈금 하나만 숨겨진다.
@@ -369,6 +379,8 @@ export function StockDailyChart({
               )}
               {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
               {aiLineEls}
+              {/* 우측 축 라벨(충돌 해소) — 최상단. */}
+              {aiAxisLabelsEl}
             </ComposedChart>
           ) : (
             <AreaChart data={priceSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
@@ -414,6 +426,8 @@ export function StockDailyChart({
               )}
               {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
               {aiLineEls}
+              {/* 우측 축 라벨(충돌 해소) — 최상단. */}
+              {aiAxisLabelsEl}
             </AreaChart>
           )}
         </ResponsiveContainer>
