@@ -20,10 +20,16 @@ import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 
 interface PlacedLabel {
   text: string;
-  color: string;
+  /** 알약 채움색(레벨색) — 연결선 색도 공용. */
+  fill: string;
+  /** 글자색 — 밝은 채움(앰버)은 어두운 글자, 그 외 흰 글자(현재가 태그와 동일 톤). */
+  textColor: string;
   y0: number;
   y: number;
 }
+
+/** 밝은 채움(앰버 재진입) 위 글자 — 고정 어두운색(테마 반전 토큰은 다크에서 밝아져 부적합). */
+const DARK_ON_LIGHT = "#141922";
 
 const BOX_H = 18;
 const GAP = BOX_H + 2;
@@ -60,8 +66,9 @@ export function AiLevelAxisLabels({
     if (y0 != null) {
       labels.push({
         text: formatNumber(levels.target.price, { digits: 0 }),
-        // 목표=상승색(빨강) / 재진입=앰버(회색은 안 보임 — 빨강·파랑과 구분되는 눈에 띄는 색).
-        color: isTarget ? C.stroke : C.signalLine,
+        // 목표=상승색(빨강, 흰 글자) / 재진입=앰버(밝아서 어두운 글자). 회색은 안 보여서 변경.
+        fill: isTarget ? C.stroke : C.signalLine,
+        textColor: isTarget ? "#fff" : DARK_ON_LIGHT,
         y0,
         y: 0,
       });
@@ -69,7 +76,13 @@ export function AiLevelAxisLabels({
   }
   const stopY0 = yScale(levels.stop.price);
   if (stopY0 != null) {
-    labels.push({ text: formatNumber(levels.stop.price, { digits: 0 }), color: C.down, y0: stopY0, y: 0 });
+    labels.push({
+      text: formatNumber(levels.stop.price, { digits: 0 }),
+      fill: C.down,
+      textColor: "#fff",
+      y0: stopY0,
+      y: 0,
+    });
   }
   if (labels.length === 0) return null;
 
@@ -96,8 +109,9 @@ export function AiLevelAxisLabels({
           <g key={i}>
             {/* 밀렸으면 실제 선 높이(y0) → 알약(y) 짧은 세로 연결선(알약 좌측 끝). */}
             {nudged ? (
-              <line x1={boxX} y1={l.y0} x2={boxX} y2={l.y} stroke={l.color} strokeWidth={1} strokeOpacity={0.55} />
+              <line x1={boxX} y1={l.y0} x2={boxX} y2={l.y} stroke={l.fill} strokeWidth={1} strokeOpacity={0.55} />
             ) : null}
+            {/* 현재가 태그와 동일 톤 — 레벨색 채움 + 차트면 녹아웃 테두리(뒤 UI 비침 차단). */}
             <rect
               x={boxX}
               y={boxY}
@@ -105,16 +119,16 @@ export function AiLevelAxisLabels({
               height={BOX_H}
               rx={4}
               ry={4}
-              fill={C.surface}
-              stroke={l.color}
-              strokeWidth={1.25}
+              fill={l.fill}
+              stroke={C.surface}
+              strokeWidth={1.5}
             />
             <text
               x={axisRight - PAD_X}
               y={l.y}
               textAnchor="end"
               dominantBaseline="central"
-              fill={l.color}
+              fill={l.textColor}
               fontSize={11}
               fontWeight={700}
               style={{ fontVariantNumeric: "tabular-nums" }}
