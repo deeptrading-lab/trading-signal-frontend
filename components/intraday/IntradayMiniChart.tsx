@@ -44,7 +44,7 @@ function pad(n: number): string {
  * 체결 마커(원형 핀) 치수(px) — 캔들(maxBarSize 8)과 확실히 구분되게 꽉 찬 색 원 + 흰 글자.
  * 꼬리(삼각형)가 정확한 체결가를 가리키고 원은 그 바깥에 떠서 같은 색 캔들 사이에서도 안 묻힌다.
  */
-const MARKER_GAP = 2; // 가격 포인트 ↔ 꼬리 꼭짓점 여백
+const MARKER_GAP = 11; // 가격 포인트 ↔ 꼬리 꼭짓점 여백(캔들과 살짝 띄워 겹침 방지)
 const MARKER_TAIL_H = 10; // 꼬리 높이(A1 — 눈에 띄게 키움)
 const MARKER_TAIL_W = 6; // 꼬리 반너비
 const MARKER_RADIUS = 9; // 배지 원 반지름
