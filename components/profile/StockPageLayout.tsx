@@ -15,9 +15,10 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { StockHeader } from "./StockHeader";
+import { AiVerdictStrip } from "./AiVerdictStrip";
 import { StockChartSkeleton } from "./StockChartSkeleton";
 import { SignalSummary } from "./SignalSummary";
 import { CompanyOverview } from "./CompanyOverview";
@@ -27,7 +28,9 @@ import { StockDepthSection } from "@/components/stock/StockDepthSection";
 import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
+import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
+import { deriveAiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
 import {
   DEFAULT_CHART_TYPE,
@@ -92,6 +95,20 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   // 오버레이 옵션(이평선·매물대·볼린저·VWAP·거래량 이평) — 이평선만 기본 ON, 드롭다운 체크박스로 토글. localStorage 지속.
   const { options: chartOptions, toggle: toggleChartOption } = useChartOptions();
 
+  // AI 판정 차트 오버레이 — 저장된 종합분석 결론에서 목표/재진입·손절 레벨 파생(base_price 없으면 null).
+  const { data: aiDecisionData } = useQueryAIDecision(ticker);
+  const savedDecision = aiDecisionData?.decision?.decision ?? null;
+  const aiLevels = useMemo(
+    () => (savedDecision ? deriveAiVerdictLevels(savedDecision) : null),
+    [savedDecision],
+  );
+  // 오버레이 표시 여부 — "차트보기"(?ai=1)로 진입하면 자동 ON, 그냥 검색이면 OFF(토글로 켬).
+  // 마운트 시 URL 을 1회 읽어 초기화(useSearchParams Suspense 요구 회피, 클라 전용).
+  const [showAiLevels, setShowAiLevels] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("ai") === "1") setShowAiLevels(true);
+  }, []);
+
   // 초광폭(콘텐츠 우측 여백이 큼) — 호가·체결강도를 차트 우측에 도크로 띄운다(그 미만은 차트 아래 2단).
   const isUltraWide = useMediaQuery(PEEK_DOCK_QUERY);
   const [dockWidth, setDockWidth] = useState(DEPTH_DOCK_MIN_WIDTH);
@@ -131,7 +148,21 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
 
       {/* ── 항시: 가격 차트 — 초광폭이면 우측 여백에 호가·체결강도 도크를 절대배치로 띄운다. ── */}
       <div className="relative mt-lg border-t border-border-line pt-lg">
-        <StockDailyChart ticker={ticker} {...chartControls} />
+        {/* AI 판정 스트립 — 저장 결론 있을 때만. 판정 배지 + 레벨 오버레이 토글. */}
+        {aiLevels && savedDecision ? (
+          <AiVerdictStrip
+            levels={aiLevels}
+            decision={savedDecision}
+            show={showAiLevels}
+            onToggle={setShowAiLevels}
+          />
+        ) : null}
+        <StockDailyChart
+          ticker={ticker}
+          {...chartControls}
+          aiLevels={aiLevels}
+          showAiLevels={showAiLevels}
+        />
         {isUltraWide ? (
           // 콘텐츠 우측 끝(left-full) + gap 앵커, 폭은 실측(우측 여백에 맞춤). 차트와 함께 스크롤.
           <aside

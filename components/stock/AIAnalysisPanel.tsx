@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  X, Sparkles, RefreshCw, Square, Loader2,
+  X, Sparkles, RefreshCw, Square, Loader2, LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
@@ -340,6 +341,15 @@ export function AIAnalysisPanel({
                 )}
               </div>
               <div className="flex items-center gap-1">
+                {/* 차트와 함께 보기 — 저장 결과(PM 완료)일 때 상단에 노출. 종목 상세로 이동(?ai=1 오버레이 자동 ON). */}
+                {isSavedSnapshot && (
+                  <Link
+                    href={`/stock/${ticker}?ai=1`}
+                    className="flex items-center gap-1.5 rounded-sm bg-accent-vivid px-2.5 py-1.5 text-caption font-medium text-surface transition hover:brightness-105 cursor-pointer"
+                  >
+                    <LineChart size={12} /> <span className="hidden sm:inline">차트와 함께 보기</span>
+                  </Link>
+                )}
                 {/* 중지 / 재개 버튼 */}
                 {isRunning ? (
                   <button
