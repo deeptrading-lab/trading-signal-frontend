@@ -1,6 +1,7 @@
 import {
   INTRADAY_TIMEFRAME_BY_INTERVAL,
   type PaperTradingCostModel,
+  type PaperTradingRiskMode,
 } from "@/lib/types/paperTrading/paperTrading";
 
 export const PAPER_TRADING_DEFAULT_INITIAL_CASH = 10_000_000;
@@ -11,6 +12,46 @@ export const PAPER_TRADING_MAX_STALE_PRICE_SECONDS = 180;
 export const PAPER_TRADING_POSITION_HARD_STOP_PCT = -5;
 export const PAPER_TRADING_SESSION_HARD_STOP_PCT = -7;
 export const PAPER_TRADING_MAX_TURNOVER_PER_TICK_PCT = 50;
+
+// ─── 하드스톱(포지션/세션 손실 한도) 배선 ─────────────────────────────────────
+// intraday-stop-slippage B/C. cli-agent 단타의 백스톱 — mock 경로는 무영향(forcedExit 미지정).
+
+/** 하드스톱 % 허용 범위(음수) — 검증·UI 공용. −20 ≤ v ≤ −1, 또는 null(끄기). */
+export const PAPER_TRADING_HARD_STOP_MIN_PCT = -20;
+export const PAPER_TRADING_HARD_STOP_MAX_PCT = -1;
+
+/**
+ * riskMode 연동 포지션 하드스톱 기본값(%) — 명시 override 미지정 시 이 값으로 스탬프한다
+ * (PRD §7 q4: riskMode 연동 + 명시 override). 보수 −3 / 균형 −5 / 공격 −8.
+ */
+export function defaultPositionHardStopPct(riskMode: PaperTradingRiskMode): number {
+  if (riskMode === "conservative") return -3;
+  if (riskMode === "aggressive") return -8;
+  return -5;
+}
+
+/**
+ * 세션의 유효 포지션 하드스톱(%) 해석 — forced-exit 주입용.
+ * `null`=명시적 끄기(그대로 null 반환 → 하드스톱 미적용) / `undefined`=레거시 → riskMode 기본 /
+ * 숫자=세션 설정값. 동적 손절선은 이 값과 무관하게 항상 유지된다(끄기여도 손절선은 작동).
+ */
+export function resolvePositionHardStopPct(session: {
+  positionHardStopPct?: number | null;
+  riskMode: PaperTradingRiskMode;
+}): number | null {
+  if (session.positionHardStopPct === null) return null;
+  if (session.positionHardStopPct === undefined) return defaultPositionHardStopPct(session.riskMode);
+  return session.positionHardStopPct;
+}
+
+/** 세션의 유효 세션 하드스톱(%) 해석 — `null`=끄기 / `undefined`=기본 −7 / 숫자=설정값. */
+export function resolveSessionHardStopPct(session: {
+  sessionHardStopPct?: number | null;
+}): number | null {
+  if (session.sessionHardStopPct === null) return null;
+  if (session.sessionHardStopPct === undefined) return PAPER_TRADING_SESSION_HARD_STOP_PCT;
+  return session.sessionHardStopPct;
+}
 
 // ─── 장중 단타(cli-agent) 전용 ────────────────────────────────────────────────
 

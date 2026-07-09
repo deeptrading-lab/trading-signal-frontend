@@ -59,6 +59,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       decisionProvider: body.decisionProvider ?? "mock",
       aiProvider: cliGate.provider,
       tickIntervalMinutes: body.tickIntervalMinutes,
+      // 손절 상한(포지션 하드스톱) — 미지정이면 서버가 riskMode 기본, null 이면 끄기(C).
+      positionHardStopPct: body.positionHardStopPct,
+      sessionHardStopPct: body.sessionHardStopPct,
     });
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch {

@@ -18,7 +18,11 @@ export type PaperTradingTickStatus =
   | "executed"
   | "skipped"
   | "failed";
-export type PaperTradingTriggeredBy = "user" | "auto" | "cli";
+/**
+ * 틱 발화 출처 — `risk` 는 A(60초 리스크-only 스윕)가 만든 강제 청산 틱(intraday-stop-slippage).
+ * LLM 5분 틱(`auto`/`user`/`cli`)과 구분해 체결 내역·필터에서 식별한다.
+ */
+export type PaperTradingTriggeredBy = "user" | "auto" | "cli" | "risk";
 export type PaperTradingMode = "sandbox" | "live-paper" | "replay";
 export type PaperTradingAiProvider = import("@/lib/types/stock/aiAnalysis").AIAnalysisProvider;
 
@@ -143,6 +147,14 @@ export type PaperTradingSession = {
   cashBufferPct: number;
   tickIntervalMinutes: number;
   decisionProvider: PaperTradingDecisionProvider;
+  /**
+   * 포지션 손실 하드스톱(%, 음수) — cli-agent 단타 백스톱(intraday-stop-slippage B/C).
+   * `null` = 끄기(하드스톱 미적용, 동적 손절선은 유지), `undefined`(레거시) = riskMode 기본
+   * (보수 −3 / 균형 −5 / 공격 −8). A(60초 스윕)·기존 5분 틱 양쪽 forced-exit 에서 사용.
+   */
+  positionHardStopPct?: number | null;
+  /** 세션 손실 하드스톱(%, 음수) — 세션 수익률 도달 시 전량 flatten. `null`=끄기, 미기록=기본 −7. */
+  sessionHardStopPct?: number | null;
   /** 단타 cli-agent 실행에 사용할 로컬 AI CLI. 기존 세션은 미기록일 수 있어 optional. */
   aiProvider?: PaperTradingAiProvider;
   /**
@@ -236,6 +248,13 @@ export type CreatePaperTradingSessionRequest = {
   aiProvider?: PaperTradingAiProvider;
   /** 단타(cli-agent) 판단 주기(분) — 미지정 시 서버 기본(env). mock 세션에선 무시. */
   tickIntervalMinutes?: number;
+  /**
+   * 포지션 손실 하드스톱(%, 음수) — 세션 생성 시 UI 손절 상한 선택값(intraday-stop-slippage C).
+   * `null`=끄기, 미지정(undefined)=riskMode 기본(−3/−5/−8). 검증: −20 ≤ v ≤ −1 또는 null.
+   */
+  positionHardStopPct?: number | null;
+  /** 세션 손실 하드스톱(%, 음수) — 미지정 시 기본 −7. `null`=끄기. */
+  sessionHardStopPct?: number | null;
 };
 
 export type PaperTradingSessionsResponse = {

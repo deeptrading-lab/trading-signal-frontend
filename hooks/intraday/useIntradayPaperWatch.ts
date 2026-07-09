@@ -123,6 +123,7 @@ export function useIntradayPaperWatch() {
     stock: PaperTradingSelectedStock,
     initialCash: number,
     tickIntervalMinutes: number,
+    positionHardStopPct: number | null,
   ): Promise<PaperTradingSessionDetail> =>
     create({
       name: `단타 모의 · ${stock.name}`,
@@ -133,6 +134,8 @@ export function useIntradayPaperWatch() {
       riskMode: "balanced",
       decisionProvider: "cli-agent",
       tickIntervalMinutes,
+      // 손절 상한(포지션 하드스톱) — 표 셀렉트 선택값. null=끄기(동적 손절선은 유지).
+      positionHardStopPct,
     });
 
   return {
