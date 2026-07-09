@@ -382,19 +382,22 @@
    * theme(colors.*) 은 빌드 시 var(--fs-*) 로 해석돼 다크에서 자동 스왑(‥app/components 의 var(-- 직타 아님).
    * 배경(th/code)·간격·폰트크기는 호출 측 prose-* 모디파이어(토큰)가 담당. */
   .markdown-content.prose {
-    --tw-prose-body: theme(colors.text-strong);
-    --tw-prose-headings: theme(colors.text-strong);
-    --tw-prose-bold: theme(colors.text-strong);
-    --tw-prose-links: theme(colors.accent-vivid);
-    --tw-prose-code: theme(colors.accent-vivid);
-    --tw-prose-counters: theme(colors.text-muted);
-    --tw-prose-bullets: theme(colors.text-muted);
-    --tw-prose-quotes: theme(colors.text-muted);
-    --tw-prose-captions: theme(colors.text-muted);
-    --tw-prose-hr: theme(colors.border-line);
-    --tw-prose-quote-borders: theme(colors.border-line);
-    --tw-prose-th-borders: theme(colors.border-line);
-    --tw-prose-td-borders: theme(colors.border-line);
+    /* ★ var(--fs-*) 직타 — theme(colors.*) 는 Tailwind v4 에서 빌드 시 정적(라이트) 값으로 해석돼
+       다크에서 flip 안 됨 → prose 기본(어두운 회색) 폴백으로 다크에서 글자가 안 보였다. CSS 변수는
+       html.dark 로 자동 스왑되므로 라이트/다크 모두 정상. */
+    --tw-prose-body: var(--fs-text-strong);
+    --tw-prose-headings: var(--fs-text-strong);
+    --tw-prose-bold: var(--fs-text-strong);
+    --tw-prose-links: var(--fs-accent-vivid);
+    --tw-prose-code: var(--fs-accent-vivid);
+    --tw-prose-counters: var(--fs-text-muted);
+    --tw-prose-bullets: var(--fs-text-muted);
+    --tw-prose-quotes: var(--fs-text-muted);
+    --tw-prose-captions: var(--fs-text-muted);
+    --tw-prose-hr: var(--fs-border-line);
+    --tw-prose-quote-borders: var(--fs-border-line);
+    --tw-prose-th-borders: var(--fs-border-line);
+    --tw-prose-td-borders: var(--fs-border-line);
   }
 
   /* ---------- 가격 막대 (CSS 만, 차트 라이브러리 미도입) ---------- */
