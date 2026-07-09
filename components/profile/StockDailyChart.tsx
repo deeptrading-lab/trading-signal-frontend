@@ -356,8 +356,12 @@ export function StockDailyChart({
       : priceSeries.map((p) => p.price);
   const priceSpan = plotVals.length ? Math.max(...plotVals) - Math.min(...plotVals) : 0;
   const tickHideThreshold = priceSpan > 0 ? priceSpan * 0.1 : 0;
+  // 알약이 박히는 가격들(최신가 + AI 목표/재진입·손절)의 근처 y축 눈금을 숨겨 겹침 제거.
+  const hidePrices = [lastClose, ai?.target?.price, ai?.stop?.price].filter(
+    (v): v is number => v != null,
+  );
   const priceTick = (
-    <PriceAxisTick tickFill={C.axisTick} hideNear={lastClose} hideThreshold={tickHideThreshold} />
+    <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} />
   );
 
   return (
