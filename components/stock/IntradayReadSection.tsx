@@ -12,6 +12,7 @@ import { useMutationIntradayRead } from "@/hooks/stock/useMutationIntradayRead";
 import { IntradayReadCard } from "@/components/stock/IntradayReadCard";
 import { INTRADAY_READ_COPY as C } from "@/lib/copy/stock/intradayRead";
 import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
+import { useMe } from "@/hooks/auth/useMe";
 
 export interface IntradayReadSectionProps {
   ticker: string;
@@ -29,11 +30,16 @@ export function IntradayReadSection({ ticker, heading, onRemove }: IntradayReadS
   const isLocal = !isVercelRuntime();
   const { data: providers, isLoading: gateLoading } = useQueryAIProviders(isLocal);
   const read = useMutationIntradayRead();
+  const { isAdmin } = useMe();
 
   const provider = providers?.available[0]; // claude 우선(detectProviders 순서)
   const onRun = () => {
     if (provider) read.mutate({ ticker, provider });
   };
+
+  // `/intraday` 메뉴와 동일 게이트(localOnly) — 로컬은 전체, prod(Vercel)는 admin 이상만 노출.
+  //   (미인증·로딩 시 isAdmin=false → prod 첫 렌더 숨김, 신원 확인 후 admin 이면 노출.)
+  if (!isLocal && !isAdmin) return null;
 
   return (
     <section className="card flex flex-col gap-md" aria-label={`${C.title} ${heading ?? ""}`}>
