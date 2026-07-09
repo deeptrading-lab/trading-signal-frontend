@@ -341,8 +341,9 @@ export function AIAnalysisPanel({
                 )}
               </div>
               <div className="flex items-center gap-1">
-                {/* 차트와 함께 보기 — 저장 결과(PM 완료)일 때 상단에 노출. 종목 상세로 이동(?ai=1 오버레이 자동 ON). */}
-                {isSavedSnapshot && (
+                {/* 차트와 함께 보기 — PM 완료(저장 결과 or 라이브 최종판정 완료)면 상단에 노출.
+                    종목 상세로 이동(?ai=1 오버레이 자동 ON). 분석 중(final 없음)엔 미노출. */}
+                {(isSavedSnapshot || final != null) && (
                   <Link
                     href={`/stock/${ticker}?ai=1`}
                     className="flex items-center gap-1.5 rounded-sm bg-accent-vivid px-2.5 py-1.5 text-caption font-medium text-surface transition hover:brightness-105 cursor-pointer"
@@ -360,26 +361,19 @@ export function AIAnalysisPanel({
                   >
                     <Square size={11} fill="currentColor" /> <span className="hidden md:inline">{COPY.panel.stop}</span>
                   </button>
-                ) : !isAllPending && (
-                  <>
-                    {resumeFrom && (
-                      <button
-                        type="button"
-                        onClick={() => resume(resumeFrom)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-caption font-medium text-accent-vivid bg-accent-vivid-soft hover:brightness-105 rounded-sm transition cursor-pointer"
-                      >
-                        <RefreshCw size={11} />
-                        {COPY.panel.resumeFrom(AGENT_META.find(m => m.key === resumeFrom)?.label ?? resumeFrom)}
-                      </button>
-                    )}
+                ) : (
+                  // 에러 재개 버튼만 유지. '다시 선택'(restartAll)은 제거 — 재분석은 /analyze 케밥·
+                  //   종목 상세 'AI 종합분석'·'차트와 함께 보기' 로 갈음(사용자 요청).
+                  !isAllPending && resumeFrom && (
                     <button
                       type="button"
-                      onClick={chooseAgain}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-caption font-medium text-text-muted bg-surface-muted hover:bg-border-line rounded-sm transition-colors cursor-pointer"
+                      onClick={() => resume(resumeFrom)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-caption font-medium text-accent-vivid bg-accent-vivid-soft hover:brightness-105 rounded-sm transition cursor-pointer"
                     >
-                      <RefreshCw size={11} /> {COPY.panel.restartAll}
+                      <RefreshCw size={11} />
+                      {COPY.panel.resumeFrom(AGENT_META.find(m => m.key === resumeFrom)?.label ?? resumeFrom)}
                     </button>
-                  </>
+                  )
                 )}
                 {/* 닫기 */}
                 <button
