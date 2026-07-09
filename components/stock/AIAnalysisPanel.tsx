@@ -345,7 +345,7 @@ export function AIAnalysisPanel({
                 {isSavedSnapshot && (
                   <Link
                     href={`/stock/${ticker}?ai=1`}
-                    className="flex items-center gap-1.5 rounded-sm bg-accent-vivid-soft px-2.5 py-1.5 text-caption font-medium text-accent-vivid transition hover:brightness-105 cursor-pointer"
+                    className="flex items-center gap-1.5 rounded-sm bg-accent-vivid px-2.5 py-1.5 text-caption font-medium text-surface transition hover:brightness-105 cursor-pointer"
                   >
                     <LineChart size={12} /> <span className="hidden sm:inline">차트와 함께 보기</span>
                   </Link>
