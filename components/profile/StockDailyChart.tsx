@@ -369,7 +369,7 @@ export function StockDailyChart({
               {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               {/* 볼린저 음영 밴드 — 캔들 뒤(먼저 선언). [하단,상단] 범위 Area. */}
               {showBB && (
-                <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} activeDot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
@@ -416,7 +416,7 @@ export function StockDailyChart({
               {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               {/* 볼린저 음영 밴드 — 가격 라인 뒤(먼저 선언). [하단,상단] 범위 Area. */}
               {showBB && (
-                <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} isAnimationActive={false} tooltipType="none" legendType="none" />
+                <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} activeDot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
