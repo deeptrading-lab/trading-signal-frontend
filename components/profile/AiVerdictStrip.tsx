@@ -22,7 +22,7 @@ import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
 const ROLE_LABEL: Record<AiLevelRole, string> = { target: "목표", reentry: "재진입", stop: "손절" };
 const ROLE_DOT: Record<AiLevelRole, string> = {
   target: "bg-signal-up",
-  reentry: "bg-text-muted",
+  reentry: "bg-chart-signal", // 앰버 — 회색(안 보임)에서 변경, 차트 레벨 색과 일치
   stop: "bg-signal-down",
 };
 const CONFIDENCE_LABEL: Record<FinalDecision["confidence"], string> = {

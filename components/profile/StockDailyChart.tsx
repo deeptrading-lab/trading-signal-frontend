@@ -71,7 +71,7 @@ import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag } from "./chart/LastPriceTag";
-import { AiLevelAxisLabels, aiLabelBandWidth } from "./chart/AiLevelAxisLabels";
+import { AiLevelAxisLabels } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
@@ -307,14 +307,9 @@ export function StockDailyChart({
       />,
     );
   }
-  // 우측 가격 축 라벨 — 눈금·플롯과 안 겹치게 축 오른쪽 전용 밴드에 그린다. 밴드 폭만큼 margin.right
-  //  예약해 알약이 잘리지 않게. 전 레벨 픽셀 y 를 모아 충돌 해소(v3 스케일 훅, 직접 자식).
-  const aiBandW = ai ? aiLabelBandWidth(ai) : 0;
-  const priceMargin = { top: 5, right: 4 + aiBandW, left: 0, bottom: 0 };
-  // 서브차트(거래량·MACD·RSI)도 같은 우측 여백을 써야 가격 차트와 x축이 정렬된다(밴드 확보 시 어긋남 방지).
-  const subMargin = { top: 0, right: 4 + aiBandW, left: 0, bottom: 0 };
+  // 우측 가격 축 라벨(현재가 태그처럼 축 위에) — 전 레벨 픽셀 y 를 모아 충돌 해소(v3 스케일 훅, 직접 자식).
   const aiAxisLabelsEl = ai ? (
-    <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} bandWidth={aiBandW} />
+    <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} />
   ) : null;
 
   // 최신가 알약과 겹치는 가장 가까운 y축 눈금을 숨길 가격 임계값 — 보이는 가격 폭의 ~10%.
@@ -338,7 +333,7 @@ export function StockDailyChart({
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={280}>
           {chartType === "candle" ? (
-            <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={priceMargin}>
+            <ComposedChart data={candleSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
               {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
               {aiZoneEls}
@@ -379,7 +374,7 @@ export function StockDailyChart({
               {aiAxisLabelsEl}
             </ComposedChart>
           ) : (
-            <AreaChart data={priceSeries} syncId={SYNC_ID} margin={priceMargin}>
+            <AreaChart data={priceSeries} syncId={SYNC_ID} margin={{ top: 5, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="sdcFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={C.fill} stopOpacity={0.3} />
@@ -433,7 +428,7 @@ export function StockDailyChart({
       <SubLabel label="거래량" />
       <div className="w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={70}>
-          <ComposedChart data={volSeries} syncId={SYNC_ID} margin={subMargin}>
+          <ComposedChart data={volSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
             <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
@@ -457,7 +452,7 @@ export function StockDailyChart({
           <SubLabel label="MACD (12, 26, 9)" />
           <div className="w-full overflow-hidden">
             <ResponsiveContainer width="100%" height={90}>
-              <ComposedChart data={macdSeries} syncId={SYNC_ID} margin={subMargin}>
+              <ComposedChart data={macdSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} hide />
                 <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={CHART_AXIS_WIDTH} orientation="right" />
@@ -486,7 +481,7 @@ export function StockDailyChart({
           <SubLabel label="RSI (14)" />
           <div className="w-full overflow-hidden">
             <ResponsiveContainer width="100%" height={80}>
-              <LineChart data={rsiSeries} syncId={SYNC_ID} margin={subMargin}>
+              <LineChart data={rsiSeries} syncId={SYNC_ID} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} dy={6} hide />
                 <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={CHART_AXIS_WIDTH} orientation="right" />
