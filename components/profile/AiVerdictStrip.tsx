@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatMoney } from "@/lib/utils/formatMoney";
 import {
@@ -34,6 +34,19 @@ const CONFIDENCE_LABEL: Record<FinalDecision["confidence"], string> = {
 function fmtPct(pct: number): string {
   const sign = pct > 0 ? "+" : "";
   return `${sign}${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
+}
+
+/** 전략 텍스트의 마크다운 `**볼드**` 만 굵게 렌더(무거운 마크다운 렌더러 없이 인라인 강조). */
+function renderInlineBold(text: string): ReactNode[] {
+  return text.split("**").map((seg, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="font-bold text-text-strong">
+        {seg}
+      </strong>
+    ) : (
+      <span key={i}>{seg}</span>
+    ),
+  );
 }
 
 export interface AiVerdictStripProps {
@@ -114,12 +127,14 @@ export function AiVerdictStrip({ levels, decision, show, onToggle }: AiVerdictSt
         <div className="flex flex-col gap-0.5 text-caption text-text-muted">
           {decision.new_entry_strategy ? (
             <p>
-              <span className="font-medium text-text-strong">신규 진입</span> · {decision.new_entry_strategy}
+              <span className="font-medium text-text-strong">신규 진입</span> ·{" "}
+              {renderInlineBold(decision.new_entry_strategy)}
             </p>
           ) : null}
           {decision.holder_strategy ? (
             <p>
-              <span className="font-medium text-text-strong">보유 중</span> · {decision.holder_strategy}
+              <span className="font-medium text-text-strong">보유 중</span> ·{" "}
+              {renderInlineBold(decision.holder_strategy)}
             </p>
           ) : null}
         </div>
