@@ -122,6 +122,47 @@ describe("runPaperTradingTick — cli-agent 분기", () => {
     expect(result.positions).toHaveLength(0);
     expect(result.tick.guardAdjustments.join(" ")).toContain("손절선");
   });
+
+  it("포지션 하드스톱(−5%) 배선 — 동적 손절선 없이 급락해도 runTick 이 세션 설정으로 청산(B)", async () => {
+    const held: PaperTradingPosition = {
+      ticker: "005930",
+      name: "삼성전자",
+      quantity: 30,
+      avgEntryPrice: 10_000,
+      lastPrice: 10_000,
+      marketValue: 300_000,
+      unrealizedPnl: 0,
+      unrealizedPnlPct: 0,
+      allocationPct: 30,
+      updatedAt: "2026-06-29T00:55:00.000Z",
+    };
+    // resolver 는 동적 손절선을 주지 않는다(stopPrice null). 하드스톱은 runTick 이 세션에서 주입.
+    const resolver = async (): Promise<IntradayTickResult> => ({
+      decision: {
+        action: "HOLD",
+        targetAllocationPct: 30,
+        targetAllocations: [{ ticker: "005930", name: "삼성전자", targetAllocationPct: 30, rationale: "유지" }],
+        confidence: "LOW",
+        rationale: "유지",
+        riskNotes: [],
+        source: "cli-agent",
+      },
+      forcedExit: { targetPrice: null, stopPrice: null, flattenAll: false },
+    });
+
+    const result = await runPaperTradingTick({
+      session: session({ cash: 700_000 }), // positionHardStopPct 미설정 → riskMode 기본 −5%
+      positions: [held],
+      existingTicks: [],
+      triggeredBy: "auto",
+      tickWindowStart: "2026-06-29T01:00:00.000Z",
+      priceSnapshotProvider: priceAt(9_400), // −6% → 하드스톱 −5% 발동
+      intradayResolver: resolver,
+    });
+
+    expect(result.positions).toHaveLength(0);
+    expect(result.tick.guardAdjustments.join(" ")).toContain("포지션 손실 한도(-5%)");
+  });
 });
 
 describe("createPaperTradingSession — cli-agent 세션", () => {
@@ -141,5 +182,56 @@ describe("createPaperTradingSession — cli-agent 세션", () => {
     );
     expect(detail.session.decisionProvider).toBe("cli-agent");
     expect(detail.session.tickIntervalMinutes).toBe(5);
+  });
+
+  it("하드스톱 기본 스탬프 — 미지정이면 riskMode 기본(−5/−7)", async () => {
+    resetPaperTradingStoreForTest();
+    const detail = await createPaperTradingSession(
+      {
+        name: "단타",
+        tickers: ["005930"],
+        stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+        initialCash: 1_000_000,
+        targetReturnPct: 3,
+        riskMode: "balanced",
+        decisionProvider: "cli-agent",
+      },
+      { priceSnapshotProvider: priceAt(10_000) },
+    );
+    expect(detail.session.positionHardStopPct).toBe(-5);
+    expect(detail.session.sessionHardStopPct).toBe(-7);
+  });
+
+  it("하드스톱 명시 override 존중 — −8·끄기(null)", async () => {
+    resetPaperTradingStoreForTest();
+    const aggressive = await createPaperTradingSession(
+      {
+        name: "단타공격",
+        tickers: ["005930"],
+        stocks: [{ ticker: "005930", name: "삼성전자", market: "KOSPI" }],
+        initialCash: 1_000_000,
+        targetReturnPct: 3,
+        riskMode: "balanced",
+        decisionProvider: "cli-agent",
+        positionHardStopPct: -8,
+      },
+      { priceSnapshotProvider: priceAt(10_000) },
+    );
+    expect(aggressive.session.positionHardStopPct).toBe(-8);
+
+    const off = await createPaperTradingSession(
+      {
+        name: "단타끄기",
+        tickers: ["000660"],
+        stocks: [{ ticker: "000660", name: "SK하이닉스", market: "KOSPI" }],
+        initialCash: 1_000_000,
+        targetReturnPct: 3,
+        riskMode: "balanced",
+        decisionProvider: "cli-agent",
+        positionHardStopPct: null,
+      },
+      { priceSnapshotProvider: priceAt(10_000) },
+    );
+    expect(off.session.positionHardStopPct).toBeNull();
   });
 });
