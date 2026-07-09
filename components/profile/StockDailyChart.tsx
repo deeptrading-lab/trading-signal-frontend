@@ -199,6 +199,9 @@ export function StockDailyChart({
     };
   }, []);
   const tooltipActive = forceHideTooltip ? false : undefined;
+  // 활성 점(activeDot)은 Tooltip 이 아니라 각 시리즈가 차트 내부 active 인덱스로 그리므로, 닫힘 시
+  //  함께 꺼야 점이 남지 않는다. undefined=기본(활성 시 점 표시) / false=점 없음.
+  const activeDotProp = forceHideTooltip ? false : undefined;
 
   // 멀티데이 분봉 x축 눈금(날짜 경계) 유무 — 있으면 그 눈금만(interval=0), 없으면 recharts 자동(양끝 보존).
   const xAxisInterval = xTicks ? 0 : "preserveStartEnd";
@@ -211,19 +214,19 @@ export function StockDailyChart({
   //   recharts 는 children 을 React.Children.toArray 로 평탄화하므로 배열 보간이 안전(false 는 자동 제거).
   const priceOverlayLines = [
     showMA && (
-      <Line key="ma5" type="monotone" dataKey="ma5" stroke={C.ma5} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+      <Line key="ma5" type="monotone" dataKey="ma5" stroke={C.ma5} strokeWidth={1} dot={false} activeDot={activeDotProp} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
     ),
     showMA && (
-      <Line key="ma20" type="monotone" dataKey="ma20" stroke={C.ma20} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+      <Line key="ma20" type="monotone" dataKey="ma20" stroke={C.ma20} strokeWidth={1} dot={false} activeDot={activeDotProp} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
     ),
     showMA && (
-      <Line key="ma60" type="monotone" dataKey="ma60" stroke={C.ma60} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+      <Line key="ma60" type="monotone" dataKey="ma60" stroke={C.ma60} strokeWidth={1} dot={false} activeDot={activeDotProp} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
     ),
     showMA && (
-      <Line key="ma120" type="monotone" dataKey="ma120" stroke={C.ma120} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+      <Line key="ma120" type="monotone" dataKey="ma120" stroke={C.ma120} strokeWidth={1} dot={false} activeDot={activeDotProp} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
     ),
     showVWAP && (
-      <Line key="vwap" type="monotone" dataKey="vwap" stroke={C.vwap} strokeWidth={1.25} strokeDasharray="5 3" dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+      <Line key="vwap" type="monotone" dataKey="vwap" stroke={C.vwap} strokeWidth={1.25} strokeDasharray="5 3" dot={false} activeDot={activeDotProp} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
     ),
   ];
 
@@ -416,7 +419,7 @@ export function StockDailyChart({
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
               <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
               <Tooltip trigger="click" active={tooltipActive} contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
-              <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} />
+              <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={forceHideTooltip ? false : { r: 5, strokeWidth: 0 }} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 가격 라인 위에 표시 */}
               {showBB && (
                 <Line type="monotone" dataKey="bbUpper" stroke={C.bb} strokeWidth={1} dot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
@@ -464,7 +467,7 @@ export function StockDailyChart({
             </Bar>
             {/* 거래량 이동평균(VMA 20) — 연빨강/연파랑 봉 위에 또렷한 라인. 툴팁·범례 제외(봉만 유지) */}
             {showVMA && (
-              <Line type="monotone" dataKey="vma" stroke={C.vma} strokeWidth={1.25} dot={false} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
+              <Line type="monotone" dataKey="vma" stroke={C.vma} strokeWidth={1.25} dot={false} activeDot={activeDotProp} connectNulls isAnimationActive={false} tooltipType="none" legendType="none" />
             )}
           </ComposedChart>
         </ResponsiveContainer>
@@ -487,9 +490,9 @@ export function StockDailyChart({
                     <Cell key={i} fill={(entry.histogram ?? 0) >= 0 ? C.histUp : C.histDown} />
                   ))}
                 </Bar>
-                <Line type="monotone" dataKey="macd" stroke={C.macdLine} strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="macd" stroke={C.macdLine} strokeWidth={1.5} dot={false} activeDot={activeDotProp} />
                 {macdSeries.some((m) => m.signal !== null) && (
-                  <Line type="monotone" dataKey="signal" stroke={C.signalLine} strokeWidth={1.5} dot={false} />
+                  <Line type="monotone" dataKey="signal" stroke={C.signalLine} strokeWidth={1.5} dot={false} activeDot={activeDotProp} />
                 )}
               </ComposedChart>
             </ResponsiveContainer>
@@ -513,7 +516,7 @@ export function StockDailyChart({
                 <ReferenceLine y={30} stroke={C.refOS} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "30", position: "right", fill: C.refOS, fontSize: 10 }} />
                 <ReferenceLine y={50} stroke={C.refMid} strokeOpacity={0.4} />
                 <Tooltip trigger="click" active={tooltipActive} contentStyle={tooltipStyle} formatter={fmtTooltipRSI} labelStyle={labelStyle} />
-                <Line type="monotone" dataKey="rsi" stroke={C.rsiLine} strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="rsi" stroke={C.rsiLine} strokeWidth={1.5} dot={false} activeDot={activeDotProp} />
               </LineChart>
             </ResponsiveContainer>
           </div>
