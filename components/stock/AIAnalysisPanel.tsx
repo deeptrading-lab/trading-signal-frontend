@@ -44,6 +44,8 @@ function priceChangeColor(direction: "up" | "down" | "flat"): string {
 
 export function AIAnalysisPanel({
   ticker,
+  viewTicker,
+  viewName,
   provider,
   isOpen,
   isRunning,
@@ -73,9 +75,13 @@ export function AIAnalysisPanel({
   const [expandedCard, setExpandedCard] = useState<{ title: string; content: string; highlight?: string } | null>(null);
   const [showProviderChooser, setShowProviderChooser] = useState(false);
   const { data: stockData } = useQueryStockPrice(ticker);
-  // 상단 종목명 — 리스트/openFor 로 이미 넘어온 탭 이름을 우선 사용해 재매칭(시세 로딩 동안 티커
-  // 번호가 잠깐 뜨는 깜빡임)을 없앤다. 다른 진입점(이름 미전달)일 때만 시세 응답 → 티커 폴백.
-  const knownName = tabs.find((t) => t.ticker === ticker)?.name ?? null;
+  // 상단 종목명 — 이미 아는 이름을 우선 사용해 재매칭(시세 로딩 동안 티커 번호가 잠깐 뜨는 깜빡임)을
+  // 없앤다. ① 진행/결과 슬롯이 있으면 탭 이름, ② 슬롯이 없어도(저장 결과 카드를 *보기*만 하는 경우)
+  // openFor 로 넘어온 viewName(현재 보는 종목에 한함), ③ 둘 다 없을 때만 시세 응답 → 티커 폴백.
+  const knownName =
+    tabs.find((t) => t.ticker === ticker)?.name ??
+    (ticker === viewTicker ? viewName : null) ??
+    null;
   const displayName = knownName ?? stockData?.name ?? ticker;
   // verdict-forward 히어로용 결정론 시그널 — 대기 중 4축 채움 + 완료 시 신호강도. warmup 미충족(HOLD
   // 안전폴백)이면 오해 방지로 null 처리(히어로가 확신도/대기 문구로 폴백). SignalSummary 와 동일 데이터.

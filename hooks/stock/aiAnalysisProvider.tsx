@@ -271,6 +271,12 @@ interface AIAnalysisState {
   slots: Record<string, AnalysisSlot>;
   /** 패널 표시 대상 종목. 슬롯 없으면 idle 진입(공급자 선택). */
   viewTicker: string | null;
+  /**
+   * viewTicker 를 열 때 호출부(카드 클릭 등)가 이미 아는 종목명 — 슬롯/탭이 아직 없어도(저장 결과
+   * 카드를 *보기*만 하는 경우) 헤더가 시세 조회를 기다리지 않고 즉시 이름을 쓰게 하는 반응형 값.
+   * 이름을 안 넘긴 진입점(open/switchTab, 이미 탭이 있는 종목)에서는 null.
+   */
+  viewName: string | null;
   isOpen: boolean;
   showReanalysisPrompt: boolean;
   /** 동시성 게이트 안내(transient). */
@@ -280,6 +286,7 @@ interface AIAnalysisState {
 const INITIAL_STATE: AIAnalysisState = {
   slots: {},
   viewTicker: null,
+  viewName: null,
   isOpen: false,
   showReanalysisPrompt: false,
   limitNotice: null,
@@ -293,7 +300,7 @@ type Action =
   | { kind: "halt"; ticker: string }
   | { kind: "fetchError"; ticker: string; message: string }
   | { kind: "removeSlot"; ticker: string }
-  | { kind: "setView"; ticker: string; open: boolean; reanalysisPrompt: boolean }
+  | { kind: "setView"; ticker: string; name: string | null; open: boolean; reanalysisPrompt: boolean }
   | { kind: "setOpen"; open: boolean }
   | { kind: "setReanalysisPrompt"; show: boolean }
   | { kind: "collapse" }
@@ -426,6 +433,8 @@ function reducer(state: AIAnalysisState, action: Action): AIAnalysisState {
       return {
         ...state,
         viewTicker: action.ticker,
+        // 슬롯이 있으면 그 이름을 우선(탭 라벨과 일치), 없을 때만 호출부가 넘긴 이름을 쓴다.
+        viewName: state.slots[action.ticker]?.name ?? action.name,
         isOpen: action.open,
         showReanalysisPrompt: action.reanalysisPrompt,
       };
@@ -469,6 +478,8 @@ export interface AIAnalysisContextValue {
   analyzingTicker: string | null;
   /** 패널이 현재 보여주는 종목. */
   viewTicker: string | null;
+  /** viewTicker 를 열 때 호출부가 넘긴 이름(슬롯/탭 없을 때 헤더 즉시 표시용). 없으면 null. */
+  viewName: string | null;
   /** 패널 호스트가 렌더할 종목(열림=viewTicker, 닫힘=analyzingTicker). null 이면 미렌더. */
   panelTicker: string | null;
   isOpen: boolean;
@@ -709,6 +720,9 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
     dispatch({
       kind: "setView",
       ticker,
+      // 클릭 시점 이름을 헤더가 즉시 쓰게 상태로 올린다(namesRef 는 분석 *시작* 시드 전용이라
+      // 반응형이 아님 — 저장 결과 카드를 보기만 하면 헤더가 티커→이름 깜빡였음).
+      name: name ?? namesRef.current[ticker] ?? null,
       open: true,
       reanalysisPrompt: !!slot && !allPending && !slot.isRunning && stale,
     });
@@ -882,6 +896,7 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
       ...projected,
       analyzingTicker,
       viewTicker: state.viewTicker,
+      viewName: state.viewName,
       panelTicker,
       isOpen: state.isOpen,
       showReanalysisPrompt: state.showReanalysisPrompt,
@@ -901,7 +916,7 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
       dismissReanalysisPrompt,
     }),
     [
-      projected, analyzingTicker, state.viewTicker, panelTicker, state.isOpen,
+      projected, analyzingTicker, state.viewTicker, state.viewName, panelTicker, state.isOpen,
       state.showReanalysisPrompt, tabs, state.limitNotice,
       openFor, open, start, switchTab, isTickerRunning, dismissSlot,
       chooseAgain, run, resume, stop, close, dismissReanalysisPrompt,

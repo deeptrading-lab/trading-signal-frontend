@@ -7374,3 +7374,44 @@
   - 남의 세션 재조회를 **세션 단위 경량 로드**(해당 session_id 만)로 최적화 검토 — 현재는 top-50 전량 리로드 재사용.
   - `latestDecision`/`lastTickWindowStart` 만 필요한 목록용 **가벼운 요약 쿼리** 분리 여지(전체 틱 페이지네이션 회피).
   - 소유자 미지정(레거시) 세션을 두 서버가 동시에 틱하는 기존 다중 서버 해저드는 이 PR 범위 밖 — 별도 티켓.
+
+### 2026-07-10 — fix(analyze): 저장 결과 카드 열 때 AI 패널 헤더 종목명 즉시 표시 (티커 깜빡임 제거) (#340)
+
+- **slug**: `fix/ai-panel-name-flicker-saved-card` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/340
+- **요약**: fix(analyze): 저장 결과 카드 열 때 AI 패널 헤더 종목명 즉시 표시 (티커 깜빡임 제거)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 증상
+  > 
+  > `/analyze` 에서 **저장된 분석 결과 카드를 클릭**해 AI 패널을 열면, 헤더에 **종목번호(예: 005930)가 잠깐 떴다가 종목명(삼성전자)으로** 바뀌는 깜빡임. 이름은 클릭 시점에 카드가 이미 알고 있는데도(카드 자체가 이름으로 렌더됨) 헤더는 시세 조회를 기다림.
+  > 
+  > ## 원인
+  > 
+  > - 카드 클릭 → `openFor(ticker, nameOf(ticker))` — **이름은 정상적으로 전달됨**.
+  > - 그러나 `openFor` 는 그 이름을 `namesRef`(비반응형 mutable ref)에만 저장하고, `namesRef` 는 분석 **시작(startSlot)** 시 슬롯 시드용으로만 읽힘.
+  > - 슬롯/탭이 없는 "보기만" 하는 경로에선 헤더의 `knownName = tabs.find(...)?.name ?? null` 이 **항상 null** → `displayName = null ?? stockData?.name ?? ticker` → `useQueryStockPrice` 응답 전까지 **티커 폴백 = 깜빡임**.
+  > - **PR #320("종목명 재매칭 제거")은 `tabs`(슬롯) 있는 경우만 고쳐**, 이 경로(저장 카드 보기)에는 no-op 이었음. 커밋 메시지는 "티커 깜빡임 해소"라 했지만 not-yet-analyzed 케이스를 배선하지 않음.
+  > 
+  > ## 변경
+  > 
+  > 클릭 시점 이름을 `namesRef`(ref) 대신 **반응형 state `viewName`** 으로 표면화:
+  > - `AIAnalysisState.viewName` 추가 + `setView` 액션이 이름 운반 → 리듀서가 `slots[ticker]?.name ?? action.name` 로 세팅(슬롯 있으면 탭 이름 우선).
+  > - 컨텍스트에 `viewName` 노출(`{...ctx}` 스프레드로 패널 자동 전달).
+  > - 패널 헤더: `knownName = 탭이름 ?? (현재 보는 종목이면) viewName ?? null`. `viewTicker` 가드로 다른 탭에 오염 방지.
+  > 
+  > **핵심**: `viewName` 이 `viewTicker` 와 **같은 dispatch 에서 동기 설정**돼, 열리는 순간 이미 이름이 있음 → 티커가 뜰 타이밍 창 자체가 사라짐(async 경합 없음).
+  > 
+  > 2파일 +26/−5. 거동 무변경(표시 전용), 이름 미전달 진입점은 기존대로 시세→티커 폴백.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` ✅ / `eslint` ✅ (aiAnalysisProvider·AIAnalysisPanel·GlobalAIAnalysis)
+  > - `setView` dispatcher 단일(openFor)만 존재 확인 — name 필수화 무회귀.
+  > - 런타임 트레이스: 카드 클릭 → openFor(ticker, "삼성전자") → setView name="삼성전자" → viewName="삼성전자"(슬롯 없음) → 컨텍스트 → 패널 knownName="삼성전자" → 헤더 즉시 표시(시세 대기 없음).
+  > 
+  > ## 다음 작업
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 이름 없는 저장 항목(dbName·KIS 둘 다 미해석)은 여전히 티커 폴백 — 드문 에지, 별도 개선 여지.
+  - `namesRef` 와 `viewName` 의 역할 분리(시작 시드 vs 표시)는 유지 — 향후 이름 캐시 통합 리팩터 시 재검토.
