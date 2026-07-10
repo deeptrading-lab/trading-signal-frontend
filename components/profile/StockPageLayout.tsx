@@ -31,6 +31,7 @@ import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
 import { useQueryAIDecision } from "@/hooks/stock/useQueryAIDecision";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
 import { deriveAiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
+import { isUsTicker } from "@/lib/utils/isUsTicker";
 import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
 import {
   DEFAULT_CHART_TYPE,
@@ -118,6 +119,10 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
     window.history.replaceState(null, "", url);
   };
 
+  // 미국 종목 — 회사개요·공시·수급은 KR 전용 소스(DART·KIS)라 데이터가 없다. 해당 섹션을 숨긴다
+  // (us-stock-support Q6: 뱃지·"미지원" 안내 없이 완전 숨김). 시세·차트·호가·체결·시그널은 Toss 로 동작.
+  const isUs = isUsTicker(ticker);
+
   // 초광폭(콘텐츠 우측 여백이 큼) — 호가·체결강도를 차트 우측에 도크로 띄운다(그 미만은 차트 아래 2단).
   const isUltraWide = useMediaQuery(PEEK_DOCK_QUERY);
   const [dockWidth, setDockWidth] = useState(DEPTH_DOCK_MIN_WIDTH);
@@ -195,17 +200,21 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
         <SignalSummary ticker={ticker} />
       </div>
 
-      {/* ── 온디맨드(T4): 회사개요·최근공시·수급 — 데스크탑·모바일 공통 기본 접힘 ── */}
-      <div className="mt-lg border-t border-border-line">
-        <CompanyOverview ticker={ticker} collapsible />
-        <DisclosureList ticker={ticker} count={5} collapsible />
-        <StockInvestorTrend ticker={ticker} collapsible />
-      </div>
+      {/* ── 온디맨드(T4): 회사개요·최근공시·수급 — KR 전용 소스라 미국 종목에선 숨김 ── */}
+      {!isUs ? (
+        <>
+          <div className="mt-lg border-t border-border-line">
+            <CompanyOverview ticker={ticker} collapsible />
+            <DisclosureList ticker={ticker} count={5} collapsible />
+            <StockInvestorTrend ticker={ticker} collapsible />
+          </div>
 
-      {/* T4 안내 — 무엇이 항시이고 무엇이 펼침인지 */}
-      <p className="mt-md text-caption text-text-muted">
-        {STOCK_DETAIL_TIERING_NOTE}
-      </p>
+          {/* T4 안내 — 무엇이 항시이고 무엇이 펼침인지 */}
+          <p className="mt-md text-caption text-text-muted">
+            {STOCK_DETAIL_TIERING_NOTE}
+          </p>
+        </>
+      ) : null}
     </div>
   );
 }
