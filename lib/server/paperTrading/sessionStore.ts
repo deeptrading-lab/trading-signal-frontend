@@ -51,7 +51,17 @@ type PaperTradingStore = {
   hydrated?: boolean;
   /** 진행 중 hydrate(single-flight). 완료 후 해제. */
   hydration?: Promise<void>;
+  /** 타 운영자 세션 마지막 DB 재조회 시각(ms epoch) — TTL 게이트 키(intraday-session-owner). */
+  foreignRefreshedAt?: number;
+  /** 진행 중 타 운영자 세션 재조회(single-flight). 완료 후 해제. */
+  foreignRefresh?: Promise<void>;
 };
+
+/**
+ * 타 운영자 세션 DB 재조회 TTL(ms) — 잦은 폴링·새로고침이 매번 전량 리로드하지 않게 한다.
+ * 단타 판단은 5분 주기라 20초 신선도면 "최근 판단"이 멈춰 보이지 않으면서 DB 부하도 낮다.
+ */
+const FOREIGN_REFRESH_TTL_MS = 20_000;
 
 const STORE_KEY = "__paperTradingStore";
 
@@ -102,8 +112,49 @@ async function ensureHydrated(): Promise<void> {
   return store.hydration;
 }
 
+/**
+ * 타 운영자(owner 가 내 operator 도 아니고 미지정도 아닌) 세션을 DB 최신본으로 덮어쓴다
+ * (intraday-session-owner).
+ *
+ * ★ 왜 필요한가: 부팅 hydrate 는 1회뿐(`ensureHydrated`)이고 소유자 게이트 때문에 이 서버는 남의
+ *   세션을 틱하지 않는다 → 남의 세션 인메모리 복사본은 **부팅 스냅샷에 영구 고정**돼 "최근 판단"이
+ *   멈춰 보인다. 같은 프로세스 = 같은 globalThis 메모리라 **브라우저 새로고침으로도 안 풀린다**
+ *   (재조회 트리거가 프로세스 재시작뿐이었음). 목록·상세 조회에서 TTL 게이트로 DB 를 되읽어 남의
+ *   세션만 갱신한다.
+ * ★ 내/레거시(미소유) 세션은 이 서버가 직접 틱하므로 메모리가 항상 최신 — 덮어쓰지 않는다(소유자
+ *   게이트 `!owner || owner === operator` 와 대칭).
+ * - 실패 시 `foreignRefreshedAt` 미갱신 → 다음 접근에서 재시도. single-flight 로 중복 로드 방지.
+ */
+async function refreshForeignSessions(operator: string, now = Date.now()): Promise<void> {
+  const store = getStore();
+  if (store.foreignRefresh) return store.foreignRefresh;
+  if (store.foreignRefreshedAt && now - store.foreignRefreshedAt < FOREIGN_REFRESH_TTL_MS) return;
+  store.foreignRefresh = (async () => {
+    const loaded = await loadPersistedPaperTrading();
+    if (loaded.status !== "ok") return; // disabled/error → TTL 미갱신, 다음 접근 재시도.
+    for (const entry of loaded.sessions) {
+      const owner = entry.session.owner;
+      if (!owner || owner === operator) continue; // 내/레거시 세션은 메모리 우선.
+      const existing = store.sessions.get(entry.session.id);
+      store.sessions.set(entry.session.id, {
+        session: entry.session,
+        positions: entry.positions,
+        ticks: entry.ticks,
+        tickChain: existing?.tickChain, // 방어적 보존(남의 세션엔 보통 없음).
+      });
+    }
+    store.foreignRefreshedAt = now;
+  })()
+    .catch(() => undefined)
+    .finally(() => {
+      store.foreignRefresh = undefined;
+    });
+  return store.foreignRefresh;
+}
+
 export async function listPaperTradingSessions(): Promise<PaperTradingSession[]> {
   await ensureHydrated();
+  await refreshForeignSessions(resolveServerOperator());
   return Array.from(getStore().sessions.values())
     .map((entry) => entry.session)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -113,6 +164,13 @@ export async function getPaperTradingSessionDetail(
   sessionId: string,
 ): Promise<PaperTradingSessionDetail | null> {
   await ensureHydrated();
+  const operator = resolveServerOperator();
+  const existing = getStore().sessions.get(sessionId);
+  // 남의 세션(또는 부팅 후 새로 나타난 미지의 세션)이면 DB 최신본으로 갱신 후 다시 읽는다.
+  // 내/레거시 세션은 메모리가 최신이라 재조회 불필요.
+  if (!existing || (existing.session.owner && existing.session.owner !== operator)) {
+    await refreshForeignSessions(operator);
+  }
   const entry = getStore().sessions.get(sessionId);
   if (!entry) return null;
   return toDetail(entry);
