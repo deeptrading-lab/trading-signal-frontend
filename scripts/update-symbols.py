@@ -143,6 +143,12 @@ def main():
     )
     final_list = ordered + new_ones
 
+    # 변경 없으면 파일을 건드리지 않는다 — 주간 자동화가 createdAt 만 바뀌는 헛 diff 로 no-op PR 을
+    # 열지 않게. corp_code 포함 엔트리 전체 비교라 신규/폐지/corp_code 교정 중 하나라도 있으면 갱신.
+    if final_list == list(existing.values()):
+        print("변경 없음 — symbols.json 미갱신(no-op)")
+        return
+
     kospi_count = sum(1 for e in final_list if e["market"] == "KOSPI")
     kosdaq_count = sum(1 for e in final_list if e["market"] == "KOSDAQ")
 
