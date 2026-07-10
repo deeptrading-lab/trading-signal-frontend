@@ -7332,3 +7332,45 @@
   - PR-4 "손절 후 진입가 회복률" 지표 캘리브레이션 대시보드/라벨에 상시화(A 효과=더 일찍 끊어 회복 못 하는 손실 회피를 데이터로 추적).
   - 장중 실검증(평일 09:00~15:30) — 리스크 스윕 EXIT·하드스톱·슬리피지 노트 라이브 확인.
   - 세션 하드스톱 UI 노출(현재 −7 기본, override 는 API 만) 여부 판단.
+
+### 2026-07-10 — fix(intraday): 타 운영자 단타 세션 조회 시 DB 최신본 재조회 (새로고침 갱신) (#339)
+
+- **slug**: `intraday-foreign-session-refresh` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/339
+- **요약**: fix(intraday): 타 운영자 단타 세션 조회 시 DB 최신본 재조회 (새로고침 갱신)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경 / 증상
+  > 
+  > 찬민(타 운영자)이 돌린 단타 세션이 하영 로컬 `/intraday` 화면에서 **"최근 판단"이 오전 한 시점(예: 10:00)에 멈춰** 보이고, **브라우저 새로고침으로도 갱신되지 않던** 문제.
+  > 
+  > 실제 데이터는 정상이었음 — Supabase `paper_trading_ticks` 직접 조회 시 찬민 세션 14종목 전부 09:15~**15:20(마감)** 40~41틱 축적 확인. 데이터 누락이 아니라 **인메모리 스냅샷 고착** 문제였음.
+  > 
+  > ## 원인
+  > 
+  > - 단타 데이터는 인메모리(`globalThis` 스토어)가 SSOT, Supabase 는 write-through 백업.
+  > - `ensureHydrated()` 는 **부팅 후 1회만** DB → 메모리 복원(이미 있는 id 는 안 건드림).
+  > - **소유자 게이트**(`tickScheduler` `!owner || owner === operator`) 때문에 이 서버는 **남의 세션을 틱하지 않음** → 남의 세션 인메모리 복사본은 부팅 스냅샷에 **영구 고정**.
+  > - 목록/상세 API 는 인메모리만 읽고, 같은 프로세스 = 같은 메모리라 **브라우저 새로고침으로도 안 풀림**(재조회 트리거가 프로세스 재시작뿐).
+  > 
+  > ## 변경
+  > 
+  > `lib/server/paperTrading/sessionStore.ts` (+58):
+  > 
+  > - `refreshForeignSessions(operator)` 추가 — `owner && owner !== operator` 세션만 `loadPersistedPaperTrading()` 로 DB 최신본을 되읽어 인메모리 덮어씀.
+  > - **TTL 20초 게이트 + single-flight** — 잦은 폴링/새로고침이 매번 전량 리로드하지 않도록. 단타 판단 5분 주기라 신선도 충분.
+  > - `listPaperTradingSessions` / `getPaperTradingSessionDetail` 진입부에 훅. 상세는 대상이 남의 세션(또는 부팅 후 새로 등장한 미지 세션)일 때만 트리거.
+  > - **내/레거시(미소유) 세션은 미변경** — 이 서버가 직접 틱해 메모리가 항상 최신. 소유자 게이트와 대칭.
+  > - 실패 시 `foreignRefreshedAt` 미갱신 → 다음 접근 재시도.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` ✅ / `eslint` ✅
+  > - **실 DB 통합 검증**: 실코드 `loadPersistedPaperTrading` + 동일 필터로 찬민 14세션 `lastTickWindowStart 10:00(stale) → 15:20(최신)`, 40~41틱 전량, status=paused 로 해소. 내/레거시 36세션은 재조회 제외 확인.
+  > 
+  > ## 리스크 / 범위
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 남의 세션 재조회를 **세션 단위 경량 로드**(해당 session_id 만)로 최적화 검토 — 현재는 top-50 전량 리로드 재사용.
+  - `latestDecision`/`lastTickWindowStart` 만 필요한 목록용 **가벼운 요약 쿼리** 분리 여지(전체 틱 페이지네이션 회피).
+  - 소유자 미지정(레거시) 세션을 두 서버가 동시에 틱하는 기존 다중 서버 해저드는 이 PR 범위 밖 — 별도 티켓.
