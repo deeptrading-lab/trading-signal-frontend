@@ -148,10 +148,11 @@ def main():
 
     output = {
         "$meta": {
-            "version": "0.3.0",
+            "version": "0.4.0",
             "createdAt": datetime.now().strftime("%Y-%m-%d"),
             "source": "KRX KIND 상장법인목록(https://kind.krx.co.kr) + OpenDART CORPCODE.xml corp_code 보강.",
-            "note": "KRX KIND 기준 전체 KOSPI+KOSDAQ 상장 보통주. 신규 상장/상장폐지 시 본 스크립트 재실행.",
+            "note": "KRX KIND 기준 전체 KOSPI+KOSDAQ 상장 보통주. 신규 상장/상장폐지 시 본 스크립트 재실행. "
+                    "KIND 상장법인목록은 6자리 숫자 티커만 수록하므로 영숫자 코드/당일 상장 신규분은 며칠 지연 반영될 수 있음.",
             "corp_code_source": "OpenDART CORPCODE.xml 8자리 고유번호. 미매핑 종목은 빈 문자열.",
             "count_actual": len(final_list),
             "count_kospi": kospi_count,
