@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { getSymbolName, getMarketByTicker, searchSymbols } from "@/lib/api/kis/search";
+import { getSymbolName, getMarketByTicker, getCorpCode, searchSymbols } from "@/lib/api/kis/search";
 import { resolveBenchCode } from "@/lib/server/scorecard/relativeRunScoring";
 
 describe("getSymbolName", () => {
@@ -53,5 +53,32 @@ describe("searchSymbols — 띄어쓰기 무시 매칭", () => {
     const r = searchSymbols("005 930");
     expect(r).toHaveLength(1);
     expect(r[0]!.ticker).toBe("005930");
+  });
+});
+
+describe("searchSymbols — 미국 종목 통합 검색·랭킹(us-stock-support)", () => {
+  it("정확 티커는 1위 — 'AAPL' → AAPL(NASDAQ) 최상단", () => {
+    const r = searchSymbols("AAPL");
+    expect(r[0]!.ticker).toBe("AAPL");
+    expect(r[0]!.market).toBe("NASDAQ");
+  });
+
+  it("이름 접두는 유사 ETF 를 이긴다 — 'Apple' → AAPL 1위(2X Long Apple ETF 뒤로)", () => {
+    const r = searchSymbols("Apple");
+    expect(r[0]!.ticker).toBe("AAPL");
+  });
+
+  it("정확 티커 ETF 도 1위 — 'SPY' → SPY 최상단", () => {
+    expect(searchSymbols("SPY")[0]!.ticker).toBe("SPY");
+  });
+
+  it("US 역참조: getSymbolName 은 미국 종목명, corp_code·getMarketByTicker 는 KR 전용이라 null", () => {
+    expect(getSymbolName("AAPL")).toBe("Apple Inc.");
+    expect(getCorpCode("AAPL")).toBeNull(); // 미국은 DART corp_code 없음.
+    expect(getMarketByTicker("AAPL")).toBeNull(); // 스코어카드 벤치마크는 KR 전용 → US 는 null.
+  });
+
+  it("KR/US 격리 무회귀 — '삼성전자' 는 여전히 국내 005930", () => {
+    expect(searchSymbols("삼성전자").some((s) => s.ticker === "005930")).toBe(true);
   });
 });
