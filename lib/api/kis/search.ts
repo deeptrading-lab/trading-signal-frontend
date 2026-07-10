@@ -16,16 +16,25 @@
  */
 
 import symbolsJson from "./symbols.json";
-import type { StockSearchResult } from "./types";
+import usSymbolsJson from "@/lib/api/marketdata/us-symbols.json";
+import type { StockSearchMarket, StockSearchResult } from "./types";
 
 type SymbolEntry = {
   ticker: string;
   name: string;
-  market: "KOSPI" | "KOSDAQ";
-  corp_code: string;
+  market: StockSearchMarket;
+  /** 국내만 보유(DART corp_code). 미국 종목은 없음. */
+  corp_code?: string;
+  /** 미국 시드만 보유 — ETF 여부(검색 랭킹에서 보통주 뒤로 미룸). */
+  etf?: boolean;
 };
 
-const SYMBOLS: SymbolEntry[] = (symbolsJson.symbols ?? []) as SymbolEntry[];
+/** 국내 시드(KRX KIND + OpenDART) — 6자리 티커·corp_code 보유. */
+const KR_SYMBOLS: SymbolEntry[] = (symbolsJson.symbols ?? []) as SymbolEntry[];
+/** 미국 시드(NASDAQ Trader) — 영문 티커·거래소, corp_code 없음(us-stock-support). */
+const US_SYMBOLS: SymbolEntry[] = (usSymbolsJson.symbols ?? []) as SymbolEntry[];
+/** 검색 통합 인덱스 — 국내 우선(빈 질의 대표주·모호 질의 상단). */
+const SYMBOLS: SymbolEntry[] = [...KR_SYMBOLS, ...US_SYMBOLS];
 const MAX_RESULTS = 20;
 
 /**
@@ -47,15 +56,30 @@ export function searchSymbols(keyword: string): StockSearchResult[] {
   }
 
   const needle = compact.toLowerCase();
-  const matched = SYMBOLS.filter((s) => {
-    // 후보 종목명도 공백 제거해 비교(양쪽 정규화) — 시드에 공백 포함 이름이 있어도 매칭되게.
-    return (
-      s.name.toLowerCase().replace(/\s+/g, "").includes(needle) ||
-      s.ticker.toLowerCase().includes(needle)
-    );
-  });
+  // 관련도 랭킹 — 미국 시드는 유사 이름 ETF(예: "2X Long Apple ETF")가 많아 단순 substring 이면
+  // 정확 종목(AAPL·SPY)이 파묻힌다. 정확 티커 → 티커 접두 → 이름 접두 → 부분일치 순, ETF 후순위.
+  const scored: { entry: SymbolEntry; score: number }[] = [];
+  for (const s of SYMBOLS) {
+    const ticker = s.ticker.toLowerCase();
+    const name = s.name.toLowerCase().replace(/\s+/g, "");
+    let score = -1;
+    if (ticker === needle) score = 0;
+    else if (ticker.startsWith(needle)) score = 1;
+    else if (name.startsWith(needle)) score = 2;
+    else if (ticker.includes(needle)) score = 4;
+    else if (name.includes(needle)) score = 5;
+    else continue;
+    if (s.etf) score += 0.5; // 보통주 우선.
+    scored.push({ entry: s, score });
+  }
+  scored.sort(
+    (a, b) =>
+      a.score - b.score ||
+      a.entry.ticker.length - b.entry.ticker.length || // 짧은 티커 우선(태그성 ETF 밀어냄).
+      a.entry.ticker.localeCompare(b.entry.ticker),
+  );
 
-  return matched.slice(0, MAX_RESULTS).map(toResult);
+  return scored.slice(0, MAX_RESULTS).map((x) => toResult(x.entry));
 }
 
 /**
@@ -64,7 +88,8 @@ export function searchSymbols(keyword: string): StockSearchResult[] {
  * DART 호출 시 ticker 가 아닌 corp_code 가 필요. 미존재 ticker 는 null.
  */
 export function getCorpCode(ticker: string): string | null {
-  const found = SYMBOLS.find((s) => s.ticker === ticker);
+  // corp_code 는 국내(DART) 전용 — 미국 종목은 항상 null.
+  const found = KR_SYMBOLS.find((s) => s.ticker === ticker);
   return found?.corp_code ?? null;
 }
 
@@ -86,7 +111,9 @@ export function getSymbolName(ticker: string): string | null {
  * 한계를 인지한다(PRD §6). search-stock-info(prod 전용 추가 호출) 의존을 피해 비용·rate-limit 절감.
  */
 export function getMarketByTicker(ticker: string): "KOSPI" | "KOSDAQ" | null {
-  return SYMBOLS.find((s) => s.ticker === ticker)?.market ?? null;
+  // 벤치마크 지수 판정용 — 국내 시장만 의미(미국 종목은 null → 호출부 KR 폴백).
+  const market = KR_SYMBOLS.find((s) => s.ticker === ticker)?.market;
+  return market === "KOSPI" || market === "KOSDAQ" ? market : null;
 }
 
 /**
