@@ -1,13 +1,13 @@
 {
   "$meta": {
-    "version": "0.3.1",
-    "createdAt": "2026-06-03",
-    "source": "KRX KIND 상장법인목록(https://kind.krx.co.kr) + OpenDART CORPCODE.xml corp_code 보강. 수동 시드(v0.1.0) 우선 유지.",
-    "note": "KRX KIND 기준 전체 KOSPI+KOSDAQ 상장 보통주. 신규 상장/상장폐지 시 scripts/update-symbols.py 재실행. v0.3.1: corp_code 전수 재매핑(corpCode.xml 정확 stock_code 조인) — 오매핑 82건 교정.",
+    "version": "0.4.0",
+    "createdAt": "2026-07-10",
+    "source": "KRX KIND 상장법인목록(https://kind.krx.co.kr) + OpenDART CORPCODE.xml corp_code 보강.",
+    "note": "KRX KIND 기준 전체 KOSPI+KOSDAQ 상장 보통주. 신규 상장/상장폐지 시 본 스크립트 재실행. KIND 상장법인목록은 6자리 숫자 티커만 수록하므로 영숫자 코드/당일 상장 신규분은 며칠 지연 반영될 수 있음.",
     "corp_code_source": "OpenDART CORPCODE.xml 8자리 고유번호. 미매핑 종목은 빈 문자열.",
-    "count_actual": 2611,
-    "count_kospi": 833,
-    "count_kosdaq": 1778
+    "count_actual": 2600,
+    "count_kospi": 830,
+    "count_kosdaq": 1770
   },
   "symbols": [
     {
@@ -2867,12 +2867,6 @@
       "corp_code": "00158024"
     },
     {
-      "ticker": "464680",
-      "name": "KB제27호스팩",
-      "market": "KOSDAQ",
-      "corp_code": "01785551"
-    },
-    {
       "ticker": "478390",
       "name": "KB제29호스팩",
       "market": "KOSDAQ",
@@ -3057,12 +3051,6 @@
       "name": "NICE인프라",
       "market": "KOSDAQ",
       "corp_code": "00363769"
-    },
-    {
-      "ticker": "222160",
-      "name": "NPX",
-      "market": "KOSDAQ",
-      "corp_code": "01037542"
     },
     {
       "ticker": "332570",
@@ -3777,12 +3765,6 @@
       "name": "노브랜드",
       "market": "KOSDAQ",
       "corp_code": "00305941"
-    },
-    {
-      "ticker": "106520",
-      "name": "노블엠앤비",
-      "market": "KOSDAQ",
-      "corp_code": "00536329"
     },
     {
       "ticker": "376930",
@@ -5201,12 +5183,6 @@
       "corp_code": "01157846"
     },
     {
-      "ticker": "032980",
-      "name": "바이온",
-      "market": "KOSDAQ",
-      "corp_code": "00232089"
-    },
-    {
       "ticker": "308080",
       "name": "바이젠셀",
       "market": "KOSDAQ",
@@ -5445,12 +5421,6 @@
       "name": "비엠티",
       "market": "KOSDAQ",
       "corp_code": "00524786"
-    },
-    {
-      "ticker": "230980",
-      "name": "비유테크놀러지",
-      "market": "KOSDAQ",
-      "corp_code": "01110076"
     },
     {
       "ticker": "488900",
@@ -6815,12 +6785,6 @@
       "corp_code": "01326279"
     },
     {
-      "ticker": "101390",
-      "name": "아이엠",
-      "market": "KOSDAQ",
-      "corp_code": "00609634"
-    },
-    {
       "ticker": "493280",
       "name": "아이엠바이오로직스",
       "market": "KOSDAQ",
@@ -6945,12 +6909,6 @@
       "name": "아진산업",
       "market": "KOSDAQ",
       "corp_code": "00139083"
-    },
-    {
-      "ticker": "203690",
-      "name": "아크솔루션스",
-      "market": "KOSDAQ",
-      "corp_code": "01036367"
     },
     {
       "ticker": "158430",
@@ -7565,12 +7523,6 @@
       "corp_code": "00896753"
     },
     {
-      "ticker": "230360",
-      "name": "에코마케팅",
-      "market": "KOSDAQ",
-      "corp_code": "01029394"
-    },
-    {
       "ticker": "097780",
       "name": "에코볼트",
       "market": "KOSDAQ",
@@ -7719,12 +7671,6 @@
       "name": "엔알비",
       "market": "KOSDAQ",
       "corp_code": "01708163"
-    },
-    {
-      "ticker": "451700",
-      "name": "엔에이치스팩29호",
-      "market": "KOSDAQ",
-      "corp_code": "01712616"
     },
     {
       "ticker": "481890",
@@ -10889,12 +10835,6 @@
       "corp_code": "01258428"
     },
     {
-      "ticker": "227100",
-      "name": "프로브잇",
-      "market": "KOSDAQ",
-      "corp_code": "01207761"
-    },
-    {
       "ticker": "321260",
       "name": "프로이천",
       "market": "KOSDAQ",
@@ -11289,12 +11229,6 @@
       "name": "한국정보통신",
       "market": "KOSDAQ",
       "corp_code": "00159342"
-    },
-    {
-      "ticker": "464440",
-      "name": "한국제13호스팩",
-      "market": "KOSDAQ",
-      "corp_code": "01775952"
     },
     {
       "ticker": "479880",
@@ -12039,12 +11973,6 @@
       "name": "JB금융지주",
       "market": "KOSPI",
       "corp_code": "00980122"
-    },
-    {
-      "ticker": "204210",
-      "name": "JK리버스톤리츠",
-      "market": "KOSPI",
-      "corp_code": "01035289"
     },
     {
       "ticker": "234080",
@@ -14111,12 +14039,6 @@
       "corp_code": "00651901"
     },
     {
-      "ticker": "140910",
-      "name": "에이리츠",
-      "market": "KOSPI",
-      "corp_code": "00860730"
-    },
-    {
       "ticker": "078520",
       "name": "에이블씨엔씨",
       "market": "KOSPI",
@@ -14505,12 +14427,6 @@
       "name": "일양약품",
       "market": "KOSPI",
       "corp_code": "00146454"
-    },
-    {
-      "ticker": "008500",
-      "name": "일정실업",
-      "market": "KOSPI",
-      "corp_code": "00146542"
     },
     {
       "ticker": "081000",
@@ -15675,6 +15591,24 @@
       "name": "흥아해운",
       "market": "KOSPI",
       "corp_code": "00167208"
+    },
+    {
+      "ticker": "365660",
+      "name": "레몬헬스케어",
+      "market": "KOSDAQ",
+      "corp_code": "01424261"
+    },
+    {
+      "ticker": "475040",
+      "name": "스트라드비젼",
+      "market": "KOSDAQ",
+      "corp_code": "01370517"
+    },
+    {
+      "ticker": "153890",
+      "name": "져스텍",
+      "market": "KOSDAQ",
+      "corp_code": "00577593"
     }
   ]
 }
