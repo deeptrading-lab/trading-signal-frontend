@@ -7456,3 +7456,44 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 매드업 등 KIND 지연 반영 종목 편입을 위해 며칠 뒤 스크립트 1회 재실행.
   - symbols 시드 주기적 자동 갱신(GitHub Actions) 도입 검토 — 수동 의존 제거.
+
+### 2026-07-10 — ci(data): 종목 검색 시드 주간 자동 최신화 워크플로 (PR 자동생성) (#343)
+
+- **slug**: `chore/symbols-weekly-automation` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/343
+- **요약**: ci(data): 종목 검색 시드 주간 자동 최신화 워크플로 (PR 자동생성)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 종목명 검색 시드 `lib/api/kis/symbols.json` 은 정적 번들이라 `scripts/update-symbols.py` 수동 재실행 없이는 신규 상장이 검색되지 않는다(#342 에서 5주 지연분 3종목 수동 반영). 이 수동 의존을 주간 자동화로 제거한다. (사용자 요청, [[reference_stock-symbol-search-index]] 후속.)
+  > 
+  > ## 변경 (3파일)
+  > 
+  > **`.github/workflows/symbols-refresh.yml`** (신규)
+  > - `schedule` 주 1회(일 18:00 UTC = 월 03:00 KST, DART 할당량 배려 야간) + `workflow_dispatch`(수동).
+  > - Vercel Hobby cron 미발화라 GHA 사용(기존 `flow-snapshot.yml` 과 동일 패턴).
+  > - `setup-python@v5` 3.12 고정(스크립트는 stdlib 전용, pip 불필요).
+  > - 흐름: 재생성 → `git diff` 변경 감지(무변경 시 PR 생략) → 무결성 게이트 → **PR 자동 생성**(impl-ready).
+  > 
+  > **`scripts/symbols_ci.py`** (신규)
+  > - **무결성 게이트**: count 정상범위(2400~2800)·`$meta` 정합·6자리 티커·빈 이름 0·중복 0·HEAD 대비 급감(<97%) 방지. 실패 시 `::error::` + exit 1 → **워크플로 실패, PR 미생성**(garbage/부분 KRX fetch 가 시드를 조용히 덮어쓰는 것 차단).
+  > - HEAD 대비 **델타(신규/폐지/corp_code 교정)** 계산 → PR 본문 마크다운 렌더(검토자가 증감 종목을 바로 확인).
+  > 
+  > **`scripts/update-symbols.py`** (손질)
+  > - symbols 배열이 실제로 바뀔 때만 write, 무변경 시 no-op 종료 — `createdAt` 만 바뀌는 헛 diff 로 매주 no-op PR 이 열리는 것 방지.
+  > 
+  > ## 검증 (로컬)
+  > 
+  > - `py_compile` 통과, `from __future__ import annotations` 로 py3.9+ 호환.
+  > - 무결성 게이트 실측: 정상 시드 통과(0 err), **절반 유실→급감+범위 초과 감지**, **중복 티커→count 불일치+중복 감지**.
+  > - 델타 렌더 실측: old 에서 스트라드비젼·져스텍 빠지고 가짜폐지주 추가한 케이스 → "신규 2 / 폐지 1" 정확 렌더.
+  > - 무변경 케이스 본문("종목 증감 없음") 정상.
+  > 
+  > ## ★사전 준비 (사용자 1회, 머지 후)
+  > 
+  > 1. 리포 **Secret 에 `OPENDART_API_KEY` 추가** — 스크립트 docstring 경고대로 **앱과 별개 전용 키 권장**(CORPCODE.xml 다운로드가 일일 할당량 20k 를 앱 공시 API 와 공유하면 rate-limit). Settings > Secrets and variables > Actions.
+  > 2. Settings > Actions > General > **"Allow GitHub Actions to create and approve pull requests" 활성화** (봇 PR 생성 권한).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 첫 스케줄/수동 실행으로 실제 PR 생성 E2E 확인(secret 설정 후).
+  - KIND 6자리 숫자 티커 한계(당일/영숫자 IPO 지연)는 주간 캐이던스로 자연 흡수 — 매드업 등은 다음 주 편입 예상.

@@ -1,0 +1,78 @@
+name: 종목 검색 시드 주간 최신화
+
+# 종목명 검색 시드(lib/api/kis/symbols.json)는 정적 번들이라 수동 재실행 없이는 신규 상장이
+# 검색되지 않는다. 주 1회 KRX KIND + OpenDART 를 재수집해 변경이 있으면 PR 을 연다(자동 머지 X —
+# 사람이 신규/폐지 델타를 확인하고 게이트 부여 후 머지). Vercel Hobby cron 은 미발화라 GHA 사용.
+#
+# ★사전 준비(1회):
+#   1. 리포 Secret 에 OPENDART_API_KEY 추가(앱과 별개 전용 키 권장 — CORPCODE.xml 다운로드가
+#      일일 할당량 20k 를 앱 공시 API 와 공유하면 rate-limit).
+#   2. Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests" 활성화.
+
+on:
+  schedule:
+    - cron: "0 18 * * 0" # 매주 일 18:00 UTC = 월 03:00 KST(앱 트래픽 적은 야간, DART 할당량 배려)
+  workflow_dispatch: {} # 수동 실행(신규 상장 즉시 반영하고 싶을 때)
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: symbols-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12" # 스크립트는 stdlib 전용(pip 설치 불필요), 버전만 고정해 재현성 확보
+
+      - name: 시드 재생성 (KRX KIND + OpenDART)
+        env:
+          OPENDART_API_KEY: ${{ secrets.OPENDART_API_KEY }}
+        run: |
+          if [ -z "$OPENDART_API_KEY" ]; then
+            echo "::error::OPENDART_API_KEY secret 미설정 — 리포 Settings > Secrets and variables > Actions 에 추가 필요"
+            exit 1
+          fi
+          python3 scripts/update-symbols.py
+
+      - name: 변경 감지
+        id: diff
+        run: |
+          if git diff --quiet -- lib/api/kis/symbols.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "종목 변경 없음 — PR 생략"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 무결성 게이트 + PR 본문 생성
+        if: steps.diff.outputs.changed == 'true'
+        run: python3 scripts/symbols_ci.py "${{ runner.temp }}/pr-body.md"
+
+      - name: PR 생성
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE="$(date -u +%Y-%m-%d)"
+          BRANCH="chore/symbols-refresh-auto-${DATE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add lib/api/kis/symbols.json
+          git commit -m "chore(data): 종목 검색 시드 주간 자동 최신화 (${DATE})"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(data): 종목 검색 시드 주간 자동 최신화 (${DATE})" \
+            --body-file "${{ runner.temp }}/pr-body.md" \
+            --label impl-ready
