@@ -69,6 +69,7 @@ import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
+import { isUsTicker } from "@/lib/utils/isUsTicker";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag, lastPriceTagWidth } from "./chart/LastPriceTag";
 import { AiLevelAxisLabels, aiLabelMaxWidth } from "./chart/AiLevelAxisLabels";
@@ -155,6 +156,9 @@ export function StockDailyChart({
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
     useChartData(ticker, interval, days, timeframe, minutePriorDays);
+
+  // 미국 종목(달러) — y축·툴팁을 원화 만 단위 대신 달러 평문/$ 로(us-stock-support).
+  const isUs = isUsTicker(ticker);
 
   // 런타임 테마 색 — light/dark 전환 시 새 객체 reference 로 recharts 리렌더.
   const theme = useChartTheme();
@@ -368,7 +372,7 @@ export function StockDailyChart({
     (v): v is number => v != null,
   );
   const priceTick = (
-    <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} />
+    <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} isUs={isUs} />
   );
 
   return (
@@ -390,8 +394,8 @@ export function StockDailyChart({
                 <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} activeDot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
-              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
+              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={(v) => fmtYAxis(v, isUs)} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
+              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} isUs={isUs} />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 캔들 위에 표시 */}
               {showBB && (
@@ -437,8 +441,8 @@ export function StockDailyChart({
                 <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} activeDot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
-              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
+              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={(v) => fmtYAxis(v, isUs)} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
+              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} contentStyle={tooltipStyle} formatter={(v) => fmtTooltipPrice(v, isUs)} labelStyle={labelStyle} />
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={clickedIndex != null ? { r: 5, strokeWidth: 0 } : false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 가격 라인 위에 표시 */}
               {showBB && (

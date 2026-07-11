@@ -18,6 +18,7 @@
 import { ArrowDownRight, ArrowUpRight, Minus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
+import { isUsTicker } from "@/lib/utils/isUsTicker";
 import { formatPct } from "@/lib/utils/formatPct";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryStockWarnings } from "@/hooks/stock/useQueryStockWarnings";
@@ -42,6 +43,8 @@ export interface StockHeaderProps {
 
 export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const { data, isLoading, isError } = useQueryStockPrice(ticker);
+  // 미국 종목은 달러 — 통화 라벨을 USD 로(us-stock-support).
+  const isUs = isUsTicker(ticker);
   // 매수 유의 경고칩 — BFF fail-soft(실패도 200+빈 배열)라 data 만 보고 없으면 미표시.
   const { data: warningsData } = useQueryStockWarnings(ticker);
   const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
@@ -121,7 +124,7 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
         <span className="text-font-display font-font-display tabular-nums tracking-tight text-text-strong">
           {formatNumber(data.price)}
         </span>
-        <span className="pb-1 text-caption text-text-muted">KRW</span>
+        <span className="pb-1 text-caption text-text-muted">{isUs ? "USD" : "KRW"}</span>
         <div
           className={cn(
             "inline-flex items-center gap-xs pb-1 text-body-strong",

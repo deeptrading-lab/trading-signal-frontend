@@ -24,12 +24,14 @@ type CandlePayload = {
   vwap: number | null;
 };
 
-export function CandleTooltip({ active, payload, label, showMA, showVWAP }: {
+export function CandleTooltip({ active, payload, label, showMA, showVWAP, isUs = false }: {
   active?: boolean;
   payload?: { payload: CandlePayload }[];
   label?: string;
   showMA?: boolean;
   showVWAP?: boolean;
+  /** 미국 종목(달러) — 가격을 "원" 대신 "$"로(us-stock-support). */
+  isUs?: boolean;
 }) {
   const { C, tooltipStyle, tooltipDivider } = useChartThemeContext();
   if (!active || !payload?.length) return null;
@@ -59,7 +61,9 @@ export function CandleTooltip({ active, payload, label, showMA, showVWAP }: {
       {(["high", "open", "close", "low"] as const).map((k) => (
         <p key={k} style={{ color: k === "close" ? color : C.tooltipText, fontSize: 12, lineHeight: "1.6" }}>
           {k === "high" ? "고" : k === "open" ? "시" : k === "close" ? "종" : "저"}&nbsp;
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatNumber(d[k])} 원</span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {isUs ? `$${formatNumber(d[k])}` : `${formatNumber(d[k])} 원`}
+          </span>
         </p>
       ))}
       {(maRows.length > 0 || showVwapRow) && (
