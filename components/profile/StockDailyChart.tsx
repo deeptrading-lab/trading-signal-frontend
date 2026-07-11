@@ -128,6 +128,8 @@ export interface StockDailyChartProps {
   aiLevels?: AiVerdictLevels | null;
   /** AI 레벨 오버레이 표시 여부(배너 토글). aiLevels 있을 때만 유효. */
   showAiLevels?: boolean;
+  /** 분봉 선택 허용 — 미국 종목은 분봉 미지원이라 false 로 분봉 탭 숨김(us-stock-support). */
+  allowMinute?: boolean;
 }
 
 export function StockDailyChart({
@@ -149,6 +151,7 @@ export function StockDailyChart({
   onToggleOverlay,
   aiLevels,
   showAiLevels,
+  allowMinute,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
     useChartData(ticker, interval, days, timeframe, minutePriorDays);
@@ -178,7 +181,7 @@ export function StockDailyChart({
     [candleSeries, volSeries],
   );
 
-  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
+  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay, allowMinute };
 
   // 클릭 툴팁 — 전 서브플롯을 **공유 클릭 인덱스**로 제어(syncId·trigger 미사용). recharts syncId 는
   //  hover 기반이라, 클릭 후 마우스를 보조지표로 옮기면 가격 차트 mouseLeave 로 동기화가 풀려 보조지표

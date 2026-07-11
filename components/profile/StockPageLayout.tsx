@@ -176,6 +176,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
           {...chartControls}
           aiLevels={aiLevels}
           showAiLevels={showAiLevels}
+          allowMinute={!isUs}
         />
         {isUltraWide ? (
           // 콘텐츠 우측 끝(left-full) + gap 앵커, 폭은 실측(우측 여백에 맞춤). 차트와 함께 스크롤.
