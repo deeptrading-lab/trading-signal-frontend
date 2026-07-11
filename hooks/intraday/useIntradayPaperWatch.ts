@@ -17,6 +17,7 @@ import type {
   PaperTradingSession,
   PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
+import type { IntradayPortfolioPlan } from "@/lib/intraday/portfolioPlan";
 
 /** 세션의 대상 종목(단타 세션은 단일 종목 설계 — intradayTickDecision 이 stocks[0]만 본다). */
 export function intradaySessionStock(session: PaperTradingSession): PaperTradingSelectedStock {
@@ -138,7 +139,35 @@ export function useIntradayPaperWatch() {
       positionHardStopPct,
     });
 
+  const startPortfolio = async (plan: IntradayPortfolioPlan): Promise<PaperTradingSessionDetail[]> => {
+    const portfolioId = globalThis.crypto?.randomUUID?.() ?? `portfolio-${Date.now()}`;
+    const portfolioName = `AI 단타 포트폴리오 · ${todayKey}`;
+    // 로컬 AI CLI 과부하와 provider rate limit을 피하려고 종목별 첫 판단을 순차 실행한다.
+    const details: PaperTradingSessionDetail[] = [];
+    for (const allocation of plan.allocations) {
+      details.push(
+        await create({
+          name: `${portfolioName} · ${allocation.name}`,
+          tickers: [allocation.ticker],
+          stocks: [{ ticker: allocation.ticker, name: allocation.name }],
+          initialCash: allocation.amount,
+          targetReturnPct: 5,
+          riskMode: "balanced",
+          decisionProvider: "cli-agent",
+          tickIntervalMinutes: 5,
+          positionHardStopPct: -5,
+          sessionHardStopPct: -7,
+          portfolioId,
+          portfolioName,
+          portfolioAllocationPct: allocation.allocationPct,
+        }),
+      );
+    }
+    return details;
+  };
+
   return {
+    sessions: cliSessions,
     sessionByTicker,
     todaySessionStocks,
     pastSessions,
@@ -147,5 +176,6 @@ export function useIntradayPaperWatch() {
     currentOperator,
     isCreating,
     start,
+    startPortfolio,
   };
 }

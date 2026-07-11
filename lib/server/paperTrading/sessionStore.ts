@@ -248,6 +248,9 @@ export async function createPaperTradingSession(
     // 통째 저장)돼 다른 서버의 스케줄러가 own-or-unowned 게이트로 남의 세션을 틱하지 않게 한다.
     // 모든 provider 에 스탬프(mock 은 스케줄 대상이 아니라 무해, 규칙 일관).
     owner: resolveServerOperator(),
+    portfolioId: request.portfolioId,
+    portfolioName: request.portfolioName,
+    portfolioAllocationPct: request.portfolioAllocationPct,
     mode: "live-paper",
     lastTickWindowStart: null,
     startedAt: now,

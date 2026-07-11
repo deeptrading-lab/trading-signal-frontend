@@ -72,5 +72,13 @@ export function validateCreateSessionRequest(
   if (positionHardStopError) return positionHardStopError;
   const sessionHardStopError = validateHardStopPct(body.sessionHardStopPct, "세션 손절 상한");
   if (sessionHardStopError) return sessionHardStopError;
+  if (
+    body.portfolioAllocationPct !== undefined &&
+    (!Number.isFinite(body.portfolioAllocationPct) ||
+      body.portfolioAllocationPct <= 0 ||
+      body.portfolioAllocationPct > 100)
+  ) {
+    return "포트폴리오 배정 비중은 0% 초과 100% 이하이어야 해요.";
+  }
   return null;
 }

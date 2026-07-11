@@ -164,6 +164,12 @@ export type PaperTradingSession = {
    * 규칙으로 미기록 세션도 계속 처리(하위호환, orphan 방지).
    */
   owner?: string;
+  /** 자동 포트폴리오 실행 묶음 ID — 같은 값의 종목별 세션을 하나의 포트폴리오로 합산한다. */
+  portfolioId?: string;
+  /** 자동 포트폴리오 표시명. 레거시·수동 단일 종목 세션은 미설정. */
+  portfolioName?: string;
+  /** 전체 자동 투자금 중 이 종목에 배정된 비중(%). */
+  portfolioAllocationPct?: number;
   mode: PaperTradingMode;
   lastTickWindowStart: string | null;
   startedAt: string;
@@ -255,6 +261,10 @@ export type CreatePaperTradingSessionRequest = {
   positionHardStopPct?: number | null;
   /** 세션 손실 하드스톱(%, 음수) — 미지정 시 기본 −7. `null`=끄기. */
   sessionHardStopPct?: number | null;
+  /** 자동 포트폴리오 오케스트레이터가 종목별 세션을 묶는 메타데이터. */
+  portfolioId?: string;
+  portfolioName?: string;
+  portfolioAllocationPct?: number;
 };
 
 export type PaperTradingSessionsResponse = {
