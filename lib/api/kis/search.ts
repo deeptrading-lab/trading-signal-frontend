@@ -27,6 +27,8 @@ type SymbolEntry = {
   corp_code?: string;
   /** 미국 시드만 보유 — ETF 여부(검색 랭킹에서 보통주 뒤로 미룸). */
   etf?: boolean;
+  /** 미국 시드만 보유 — 한글명(Toss). 한글 검색 매칭 + 결과 표시용("애플"). 미보유 종목은 없음. */
+  koName?: string;
 };
 
 /** 국내 시드(KRX KIND + OpenDART) — 6자리 티커·corp_code 보유. */
@@ -36,6 +38,17 @@ const US_SYMBOLS: SymbolEntry[] = (usSymbolsJson.symbols ?? []) as SymbolEntry[]
 /** 검색 통합 인덱스 — 국내 우선(빈 질의 대표주·모호 질의 상단). */
 const SYMBOLS: SymbolEntry[] = [...KR_SYMBOLS, ...US_SYMBOLS];
 const MAX_RESULTS = 20;
+
+/**
+ * 흔한 한글 별칭 → 정식 Toss 한글명. Toss 는 정식 사명("알파벳")을 주지만 사용자는 통칭("구글")으로
+ * 검색한다. 질의 전체가 별칭이면 정식명으로 치환해 매칭한다(us-stock-support 한글 검색).
+ */
+const KO_ALIASES: Record<string, string> = {
+  구글: "알파벳",
+  페이스북: "메타",
+  페북: "메타",
+  버크셔: "버크셔",
+};
 
 /**
  * symbols.json 시드에서 fuzzy 검색.
@@ -55,19 +68,22 @@ export function searchSymbols(keyword: string): StockSearchResult[] {
     return exact ? [toResult(exact)] : [];
   }
 
-  const needle = compact.toLowerCase();
+  const needle = (KO_ALIASES[compact] ?? compact).toLowerCase();
   // 관련도 랭킹 — 미국 시드는 유사 이름 ETF(예: "2X Long Apple ETF")가 많아 단순 substring 이면
   // 정확 종목(AAPL·SPY)이 파묻힌다. 정확 티커 → 티커 접두 → 이름 접두 → 부분일치 순, ETF 후순위.
   const scored: { entry: SymbolEntry; score: number }[] = [];
   for (const s of SYMBOLS) {
     const ticker = s.ticker.toLowerCase();
     const name = s.name.toLowerCase().replace(/\s+/g, "");
+    // 한글명(미국 종목) — "애플·엔비디아·구글" 한글 검색 매칭(영문명과 동일 tier).
+    const koName = s.koName?.toLowerCase().replace(/\s+/g, "") ?? "";
     let score = -1;
     if (ticker === needle) score = 0;
+    else if (name === needle || koName === needle) score = 0.5; // 정확 이름 일치("애플"→애플)가 접두("애플랙")를 이김.
     else if (ticker.startsWith(needle)) score = 1;
-    else if (name.startsWith(needle)) score = 2;
+    else if (name.startsWith(needle) || (koName && koName.startsWith(needle))) score = 2;
     else if (ticker.includes(needle)) score = 4;
-    else if (name.includes(needle)) score = 5;
+    else if (name.includes(needle) || (koName && koName.includes(needle))) score = 5;
     else continue;
     if (s.etf) score += 0.5; // 보통주 우선.
     scored.push({ entry: s, score });
@@ -100,7 +116,8 @@ export function getCorpCode(ticker: string): string | null {
  * store 에 추가 시점 종목명이 없을 때만 보조로 쓴다(클라이언트 import 가능, 부수효과 0).
  */
 export function getSymbolName(ticker: string): string | null {
-  return SYMBOLS.find((s) => s.ticker === ticker)?.name ?? null;
+  const found = SYMBOLS.find((s) => s.ticker === ticker);
+  return found ? (found.koName ?? found.name) : null;
 }
 
 /**
@@ -136,7 +153,8 @@ export function getSymbolsMeta(): {
 function toResult(entry: SymbolEntry): StockSearchResult {
   return {
     ticker: entry.ticker,
-    name: entry.name,
+    // 미국 종목은 한글명(있으면)으로 표시 — 최근검색·관심종목의 Toss 한글명과 일관(예 "애플").
+    name: entry.koName ?? entry.name,
     market: entry.market,
   };
 }

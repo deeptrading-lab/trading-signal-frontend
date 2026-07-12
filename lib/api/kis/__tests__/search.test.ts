@@ -72,8 +72,25 @@ describe("searchSymbols — 미국 종목 통합 검색·랭킹(us-stock-support
     expect(searchSymbols("SPY")[0]!.ticker).toBe("SPY");
   });
 
-  it("US 역참조: getSymbolName 은 미국 종목명, corp_code·getMarketByTicker 는 KR 전용이라 null", () => {
-    expect(getSymbolName("AAPL")).toBe("Apple Inc.");
+  it("한글명 검색 — '애플'→AAPL 1위(정확 이름이 '애플랙' 접두를 이김), 결과는 한글명 표시", () => {
+    const r = searchSymbols("애플");
+    expect(r[0]!.ticker).toBe("AAPL");
+    expect(r[0]!.name).toBe("애플"); // koName 표시.
+  });
+
+  it("한글명 검색 — '엔비디아'·'테슬라'·'아마존'", () => {
+    expect(searchSymbols("엔비디아")[0]!.ticker).toBe("NVDA");
+    expect(searchSymbols("테슬라")[0]!.ticker).toBe("TSLA");
+    expect(searchSymbols("아마존")[0]!.ticker).toBe("AMZN");
+  });
+
+  it("별칭 — '구글' 은 정식명 '알파벳'(GOOGL/GOOG)으로 매칭", () => {
+    const tickers = searchSymbols("구글").map((s) => s.ticker);
+    expect(tickers.some((t) => t === "GOOGL" || t === "GOOG")).toBe(true);
+  });
+
+  it("US 역참조: getSymbolName 은 한글명(있으면), corp_code·getMarketByTicker 는 KR 전용이라 null", () => {
+    expect(getSymbolName("AAPL")).toBe("애플"); // koName 우선.
     expect(getCorpCode("AAPL")).toBeNull(); // 미국은 DART corp_code 없음.
     expect(getMarketByTicker("AAPL")).toBeNull(); // 스코어카드 벤치마크는 KR 전용 → US 는 null.
   });
