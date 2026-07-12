@@ -21,6 +21,7 @@ import { formatNumber } from "@/lib/utils/formatMoney";
 import { isUsTicker } from "@/lib/utils/isUsTicker";
 import { formatPct } from "@/lib/utils/formatPct";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
+import { useQueryExchangeRate } from "@/hooks/query/useQueryExchangeRate";
 import { useQueryStockWarnings } from "@/hooks/stock/useQueryStockWarnings";
 import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { WatchlistStarButton } from "@/components/watchlist/WatchlistStarButton";
@@ -43,8 +44,10 @@ export interface StockHeaderProps {
 
 export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
   const { data, isLoading, isError } = useQueryStockPrice(ticker);
-  // 미국 종목은 달러 — 통화 라벨을 USD 로(us-stock-support).
+  // 미국 종목은 달러 — 통화 라벨을 USD 로 + 원화 환산가 병기(us-stock-support). 환율은 미국 종목일
+  // 때만 조회(enabled=isUs), 실패·null 은 미표시로 수렴(부가 정보).
   const isUs = isUsTicker(ticker);
+  const { data: fx } = useQueryExchangeRate("USD", "KRW", isUs);
   // 매수 유의 경고칩 — BFF fail-soft(실패도 200+빈 배열)라 data 만 보고 없으면 미표시.
   const { data: warningsData } = useQueryStockWarnings(ticker);
   const { getName, hasTicker, addTicker, removeTicker } = useWatchlistTickers();
@@ -125,6 +128,11 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
           {formatNumber(data.price)}
         </span>
         <span className="pb-1 text-caption text-text-muted">{isUs ? "USD" : "KRW"}</span>
+        {isUs && fx?.rate != null ? (
+          <span className="pb-1 text-caption text-text-muted">
+            ≈ {formatNumber(data.price * fx.rate, { digits: 0 })}원
+          </span>
+        ) : null}
         <div
           className={cn(
             "inline-flex items-center gap-xs pb-1 text-body-strong",
