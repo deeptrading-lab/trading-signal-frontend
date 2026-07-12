@@ -129,8 +129,9 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
         </span>
         <span className="pb-1 text-caption text-text-muted">{isUs ? "USD" : "KRW"}</span>
         {isUs && fx?.rate != null ? (
-          <span className="pb-1 text-caption text-text-muted">
-            ≈ {formatNumber(data.price * fx.rate, { digits: 0 })}원
+          <span className="pb-1 text-body-strong text-text-strong tabular-nums">
+            <span className="mr-xs text-text-muted">·</span>약{" "}
+            {formatNumber(data.price * fx.rate, { digits: 0 })}원
           </span>
         ) : null}
         <div
