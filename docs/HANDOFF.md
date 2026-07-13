@@ -7979,3 +7979,31 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - [ ] 실기기(안드로이드 뒤로가기·iOS 스와이프)에서 3개 오버레이 확인
   - [ ] 남은 모바일 오버레이(StockPeekSheet 등) 필요 시 동일 훅 적용
+
+### 2026-07-13 — feat(peek): 종목 peek 바텀시트에도 뒤로가기 닫기 훅 적용 (#363)
+
+- **slug**: `peek-sheet-back-close` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/363
+- **요약**: feat(peek): 종목 peek 바텀시트에도 뒤로가기 닫기 훅 적용
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > #362 의 `useOverlayBackClose` 공용 훅을 마지막 남은 모바일 오버레이인 **종목 peek 바텀시트**(롱프레스 미리보기, `StockPeekSheet`)에 적용. 이로써 모바일 오버레이 4곳(AI 패널·체결내역 시트·업종 모달·peek 시트) 전부 뒤로가기가 오버레이만 닫는다.
+  > 
+  > ## 변경
+  > 
+  > - `components/stock/StockPeekSheet.tsx`: `useOverlayBackClose(true, onClose)` 1줄(+import) — 열릴 때만 마운트되는 시트라 다른 두 곳과 동일 사용법
+  > - 상세 진입 CTA(`goDetail`: onClose → router.push) 경로는 훅이 marker 를 소비(선행 시)하거나 매몰 처리(후행 시)해 어느 순서든 히스토리 안전
+  > 
+  > ## 검증 (모바일 뷰포트, 브라우저 실검증)
+  > 
+  > - 홈 랭킹 행 롱프레스(touchstart 450ms) → peek 시트 열림 + marker `ovl-1` 무장 확인
+  > - **back → 시트만 닫힘 + 홈 유지 + marker 소비** ✅
+  > - `tsc`·vitest **1305 passed**·프로덕션 빌드 정상
+  > 
+  > ## 다음 작업
+  > 
+  > - [ ] 실기기에서 4개 오버레이(AI 패널·체결내역 시트·업종 모달·peek 시트) 뒤로가기 일괄 확인
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 실기기에서 4개 오버레이(AI 패널·체결내역 시트·업종 모달·peek 시트) 뒤로가기 일괄 확인
