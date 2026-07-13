@@ -7825,3 +7825,44 @@
   - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
   - [ ] `/admin` loading.tsx (후속 chore — BottomNav 대상 아님)
   - [ ] View Transitions API 는 이번 이니셔티브 제외(실험 플래그 리스크)
+
+### 2026-07-13 — refactor(intraday): 워치 표 행 분리(memo) + 펼침 아코디언(폴링 1행 상한) (#359)
+
+- **slug**: `intraday-table-refactor` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/359
+- **요약**: refactor(intraday): 워치 표 행 분리(memo) + 펼침 아코디언(폴링 1행 상한)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > > #358 대체(재생성) — 베이스 브랜치(#355) 머지·삭제 시 자동 close 됐고 리베이스(force-push) 후라 재오픈 불가. 내용 동일, main 위로 리베이스 완료(tsc·vitest 1305 재통과).
+  > 
+  > ## 배경
+  > 
+  > `IntradayWatchTable.tsx` 는 1,228줄 단일 컴포넌트로, ① 30초 세션 invalidation·3초 패널 폴링·시트 상태가 표 전체를 재렌더시키고(행 memo 없음 — 프로젝트 전체 memo 2곳뿐), ② 행마다 독립 `expanded` useState 라 **여러 행 동시 펼침 = 행 수 × (호가+체결강도) × 3초 폴링 중첩**이 가능했다. 모바일 단타 화면의 프레임 드랍·부하 기여 요인. (mobile-perf 이니셔티브 PR 4/4 — #355 번들·#356 메모리·#357 로딩UX 머지 완료)
+  > 
+  > ## 변경
+  > 
+  > ### 1. 행 분리 — `IntradayWatchRow.tsx` 신설 (~950줄 이동)
+  > - `WatchRow` + 전속 부품(OwnerBadge · useFixedMenu/MenuPanel · IntervalSelect · HardStopSelect · CashInput · 컴팩트 버튼 상수 · 포맷 헬퍼) 이동. 코드 자체는 무수정 이동(diff 는 크지만 로직 변경은 아래 2·3뿐).
+  > - `IntradayWatchTable.tsx` 는 표 셸(날짜 그룹핑·그룹 헤더·그룹 펼침 제어)만 잔류(~350줄). `groupWatchItemsByDate`·`WatchDateGroup` 등 기존 export 유지 — 워크스페이스·기존 테스트 무수정 통과.
+  > 
+  > ### 2. memo 유효화
+  > - `export const IntradayWatchRow = memo(WatchRow)`
+  > - `onRemove={() => onRemove(item.ticker)}` 인라인 클로저 제거 → `(ticker) => void` 시그니처로 부모 콜백 직결
+  > 
+  > ### 3. 펼침 아코디언 — 폴링 구조적 상한
+  > - 행 내부 `expanded` useState → 표 레벨 `expandedTicker: string | null` 승격, `onExpandChange(ticker, expanded)` 안정 콜백(useCallback + 함수형 업데이트)
+  > - 효과: **동시 펼침 1행 → 펼침 패널 3초 폴링이 행 수와 무관하게 최대 1쌍** — env 손잡이 없이 코드 구조로 고정
+  > - 동작 변화(의도): 다른 행을 펼치면 이전 행이 접힌다(아코디언)
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` 통과, vitest **1305 passed** (main 리베이스 후 재실행), 프로덕션 빌드 정상
+  > - 브라우저 실검증: /intraday 레메디 펼침(차트+호가+체결강도) → 모나미 펼침 시 **레메디 자동 접힘** 확인, 콘솔 에러 0
+  > 
+  > ## QA 체크리스트
+  > 
+  > - [ ] React DevTools Profiler: 장중 시세 폴링 1주기에 미펼침 행 재렌더 0
+  > - [ ] 장중 네트워크 탭: 행 2개 연속 펼침 시 orderbook/trades 요청이 최신 1종목만
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] mobile-perf 이니셔티브 4PR 머지 완료 후 모바일 실기기에서 탭 킬·이동 딜레이 재발 여부 며칠 관찰
+  - [ ] 후속 chore 후보: RealtimeRankingSection RankRow memo(≤14행, 효과 미미)·/admin loading.tsx·토스트 motion→CSS 전환
