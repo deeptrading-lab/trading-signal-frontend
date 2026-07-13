@@ -20,6 +20,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
 import { getVisibleNavItems, isNavItemActive } from "@/components/layout/navItems";
+import { NavLinkPending } from "@/components/layout/NavLinkPending";
 import { useStockNavClick } from "@/hooks/layout/useStockNavClick";
 import { useMe } from "@/hooks/auth/useMe";
 import { cn } from "@/lib/utils/cn";
@@ -52,8 +53,11 @@ export function BottomNav() {
             aria-current={active ? "page" : undefined}
             {...(item.path === "/stock" ? stockNavBinding(active) : {})}
           >
-            <Icon className="bottom-nav-item-icon" aria-hidden="true" />
-            <span className="bottom-nav-item-label">{item.label}</span>
+            {/* pending 피드백 래퍼 — 부모(.bottom-nav-item)의 내부 레이아웃을 그대로 복제(시각 무변경). */}
+            <NavLinkPending className="inline-flex flex-col items-center justify-center gap-[2px]">
+              <Icon className="bottom-nav-item-icon" aria-hidden="true" />
+              <span className="bottom-nav-item-label">{item.label}</span>
+            </NavLinkPending>
           </Link>
         );
       })}

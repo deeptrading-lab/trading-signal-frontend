@@ -688,6 +688,21 @@
     @apply text-caption;
   }
 
+  /* ---------- 네비 pending 피드백 (nav-loading-ux) ----------
+   * `NavLinkPending`(useLinkStatus) 이 라우트 이동 중에만 조건부로 붙이는 리터럴 클래스 —
+   *   ⚠️ 속성 선택자(`[data-*]` + @apply) 는 Turbopack 미방출 함정(#234)이라 쓰지 않는다.
+   * 틴트(액센트)는 즉시 = 탭 반응성. 펄스는 150ms 지연 시작 = 즉시 완료되는 내비(정적 셸·
+   *   캐시 히트)에선 한 프레임도 안 보임(Next useLinkStatus 권장 패턴). 이징은 모션 토큰만 사용. */
+  .nav-link-pending {
+    @apply text-accent-vivid;
+    animation: navPendingPulse 1.1s theme(transitionTimingFunction.standard) 150ms infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nav-link-pending {
+      animation: none;
+    }
+  }
+
   /* ---------- 즐겨찾기 토글 (v5 토큰 키 연결, 시각 동일) ---------- */
   /* 시각 size 32×32, hit area 는 호출 측에서 before:absolute -inset-1 로 40×40 확장. */
   .favorite-toggle {

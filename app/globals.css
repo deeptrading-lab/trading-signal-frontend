@@ -77,6 +77,13 @@
     50% { opacity: 1; }
   }
 
+  /* 네비 pending 펄스 keyframe — `.nav-link-pending`(components.css) 전용. 라우트 이동이
+   * 오래 걸릴 때 눌린 nav 항목이 숨쉬듯 깜빡여 "누른 게 진행 중"임을 알린다(nav-loading-ux). */
+  @keyframes navPendingPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+
   /* recharts 차트 클릭/탭 시 나타나는 브라우저 기본 포커스 아웃라인(둥근 굵은 테두리) 제거.
    * 실제 포커스 대상은 surface(svg) 가 아니라 그 내부의 zIndex 레이어 `<g tabindex>` 라
    *   wrapper 후손 전체(`:focus`)를 덮는다(zIndex 값 `_-100`/`_0`/`_100` … 가변 → 후손 선택자가 안전).
