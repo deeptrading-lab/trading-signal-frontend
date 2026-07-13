@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { isPaperSessionStalled } from "@/lib/utils/paperTradingStale";
 import {
+  INTRADAY_AUTOPILOT_COPY as A,
   INTRADAY_PAPER_COPY as P,
   INTRADAY_READ_COPY as C,
 } from "@/lib/copy/stock/intradayRead";
@@ -855,6 +856,12 @@ function WatchRow({
             <span className="text-body-sm-strong text-text-strong">{item.name}</span>
             <StockWarningBadges warnings={warnings} max={1} size="sm" />
             <OwnerBadge owner={current?.owner} currentOperator={currentOperator} />
+            {/* 오토파일럿 자식 세션 — 자동 편입 종목 구분(intraday-autopilot). */}
+            {current?.autopilotRunId ? (
+              <Badge variant="accent" title={A.rowBadgeTitle}>
+                {A.rowBadge}
+              </Badge>
+            ) : null}
             {current ? (
               stalled ? (
                 <Badge variant="warn" title={P.stalledHint}>

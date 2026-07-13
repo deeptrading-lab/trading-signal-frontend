@@ -200,6 +200,51 @@ export const INTRADAY_PAPER_COPY = {
   },
 } as const;
 
+/** 오토파일럿(자동 포트폴리오) 카드 카피 — intraday-autopilot. */
+export const INTRADAY_AUTOPILOT_COPY = {
+  title: "오토파일럿",
+  badge: "자동 포트폴리오",
+  subtitle:
+    "시작해 두면 장중에 단타 적합 종목(변동성·유동성·모멘텀)을 스스로 골라 슬롯을 채우고, 죽은 종목은 빼고 새로 뜨는 종목으로 교체하며 모의 단타를 자동 운영해요.",
+  startLabel: "자동 시작",
+  starting: "시작 중…",
+  stopLabel: "중지",
+  stopping: "중지 중…",
+  stopHint: "종목 선정·교체만 멈춰요 — 이미 진행 중인 모의 세션은 그대로 이어져요.",
+  totalCapitalLabel: "총자본(원)",
+  slotCountLabel: "슬롯",
+  slotCountUnit: (n: number) => `${n}종목`,
+  capitalInvalid: "총자본은 100만 원 이상이어야 해요.",
+  /* 상태 라인 — 시작 전/장 시작 대기/가동 중/중지·완료. */
+  statusWaitingOpen: "장 시작 대기 — 09:05부터 종목을 골라 채워요.",
+  statusActive: "가동 중 — 10분마다 종목을 재평가해요.",
+  statusStopped: "중지됨",
+  statusCompleted: "오늘 운영 종료",
+  kisNotReady: "KIS 실전 미설정 — 종목 선정(랭킹 조회)을 할 수 없어요.",
+  /* 슬롯 칩. */
+  slotEmpty: "빈 슬롯",
+  slotDone: "종료",
+  /* 런 누적 손익(교체 회수된 세션 포함). */
+  pnlLabel: "런 손익",
+  pnlChildren: (n: number) => `세션 ${n}개 합산`,
+  /* 로테이션 히스토리(접이식). */
+  historyTitle: "선정·교체 기록",
+  historyEmpty: "아직 기록이 없어요.",
+  historyKind: {
+    fill: "편입",
+    replace: "교체",
+    reconcile: "정리",
+    skip: "대기",
+  },
+  /* 마지막 스크리너 요약. */
+  screenerLabel: (universe: number, passed: number) => `후보 ${universe} → 통과 ${passed}`,
+  error: "오토파일럿 처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  disclaimer: "가상 기록이에요 — 실제 주문은 발생하지 않아요.",
+  /* 워치 표 행 배지 — 오토파일럿이 자동 편입한 세션 구분. */
+  rowBadge: "오토",
+  rowBadgeTitle: "오토파일럿이 자동 편입한 종목이에요",
+} as const;
+
 /** 관리자 캘리브레이션 패널(틱 자가채점 라벨) 카피 — intraday-decision-overhaul PR-2. */
 export const INTRADAY_CALIBRATION_COPY = {
   title: "판단 캘리브레이션",
