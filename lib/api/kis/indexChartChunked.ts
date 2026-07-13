@@ -1,10 +1,11 @@
 /**
  * fetchIndexDailyChunked — KIS 지수 일봉 청크 분할 호출 유틸.
  *
- * PRD `scorecard-relative-scoring`. `inquire-daily-indexchartprice` 는 1회 ~100봉 한도.
+ * PRD `scorecard-relative-scoring`. `inquire-daily-indexchartprice` 는 실측 1회 **최대 50봉** 한도
+ * (범위를 넓게 줘도 최근 50봉만 반환하고 과거는 조용히 버림).
  * 베타 추정 윈도우(entry 직전 60영업일) + horizon 구간(최대 21영업일 + 여유)을 한 번에 덮으려면
- * 100봉을 넘을 수 있어, 종목 일봉 청크(`fetchDailyChunked`)와 동일한 CHUNK_DAYS 분할 패턴으로
- * 여러 번 호출 후 중복 제거·오름차순 정렬한다.
+ * 50봉을 넘으므로, CHUNK_DAYS(50봉 안에 드는 캘린더일) 분할 패턴으로 여러 번 호출 후
+ * 중복 제거·오름차순 정렬한다.
  *
  * 사용처: lib/server/scorecard/relativeRunScoring.ts(지수 history 취득).
  */
@@ -12,8 +13,12 @@
 import { fetchIndexDailyChart } from "@/lib/api/kis/index-chart";
 import type { IndexDailyClose } from "@/lib/api/kis/types";
 
-/** 단일 호출 커버 가능 캘린더일 (100 영업봉 ≒ 140일, 여유 10일). 종목 청크와 동일. */
-const CHUNK_DAYS = 130;
+/**
+ * 단일 호출 커버 캘린더일. `inquire-daily-indexchartprice`(FHKUP03500100)는 실측 1콜 **최대 50봉**만
+ * 반환하고(범위가 더 넓어도 최근 50봉만 주고 과거는 조용히 버림) 60 캘린더일 ≒ 40~43 영업봉이라
+ * 50봉 한도 안에 들어와 봉 누락이 없다. (종목 일봉 청크는 100봉 한도라 130일을 쓰지만 지수는 별개.)
+ */
+const CHUNK_DAYS = 60;
 /** 청크 간 지연 — EGW00201 회피. */
 const CHUNK_DELAY_MS = 150;
 
