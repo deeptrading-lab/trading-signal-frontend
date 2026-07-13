@@ -8,7 +8,7 @@
  * (단타워치·AI 모의투자 생성 폼 등 "종목을 골라 목록에 추가"하는 화면 공용).
  * 홈 검색은 최근검색·관심종목 탭이 더 있어 기존 컨테이너를 유지한다.
  *
- * 데이터는 `useQueryStockSearch`(정적 시드 클라이언트 검색) — BFF 왕복 0.
+ * 데이터는 `useQueryStockSearch`(BFF `/api/stock/search` — 시드는 서버 전용, 클라 번들 0).
  */
 
 import { useEffect, useRef, useState } from "react";

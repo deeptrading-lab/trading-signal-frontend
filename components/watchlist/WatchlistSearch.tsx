@@ -12,7 +12,7 @@
  *   - **바깥 클릭으로만 닫힘** — 컨테이너 밖 mousedown 시에만 닫는다(홈 검색 패턴).
  *   - 행(별 제외)은 비클릭(정보 표시 전용) — 별이 유일한 액션.
  *
- * 검색은 홈과 동일한 `useQueryStockSearch`(클라이언트 lazy symbols) 재사용 + 6자리 코드 직접 추가.
+ * 검색은 홈과 동일한 `useQueryStockSearch`(BFF `/api/stock/search`) 재사용 + 6자리 코드 직접 추가.
  * 추가/제거/멤버십은 상위(`WatchlistContainer`)의 단일 `useWatchlistTickers` 인스턴스를 props 로 받아
  * 표/검색이 같은 상태를 공유(스토어 이중화 desync 방지).
  */

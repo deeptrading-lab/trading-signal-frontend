@@ -18,11 +18,11 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Section } from "@/components/ui/Section";
 import { ListRow } from "@/components/ui/ListRow";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { MaintenanceNotice } from "@/components/market/MaintenanceNotice";
-import { SectorConstituentsModal } from "@/components/market/SectorConstituentsModal";
 import { useQuerySectorRanking } from "@/hooks/market/useQuerySectorRanking";
 import { useMe } from "@/hooks/auth/useMe";
 import { resolveAvailability } from "@/lib/market/availability";
@@ -37,6 +37,19 @@ import {
   sectorsBreadthSummary,
   sectorRowAria,
 } from "@/lib/copy/market/sectors";
+
+/**
+ * 구성종목 모달 — 내부 `MiniStockChart`(→ recharts ~100KB gz)를 끌어와 지연 로드
+ * (mobile-perf-bundle). 행 클릭 시에만 마운트되므로 홈(`/`) 초기 번들에서 recharts 이탈.
+ * 열림 순간 청크를 받는 1회성 지연이라 loading 폴백은 생략(모달 내부 스켈레톤이 담당).
+ */
+const SectorConstituentsModal = dynamic(
+  () =>
+    import("@/components/market/SectorConstituentsModal").then(
+      (m) => m.SectorConstituentsModal,
+    ),
+  { ssr: false },
+);
 
 /** 등락 방향 → 등락률 색 합성 클래스(cn 사이즈 override 시에도 색 유지). */
 function changeClass(direction: SectorRankItem["direction"]): string {
