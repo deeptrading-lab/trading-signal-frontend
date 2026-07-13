@@ -7621,3 +7621,39 @@
   - 배포 후 첫 cron(평일 16:10 KST 전후) 실행 뒤 `signal_scorecard`의 w1/w2/m1 status가 채워지는지, KV 마커 `scored > 0`인지 라이브 확인
   - 채점 정체를 조기 감지할 관측 채널 검토 — `scorecard:cron:meta`를 `/api/flow/cron-status`류 라우트에 함께 노출
   - (별건, 감사 후속) 판정 생성 개선: 약세 콜 target/stop 세맨틱 모순 정리, verdict/confidence 분포 붕괴(전원 MEDIUM·약세 편중), 베타/알파 미구분 — 분석 프롬프트 차원
+
+### 2026-07-13 — feat(intraday): 단타 오토파일럿 PR-2 — 자동 시작 카드·슬롯 현황 UI (#349)
+
+- **slug**: `intraday-autopilot-ui` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/349
+- **요약**: feat(intraday): 단타 오토파일럿 PR-2 — 자동 시작 카드·슬롯 현황 UI
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PR-1(#348) 코어 위의 UI 레이어입니다. /intraday 상단에 오토파일럿 카드를 얹어 **출근 전 "자동 시작" 한 번**으로 자동 포트폴리오 모의 단타를 켜고, 슬롯 현황·런 누적 손익·선정/교체 기록을 보여줍니다.
+  > 
+  > **base = `feature/intraday-autopilot-core`** (PR-1 머지 후 base 가 main 으로 자동 전환되도록 시리즈 구성 — 머지 게이트 절차 준수)
+  > 
+  > ## 내용
+  > 
+  > - **IntradayAutopilotCard**: 미실행 시 총자본(기본 1천만)·슬롯(기본 3종목) 입력 + 자동 시작. 실행 중엔 상태 라인(09:05 전 "장 시작 대기"/가동 중), 슬롯 칩(종목명·수익률·종료 표시), 런 손익(교체 회수된 완료 자식 포함 합산), 스크리너 요약(후보→통과), 선정·교체 기록 접이식 목록, 중지 버튼(자식 세션은 유지 안내). KIS 미설정 시 경고 배지. 로컬 dev 전용 노출(Vercel 스케줄러 no-op).
+  > - **훅**: `useIntradayAutopilot`(런↔자식 세션 조인, `computeRunPnl`), `useQueryAutopilotRun`(active 시 30초 폴링), start/stop 뮤테이션(전역 토스트 opt-out·인라인 에러). queryKeys·queryConfig 단일 위치 등록.
+  > - **워치 표**: `autopilotRunId` 자식 세션에 "오토" 배지 — 수동 세션과 구분.
+  > - 카피는 `INTRADAY_AUTOPILOT_COPY`(lib/copy) 한 곳.
+  > 
+  > ## 검증
+  > 
+  > - `npm test` 1283 passed(신규 computeRunPnl 2본 — 런 귀속 자식만 합산·완료 자식 포함·남의 세션 제외)
+  > - `tsc --noEmit` / `eslint` / `next build` 통과
+  > - 브라우저 육안 검증은 평일 라이브에서(PR-1 가이드와 함께)
+  > 
+  > ## 다음 작업
+  > 
+  > - 평일 장중 라이브 검증: 08:50 시작→09:05 첫 fill→슬롯 칩·오토 배지·교체 기록 육안 확인
+  > - Supabase `docs/sql/paper-trading-autopilot.sql` 수동 1회 실행(PR-1 참조)
+  > - 후속: 스크리너 임계 env 튜닝·LLM 스카우트 재랭킹 A/B
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 평일 장중 라이브 검증: 08:50 시작→09:05 첫 fill→슬롯 칩·오토 배지·교체 기록 육안 확인
+  - Supabase `docs/sql/paper-trading-autopilot.sql` 수동 1회 실행(PR-1 참조)
+  - 후속: 스크리너 임계 env 튜닝·LLM 스카우트 재랭킹 A/B
