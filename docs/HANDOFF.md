@@ -7699,3 +7699,44 @@
   - 배포 후 신규 분석이 쌓이면 `/dashboard/scorecard`에서 confidence 분포(HIGH/MEDIUM/LOW 실제 분화 여부)·excess 적중률 추이를 추적
   - 여력 시 기존 ab-harness로 구/신 프롬프트 A/B(동일 골든셋) — confidence 분화·excess 개선 정량 비교
   - (감사 phase-2) target/무효화 터치 기반 채점 도입 — 이제 약세 콜 방향 밴드가 반대라 판별력 확보(#350)
+
+### 2026-07-13 — perf(memory): 일봉·기업개황 gcTime 하향 + 프리패치 warmed Set 제거 (#356)
+
+- **slug**: `mobile-perf-memory` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/356
+- **요약**: perf(memory): 일봉·기업개황 gcTime 하향 + 프리패치 warmed Set 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 모바일 장시간 세션에서 브라우저 탭이 메모리 부하로 재시작하는 증상의 두 번째 벡터. `stock.daily` 등 대용량 쿼리의 `gcTime: 7일` 때문에 세션 중 방문/프리패치한 **모든 종목의 캔들 배열(종목당 최대 ~3000봉 × 파생 15필드)이 observer 0 이후에도 7일간 힙에 잔류**했다. (mobile-perf 이니셔티브 PR 3/4 — PR1 #355 번들, 본 PR 힙)
+  > 
+  > ## 변경
+  > 
+  > | 키 | gcTime | 근거 |
+  > |---|---|---|
+  > | `stock.daily` | 7일 → **30분** | 캔들 배열 힙 누적 주범. 세션 내 재방문(뒤로가기·peek)은 30분이면 충분, 이후 refetch 1회로 복구. staleTime 1일 불변 |
+  > | `stock.description` | 7일 → **1시간** | 자유 텍스트, 건당 큼 |
+  > | `disclosure.company` | 7일 → **1시간** | 동일 축 |
+  > 
+  > - `queryConfig.ts` 헤더의 "gcTime > staleTime 의무" 주석 정정 — TanStack 실제 제약이 아니며, 대용량 도메인은 gcTime < staleTime 으로 힙 회수를 우선한다는 정책을 명문화 (안 고치면 본 변경과 자기모순).
+  > - `useVisibleChartPrefetch` 의 모듈 스코프 `warmed` Set 제거 — ① 세션 내내 무한 축적(자체 누수), ② gcTime 하향과 결합 시 **'gc 됐는데 warmed 로 남아 영구 콜드' 버그 벡터**. dedupe 는 `prefetchQuery` 의 fresh-캐시 no-op 이 이미 담당(재스케줄 비용 = 타이머 몇 개, 실호출 0).
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` 통과, vitest **1305 passed**
+  > - 스태거(300ms)·`(pointer: fine)` 게이트·idle 트리거 등 레이트리밋 보호 로직 무변경 — diff 는 gcTime 상수 3곳 + Set 제거뿐
+  > 
+  > ## 리스크
+  > 
+  > - gc(30분) 후 재방문 시 KIS 일봉 재호출 소폭 증가 — 프리패치 스태거가 초당 ~3.3건으로 한도 보호 중이라 수용. 데스크탑 hover peek 즉시성은 30분 창 내 동일.
+  > 
+  > ## 다음 작업
+  > 
+  > - [ ] PR2 `feature/nav-loading-ux` — async 라우트 5곳 loading.tsx + useLinkStatus 네비 즉시 피드백
+  > - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
+  > - [ ] PR1+본 PR 머지 후 모바일 실기기에서 탭 킬 재발 여부 며칠 관찰 (DevTools Memory 힙 스냅샷으로 30분 후 차트 배열 해제 확인 가능)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] PR2 `feature/nav-loading-ux` — async 라우트 5곳 loading.tsx + useLinkStatus 네비 즉시 피드백
+  - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
+  - [ ] PR1+본 PR 머지 후 모바일 실기기에서 탭 킬 재발 여부 며칠 관찰 (DevTools Memory 힙 스냅샷으로 30분 후 차트 배열 해제 확인 가능)
