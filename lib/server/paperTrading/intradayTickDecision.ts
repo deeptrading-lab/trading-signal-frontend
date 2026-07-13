@@ -55,6 +55,13 @@ export interface IntradayTickResult {
 /** 전일 warmup 분봉 캐시(ticker|tf|당일) — 같은 날 틱들이 공유. */
 const priorMinuteCache = new Map<string, StockMinuteCandle[]>();
 
+/**
+ * 일봉 레짐 캐시(ticker|당일) — 일봉 레짐은 장중 안 바뀌므로 하루 1회만 페치.
+ * 매 틱 재페치는 낭비이고, 동시 세션 부하 시 KIS rate-limit → 페치 실패 → regime 0 폴백으로
+ * veto 가 무력화되는 회귀를 부른다(200→400일 창 확대로 페치량 2배라 특히). 성공값만 캐시.
+ */
+const dailyRegimeCache = new Map<string, -1 | 0 | 1>();
+
 function todayYmd(): string {
   const d = new Date();
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -203,13 +210,21 @@ export async function resolveIntradayTickDecision(
     } catch {
       minuteCandles = [];
     }
-    try {
-      const to = todayYmd();
-      const from = nDaysAgoYyyymmdd(200);
-      const daily = await fetchDailyChunked(stock.ticker, from, to);
-      dailyRegime = dailyRegimeFromCandles(daily);
-    } catch {
-      dailyRegime = 0;
+    const regimeKey = `${stock.ticker}|${todayYmd()}`;
+    const cachedRegime = dailyRegimeCache.get(regimeKey);
+    if (cachedRegime !== undefined) {
+      dailyRegime = cachedRegime;
+    } else {
+      try {
+        // 400 달력일 ≈ 269 거래일 — 레짐 SMA(≈130봉) 기울기 산출에 필요한 이력.
+        // ★200일(=132 거래일)은 SMA 문턱(130)만 겨우 넘겨 기울기 봉이 2개뿐 → 전 종목 regime 0
+        //   (일봉상 명백한 상승/하락 종목도 0)으로 레짐 veto 가 상시 무력화되던 버그.
+        const daily = await fetchDailyChunked(stock.ticker, nDaysAgoYyyymmdd(400), todayYmd());
+        dailyRegime = dailyRegimeFromCandles(daily);
+        dailyRegimeCache.set(regimeKey, dailyRegime); // 성공만 캐시(실패는 다음 틱 재시도).
+      } catch {
+        dailyRegime = 0;
+      }
     }
   }
 

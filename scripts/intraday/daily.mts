@@ -45,7 +45,10 @@ const P = (s = "") => { out.push(s); console.log(s); };
 
 // ── 1. 적재 ──
 const sres = await fetch(`${url}/rest/v1/paper_trading_sessions?select=payload&order=updated_at.desc&limit=120`, { headers: H });
-const sessions = (await sres.json()).map((r: any) => r.payload).filter((p: any) => p.decisionProvider === "cli-agent" && kstDate(p.createdAt) === DAY);
+const allDay = (await sres.json()).map((r: any) => r.payload).filter((p: any) => p.decisionProvider === "cli-agent" && kstDate(p.createdAt) === DAY);
+// codex 세션 제외 — codex CLI 미설치 환경에선 analyst/judge 전량 실패(매매 0)라 순수 노이즈. claude 만 분석.
+const codexExcluded = allDay.filter((p: any) => p.aiProvider === "codex").length;
+const sessions = allDay.filter((p: any) => p.aiProvider !== "codex");
 const byOwner: Record<string, number> = {};
 for (const s of sessions) byOwner[s.owner ?? "(미지정)"] = (byOwner[s.owner ?? "(미지정)"] || 0) + 1;
 const ids = sessions.map((s: any) => s.id);
@@ -60,7 +63,7 @@ fs.writeFileSync(`${OUT}today-sessions-${DAY}.json`, JSON.stringify(sessions));
 fs.writeFileSync(`${OUT}today-ticks-${DAY}.json`, JSON.stringify(ticks));
 
 P(`# 단타 일일 리포트 ${DAY}`);
-P(`세션 ${sessions.length} (owner ${Object.entries(byOwner).map(([o, n]) => `${o}:${n}`).join(" ") || "없음"}) / 틱 ${ticks.length}`);
+P(`세션 ${sessions.length} (owner ${Object.entries(byOwner).map(([o, n]) => `${o}:${n}`).join(" ") || "없음"}) / 틱 ${ticks.length}${codexExcluded > 0 ? ` · codex ${codexExcluded}세션 제외(CLI 미설치 노이즈)` : ""}`);
 if (Object.keys(byOwner).includes("(미지정)")) P(`⚠️ 미지정(owner 없음) 세션 존재 — 이중틱 오염 가능(owner 게이트 #326 확인).`);
 if (ticks.length === 0) { P("\n틱 없음 — 종료(장중 서버 미가동 or 미래일)."); fs.writeFileSync(`${OUT}report-${DAY}.txt`, out.join("\n")); process.exit(0); }
 
