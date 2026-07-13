@@ -210,7 +210,8 @@ export function StockDailyChart({
       const maxAbs = Math.max(...macdVals.map(Math.abs));
       labels.push((macdVals.some((x) => x < 0) ? -maxAbs : maxAbs).toFixed(0));
     }
-    return Math.round(Math.min(56, Math.max(40, Math.max(...labels.map(w)) + 18)));
+    // 축선·눈금선 없음(axisProps: axisLine/tickLine false)이라 폭은 텍스트+소폭 여백만.
+    return Math.round(Math.min(54, Math.max(30, Math.max(...labels.map(w)) + 10)));
   }, [chartType, candleSeries, priceSeries, volSeries, macdSeries, isUs]);
 
   const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay, allowMinute };
