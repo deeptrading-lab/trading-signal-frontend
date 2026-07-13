@@ -7538,6 +7538,48 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
 
+### 2026-07-13 — feat(intraday): 단타 오토파일럿 PR-1 — 자동 포트폴리오 스크리너·로테이션 코어 (#348)
+
+- **slug**: `intraday-autopilot-core` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/348
+- **요약**: feat(intraday): 단타 오토파일럿 PR-1 — 자동 포트폴리오 스크리너·로테이션 코어
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 출근 전 버튼 하나로 AI 단타를 자동 운영하는 오토파일럿의 **서버 코어**입니다. 오토파일럿 "런"이 기존 단일종목 cli-agent 세션을 자식으로 생성/회수하며, 장중에 단타 적합 종목을 스스로 고르고(스크리너) 죽은 종목을 교체(로테이션)합니다. 기존 틱·judge·체결·자가채점·daily.mts 캘리브레이션 경로는 **무변경**(자식 = 일반 세션이라 관측성 공짜).
+  > 
+  > ## 구조
+  > 
+  > - **스크리너(결정론 2단)**: KIS 랭킹 4콜(거래대금·등락률·외인/기관 수급) union → 하드필터(정리매매/투자위험/투자경고·가격 1천~30만·거래대금 100억↓·등락률 +1~25%) → 1차 점수(모멘텀 0.45·유동성 0.35·수급 0.20, percentile 정규화, 단기과열 감점) → 상위 8 shortlist 당일 5분봉 → 2차 점수(ATR% 삼각 0.30·거래량z 0.25·VWAP 위치 0.25·구조 0.20). 종목 선정에 LLM 불개입(PR-4 conviction 역상관 교훈) — `rerank` 훅만 예약.
+  > - **로테이션**: 10분 창 스윕. flat 슬롯만 교체(★포지션 보유 슬롯 불가침 — 청산은 judge/하드스톱 전담), 교체 조건 = 랭킹 12위 밖 또는 무주문 6틱+conviction≤55. 쿨다운 30분, fill 창 09:05~14:00, 스윕당 2 fill 캡. 랭킹 미가용 시 무근거 교체 방지.
+  > - **스케줄러**: 기존 60초 사이클에 `closeOutAutopilotRuns`(①ᴮ)·`sweepAutopilotRuns`(②ᴮ) 2스테이지 삽입. 자식 세션 틱은 기존 스테이지가 자동 처리.
+  > - **다중 운영자 격리**: 런 owner=operator 엄격 일치만 스윕/마감. 오늘 running 티커(소유자 무관) 사전 제외 + 생성 후 owner/autopilotRunId 검증으로 친구 서버·수동 세션과 경합/흡수 없음.
+  > - **영속**: `paper_trading_autopilot_runs`(payload jsonb) write-through + 부팅 hydrate(내 owner 만). 재시작 후 슬롯·쿨다운·스윕 창 복원.
+  > - **API**: `GET/POST /api/paper-trading/autopilot`(시작은 09:00 이전·KIS 미설정에도 허용, kisReady 힌트), `PATCH .../[runId]`(중지 — 자식 세션은 건드리지 않음).
+  > 
+  > ## 검증
+  > 
+  > - `npm test` 1281 passed(신규 41: rotation/screener/runStore — 포지션 불가침·창 게이트·쿨다운·멱등가드 충돌·owner 게이트·창 dedup)
+  > - `tsc --noEmit` / `eslint` / `next build` 통과
+  > - 라이브 검증은 평일 장중 로컬 dev 로 진행 예정(가이드: 본문 하단)
+  > 
+  > ## ⚠️ 수동 스텝
+  > 
+  > - Supabase SQL Editor 에서 `docs/sql/paper-trading-autopilot.sql` 1회 실행(테이블 생성). 미실행이어도 인메모리로 동작(재시작 시 런 소실만).
+  > 
+  > ## 라이브 검증 가이드
+  > 
+  > 1. 평일 08:50 dev 기동 → `curl -X POST localhost:3000/api/paper-trading/autopilot -H 'Content-Type: application/json' -d '{}'`
+  > 2. 09:05+ `[autopilot]` 로그로 유니버스/fill 확인, 워치 표에 자식 세션 등장
+  > 3. 교체 강제 유발: `AUTOPILOT_REPLACE_RANK_THRESHOLD=3`
+  > 4. 15:41 후 런·자식 completed, 다음날 daily.mts 집계 포함 확인
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2 `feature/intraday-autopilot-ui`: /intraday 오토파일럿 카드(시작/중지·슬롯 칩·손익·로테이션 히스토리) + 워치 표 "오토" 배지 + 훅
+  - 평일 라이브 검증(스크리너 품질 관찰 → env 임계 튜닝)
+  - 후속: LLM 스카우트 재랭킹 훅 실험(결정론 대비 A/B)
+
 ### 2026-07-13 — fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소 (#347)
 
 - **slug**: `scorecard-index-field-fix` · **author**: @HY0118
