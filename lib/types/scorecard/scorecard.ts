@@ -56,7 +56,7 @@ export interface ScorecardRow {
   signalAction: SignalAction | null;
   /** FinalDecision.target_pct(현재가 대비 목표 %, nullable). */
   targetPct: number | null;
-  /** FinalDecision.stop_loss_pct(항상 음수 %). */
+  /** FinalDecision.stop_loss_pct(테제 무효화 라인 %: 강세=하방 음수, 약세=상방 양수. legacy 약세는 음수 가능). */
   stopLossPct: number | null;
   /** 결정시점 기준 봉 종가(KRW) = entry. */
   entryClose: number;

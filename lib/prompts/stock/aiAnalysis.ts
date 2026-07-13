@@ -543,7 +543,7 @@ ${PCT_CLARITY}
   "new_entry_strategy": "아직 보유하지 않은 신규 진입자용 가이드 — 지금 진입할지/관망할지, 어느 가격·조건에 진입할지 구체적으로 (1~2문장). 현재가 기준으로만 서술.",
   "holder_strategy": "이미 보유 중인 사람용 가이드 — 유지/분할 매도/전량 청산을 포지션 비율·가격 레벨로 (1~2문장). 수익률(%) 표현 절대 금지.",
   "target_pct": 목표 수익률 또는 재진입 구간(숫자, 현재가 대비 %). BUY/OVERWEIGHT/HOLD = 상방 목표(양수, 예: 15). UNDERWEIGHT/REDUCE = 재진입 고려 구간(음수, 예: -12 = 현재가 대비 -12% 하락 시 재진입). SELL = null,
-  "stop_loss_pct": 손절선(음수 숫자, 현재가 대비 %, 예: -5 = -5%). 모든 verdict에 필수,
+  "stop_loss_pct": 테제(논거) 무효화 라인(숫자, 현재가 대비 %). 강세(BUY/OVERWEIGHT/HOLD) = 하방 손절(음수, 예: -5). 약세(UNDERWEIGHT/REDUCE/SELL) = 상방 무효화(양수, 예: +6 = 현재가 +6% 돌파 시 약세 논거 취소). 모든 verdict에 필수,
   "risk_reward_ratio": 손익비(숫자, 예: 3.0 = 3:1). BUY/OVERWEIGHT/HOLD에만 설정. UNDERWEIGHT/REDUCE/SELL = null,
   "short_term_outlook": "1~2주 단기 전망 (기술적 신호·수급·이벤트 중심 1~2문장)",
   "mid_term_outlook": "1~3개월 중기 전망 (실적·밸류에이션·섹터 흐름 중심 1~2문장)",
@@ -578,10 +578,10 @@ verdict 선택 기준 — 강세→약세 6단계 (리서치 매니저·트레�
 
 risk_reward_ratio: BUY/OVERWEIGHT/HOLD에만 설정. UNDERWEIGHT/REDUCE/SELL = null.
 
-stop_loss_pct 설정 기준:
-- BUY/OVERWEIGHT: 기술적 지지선 또는 -5%~-8% 수준
-- HOLD: -5%~-10% 수준
-- UNDERWEIGHT/REDUCE/SELL: 보유 시 손절 기준 (없으면 -3%~-5%)
+stop_loss_pct(테제 무효화 라인) 설정 기준 — 방향이 verdict로 갈립니다:
+- BUY/OVERWEIGHT: 하방 손절(음수). 기술적 지지선 이탈 또는 -5%~-8% 수준
+- HOLD: 하방 손절(음수). -5%~-10% 수준
+- UNDERWEIGHT/REDUCE/SELL: **상방 무효화(양수)**. 약세 논거가 깨지는 저항 돌파 지점(보통 +4%~+8%). 현재가가 이 위로 오르면 약세 판단을 철회해야 하는 라인이며, 하방 손절이 아님. target_pct(하방 재진입 구간)와 반대 방향이어야 함.
 
 반드시 구체적인 숫자를 포함하세요. "추후 결정" 또는 모호한 표현 금지.`,
     user: (s: AnalysisState) => `${s.ticker}에 대한 모든 분석을 종합해 최종 투자 결정을 JSON으로 출력하세요.

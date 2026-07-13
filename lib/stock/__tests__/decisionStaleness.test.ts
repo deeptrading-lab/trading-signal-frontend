@@ -115,6 +115,44 @@ describe("evaluateDecisionStaleness — 손절 규칙", () => {
   });
 });
 
+describe("evaluateDecisionStaleness — 무효화 규칙(약세 상방, stop_loss_pct 양수)", () => {
+  it("무효화 × 0.97 경계(정확히) → invalidation-near", () => {
+    // base 10000, +6% → 무효화 10600. 경계 10600×0.97 = 10282. live=10282 → ≥ 경계.
+    const r = evalStale({
+      decision: decision({ verdict: "UNDERWEIGHT", target_pct: -10, stop_loss_pct: 6 }),
+      livePrice: 10_282,
+    });
+    expect(r).toEqual({ stale: true, reason: "invalidation-near" });
+  });
+
+  it("무효화 경계 바로 아래 → 무효화 아님(다른 규칙도 미발화면 not stale)", () => {
+    // live 10200 < 10282, base 대비 +2%(큰이동 미만), 재진입 9000 멀음.
+    const r = evalStale({
+      decision: decision({ verdict: "UNDERWEIGHT", target_pct: -10, stop_loss_pct: 6 }),
+      livePrice: 10_200,
+    });
+    expect(r).toEqual({ stale: false, reason: null });
+  });
+
+  it("우선순위 — 급등(무효화 돌파 + 큰이동 동시)이면 invalidation-near", () => {
+    // live 11000: 무효화 10282 이상(참) & +10% ≥ 6%(참). 무효화가 이긴다.
+    const r = evalStale({
+      decision: decision({ verdict: "REDUCE", target_pct: -10, stop_loss_pct: 6 }),
+      livePrice: 11_000,
+    });
+    expect(r).toEqual({ stale: true, reason: "invalidation-near" });
+  });
+
+  it("legacy 약세(stop 음수)에서 상방 급등은 무효화 아님 → big-move (하위호환)", () => {
+    // 이전 시맨틱 저장 행: stop -8(하방). +7% 상승은 무효화 규칙 대상 아니고 big-move 로만 잡힘.
+    const r = evalStale({
+      decision: decision({ verdict: "UNDERWEIGHT", target_pct: -10, stop_loss_pct: -8 }),
+      livePrice: 10_700,
+    });
+    expect(r).toEqual({ stale: true, reason: "big-move" });
+  });
+});
+
 describe("evaluateDecisionStaleness — 큰 가격 이동", () => {
   it("목표·손절 안 닿았지만 6% 이상 이동 → big-move", () => {
     // base 10000, target +30%→13000(멀다), stop −8%→9200(경계9476). live 10700 = +7%.

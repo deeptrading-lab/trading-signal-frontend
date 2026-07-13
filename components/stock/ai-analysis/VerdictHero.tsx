@@ -218,6 +218,8 @@ function DoneHero({
     typeof final.base_price === "number" && final.base_price > 0 ? final.base_price : null;
   const hasRR = final.risk_reward_ratio !== null;
   const targetIsReentry = final.target_pct !== null && final.target_pct < 0;
+  // stop_loss_pct 부호로 방향: 음수=하방 손절 / 양수=상방 무효화(약세 논거가 깨지는 라인).
+  const stopIsInvalidation = final.stop_loss_pct > 0;
   // v-meta 가격 — live=현재가(prop) / saved=분석 시점가(base_price).
   const metaPrice = isSaved ? basePrice : livePrice;
   const metaPriceLabel = isSaved ? COPY.hero.metaBasePrice : COPY.hero.metaLivePrice;
@@ -278,8 +280,12 @@ function DoneHero({
             )
           )}
         </LvlBox>
-        <LvlBox label={COPY.verdict.stopLossLabel}>
-          {lvlValue(final.stop_loss_pct, basePrice, "text-signal-down")}
+        <LvlBox label={stopIsInvalidation ? COPY.verdict.invalidationLabel : COPY.verdict.stopLossLabel}>
+          {lvlValue(
+            final.stop_loss_pct,
+            basePrice,
+            stopIsInvalidation ? "text-chart-rsi" : "text-signal-down",
+          )}
         </LvlBox>
         {hasRR && (
           <LvlBox label={COPY.verdict.rrLabel}>

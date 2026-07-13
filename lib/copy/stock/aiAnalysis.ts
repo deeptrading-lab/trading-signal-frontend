@@ -4,6 +4,7 @@ import type { StaleReason } from "@/lib/stock/decisionStaleness";
 /** 저장 분석 재분석 권유 사유 → 한글 문구(앰버 배너). decisionStaleness 의 StaleReason 과 1:1. */
 const SAVED_STALE_REASON: Record<StaleReason, string> = {
   "stop-near": "손절가 부근이에요",
+  "invalidation-near": "무효화 라인 부근이에요",
   "target-near": "목표가에 근접했어요",
   "big-move": "분석 시점보다 가격이 크게 움직였어요",
   aged: "분석한 지 시간이 지났어요",
@@ -325,6 +326,8 @@ export const COPY = {
     targetLabel: "목표가",
     reentryLabel: "재진입 구간",
     stopLossLabel: "손절가",
+    /** 약세 판정의 상방 무효화 라인 라벨 — 현재가가 이 위로 오르면 약세 논거 취소(stop_loss_pct 양수). */
+    invalidationLabel: "무효화",
     rrLabel: "손익비",
     targetHint: "현재가 대비",
     shortTermLabel: "단기 전망 (1~2주)",

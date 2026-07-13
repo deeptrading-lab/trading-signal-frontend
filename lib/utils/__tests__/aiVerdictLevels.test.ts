@@ -34,18 +34,39 @@ describe("deriveAiVerdictLevels", () => {
     expect(lv!.stop.role).toBe("stop");
   });
 
-  it("신규 진입 주의(target_pct 음수)=재진입 아래, role=reentry", () => {
+  it("약세 신규 시맨틱(stop_loss_pct 양수)=무효화 위, role=invalidation", () => {
+    // 약세 콜: target=재진입(하방 음수) + stop=무효화(상방 양수).
+    const lv = deriveAiVerdictLevels(
+      decision({ verdict: "UNDERWEIGHT", target_pct: -10, stop_loss_pct: 6 }),
+    );
+    expect(lv!.target?.role).toBe("reentry");
+    expect(lv!.target!.price).toBeLessThan(lv!.basePrice); // 재진입은 아래
+    expect(lv!.stop.role).toBe("invalidation");
+    expect(lv!.stop.price).toBeGreaterThan(lv!.basePrice); // 무효화는 위
+    expect(lv!.stop.price).toBeGreaterThan(lv!.target!.price); // 무효화(위) > 재진입(아래)
+  });
+
+  it("SELL 신규 시맨틱(stop_loss_pct 양수)=무효화만 위", () => {
+    const lv = deriveAiVerdictLevels(decision({ verdict: "SELL", target_pct: null, stop_loss_pct: 5 }));
+    expect(lv!.target).toBeNull();
+    expect(lv!.stop.role).toBe("invalidation");
+    expect(lv!.stop.price).toBeGreaterThan(lv!.basePrice); // 위
+  });
+
+  it("legacy 약세(stop_loss_pct 음수)=하위호환, role=stop 아래 유지", () => {
+    // 이 시맨틱 도입 이전 저장된 약세 행: stop 이 음수(하방)라 role=stop 으로 그대로 렌더.
     const lv = deriveAiVerdictLevels(
       decision({ verdict: "UNDERWEIGHT", target_pct: -4, stop_loss_pct: -8 }),
     );
     expect(lv!.target?.role).toBe("reentry");
-    expect(lv!.target!.price).toBeLessThan(lv!.basePrice); // 재진입은 현재 아래
+    expect(lv!.stop.role).toBe("stop");
     expect(lv!.stop.price).toBeLessThan(lv!.target!.price); // 손절이 재진입보다 더 아래
   });
 
-  it("SELL(target_pct null)=target 없음, 손절만", () => {
+  it("legacy SELL(target_pct null, stop 음수)=target 없음, 손절만 아래", () => {
     const lv = deriveAiVerdictLevels(decision({ verdict: "SELL", target_pct: null, stop_loss_pct: -6 }));
     expect(lv!.target).toBeNull();
+    expect(lv!.stop.role).toBe("stop");
     expect(lv!.stop.price).toBeLessThan(lv!.basePrice);
   });
 
