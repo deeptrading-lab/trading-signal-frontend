@@ -7700,6 +7700,90 @@
   - 여력 시 기존 ab-harness로 구/신 프롬프트 A/B(동일 골든셋) — confidence 분화·excess 개선 정량 비교
   - (감사 phase-2) target/무효화 터치 기반 채점 도입 — 이제 약세 콜 방향 밴드가 반대라 판별력 확보(#350)
 
+### 2026-07-13 — perf(bundle): 검색 BFF 이전 + 2MB 심볼 JSON 클라 제거 + recharts 지연 로드 (#355)
+
+- **slug**: `mobile-perf-bundle` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/355
+- **요약**: perf(bundle): 검색 BFF 이전 + 2MB 심볼 JSON 클라 제거 + recharts 지연 로드
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 모바일에서 메뉴 이동 딜레이 + 브라우저 탭 메모리 재시작 증상의 최대 원인 진단 결과, `lib/api/kis/search.ts` 가 국내 `symbols.json`(329KB) + 미국 `us-symbols.json`(1.72MB, 10,618종목)을 정적 import 하고, `/watchlist` 클라 컨테이너(`getSymbolName`)와 검색 훅(lazy import)이 이를 클라이언트로 끌어와 **2MB JSON 다운로드+파싱+힙 상주**가 발생하고 있었다. (mobile-perf 이니셔티브 PR 1/4)
+  > 
+  > ## 변경
+  > 
+  > ### 1. 종목 검색 BFF 이전 — 2MB JSON 클라 완전 제거
+  > - `app/api/stock/search/route.ts` 신설: GET `?q=` → 서버 `searchSymbols` (정책 불변 — 6자리 티커 정확매칭·한글 별칭·관련도 랭킹·최대 20건). `X-Symbols-Source` 버전 헤더 + `Cache-Control`(시드는 배포 단위 정적).
+  > - `lib/api/stock/search.ts`: 클라 fetcher (`chart.ts` 패턴).
+  > - `hooks/stock/useQueryStockSearch.ts`: queryFn 을 동적 import → BFF fetcher 로 교체. queryKey·TTL 불변이라 소비처 3곳(홈·워치리스트·피커) 무수정.
+  > 
+  > ### 2. WatchlistContainer 시드 폴백 제거
+  > - BFF `/api/watchlist` 가 이미 서버에서 시드 name 을 보강해 응답 — 클라 `getSymbolName` 폴백은 '시세 실패+구버전 엔트리+상세 미방문' 삼중 교집합에서만 발동하는 사실상 데드 티어. 제거로 `lib/api/kis/search` 클라 소비처 0 = 번들 완전 이탈.
+  > 
+  > ### 3. recharts 정적 import 3곳 지연 로드 (`peekDynamic.ts` 정합)
+  > - `IntradayMiniChart` → 행 펼침 시 로드 (`/intraday` 진입 번들에서 recharts 이탈)
+  > - 자산곡선을 `PaperTradingEquityChart.tsx` 로 분리 후 dynamic (`/intraday/[sessionId]`)
+  > - `SectorConstituentsModal` → 행 클릭 시 로드 (홈 초기 번들에서 이탈)
+  > 
+  > ### 4. next.config
+  > - `experimental.optimizePackageImports: ["recharts"]" (lucide-react 는 Next 기본 목록 포함)
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` 통과, vitest **1305 passed** (lint 에러 11건은 기존 main `scripts/intraday/daily.mts` 것)
+  > - 프로덕션 빌드 후 클라 청크 grep: 심볼 JSON 흔적(`count_kosdaq` 등) **0건** (이전 빌드는 221KB 청크에 KR 시드 포함)
+  > - `next start` 스모크: `/api/stock/search` 4케이스(한글 정확·미국 한글명 '애플'→AAPL·6자리 티커·q 누락 400) 정상
+  > - 브라우저 실검증: /stock 검색 드롭다운(BFF 경유), /watchlist 종목명 정상(디그레이드 없음), /intraday 행 펼침 미니차트, 세션 상세 자산곡선, 홈 업종 모달 — 콘솔 에러 0
+  > 
+  > ## 리스크
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] PR2 `feature/nav-loading-ux` — async 라우트 5곳 loading.tsx + useLinkStatus 네비 즉시 피드백
+  - [ ] PR3 `feature/mobile-perf-memory` — 일봉/기업개황 gcTime 7일 → 30분/1시간 하향 + 프리패치 warmed Set 제거
+  - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화(3s 폴링 상한)
+  - [ ] 머지 후 모바일 실기기에서 탭 킬 재발 여부 며칠 관찰
+
+### 2026-07-13 — perf(memory): 일봉·기업개황 gcTime 하향 + 프리패치 warmed Set 제거 (#356)
+
+- **slug**: `mobile-perf-memory` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/356
+- **요약**: perf(memory): 일봉·기업개황 gcTime 하향 + 프리패치 warmed Set 제거
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 모바일 장시간 세션에서 브라우저 탭이 메모리 부하로 재시작하는 증상의 두 번째 벡터. `stock.daily` 등 대용량 쿼리의 `gcTime: 7일` 때문에 세션 중 방문/프리패치한 **모든 종목의 캔들 배열(종목당 최대 ~3000봉 × 파생 15필드)이 observer 0 이후에도 7일간 힙에 잔류**했다. (mobile-perf 이니셔티브 PR 3/4 — PR1 #355 번들, 본 PR 힙)
+  > 
+  > ## 변경
+  > 
+  > | 키 | gcTime | 근거 |
+  > |---|---|---|
+  > | `stock.daily` | 7일 → **30분** | 캔들 배열 힙 누적 주범. 세션 내 재방문(뒤로가기·peek)은 30분이면 충분, 이후 refetch 1회로 복구. staleTime 1일 불변 |
+  > | `stock.description` | 7일 → **1시간** | 자유 텍스트, 건당 큼 |
+  > | `disclosure.company` | 7일 → **1시간** | 동일 축 |
+  > 
+  > - `queryConfig.ts` 헤더의 "gcTime > staleTime 의무" 주석 정정 — TanStack 실제 제약이 아니며, 대용량 도메인은 gcTime < staleTime 으로 힙 회수를 우선한다는 정책을 명문화 (안 고치면 본 변경과 자기모순).
+  > - `useVisibleChartPrefetch` 의 모듈 스코프 `warmed` Set 제거 — ① 세션 내내 무한 축적(자체 누수), ② gcTime 하향과 결합 시 **'gc 됐는데 warmed 로 남아 영구 콜드' 버그 벡터**. dedupe 는 `prefetchQuery` 의 fresh-캐시 no-op 이 이미 담당(재스케줄 비용 = 타이머 몇 개, 실호출 0).
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` 통과, vitest **1305 passed**
+  > - 스태거(300ms)·`(pointer: fine)` 게이트·idle 트리거 등 레이트리밋 보호 로직 무변경 — diff 는 gcTime 상수 3곳 + Set 제거뿐
+  > 
+  > ## 리스크
+  > 
+  > - gc(30분) 후 재방문 시 KIS 일봉 재호출 소폭 증가 — 프리패치 스태거가 초당 ~3.3건으로 한도 보호 중이라 수용. 데스크탑 hover peek 즉시성은 30분 창 내 동일.
+  > 
+  > ## 다음 작업
+  > 
+  > - [ ] PR2 `feature/nav-loading-ux` — async 라우트 5곳 loading.tsx + useLinkStatus 네비 즉시 피드백
+  > - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
+  > - [ ] PR1+본 PR 머지 후 모바일 실기기에서 탭 킬 재발 여부 며칠 관찰 (DevTools Memory 힙 스냅샷으로 30분 후 차트 배열 해제 확인 가능)
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] PR2 `feature/nav-loading-ux` — async 라우트 5곳 loading.tsx + useLinkStatus 네비 즉시 피드백
+  - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
+  - [ ] PR1+본 PR 머지 후 모바일 실기기에서 탭 킬 재발 여부 며칠 관찰 (DevTools Memory 힙 스냅샷으로 30분 후 차트 배열 해제 확인 가능)
+
 ### 2026-07-13 — feat(nav-loading): async 라우트 5곳 loading.tsx + 네비 pending 즉시 피드백 (#357)
 
 - **slug**: `nav-loading-ux` · **author**: @HY0118
