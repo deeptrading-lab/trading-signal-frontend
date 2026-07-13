@@ -10,6 +10,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronDown, ExternalLink, History, Loader2, Pause, Play, X } from "lucide-react";
@@ -44,10 +45,25 @@ import {
   type PaperTradingSession,
   type PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
-import { IntradayMiniChart } from "@/components/intraday/IntradayMiniChart";
 import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
+
+/**
+ * 분봉 미니차트 — recharts(~100KB gz)를 끌어오는 유일한 표 내 컴포넌트라 지연 로드
+ * (mobile-perf-bundle, `peekDynamic.ts` 정합). 행 펼침 시에만 마운트되므로 /intraday 진입
+ * 번들에서 recharts 가 빠지고, 첫 펼침 1회만 스켈레톤(차트 실높이 220px 미러)이 잠깐 보인다.
+ */
+const IntradayMiniChart = dynamic(
+  () =>
+    import("@/components/intraday/IntradayMiniChart").then(
+      (m) => m.IntradayMiniChart,
+    ),
+  {
+    ssr: false,
+    loading: () => <Skeleton variant="block" className="h-[220px] w-full" />,
+  },
+);
 
 /**
  * 주기 드랍다운 기본값(분) — 5분 = 캘리브레이션 표준(PRD intraday-decision-overhaul §10-4).

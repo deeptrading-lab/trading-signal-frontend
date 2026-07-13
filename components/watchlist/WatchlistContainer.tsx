@@ -26,7 +26,6 @@ import { useWatchlistTickers } from "@/hooks/watchlist/useWatchlistTickers";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
 import { useVisibleChartPrefetch } from "@/hooks/stock/useVisibleChartPrefetch";
-import { getSymbolName } from "@/lib/api/kis/search";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { useStockMetaStore } from "@/lib/store/stockMetaStore";
 import { WatchlistPage } from "./WatchlistPage";
@@ -46,15 +45,13 @@ export function WatchlistContainer() {
   // 종목 메타 스토어 — 상세에서 본 실종목명을 디그레이드 행 표시명 후보로 공유(이름 일원화).
   const stockQuotes = useStockMetaStore((s) => s.quotes);
 
-  // 디그레이드 행 표시명 — watchlist store(추가 시점) → 메타 스토어(상세에서 본 실명) → 시드 name.
-  //   모두 없으면 null(행은 ticker 만 표시).
+  // 디그레이드 행 표시명 — watchlist store(추가 시점) → 메타 스토어(상세에서 본 실명).
+  //   모두 없으면 null(행은 ticker 만 표시). 시드(getSymbolName) 폴백은 제거(mobile-perf-bundle) —
+  //   BFF `/api/watchlist` 가 서버에서 시드 name 을 이미 보강하고, 클라 시드 정적 import 는
+  //   2MB 심볼 JSON 을 /watchlist 번들에 편입시키는 비용만 남는 사실상 데드 티어였다.
   const resolveName = useCallback(
     (ticker: string) =>
-      pickStockName(ticker, [
-        getName(ticker),
-        stockQuotes[ticker]?.name,
-        getSymbolName(ticker),
-      ]),
+      pickStockName(ticker, [getName(ticker), stockQuotes[ticker]?.name]),
     [getName, stockQuotes],
   );
 
