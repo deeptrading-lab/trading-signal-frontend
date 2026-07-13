@@ -26,6 +26,7 @@ import { useQuerySectorConstituents } from "@/hooks/market/useQuerySectorConstit
 import { useQuerySectorSparklines } from "@/hooks/market/useQuerySectorSparklines";
 import { useMe } from "@/hooks/auth/useMe";
 import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
+import { useOverlayBackClose } from "@/hooks/utils/useOverlayBackClose";
 import { resolveAvailability } from "@/lib/market/availability";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
@@ -100,6 +101,10 @@ export function SectorConstituentsModal({
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
+
+  // 모바일 뒤로가기 → 모달만 닫기(라우트 유지) — AI 패널·체결내역 시트와 동일 패턴(overlay-back-close).
+  // 열릴 때만 마운트되는 컴포넌트라 open=true 고정, UI 닫기(unmount)는 훅이 marker 를 소비한다.
+  useOverlayBackClose(true, onClose);
 
   const availability = resolveAvailability({
     isLoading: query.isLoading,

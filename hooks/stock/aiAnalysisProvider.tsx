@@ -14,7 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { fetchAIAnalysisStream } from "@/lib/api/stock/aiAnalysis";
 import { useToast } from "@/hooks/utils/useToast";
-import { useBreakpoint } from "@/hooks/utils/useBreakpoint";
+import { useOverlayBackClose } from "@/hooks/utils/useOverlayBackClose";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import { stripTickerCode } from "@/lib/utils/stripTickerCode";
 import { stripDecisionTickers } from "@/lib/stock/stripDecisionTickers";
@@ -572,49 +572,12 @@ export function AIAnalysisProvider({ children }: { children: React.ReactNode }) 
     dispatch({ kind: "collapse" });
   }, [pathname]);
 
-  // ── 모바일 뒤로가기 ↔ 패널 히스토리 연동 (ai-panel-back-close) ──────────────
-  // 모바일에서 패널은 풀스크린 오버레이인데 히스토리에 안 얹혀 있어, 하드웨어 뒤로가기/스와이프가
-  // 패널 대신 **라우트를 뒤로** 보냈다(사용자: 패널만 닫히길 기대). 패널이 열릴 때 marker 엔트리를
-  // 1개 push 해 두고, popstate(뒤로가기)가 오면 패널만 닫는다. X 등 UI 닫기는 back() 으로 marker 를
-  // 소비해 히스토리 잔여를 없앤다. 데스크탑(사이드 패널)은 기존 동작 유지(뒤로가기=페이지 이동).
-  //   - push 는 openFor(사용자 액션) 시점의 명령형 1회 — effect 기반 push 는 StrictMode 이중
-  //     실행에서 marker 가 2개 쌓이는 함정이 있어 피한다. armed ref 가 중복 push 를 막는다.
-  //   - 라우트 이동으로 collapse 된 경우엔 현재 엔트리가 marker 가 아니므로(back() 하면 페이지가
-  //     이동해 버림) history.state 검사 후 disarm 만 한다(잔여 marker 는 같은 URL 이라 무해).
-  const { isMobile } = useBreakpoint();
-  const isMobileRef = useRef(isMobile);
-  useEffect(() => {
-    isMobileRef.current = isMobile;
-  }, [isMobile]);
-  const panelHistoryArmedRef = useRef(false);
-  const armPanelHistory = useCallback(() => {
-    if (!isMobileRef.current || panelHistoryArmedRef.current) return;
-    if (typeof window === "undefined") return;
-    window.history.pushState({ aiPanelOpen: true }, "");
-    panelHistoryArmedRef.current = true;
+  // 모바일 뒤로가기 ↔ 패널 히스토리 연동 — 뒤로가기는 패널만 닫고 라우트를 유지한다(#361).
+  // 구현은 공용 훅으로 일원화(overlay-back-close — 체결내역 시트·업종 모달과 동일 패턴).
+  const closeFromBack = useCallback(() => {
+    dispatch({ kind: "setOpen", open: false });
   }, []);
-  // 뒤로가기(popstate) — marker 가 무장돼 있으면 이 pop 은 "패널 닫기" 의도.
-  useEffect(() => {
-    const onPop = () => {
-      if (!panelHistoryArmedRef.current) return;
-      panelHistoryArmedRef.current = false;
-      if (stateRef.current.isOpen) dispatch({ kind: "setOpen", open: false });
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-  // 열림/닫힘 전이 — 어떤 경로로 열려도(카드 클릭·분석 시작·재열기) 무장하고, 어떤 경로로
-  // 닫혀도(X·탭 전부 닫기·라우트 collapse·뒤로가기) marker 를 정리한다. armed ref 가 중복
-  // push 를 막아 StrictMode 이중 실행에도 안전.
-  useEffect(() => {
-    if (state.isOpen) {
-      armPanelHistory();
-      return;
-    }
-    if (!panelHistoryArmedRef.current) return;
-    panelHistoryArmedRef.current = false;
-    if (window.history.state?.aiPanelOpen) window.history.back();
-  }, [state.isOpen, armPanelHistory]);
+  useOverlayBackClose(state.isOpen, closeFromBack);
 
   // limitNotice 자동 클리어(~4s).
   useEffect(() => {
