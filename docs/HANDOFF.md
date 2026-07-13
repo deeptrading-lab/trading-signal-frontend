@@ -7938,3 +7938,44 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - [ ] 실기기(안드로이드 하단 뒤로가기·iOS 스와이프)에서 동일 시나리오 확인
   - [ ] 후속 후보: 단타 체결내역 시트·업종 모달 등 다른 모바일 오버레이에도 동일 패턴 확장
+
+### 2026-07-13 — feat(overlay): 모바일 뒤로가기 오버레이 닫기 공용 훅 + 시트·모달 확장 (#362)
+
+- **slug**: `overlay-back-close` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/362
+- **요약**: feat(overlay): 모바일 뒤로가기 오버레이 닫기 공용 훅 + 시트·모달 확장
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > #361 에서 AI 분석 패널에 넣은 "모바일 뒤로가기 → 오버레이만 닫기" 히스토리 연동을, 사용자 요청으로 **체결내역 시트**(단타)와 **업종 구성종목 모달**(홈)에도 확장. 세 오버레이가 같은 패턴을 쓰므로 **공용 훅으로 추출**해 일원화했다.
+  > 
+  > ## 변경
+  > 
+  > ### `hooks/utils/useOverlayBackClose.ts` 신설 (도메인 무관 훅)
+  > - 오버레이가 열릴 때(모바일 한정, `useBreakpoint`) marker 엔트리 push → **popstate(뒤로가기)는 오버레이만 닫음**(라우트 유지)
+  > - UI 닫기(X·배경·Escape) → `back()` 으로 marker 소비(히스토리 잔여 0)
+  > - 라우트 이동으로 닫힘 → 현재 엔트리가 marker 가 아니므로 정리만(페이지 이탈 방지)
+  > - **중첩 오버레이**: 모듈 스택으로 최상단 marker 소유자만 응답 + 같은 popstate 이벤트 dedupe(WeakSet) — 오버레이 위 오버레이에서 back 한 번에 하나만 닫힘
+  > - **StrictMode 안전**: 소비를 다음 tick 예약 + 이중 마운트가 같은 marker 를 adopt(재사용)하며 예약 취소
+  > - **프로그래매틱 back 구분**: marker 소비용 back() 이 유발한 popstate 는 suppress 카운터로 무시(아래 오버레이 연쇄 닫힘 방지)
+  > - 사용: 항상 마운트형 `useOverlayBackClose(isOpen, close)` / 열릴 때만 마운트형 `useOverlayBackClose(true, onClose)`
+  > 
+  > ### 적용 3곳
+  > | 오버레이 | 변경 |
+  > |---|---|
+  > | AI 분석 패널 (`aiAnalysisProvider`) | #361 인라인 구현(45줄) → 훅 호출로 교체(동작 동일) |
+  > | 체결내역 시트 (`IntradayPaperDetailSheet`) | 훅 적용 |
+  > | 업종 구성종목 모달 (`SectorConstituentsModal`) | 훅 적용 |
+  > 
+  > ## 검증 (모바일 뷰포트 492px, 브라우저 실검증)
+  > 
+  > - **업종 모달**: 홈 → 화학 클릭 → 모달(marker `ovl-1`) → back → **모달만 닫힘 + 홈 유지 + marker 소비** / X 닫기 → marker 소비 ✅
+  > - **AI 패널(회귀)**: /analyze → 카드 → 패널(marker) → back → 패널만 닫힘 + /analyze 유지 ✅
+  > - **체결내역 시트**: /intraday 세션 행 체결내역 → 시트(marker) → back → **시트만 닫힘 + /intraday 유지** ✅
+  > - 콘솔 에러 0 · `tsc`·vitest 1305 passed·프로덕션 빌드 정상
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 실기기(안드로이드 뒤로가기·iOS 스와이프)에서 3개 오버레이 확인
+  - [ ] 남은 모바일 오버레이(StockPeekSheet 등) 필요 시 동일 훅 적용

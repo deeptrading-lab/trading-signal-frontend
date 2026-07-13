@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
 import { formatMoney } from "@/lib/utils/formatMoney";
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
+import { useOverlayBackClose } from "@/hooks/utils/useOverlayBackClose";
 import { INTRADAY_PAPER_COPY as P } from "@/lib/copy/stock/intradayRead";
 import {
   ACTION_LABEL,
@@ -84,6 +85,10 @@ export function IntradayPaperDetailSheet({
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
+
+  // 모바일 뒤로가기 → 시트만 닫기(라우트 유지) — AI 패널·업종 모달과 동일 패턴(overlay-back-close).
+  // 열릴 때만 마운트되는 컴포넌트라 open=true 고정, UI 닫기(unmount)는 훅이 marker 를 소비한다.
+  useOverlayBackClose(true, onClose);
 
   // 포털 — 워치 표(tbody) 안에서 열려도 DOM 중첩 위반 없이 body 에 띄운다(열림 시에만 렌더 = 클라 전용).
   return createPortal(
