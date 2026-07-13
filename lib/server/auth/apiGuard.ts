@@ -44,8 +44,9 @@ export async function requireAdminApi(
 }
 
 /**
- * **prod(Vercel)에서만** admin+ 요구, 로컬은 통과. `/intraday`·`/analyze` 페이지 게이트 규칙과 정합
+ * **prod(Vercel)에서만** admin+ 요구, 로컬은 통과. `/intraday` 페이지 게이트 규칙과 정합
  * (로컬 dev 무마찰 유지 — 로컬은 세션 없이도/일반 등급도 사용, prod 만 admin 제한).
+ * (`/analyze` 는 analyze-open-access 로 개방 — decisions 목록은 가드 없음, usage 만 본 가드 유지.)
  */
 export async function requireProdAdminApi(
   request: NextRequest,

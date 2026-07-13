@@ -19,16 +19,12 @@
 
 import { Suspense } from "react";
 import { AnalyzeTabsContainer } from "@/components/analyze/AnalyzeTabsContainer";
-import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
-import { hasServerRole } from "@/lib/auth/serverGuard";
-import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 import { ANALYZE_PAGE_TITLE } from "@/lib/copy/analyze/labels";
 
-export default async function AnalyzePage() {
-  // 토큰비용·판정원장(운영정보) — prod(Vercel)는 admin 이상만, 로컬은 전체(/intraday 규칙과 동일).
-  if (isVercelRuntime() && !(await hasServerRole("admin"))) {
-    return <AccessDeniedView />;
-  }
+export default function AnalyzePage() {
+  // 권한 게이트 없음(analyze-open-access) — 판정 카드는 로그인 유저 전체 공개(로그인은 전역 proxy
+  // 게이트 담당). 운영정보 격리는 지면 안에서: usage 탭 prod 숨김(IS_PROD)·카드 삭제 superadmin·
+  // usage API admin 가드 유지.
   return (
     <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
       {/* 페이지 타이틀 — 전 페이지 공통으로 시각 타이틀 제거(홈 정합), 문서 아웃라인용 h1 만 sr-only 유지. */}
