@@ -47,7 +47,9 @@ function levelLabelTexts(levels: AiVerdictLevels): string[] {
       `${levels.target.role === "target" ? "목표" : "재진입"} ${formatNumber(levels.target.price, { digits: 0 })}`,
     );
   }
-  texts.push(`손절 ${formatNumber(levels.stop.price, { digits: 0 })}`);
+  texts.push(
+    `${levels.stop.role === "invalidation" ? "무효화" : "손절"} ${formatNumber(levels.stop.price, { digits: 0 })}`,
+  );
   return texts;
 }
 
@@ -93,9 +95,11 @@ export function AiLevelAxisLabels({
   }
   const stopY0 = yScale(levels.stop.price);
   if (stopY0 != null) {
+    // 손절(하방, 파랑) / 무효화(상방, 보라). 부호로 갈린 role 로 라벨·색 분기.
+    const isInvalidation = levels.stop.role === "invalidation";
     labels.push({
-      text: `손절 ${formatNumber(levels.stop.price, { digits: 0 })}`,
-      fill: C.down,
+      text: `${isInvalidation ? "무효화" : "손절"} ${formatNumber(levels.stop.price, { digits: 0 })}`,
+      fill: isInvalidation ? C.rsiLine : C.down,
       textColor: "#fff",
       y0: stopY0,
       y: 0,

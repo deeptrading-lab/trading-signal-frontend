@@ -5,8 +5,9 @@
  * 대비 라이브 현재가가 목표/손절에 닿았거나 크게 움직였거나 분석이 오래됐으면 상단 앰버 배너로 재분석을 권한다.
  *
  * ## 판정 규칙 (하나라도 참이면 stale) — 우선순위 = 반환 reason 순서
- *   1. **손절가 부근/하회**(stop-near) — live ≤ stopPrice × 1.03. stopPrice = base×(1+stop_loss_pct/100).
- *      stop_loss_pct 는 항상 음수라 stopPrice < base. "3% 이내 접근 또는 이탈"을 잡는다.
+ *   1a. **손절가 부근/하회**(stop-near) — stop_loss_pct<0(강세 하방 손절)일 때 live ≤ stopPrice × 1.03.
+ *   1b. **무효화 부근/상회**(invalidation-near) — stop_loss_pct>0(약세 상방 무효화)일 때 live ≥ stopPrice × 0.97.
+ *       stopPrice = base×(1+stop_loss_pct/100). 부호로 방향이 갈려 하나만 평가된다("3% 이내 접근/돌파").
  *   2. **목표가 근접**(target-near) — 방향 처리: target_pct>0(강세 목표)=near/above, target_pct<0(약세 재진입)=near/below.
  *      targetPrice = base×(1+target_pct/100). 근접 = |live-target|/target ≤ 3% 또는 방향상 도달. target_pct null/0 이면 건너뜀.
  *   3. **가격 큰 이동**(big-move) — |live-base|/base ≥ 6%.
@@ -15,9 +16,9 @@
  * ## 방향(direction) 처리
  * - 목표가: **target_pct 의 부호**로 방향을 정한다(verdict 가 아니라). FinalDecision 계약상
  *   BUY/OVERWEIGHT/HOLD=양수 목표, UNDERWEIGHT/REDUCE=음수 재진입, SELL=null 이므로 부호가 곧 방향.
- * - 손절가: stop_loss_pct 가 항상 음수(하방)라 stop-near 는 하방 접근/이탈로만 본다.
- *   ⚠️ SELL/약세 재진입에서도 손절은 하방 기준으로 계산된다(데이터 모델 한계 — stop_loss_pct 부호 고정).
- *   재분석 "권유" 휴리스틱이라 과권유는 저위험이고, 하방 급락은 big-move 로도 잡힌다.
+ * - 손절/무효화: **stop_loss_pct 의 부호**로 방향을 정한다. 음수=하방 손절(stop-near, 하방 접근/이탈),
+ *   양수=상방 무효화(invalidation-near, 상방 접근/돌파). 이 시맨틱 도입 이전 legacy 약세 행은 stop 이
+ *   음수라 하방으로만 평가되나(상방 급등은 big-move 로 흡수), 신규 약세 행은 무효화 상방을 정확히 잡는다.
  *
  * base_price(legacy null) 또는 live 가격이 없으면 가격 3규칙은 건너뛰고 aged 만 평가한다.
  * 백엔드/네트워크 무의존 순수 함수 — 단위 테스트로 방향·경계·null 전 케이스 고정(__tests__/decisionStaleness.test.ts).
@@ -27,7 +28,7 @@ import { businessDaysBetween } from "@/lib/utils/businessDays";
 import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
 
 /** 재분석 권유 사유(배너 카피 키). 우선순위 = 아래 평가 순서. */
-export type StaleReason = "stop-near" | "target-near" | "big-move" | "aged";
+export type StaleReason = "stop-near" | "invalidation-near" | "target-near" | "big-move" | "aged";
 
 /** 목표가 근접 밴드 — |live-target|/target ≤ 3%. */
 export const TARGET_NEAR_RATIO = 0.03;
@@ -69,12 +70,18 @@ export function evaluateDecisionStaleness(input: DecisionStalenessInput): Decisi
 
   // ── 가격 3규칙 — base_price·live 둘 다 있어야 계산 가능(legacy/로딩 전이면 건너뜀). ──
   if (base != null && live != null) {
-    // 1) 손절가 부근/하회 — 하방 리스크가 가장 급하므로 최우선.
-    //    stop_loss_pct 는 항상 음수여야 하나 정규화(route)가 0 은 통과시키므로 `< 0` 가드 추가
-    //    (0 이면 stopPrice=base → 현재가 +3% 이내에서 상시 오탐하는 것을 방지).
+    // 1) 손절/무효화 부근 — 테제 무효화 리스크가 가장 급하므로 최우선. stop_loss_pct 부호로 방향이 갈림.
+    //    0 은 방향이 없어(stopPrice=base) 양쪽 다 건너뜀(상시 오탐 방지).
     const stopPrice = base * (1 + decision.stop_loss_pct / 100);
-    if (decision.stop_loss_pct < 0 && stopPrice > 0 && live <= stopPrice * STOP_PROXIMITY_MULT) {
-      return { stale: true, reason: "stop-near" };
+    if (stopPrice > 0) {
+      // 1a) 강세 하방 손절(음수) — live 가 손절가 3% 이내로 접근·이탈.
+      if (decision.stop_loss_pct < 0 && live <= stopPrice * STOP_PROXIMITY_MULT) {
+        return { stale: true, reason: "stop-near" };
+      }
+      // 1b) 약세 상방 무효화(양수) — live 가 무효화가 3% 이내로 접근·돌파(하방과 대칭: ×0.97).
+      if (decision.stop_loss_pct > 0 && live >= stopPrice * (2 - STOP_PROXIMITY_MULT)) {
+        return { stale: true, reason: "invalidation-near" };
+      }
     }
 
     // 2) 목표가 근접 — target_pct 부호로 방향 처리. null/0 이면 건너뜀.

@@ -893,6 +893,11 @@ export async function POST(req: NextRequest): Promise<Response> {
               if (VERDICTS.has(d.verdict as string)) {
                 const rawTarget = typeof d.target_pct === "number" ? d.target_pct : null;
                 const rawStop = typeof d.stop_loss_pct === "number" ? d.stop_loss_pct : -5;
+                // stop_loss_pct = 테제 무효화 라인. 방향은 verdict 가 단일 기준(LLM 부호 오류 무관):
+                // 강세(BUY/OVERWEIGHT/HOLD)=하방 손절(음수), 약세(UNDERWEIGHT/REDUCE/SELL)=상방 무효화(양수).
+                const isBearishVerdict =
+                  d.verdict === "UNDERWEIGHT" || d.verdict === "REDUCE" || d.verdict === "SELL";
+                const normalizedStop = isBearishVerdict ? Math.abs(rawStop) : -Math.abs(rawStop);
                 const finalDecision: FinalDecision = {
                   verdict: d.verdict as FinalDecision["verdict"],
                   reasoning: typeof d.reasoning === "string" ? d.reasoning : "",
@@ -909,7 +914,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                   new_entry_strategy: typeof d.new_entry_strategy === "string" ? d.new_entry_strategy : "",
                   holder_strategy: typeof d.holder_strategy === "string" ? d.holder_strategy : "",
                   target_pct: rawTarget,
-                  stop_loss_pct: rawStop > 0 ? -rawStop : rawStop,
+                  stop_loss_pct: normalizedStop,
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
                   // % 기준가 = LLM 에 넘긴 "현재가"(priceData?.price ?? 마지막 봉 종가). 절대가격 표기·재현용.
                   base_price: priceData?.price ?? sorted[sorted.length - 1]?.close ?? null,

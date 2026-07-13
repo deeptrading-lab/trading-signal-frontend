@@ -19,11 +19,17 @@ import {
 import type { AiVerdictLevels, AiLevelRole } from "@/lib/utils/aiVerdictLevels";
 import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
 
-const ROLE_LABEL: Record<AiLevelRole, string> = { target: "목표", reentry: "재진입", stop: "손절" };
+const ROLE_LABEL: Record<AiLevelRole, string> = {
+  target: "목표",
+  reentry: "재진입",
+  stop: "손절",
+  invalidation: "무효화",
+};
 const ROLE_DOT: Record<AiLevelRole, string> = {
   target: "bg-signal-up",
   reentry: "bg-chart-signal", // 앰버 — 회색(안 보임)에서 변경, 차트 레벨 색과 일치
   stop: "bg-signal-down",
+  invalidation: "bg-chart-rsi", // 보라 — 상방 무효화(약세), 차트 무효화 선·존 색과 일치
 };
 const CONFIDENCE_LABEL: Record<FinalDecision["confidence"], string> = {
   HIGH: "높음",
@@ -66,7 +72,7 @@ export function AiVerdictStrip({ levels, decision, show, onToggle }: AiVerdictSt
   const rows = useMemo(() => {
     const r: { role: AiLevelRole; price: number; pct: number }[] = [];
     if (levels.target) r.push({ role: levels.target.role, price: levels.target.price, pct: levels.target.pct });
-    r.push({ role: "stop", price: levels.stop.price, pct: levels.stop.pct });
+    r.push({ role: levels.stop.role, price: levels.stop.price, pct: levels.stop.pct });
     return r;
   }, [levels]);
 

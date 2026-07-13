@@ -322,8 +322,12 @@ export function StockDailyChart({
   const aiZoneEls: ReactElement[] = [];
   const aiLineEls: ReactElement[] = [];
   if (ai) {
-    // 존: 매수계열(target)=리워드(현재가↔목표)+리스크(손절↔현재가) · SELL=리스크만 · 재진입(관망)=존 없이 선만.
-    if (ai.target?.role !== "reentry" && lastClose != null) {
+    // stop_loss_pct 부호로 방향이 갈림: 음수=하방 손절(강세), 양수=상방 무효화(약세).
+    const stopIsInvalidation = ai.stop.role === "invalidation";
+    // 존: 강세 target=리워드(현재가↔목표, 상승색)+리스크(손절↔현재가, 하락색).
+    //     약세 무효화=리스크존(현재가↔무효화, 상방, 보라) · SELL=리스크존만.
+    //     재진입 단독(무효화 없는 legacy 약세 관망)=존 없이 선만.
+    if (lastClose != null && (ai.target?.role !== "reentry" || stopIsInvalidation)) {
       if (ai.target?.role === "target") {
         aiZoneEls.push(
           <ReferenceArea
@@ -342,15 +346,15 @@ export function StockDailyChart({
           key="ai-risk"
           y1={Math.min(lastClose, ai.stop.price)}
           y2={Math.max(lastClose, ai.stop.price)}
-          fill={C.down}
+          fill={stopIsInvalidation ? C.rsiLine : C.down}
           fillOpacity={0.11}
           stroke="none"
           ifOverflow="extendDomain"
         />,
       );
     }
-    // 선(라벨 없음). 목표=상승색 / 재진입=중립 / 손절=하락색. 라벨(가격 알약)은 우측 축에 커스텀
-    // 레이어(aiAxisLabelsEl)가 충돌 해소해 그린다.
+    // 선(라벨 없음). 목표=상승색 / 재진입=중립 / 손절=하락색 / 무효화=보라. 라벨(가격 알약)은
+    // 우측 축에 커스텀 레이어(aiAxisLabelsEl)가 충돌 해소해 그린다.
     if (ai.target) {
       aiLineEls.push(
         <ReferenceLine
@@ -367,7 +371,7 @@ export function StockDailyChart({
       <ReferenceLine
         key="ai-stop"
         y={ai.stop.price}
-        stroke={C.down}
+        stroke={stopIsInvalidation ? C.rsiLine : C.down}
         strokeWidth={1.5}
         strokeDasharray="6 3"
         ifOverflow="extendDomain"
