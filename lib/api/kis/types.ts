@@ -349,13 +349,13 @@ export type KisInquireIndexPriceOutput = {
  * ## ⚠️ 실전(prod) 전용 — 모의(vts) 미지원
  * `inquire-index-price` 와 동일 정책. BFF/cron 이 prod 게이트 통과 시에만 호출.
  *
- * output2 = 일별 봉 배열. 종가 필드는 `bstp_nmix_clpr`(업종 지수 종가).
+ * output2 = 일별 봉 배열. 종가 필드는 `bstp_nmix_prpr`(업종 지수 현재가=해당일 종가).
  */
 export type KisInquireDailyIndexChartItem = {
   /** 영업일자(YYYYMMDD). */
   stck_bsop_date?: string;
-  /** 업종 지수 종가. "2750.23". */
-  bstp_nmix_clpr?: string;
+  /** 업종 지수 종가(현재가). "2750.23". KIS 실제 응답 필드는 `bstp_nmix_prpr`. */
+  bstp_nmix_prpr?: string;
   /** 업종 지수 시가 / 고가 / 저가. */
   bstp_nmix_oprc?: string;
   bstp_nmix_hgpr?: string;
