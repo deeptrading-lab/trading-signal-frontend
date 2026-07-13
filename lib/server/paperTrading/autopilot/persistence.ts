@@ -10,11 +10,15 @@
  */
 
 import { createLogger } from "@/lib/server/logTag";
-import type { AutopilotRun } from "@/lib/types/paperTrading/autopilot";
+import type {
+  AutopilotRun,
+  AutopilotScreenerSnapshot,
+} from "@/lib/types/paperTrading/autopilot";
 
 const log = createLogger("autopilot-persist");
 
 const RUNS_TABLE = "paper_trading_autopilot_runs";
+const SNAPSHOTS_TABLE = "paper_trading_autopilot_screener_snapshots";
 /** hydrate 복원 상한 — 최근 런 히스토리(당일 active 복원 + 소량 이력)면 충분. */
 const HYDRATE_RUN_LIMIT = 20;
 /** 개별 REST 호출 타임아웃 — hydrate 가 스윕/API 진입을 무기한 블로킹하지 않게. */
@@ -71,6 +75,37 @@ export async function persistAutopilotRun(run: AutopilotRun): Promise<void> {
     if (!res.ok) warnOnce(`런 저장 실패 HTTP ${res.status}`, await res.text().catch(() => ""));
   } catch (error) {
     warnOnce("런 저장 실패(네트워크)", error);
+  }
+}
+
+/**
+ * 스크리너 스냅샷 append(fire-and-forget) — 종목 선정 품질 사후 검증 데이터(쓰기 전용, hydrate 없음).
+ * id PK(`runId:창시작`)라 같은 창 재시도는 무시(멱등). 실패해도 스윕 흐름 비차단.
+ */
+export async function persistAutopilotScreenerSnapshot(
+  snapshot: AutopilotScreenerSnapshot,
+): Promise<void> {
+  const config = supabaseConfig();
+  if (!config) return;
+  try {
+    const res = await fetch(`${config.url}/rest/v1/${SNAPSHOTS_TABLE}?on_conflict=id`, {
+      method: "POST",
+      headers: headers(config.key, { Prefer: "resolution=ignore-duplicates,return=minimal" }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      body: JSON.stringify([
+        {
+          id: snapshot.id,
+          run_id: snapshot.runId,
+          owner: snapshot.owner,
+          payload: snapshot,
+          created_at: snapshot.at,
+        },
+      ]),
+    });
+    if (!res.ok)
+      warnOnce(`스냅샷 저장 실패 HTTP ${res.status}`, await res.text().catch(() => ""));
+  } catch (error) {
+    warnOnce("스냅샷 저장 실패(네트워크)", error);
   }
 }
 
