@@ -11,12 +11,16 @@
 
 import { useMemo } from "react";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
+import { useQueryPaperTradingSessionDetails } from "@/hooks/query/useQueryPaperTradingSessionDetails";
+import { useMutationCompletePaperTradingPortfolio } from "@/hooks/query/useMutationCompletePaperTradingPortfolio";
 import { isoToKstDate, todayKstDate } from "@/lib/api/toss/kst";
+import { latestIntradayPortfolio } from "@/lib/intraday/portfolioStatus";
 import type {
   PaperTradingSelectedStock,
   PaperTradingSession,
   PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
+import type { IntradayPortfolioPlan } from "@/lib/intraday/portfolioPlan";
 
 /** 세션의 대상 종목(단타 세션은 단일 종목 설계 — intradayTickDecision 이 stocks[0]만 본다). */
 export function intradaySessionStock(session: PaperTradingSession): PaperTradingSelectedStock {
@@ -119,6 +123,30 @@ export function useIntradayPaperWatch() {
     [cliSessions, todayKey],
   );
 
+  // 새로고침 뒤에도 서버 세션 원장에서 실행 중 자동 포트폴리오를 복원한다. 상세 조회는 해당 묶음의
+  // 종목별 포지션·체결 표시만 담당하며, 기존 단일 종목 세션/틱 실행 경로에는 영향을 주지 않는다.
+  const autoPortfolioSessions = useMemo(
+    () =>
+      latestIntradayPortfolio(
+        cliSessions.filter(
+          (session) =>
+            isSessionStartedOnKstDate(session, todayKey) &&
+            (!session.owner || !currentOperator || session.owner === currentOperator),
+        ),
+      ),
+    [cliSessions, currentOperator, todayKey],
+  );
+  const autoPortfolioSessionIds = useMemo(
+    () => autoPortfolioSessions.map((session) => session.id),
+    [autoPortfolioSessions],
+  );
+  const autoPortfolioQueries = useQueryPaperTradingSessionDetails(autoPortfolioSessionIds);
+  const completeAutoPortfolioMutation =
+    useMutationCompletePaperTradingPortfolio(autoPortfolioSessionIds);
+  const autoPortfolioDetails = autoPortfolioQueries.flatMap((query) =>
+    query.data ? [query.data] : [],
+  );
+
   const start = (
     stock: PaperTradingSelectedStock,
     initialCash: number,
@@ -138,7 +166,38 @@ export function useIntradayPaperWatch() {
       positionHardStopPct,
     });
 
+  const startPortfolio = async (plan: IntradayPortfolioPlan): Promise<PaperTradingSessionDetail[]> => {
+    const portfolioId = globalThis.crypto?.randomUUID?.() ?? `portfolio-${Date.now()}`;
+    const portfolioName = `AI 단타 포트폴리오 · ${todayKey}`;
+    // 로컬 AI CLI 과부하와 provider rate limit을 피하려고 종목별 첫 판단을 순차 실행한다.
+    const details: PaperTradingSessionDetail[] = [];
+    for (const allocation of plan.allocations) {
+      details.push(
+        await create({
+          name: `${portfolioName} · ${allocation.name}`,
+          tickers: [allocation.ticker],
+          stocks: [{ ticker: allocation.ticker, name: allocation.name }],
+          initialCash: allocation.amount,
+          targetReturnPct: 5,
+          riskMode: "balanced",
+          decisionProvider: "cli-agent",
+          tickIntervalMinutes: 5,
+          positionHardStopPct: -5,
+          sessionHardStopPct: -7,
+          portfolioId,
+          portfolioName,
+          portfolioAllocationPct: allocation.allocationPct,
+        }),
+      );
+    }
+    return details;
+  };
+
   return {
+    autoPortfolioSessions,
+    autoPortfolioDetails,
+    autoPortfolioDetailsLoading: autoPortfolioQueries.some((query) => query.isLoading),
+    isCompletingAutoPortfolio: completeAutoPortfolioMutation.isPending,
     sessionByTicker,
     todaySessionStocks,
     pastSessions,
@@ -147,5 +206,8 @@ export function useIntradayPaperWatch() {
     currentOperator,
     isCreating,
     start,
+    startPortfolio,
+    completeAutoPortfolio: (portfolioId: string) =>
+      completeAutoPortfolioMutation.mutateAsync(portfolioId),
   };
 }

@@ -27,6 +27,7 @@ import {
 } from "@/components/intraday/IntradayWatchTable";
 import { IntradayAutopilotCard } from "@/components/intraday/IntradayAutopilotCard";
 import { IntradayCalibrationPanel } from "@/components/intraday/IntradayCalibrationPanel";
+import { IntradayAutoPortfolio } from "@/components/intraday/IntradayAutoPortfolio";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { todayKstDate } from "@/lib/api/toss/kst";
 import {
@@ -36,6 +37,7 @@ import {
 import type { InvestorFlowRow } from "@/lib/types/flow/top10";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
+import type { IntradayPortfolioCandidate } from "@/lib/intraday/portfolioPlan";
 
 export type Watch = { ticker: string; name: string };
 
@@ -187,12 +189,18 @@ export function IntradayWatchWorkspace() {
   const { data: flow, isLoading: flowLoading } = useQueryFlowTop10("today");
   const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
   const {
+    autoPortfolioSessions,
+    autoPortfolioDetails,
+    autoPortfolioDetailsLoading,
+    isCompletingAutoPortfolio,
     sessionByTicker,
     todaySessionStocks,
     pastSessions,
     runningSessionIds,
     currentOperator,
     start,
+    startPortfolio,
+    completeAutoPortfolio,
   } = useIntradayPaperWatch();
   // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
   useIntradayPaperRefresh(runningSessionIds);
@@ -297,6 +305,28 @@ export function IntradayWatchWorkspace() {
   const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
   const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
   const watching = new Set(rowTickers);
+  const autoPortfolioCandidates = useMemo(() => {
+    const candidates = new Map<string, IntradayPortfolioCandidate>();
+    const flowRows = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
+    flowRows.forEach((row, index) =>
+      candidates.set(row.ticker, { ...row, flowRank: index + 1 }),
+    );
+    (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES).forEach((row, index) => {
+      const previous = candidates.get(row.ticker);
+      candidates.set(row.ticker, {
+        ticker: row.ticker,
+        name: row.name,
+        price: row.price,
+        flowRank: previous?.flowRank,
+        volumeRank: index + 1,
+      });
+    });
+    return [...candidates.values()];
+  }, [flow, volumeRank]);
+  const unavailablePortfolioTickers = useMemo(
+    () => new Set(sessionByTicker.keys()),
+    [sessionByTicker],
+  );
 
   // 가시 티커(오늘 행 + 펼친 과거 그룹 + 추천 후보) union 으로 경보를 1회 배치 조회 — 티커별 칩에 내려준다.
   // 과거는 시세와 동일하게 펼친 그룹만 포함해 배치 크기를 줄인다(접힌 과거 행은 펼칠 때 편입).
@@ -350,6 +380,19 @@ export function IntradayWatchWorkspace() {
 
       {/* 오토파일럿 — 자동 포트폴리오 시작/중지·슬롯 현황(로컬 dev 전용, 컴포넌트가 자체 게이트). */}
       <IntradayAutopilotCard />
+
+      {/* 금액 기반 자동 포트폴리오 — 운용·체결 요약과 보유 전량 청산 종료. */}
+      <IntradayAutoPortfolio
+        candidates={autoPortfolioCandidates}
+        portfolioSessions={autoPortfolioSessions}
+        portfolioDetails={autoPortfolioDetails}
+        portfolioDetailsLoading={autoPortfolioDetailsLoading}
+        isCompleting={isCompletingAutoPortfolio}
+        unavailableTickers={unavailablePortfolioTickers}
+        candidatesLoading={flowLoading || volumeLoading}
+        onStart={startPortfolio}
+        onComplete={completeAutoPortfolio}
+      />
 
       {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}
       <StockSearchPicker

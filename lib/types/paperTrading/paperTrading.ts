@@ -164,6 +164,12 @@ export type PaperTradingSession = {
    * 규칙으로 미기록 세션도 계속 처리(하위호환, orphan 방지).
    */
   owner?: string;
+  /** 자동 포트폴리오 실행 묶음 ID — 같은 값의 종목별 세션을 하나의 포트폴리오로 합산한다. */
+  portfolioId?: string;
+  /** 자동 포트폴리오 표시명. 레거시·수동 단일 종목 세션은 미설정. */
+  portfolioName?: string;
+  /** 전체 자동 투자금 중 이 종목에 배정된 비중(%). */
+  portfolioAllocationPct?: number;
   /**
    * 이 세션을 만든 오토파일럿 런 id(intraday-autopilot) — 자식 세션 식별·런 손익 조인·"오토" 배지
    * 키. 수동 시작 세션은 미기록(undefined). payload(jsonb)로 영속(무마이그레이션).
@@ -260,6 +266,10 @@ export type CreatePaperTradingSessionRequest = {
   positionHardStopPct?: number | null;
   /** 세션 손실 하드스톱(%, 음수) — 미지정 시 기본 −7. `null`=끄기. */
   sessionHardStopPct?: number | null;
+  /** 자동 포트폴리오 오케스트레이터가 종목별 세션을 묶는 메타데이터. */
+  portfolioId?: string;
+  portfolioName?: string;
+  portfolioAllocationPct?: number;
   /**
    * 오토파일럿 런 id — 스윕(fill)이 서버 내부에서만 채운다. HTTP 생성 라우트는 이 필드를
    * 전달하지 않아 외부에서 위조할 수 없다(validateCreateSession 무변경).
@@ -284,6 +294,12 @@ export type CreatePaperTradingSessionResponse = PaperTradingSessionDetail;
 export type RunPaperTradingTickRequest = {
   triggeredBy?: PaperTradingTriggeredBy;
   tickWindowStart?: string;
+};
+
+export type CompletePaperTradingPortfolioResponse = {
+  portfolioId: string;
+  completedSessionIds: string[];
+  alreadyCompletedSessionIds: string[];
 };
 
 /** 세션 부분 수정 — 상태 전환 또는 판단 주기 변경(세션 중에도). 둘 중 하나 이상 지정. */
