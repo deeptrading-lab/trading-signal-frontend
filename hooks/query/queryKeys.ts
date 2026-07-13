@@ -101,6 +101,9 @@ export const queryKeys = {
     /** 스파크라인 배치 — 티커 집합별 캐시(정렬·join 으로 안정 키, 순서 무관 동일 캐시). */
     sparklines: (tickers: readonly string[]) =>
       ["market", "sparklines", [...tickers].sort().join(",")] as const,
+    /** 환율(USD/KRW 등) — 미국 종목 원화 환산. base·quote 별 분리 캐시(us-stock-support). */
+    exchangeRate: (base: string, quote: string) =>
+      ["market", "exchange-rate", base, quote] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>
@@ -124,6 +127,8 @@ export const queryKeys = {
     sessions: ["paper-trading", "sessions"] as const,
     /** AI 모의투자 세션 상세 — 세션별 tick/포지션/자산곡선. */
     session: (sessionId: string) => ["paper-trading", "session", sessionId] as const,
+    /** 단타 오토파일럿 런(자동 포트폴리오) — 이 서버 운영자의 오늘 런. 인자 없는 단일 키. */
+    autopilot: ["paper-trading", "autopilot"] as const,
   },
   auth: {
     /** 현재 세션 신원(role/email) — role-aware UI(관리자 전용 표시). 인자 없는 단일 키. */

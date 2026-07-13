@@ -14,6 +14,10 @@
 
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
+import {
+  closeOutAutopilotRuns,
+  sweepAutopilotRuns,
+} from "@/lib/server/paperTrading/autopilot/runStore";
 import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import {
@@ -281,13 +285,17 @@ export function startIntradayTickScheduler(): void {
   log(
     `단타 자동 틱 스케줄러 시작 — 60초 체크(리스크 스윕 + LLM 5분 틱) · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료 · 밀린 이전날 세션 상시 정리`,
   );
-  // 매 사이클(순차): ① 밀린 이전-거래일 세션부터 종료(크로스데이 틱 방지) → ②ᴬ 60초 리스크 스윕
-  // (LLM 앞 — 급락 포지션을 ~60초 내 청산) → ② 장중이면 오늘 세션 LLM 틱 → ③ 마감 후(15:41+)면
-  // 오늘 세션 종료 스윕. ②③ 은 시간대가 겹치지 않아 둘 중 하나만 실행. 리스크 스윕은 장중+마감 유예.
+  // 매 사이클(순차): ① 밀린 이전-거래일 세션부터 종료(크로스데이 틱 방지) → ①ᴮ 오토파일럿 런
+  // 정리(크로스데이·마감 완료 — 좀비 런이 fill 못 하게 스윕보다 앞) → ②ᴬ 60초 리스크 스윕
+  // (LLM 앞 — 급락 포지션을 ~60초 내 청산) → ② 장중이면 오늘 세션 LLM 틱 → ②ᴮ 오토파일럿 스윕
+  // (스크리너+슬롯 로테이션, 10분 창 dedup — 이번 사이클 틱 결과를 본 최신 상태로 판단) → ③ 마감
+  // 후(15:41+)면 오늘 세션 종료 스윕. ②③ 은 시간대가 겹치지 않아 둘 중 하나만 실행.
   const cycle = async () => {
     await closeOutStaleCrossdaySessions();
+    await closeOutAutopilotRuns();
     await runIntradayRiskSweep();
     await runScheduledIntradayTicks();
+    await sweepAutopilotRuns();
     await closeOutRunningSessionsAtClose();
   };
   void cycle();

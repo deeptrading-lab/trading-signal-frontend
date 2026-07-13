@@ -25,6 +25,7 @@ import {
   groupWatchItemsByDate,
   type WatchDateGroup,
 } from "@/components/intraday/IntradayWatchTable";
+import { IntradayAutopilotCard } from "@/components/intraday/IntradayAutopilotCard";
 import { IntradayCalibrationPanel } from "@/components/intraday/IntradayCalibrationPanel";
 import { IntradayAutoPortfolio } from "@/components/intraday/IntradayAutoPortfolio";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
@@ -377,6 +378,10 @@ export function IntradayWatchWorkspace() {
         </div>
       ) : null}
 
+      {/* 오토파일럿 — 자동 포트폴리오 시작/중지·슬롯 현황(로컬 dev 전용, 컴포넌트가 자체 게이트). */}
+      <IntradayAutopilotCard />
+
+      {/* 금액 기반 자동 포트폴리오 — 운용·체결 요약과 보유 전량 청산 종료. */}
       <IntradayAutoPortfolio
         candidates={autoPortfolioCandidates}
         portfolioSessions={autoPortfolioSessions}

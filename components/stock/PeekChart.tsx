@@ -113,7 +113,7 @@ export function PeekChart({ ticker, priceHeight }: PeekChartProps) {
           <ComposedChart data={candleSeries} syncId="peek-dock" margin={{ top: 4, right: 2, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} minTickGap={40} tickMargin={4} />
-            <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={AXIS_W} orientation="right" />
+            <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={(v) => fmtYAxis(v)} width={AXIS_W} orientation="right" />
             <Tooltip content={<CandleTooltip showMA />} />
             <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={8} isAnimationActive={false} />
             {maLines}

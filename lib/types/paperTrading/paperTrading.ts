@@ -170,6 +170,11 @@ export type PaperTradingSession = {
   portfolioName?: string;
   /** 전체 자동 투자금 중 이 종목에 배정된 비중(%). */
   portfolioAllocationPct?: number;
+  /**
+   * 이 세션을 만든 오토파일럿 런 id(intraday-autopilot) — 자식 세션 식별·런 손익 조인·"오토" 배지
+   * 키. 수동 시작 세션은 미기록(undefined). payload(jsonb)로 영속(무마이그레이션).
+   */
+  autopilotRunId?: string;
   mode: PaperTradingMode;
   lastTickWindowStart: string | null;
   startedAt: string;
@@ -265,6 +270,11 @@ export type CreatePaperTradingSessionRequest = {
   portfolioId?: string;
   portfolioName?: string;
   portfolioAllocationPct?: number;
+  /**
+   * 오토파일럿 런 id — 스윕(fill)이 서버 내부에서만 채운다. HTTP 생성 라우트는 이 필드를
+   * 전달하지 않아 외부에서 위조할 수 없다(validateCreateSession 무변경).
+   */
+  autopilotRunId?: string;
 };
 
 export type PaperTradingSessionsResponse = {

@@ -7497,3 +7497,163 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 첫 스케줄/수동 실행으로 실제 PR 생성 E2E 확인(secret 설정 후).
   - KIND 6자리 숫자 티커 한계(당일/영숫자 IPO 지연)는 주간 캐이던스로 자연 흡수 — 매드업 등은 다음 주 편입 예상.
+
+### 2026-07-13 — feat: 미국 주식 검색·조회 지원 (P0 검색 + P1 표시) (#346)
+
+- **slug**: `us-stock-display` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/346
+- **요약**: feat: 미국 주식 검색·조회 지원 (P0 검색 + P1 표시)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 미국 주식 검색·조회 지원 (P0 검색 + P1 표시)
+  > 
+  > PRD `docs/prd/us-stock-support.md`. 스코프 = **US 종목 검색 + 시세·차트·호가 조회**. P2(펀더멘털/AI 동급)는 백엔드 의존이라 비범위. 조회·분석 전용 원칙 준수(주문 없음). **로컬 스파이크로 US Toss 데이터 검증 완료**(AAPL/NVDA/TSLA), 전 과정 격리 워크트리 작업(공유 트리 무영향).
+  > 
+  > ### P0 — 검색
+  > - **US 심볼 인덱스** `lib/api/marketdata/us-symbols.json`(NASDAQ Trader 소스, 10,618종목, 보통주+ETF·파생 제외) + 생성 스크립트 `scripts/update-us-symbols.py`.
+  > - **한글명 보강** `scripts/enrich-us-korean-names.ts`(Toss batch, koName 10,367/10,618=97.6%).
+  > - **검색 통합+랭킹** `search.ts`: KR+US 통합, 정확티커→이름접두→부분 랭킹(ETF 후순위), **한글명 매칭**("애플"→AAPL), **별칭**(구글→알파벳), 결과 한글명 표시. `StockSearchMarket` 타입 확장. getCorpCode/getMarketByTicker는 KR 전용 유지(US=null→스코어카드 무회귀).
+  > - 단위테스트 17(US 8 + KR 9).
+  > 
+  > ### P1 — 표시
+  > - **KR 전용 섹션 숨김**(회사개요·공시·수급 — DART·KIS 소스) via `isUsTicker` 게이트.
+  > - **분봉 탭 숨김**(US 분봉 미지원) via ChartShell `allowMinute`.
+  > - **통화 표시**: 헤더 USD·y축 평문숫자·툴팁 $ (원화 만/억 오포맷 제거).
+  > - **원화 환산 병기**: Toss `/exchange-rate`(USD/KRW) → BFF 라우트+훅 → 헤더 "$314.97 · 약 474,628원"(데스크탑 전체·모바일 만단위 축약, 등락률 줄바꿈 방지).
+  > - **차트 y축 동적 폭**: 하드코딩 56 → 4차트 공통 최대 라벨폭 실측(정렬 유지), US는 값이 작아 축 축소(우측 여백 감소).
+  > - 헤더·일봉·호가·체결·시그널은 기존 Toss 경로로 US 작동(로컬 MARKET_DATA_SOURCE=toss).
+  > 
+  > ### 검증
+  > - tsc·eslint·vitest(search 17 + chartConfig 6) 통과.
+  > - 브라우저 육안(사용자): 검색(한글+영문·별칭)·US 상세(섹션 숨김·통화·환율·분봉없음)·KR 무회귀 확인 완료.
+  > 
+  > ### 알려진 한계 / 다음 작업
+  > - **prod Toss 미설정**: US 시세/차트는 현재 **로컬(MARKET_DATA_SOURCE=toss)에서만** 동작. prod 반영은 티커포맷 라우팅(US=Toss·KR=KIS 유지) 별도 결정(Q3 보류).
+  > - 시총 헤더(net-new)·US 분봉/장중(P1.5)·백엔드 US AI(P2) 미범위.
+  > - 차트 알약 예약 여백(현재가/AI 알약이 축 밖 확장)은 별도 레버 — 필요 시 후속.
+  > - KIND/NASDAQ 소스 주간 자동화(us-symbols) 편입 여지.
+  > 
+  > ## 다음 작업
+  > - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
+
+### 2026-07-13 — feat(intraday): 단타 오토파일럿 PR-1 — 자동 포트폴리오 스크리너·로테이션 코어 (#348)
+
+- **slug**: `intraday-autopilot-core` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/348
+- **요약**: feat(intraday): 단타 오토파일럿 PR-1 — 자동 포트폴리오 스크리너·로테이션 코어
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 출근 전 버튼 하나로 AI 단타를 자동 운영하는 오토파일럿의 **서버 코어**입니다. 오토파일럿 "런"이 기존 단일종목 cli-agent 세션을 자식으로 생성/회수하며, 장중에 단타 적합 종목을 스스로 고르고(스크리너) 죽은 종목을 교체(로테이션)합니다. 기존 틱·judge·체결·자가채점·daily.mts 캘리브레이션 경로는 **무변경**(자식 = 일반 세션이라 관측성 공짜).
+  > 
+  > ## 구조
+  > 
+  > - **스크리너(결정론 2단)**: KIS 랭킹 4콜(거래대금·등락률·외인/기관 수급) union → 하드필터(정리매매/투자위험/투자경고·가격 1천~30만·거래대금 100억↓·등락률 +1~25%) → 1차 점수(모멘텀 0.45·유동성 0.35·수급 0.20, percentile 정규화, 단기과열 감점) → 상위 8 shortlist 당일 5분봉 → 2차 점수(ATR% 삼각 0.30·거래량z 0.25·VWAP 위치 0.25·구조 0.20). 종목 선정에 LLM 불개입(PR-4 conviction 역상관 교훈) — `rerank` 훅만 예약.
+  > - **로테이션**: 10분 창 스윕. flat 슬롯만 교체(★포지션 보유 슬롯 불가침 — 청산은 judge/하드스톱 전담), 교체 조건 = 랭킹 12위 밖 또는 무주문 6틱+conviction≤55. 쿨다운 30분, fill 창 09:05~14:00, 스윕당 2 fill 캡. 랭킹 미가용 시 무근거 교체 방지.
+  > - **스케줄러**: 기존 60초 사이클에 `closeOutAutopilotRuns`(①ᴮ)·`sweepAutopilotRuns`(②ᴮ) 2스테이지 삽입. 자식 세션 틱은 기존 스테이지가 자동 처리.
+  > - **다중 운영자 격리**: 런 owner=operator 엄격 일치만 스윕/마감. 오늘 running 티커(소유자 무관) 사전 제외 + 생성 후 owner/autopilotRunId 검증으로 친구 서버·수동 세션과 경합/흡수 없음.
+  > - **영속**: `paper_trading_autopilot_runs`(payload jsonb) write-through + 부팅 hydrate(내 owner 만). 재시작 후 슬롯·쿨다운·스윕 창 복원.
+  > - **API**: `GET/POST /api/paper-trading/autopilot`(시작은 09:00 이전·KIS 미설정에도 허용, kisReady 힌트), `PATCH .../[runId]`(중지 — 자식 세션은 건드리지 않음).
+  > 
+  > ## 검증
+  > 
+  > - `npm test` 1281 passed(신규 41: rotation/screener/runStore — 포지션 불가침·창 게이트·쿨다운·멱등가드 충돌·owner 게이트·창 dedup)
+  > - `tsc --noEmit` / `eslint` / `next build` 통과
+  > - 라이브 검증은 평일 장중 로컬 dev 로 진행 예정(가이드: 본문 하단)
+  > 
+  > ## ⚠️ 수동 스텝
+  > 
+  > - Supabase SQL Editor 에서 `docs/sql/paper-trading-autopilot.sql` 1회 실행(테이블 생성). 미실행이어도 인메모리로 동작(재시작 시 런 소실만).
+  > 
+  > ## 라이브 검증 가이드
+  > 
+  > 1. 평일 08:50 dev 기동 → `curl -X POST localhost:3000/api/paper-trading/autopilot -H 'Content-Type: application/json' -d '{}'`
+  > 2. 09:05+ `[autopilot]` 로그로 유니버스/fill 확인, 워치 표에 자식 세션 등장
+  > 3. 교체 강제 유발: `AUTOPILOT_REPLACE_RANK_THRESHOLD=3`
+  > 4. 15:41 후 런·자식 completed, 다음날 daily.mts 집계 포함 확인
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2 `feature/intraday-autopilot-ui`: /intraday 오토파일럿 카드(시작/중지·슬롯 칩·손익·로테이션 히스토리) + 워치 표 "오토" 배지 + 훅
+  - 평일 라이브 검증(스크리너 품질 관찰 → env 임계 튜닝)
+  - 후속: LLM 스카우트 재랭킹 훅 실험(결정론 대비 A/B)
+
+### 2026-07-13 — fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소 (#347)
+
+- **slug**: `scorecard-index-field-fix` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/347
+- **요약**: fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > AI 종합분석 결과의 자가채점(`signal_scorecard`)이 **2026-06-26 이후 전면 정체**돼 있었습니다. 사후검증 감사 중 발견:
+  > 
+  > - 원장 69행 중 채점 완료는 6/23의 d1 6건뿐, 이후 w1/w2/m1 전량 pending
+  > - KV 마커 `scorecard:cron:meta`는 매 영업일 `ok:true, errors:0, scored:0, pendingKept:234` — "성공적으로 아무것도 안 하는" 조용한 실패
+  > - cron 트리거(GHA flow-snapshot)와 판정 로직 자체는 건강
+  > 
+  > ## 근본 원인
+  > 
+  > `inquire-daily-indexchartprice`(TR `FHKUP03500100`) 응답의 지수 종가를 **존재하지 않는 `bstp_nmix_clpr` 필드로 매핑**하고 있었습니다. 실제 KIS 응답 필드는 `bstp_nmix_prpr`이며, 저장소 자체 문서(`docs/references/kis-api/domestic-stock-quotations.md` L248)에는 이미 올바르게 적혀 있었습니다.
+  > 
+  > - `toNumber(undefined)` → 0 → `close > 0` 필터에서 전 봉 탈락 → **지수 일봉이 항상 빈 배열**
+  > - v2 채점(excess)은 벤치마크 지수가 없으면 fail-soft로 pending 유지 → `errors=0`인 채 무한 보류
+  > - v1(절대수익)이 마지막으로 돌던 6/23까지만 채점이 존재하고, v2(#149, 6/26 머지) 배포 후 채점 성공 0건
+  > 
+  > 로컬 dry-run으로 재현·수정 확인: 지수 일봉 `0봉 → 91봉`, `scored: 0 → 9`(hit/miss/flat + excess 정상 산출).
+  > 
+  > ## 변경
+  > 
+  > - **`index-chart.ts` / `types.ts`**: 종가 필드 `bstp_nmix_clpr` → `bstp_nmix_prpr`
+  > - **`index-chart.ts` 스키마 가드**: `output2`에 봉이 있는데 매핑 결과가 0건이면 throw. 향후 같은 종류의 필드명 회귀가 **조용한 pending 대신 `errors` 카운터·KV 마커로 드러나도록** 함
+  > - **`indexChartChunked.ts`**: `CHUNK_DAYS` 130 → 60. 이 TR은 실측 1콜 최대 50봉만 반환하고 범위가 넓어도 최근 50봉만 주고 과거를 조용히 버리는데, 130일(≈88영업봉) 청크는 과거 봉을 소실시켜 베타 추정 윈도우(60영업일)에 구멍을 냈음
+  > - **`index-chart.test.ts`**: 필드명·스키마 가드·빈 응답·rt_cd 회귀 테스트 4종 신규 (기존 스코어카드 테스트 125건 + 신규 4건 전부 통과)
+  > 
+  > ## 배포 영향
+  > 
+  > 배포 후 다음 채점 cron이 밀린 pending을 **설계상 자동 소급 채점**합니다(별도 백필 불필요). prod KIS prod 게이트에서만 지수 조회가 일어나므로 로컬/preview 무영향.
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 첫 cron(평일 16:10 KST 전후) 실행 뒤 `signal_scorecard`의 w1/w2/m1 status가 채워지는지, KV 마커 `scored > 0`인지 라이브 확인
+  - 채점 정체를 조기 감지할 관측 채널 검토 — `scorecard:cron:meta`를 `/api/flow/cron-status`류 라우트에 함께 노출
+  - (별건, 감사 후속) 판정 생성 개선: 약세 콜 target/stop 세맨틱 모순 정리, verdict/confidence 분포 붕괴(전원 MEDIUM·약세 편중), 베타/알파 미구분 — 분석 프롬프트 차원
+
+### 2026-07-13 — feat(intraday): 단타 오토파일럿 PR-2 — 자동 시작 카드·슬롯 현황 UI (#349)
+
+- **slug**: `intraday-autopilot-ui` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/349
+- **요약**: feat(intraday): 단타 오토파일럿 PR-2 — 자동 시작 카드·슬롯 현황 UI
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > PR-1(#348) 코어 위의 UI 레이어입니다. /intraday 상단에 오토파일럿 카드를 얹어 **출근 전 "자동 시작" 한 번**으로 자동 포트폴리오 모의 단타를 켜고, 슬롯 현황·런 누적 손익·선정/교체 기록을 보여줍니다.
+  > 
+  > **base = `feature/intraday-autopilot-core`** (PR-1 머지 후 base 가 main 으로 자동 전환되도록 시리즈 구성 — 머지 게이트 절차 준수)
+  > 
+  > ## 내용
+  > 
+  > - **IntradayAutopilotCard**: 미실행 시 총자본(기본 1천만)·슬롯(기본 3종목) 입력 + 자동 시작. 실행 중엔 상태 라인(09:05 전 "장 시작 대기"/가동 중), 슬롯 칩(종목명·수익률·종료 표시), 런 손익(교체 회수된 완료 자식 포함 합산), 스크리너 요약(후보→통과), 선정·교체 기록 접이식 목록, 중지 버튼(자식 세션은 유지 안내). KIS 미설정 시 경고 배지. 로컬 dev 전용 노출(Vercel 스케줄러 no-op).
+  > - **훅**: `useIntradayAutopilot`(런↔자식 세션 조인, `computeRunPnl`), `useQueryAutopilotRun`(active 시 30초 폴링), start/stop 뮤테이션(전역 토스트 opt-out·인라인 에러). queryKeys·queryConfig 단일 위치 등록.
+  > - **워치 표**: `autopilotRunId` 자식 세션에 "오토" 배지 — 수동 세션과 구분.
+  > - 카피는 `INTRADAY_AUTOPILOT_COPY`(lib/copy) 한 곳.
+  > 
+  > ## 검증
+  > 
+  > - `npm test` 1283 passed(신규 computeRunPnl 2본 — 런 귀속 자식만 합산·완료 자식 포함·남의 세션 제외)
+  > - `tsc --noEmit` / `eslint` / `next build` 통과
+  > - 브라우저 육안 검증은 평일 라이브에서(PR-1 가이드와 함께)
+  > 
+  > ## 다음 작업
+  > 
+  > - 평일 장중 라이브 검증: 08:50 시작→09:05 첫 fill→슬롯 칩·오토 배지·교체 기록 육안 확인
+  > - Supabase `docs/sql/paper-trading-autopilot.sql` 수동 1회 실행(PR-1 참조)
+  > - 후속: 스크리너 임계 env 튜닝·LLM 스카우트 재랭킹 A/B
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 평일 장중 라이브 검증: 08:50 시작→09:05 첫 fill→슬롯 칩·오토 배지·교체 기록 육안 확인
+  - Supabase `docs/sql/paper-trading-autopilot.sql` 수동 1회 실행(PR-1 참조)
+  - 후속: 스크리너 임계 env 튜닝·LLM 스카우트 재랭킹 A/B

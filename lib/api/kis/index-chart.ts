@@ -10,7 +10,7 @@
  *   - 쿼리: `FID_COND_MRKT_DIV_CODE=U`(업종), `FID_INPUT_ISCD=<code>`
  *     ("0001" KOSPI / "1001" KOSDAQ), `FID_INPUT_DATE_1`~`FID_INPUT_DATE_2`(YYYYMMDD),
  *     `FID_PERIOD_DIV_CODE=D`.
- *   - 응답 output2 = 일별 봉 배열. 종가 = `bstp_nmix_clpr`.
+ *   - 응답 output2 = 일별 봉 배열. 종가 = `bstp_nmix_prpr`(현재가=해당일 종가).
  *
  * ## ⚠️ 실전(prod) 전용
  *
@@ -62,7 +62,7 @@ function formatIndexDate(raw: string | undefined): string {
 function mapIndexCandle(item: KisInquireDailyIndexChartItem): IndexDailyClose {
   return {
     date: formatIndexDate(item.stck_bsop_date),
-    close: toNumber(item.bstp_nmix_clpr),
+    close: toNumber(item.bstp_nmix_prpr),
   };
 }
 
@@ -116,8 +116,22 @@ export async function fetchIndexDailyChart(
     throw makeKisBusinessError(data.msg1, data.msg_cd);
   }
 
-  return (data.output2 ?? [])
+  const rawRows = data.output2 ?? [];
+  const mapped = rawRows
     .map(mapIndexCandle)
     .filter((c) => c.date !== "" && Number.isFinite(c.close) && c.close > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  // 스키마 불일치 가드: KIS 가 봉을 돌려줬는데(rt_cd="0", output2 비어있지 않음) 매핑 결과가 0건이면
+  // 종가 필드명 오기 등 응답 스키마 변경을 의심하고 throw 한다. (과거 `bstp_nmix_clpr` 오기로
+  // 지수 일봉이 조용히 빈 배열이 돼 채점이 무한 pending 되던 회귀 재발 방지 — throw 시 채점
+  // 호출부의 errors 카운터·KV 마커에 잡혀 관측 가능해진다.)
+  if (rawRows.length > 0 && mapped.length === 0) {
+    throw makeKisBusinessError(
+      "KIS 지수 차트 응답에서 유효한 종가를 파싱하지 못했어요(스키마 불일치 의심).",
+      data.msg_cd,
+    );
+  }
+
+  return mapped;
 }
