@@ -7866,3 +7866,42 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - [ ] mobile-perf 이니셔티브 4PR 머지 완료 후 모바일 실기기에서 탭 킬·이동 딜레이 재발 여부 며칠 관찰
   - [ ] 후속 chore 후보: RealtimeRankingSection RankRow memo(≤14행, 효과 미미)·/admin loading.tsx·토스트 motion→CSS 전환
+
+### 2026-07-13 — feat(analyze): AI 분석 메뉴 일반 유저 개방 (단타는 admin 유지) (#360)
+
+- **slug**: `analyze-open-access` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/360
+- **요약**: feat(analyze): AI 분석 메뉴 일반 유저 개방 (단타는 admin 유지)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > prod 에서 `/analyze`(AI 분석)가 admin 전용이라 일반 유저에게 메뉴·페이지·데이터가 모두 숨겨져 있었다. 판정 카드가 사용자 대면 가치라 일반 유저에게 개방한다. **AI 단타(`/intraday`)는 그대로 admin 전용 유지.**
+  > 
+  > ## 변경
+  > 
+  > | 계층 | 변경 |
+  > |---|---|
+  > | 메뉴 (`navItems.ts`) | `/analyze` 의 `localOnly` 제거 → prod 사이드바·바텀nav 노출 (`/intraday` 는 유지) |
+  > | 페이지 (`analyze/page.tsx`) | `hasServerRole(admin)` 게이트 제거 + async 해제(정적 셸화 — 전환도 빨라짐) |
+  > | 데이터 (`decisions` API) | `requireProdAdminApi` 제거 — 판정 카드 목록 개방. **로그인 자체는 전역 proxy 게이트가 계속 요구** |
+  > 
+  > **운영정보 격리는 그대로 유지**:
+  > - 토큰 사용량 대시보드: `usage` API admin 가드 유지 + prod 에선 탭 자체 숨김(`AnalyzeTabsContainer` IS_PROD)
+  > - 카드 삭제: superadmin 가드(API+UI 버튼 모두)
+  > - 분석 실행·워커: 기존 그대로(로컬 전용/큐)
+  > 
+  > 참고: 판정 카드 메타에 토큰량·비용($) 표기는 포함되어 일반 유저에게도 보인다(사용자 결정).
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit`·vitest **1305 passed** (apiGuard 게이트 테스트 포함)
+  > - 게이트 로직 diff 는 3곳의 boolean 제거뿐 — prod 동작은 배포 후 일반 유저 계정으로 메뉴 노출·카드 목록 로드 확인 권장
+  > 
+  > ## 다음 작업
+  > 
+  > - [ ] 배포 후 일반 유저 계정으로 /analyze 메뉴 노출·카드 목록·상세 열람 확인
+  > - [ ] (별도 PR) 모바일 뒤로가기 시 AI 분석 패널만 닫히게 히스토리 연동
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 배포 후 일반 유저 계정으로 /analyze 메뉴 노출·카드 목록·상세 열람 확인
+  - [ ] (별도 PR) 모바일 뒤로가기 시 AI 분석 패널만 닫히게 히스토리 연동
