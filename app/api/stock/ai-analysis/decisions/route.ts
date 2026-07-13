@@ -6,10 +6,11 @@
  * - 토큰: ai_agent_usage 를 종목별로 그룹 → 각 종목의 최신 run_id 행들만 합산해 카드에 붙인다.
  *   (decisions 에 run_id 컬럼이 없어 usage 의 created_at 최신 run 을 그 종목의 "이 분석"으로 본다.)
  * - 분석 실행(POST /api/stock/ai-analysis)과 달리 Vercel 가드 없음 → prod 에서도 읽기 동작.
+ * - 권한: 로그인 유저 전체(analyze-open-access — 메뉴 개방과 함께 admin 가드 제거). 로그인 자체는
+ *   전역 proxy 게이트가 담당. 파괴적 작업(삭제)은 별도 라우트의 superadmin 가드 유지.
  */
 
-import { NextResponse, type NextRequest } from "next/server";
-import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
+import { NextResponse } from "next/server";
 import {
   getAllAIDecisions,
   isAIDecisionStoreConfigured,
@@ -77,11 +78,7 @@ function buildTokensByTicker(
   return out;
 }
 
-export async function GET(request: NextRequest): Promise<Response> {
-  // AI 판정 원장 + 종목별 토큰 합(/analyze) — 운영정보라 prod 만 admin+(로컬 전체).
-  const denied = await requireProdAdminApi(request);
-  if (denied) return denied;
-
+export async function GET(): Promise<Response> {
   try {
     const [decisions, usageRows, activeJobs] = await withTimeout(
       Promise.all([

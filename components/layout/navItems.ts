@@ -58,8 +58,10 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/", label: NAV_MENU_HOME, shortLabel: NAV_MENU_HOME_SHORT, icon: House },
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, shortLabel: NAV_MENU_WATCHLIST_SHORT, icon: Star },
   { path: "/stock", label: NAV_MENU_STOCK, shortLabel: NAV_MENU_STOCK_SHORT, icon: BarChart2 },
-  // AI 분석 — 토큰 사용량·비용·판정원장(운영정보)이라 로컬은 전체, prod 는 admin 이상만(localOnly).
-  { path: "/analyze", label: NAV_MENU_ANALYZE, shortLabel: NAV_MENU_ANALYZE_SHORT, icon: Compass, localOnly: true },
+  // AI 분석 — 일반 유저 전체 공개(analyze-open-access). 판정 카드가 사용자 대면 가치라 개방하되,
+  // 운영정보는 지면 안에서 격리: 토큰 사용량 탭은 prod 숨김(AnalyzeTabsContainer IS_PROD)·
+  // 카드 삭제는 superadmin(AIDecisionCardMenu)·usage API 는 admin 가드 유지.
+  { path: "/analyze", label: NAV_MENU_ANALYZE, shortLabel: NAV_MENU_ANALYZE_SHORT, icon: Compass },
   // 단타 워치 — 로컬은 전체, prod 는 admin 이상만(localOnly). 마이페이지 바로 위 고정.
   { path: "/intraday", label: NAV_MENU_INTRADAY, shortLabel: NAV_MENU_INTRADAY_SHORT, icon: Zap, localOnly: true },
   { path: "/profile", label: NAV_MENU_PROFILE, shortLabel: NAV_MENU_PROFILE_SHORT, icon: User },
