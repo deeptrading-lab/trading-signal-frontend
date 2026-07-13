@@ -12,7 +12,10 @@
  * staleTime / gcTime 분리:
  *   - staleTime — 이 시간이 지나면 stale 상태로 전환, 다음 mount 또는 focus 시 refetch.
  *   - gcTime — observer 가 0이 된 후 캐시가 메모리에서 garbage collect 될 때까지의 시간.
- *     보통 staleTime 의 5~10배가 합리적이며, gcTime > staleTime 이 의무.
+ *     staleTime 은 "신선도", gcTime 은 "힙 체류 상한" — 서로 다른 축이라 gcTime > staleTime
+ *     의무 같은 건 없다. 대용량 도메인(일봉 캔들 배열 등)은 gcTime < staleTime 으로 짧게 잡아
+ *     메모리를 회수하고, gc 후 재방문은 refetch 1회 비용과 교환한다(mobile-perf-memory —
+ *     방문 종목마다 캔들 배열이 힙에 7일 잔류해 모바일 탭 킬에 기여하던 것을 하향).
  */
 
 const SECOND = 1_000;
@@ -30,10 +33,15 @@ export const queryConfig = {
       staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
-    /** 일자별 차트 — 장 종료 후 갱신. 장중에는 당일치만 invalidate 필요. */
+    /**
+     * 일자별 차트 — 장 종료 후 갱신. 장중에는 당일치만 invalidate 필요.
+     * gcTime 7일 → 30분(mobile-perf-memory): 종목당 최대 ~3000봉 × 파생 15필드 배열이라
+     * 세션 중 방문한 모든 종목이 힙에 7일 잔류 → 모바일 탭 킬의 주요 벡터였다. 세션 내
+     * 재방문(뒤로가기·peek 재호버)은 30분이면 충분하고, 이후엔 refetch 1회로 복구.
+     */
     daily: {
       staleTime: 1 * DAY,
-      gcTime: 7 * DAY,
+      gcTime: 30 * MINUTE,
     },
     /** 당일 분봉(단타워치 차트 탭) — 장중 1분 주기 갱신은 훅의 refetchInterval 이 담당. */
     minuteChart: {
@@ -78,10 +86,13 @@ export const queryConfig = {
       staleTime: 5 * MINUTE,
       gcTime: 30 * MINUTE,
     },
-    /** 회사 소개(자유 텍스트) — 분기보고서 주기로 갱신되는 정적 정보. 기업개황과 동일 TTL. */
+    /**
+     * 회사 소개(자유 텍스트) — 분기보고서 주기로 갱신되는 정적 정보. 기업개황과 동일 TTL.
+     * gcTime 7일 → 1시간(mobile-perf-memory): 건당 텍스트가 커 방문 종목 누적 힙 회수.
+     */
     description: {
       staleTime: 1 * DAY,
-      gcTime: 7 * DAY,
+      gcTime: 1 * HOUR,
     },
     /**
      * AI 분석 토큰 사용량 집계 — 로컬 분석 실행 시에만 누적되는 이력. 수동 새로고침 + 짧은 stale.
@@ -129,10 +140,13 @@ export const queryConfig = {
     },
   },
   disclosure: {
-    /** 기업개황 — 거의 변하지 않음 (대표자명·설립일·업종 등). */
+    /**
+     * 기업개황 — 거의 변하지 않음 (대표자명·설립일·업종 등).
+     * gcTime 7일 → 1시간(mobile-perf-memory): description 과 동일 축 힙 회수.
+     */
     company: {
       staleTime: 1 * DAY,
-      gcTime: 7 * DAY,
+      gcTime: 1 * HOUR,
     },
     /** 공시 목록 — 신규 공시 빠른 반영 필요. */
     list: {
