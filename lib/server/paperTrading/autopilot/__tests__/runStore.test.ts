@@ -13,6 +13,7 @@ import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import type {
   AutopilotCandidate,
   AutopilotRun,
+  AutopilotScreenerSnapshot,
 } from "@/lib/types/paperTrading/autopilot";
 import type {
   CreatePaperTradingSessionRequest,
@@ -264,6 +265,34 @@ describe("sweepAutopilotRuns", () => {
     expect(run.cooldownUntilByTicker["999999"]).toBeDefined();
     expect(run.slots[0].sessionId).toBe("created-0"); // 회수 후 즉시 재충원.
     expect(run.rotationLog.some((e) => e.kind === "replace")).toBe(true);
+  });
+
+  it("스크리너 스냅샷 — 창당 1건, 랭킹(점수 병합)·편입·교체·탈락 전수 기록", async () => {
+    const run = makeRun({ slotCount: 1 });
+    run.slots[0] = { slotIndex: 0, sessionId: "old-1", ticker: "999999", filledAt: "2026-07-13T00:30:00.000Z" };
+    seedAutopilotRunForTest(run);
+    const snapshots: AutopilotScreenerSnapshot[] = [];
+    const { deps } = makeDeps({
+      getSessionDetail: async (id) =>
+        id === "old-1"
+          ? toDetail(makeSession({ id: "old-1", tickers: ["999999"], stocks: [{ ticker: "999999", name: "탈락" }] }))
+          : null,
+      screener: async () => okScreener(["100001", "100002"]),
+      persistSnapshot: async (s) => {
+        snapshots.push(s);
+      },
+    });
+
+    await sweepAutopilotRuns(MARKET_OPEN, deps);
+    expect(snapshots).toHaveLength(1);
+    const s = snapshots[0];
+    expect(s.id).toBe(`${run.id}:${run.lastSweepWindowStart}`);
+    expect(s.status).toBe("ok");
+    expect(s.ranking.map((c) => c.ticker)).toEqual(["100001", "100002"]);
+    expect(s.ranking[0].finalScore).toBeDefined(); // shortlist 는 최종 점수 병합.
+    expect(s.replaced.map((r) => r.ticker)).toEqual(["999999"]);
+    expect(s.picks.map((p) => p.ticker)).toEqual(["100001"]);
+    expect(s.picks[0].sessionId).toBe("created-0");
   });
 
   it("스크리너 미가용 — skip 이벤트 + 요약 기록, 슬롯 유지", async () => {

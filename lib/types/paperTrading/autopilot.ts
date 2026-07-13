@@ -84,6 +84,35 @@ export type AutopilotScreenerSummary = {
   unavailableReason?: string;
 };
 
+/**
+ * 스윕 1회의 스크리너 전수 스냅샷 — **종목 선정 품질 사후 검증용** append-only 관측 데이터.
+ * 매 스윕의 전체 랭킹(점수·스냅샷 시점 가격 포함)·탈락 후보(사유)·실제 편입/교체를
+ * `paper_trading_autopilot_screener_snapshots` 에 남긴다. 가격이 함께 저장되므로 나중에
+ * "뽑은 종목 vs 안 뽑은 종목 vs 탈락 종목"의 사후 수익률(forward return) 비교 평가가 가능하다
+ * (daily.mts 캘리브레이션과 같은 관측-먼저 접근 — 평가 스크립트는 후속).
+ */
+export type AutopilotScreenerSnapshot = {
+  /** `${runId}:${sweepWindowStart}` — 창당 1행 멱등(재시도 중복 방지). */
+  id: string;
+  runId: string;
+  owner: string;
+  at: string;
+  sweepWindowStart: string;
+  status: "ok" | "unavailable";
+  unavailableReason?: string;
+  universeSize: number;
+  /** 스크리너에서 사전 제외된 티커(쿨다운·타 세션 진행 중). */
+  excludedTickers: string[];
+  /** 하드필터 통과 전 종목(1차 점수순, shortlist 는 2차·최종 점수 병합). */
+  ranking: AutopilotCandidate[];
+  /** 하드필터·2차 재검증 탈락 후보(rejectedBy 포함). */
+  rejected: AutopilotCandidate[];
+  /** 이 스윕에서 실제 편입한 종목(세션 생성 성공분). */
+  picks: Array<{ ticker: string; slotIndex: number; sessionId: string; score: number }>;
+  /** 이 스윕에서 교체 회수한 종목(완료 patch 성공분). */
+  replaced: Array<{ ticker: string; sessionId: string; reason: string }>;
+};
+
 /** 오토파일럿 런 — 인메모리 1차 진실 + Supabase write-through(세션 스토어 패턴 미러). */
 export type AutopilotRun = {
   id: string;

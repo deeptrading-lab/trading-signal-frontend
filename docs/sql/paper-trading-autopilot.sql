@@ -19,3 +19,19 @@ create index if not exists paper_trading_autopilot_runs_owner_updated_idx
 
 -- 서비스 롤 키(BFF 서버 전용)만 접근 — RLS 활성화(정책 미부여 = anon 차단, 선례 동일).
 alter table public.paper_trading_autopilot_runs enable row level security;
+
+-- 스크리너 스냅샷(append-only) — 종목 선정 품질 사후 검증용. 매 스윕의 전체 랭킹(점수·가격)·
+-- 탈락 사유·실제 편입/교체를 남겨 "뽑은 종목 vs 안 뽑은/탈락 종목"의 사후 수익률 비교를 가능케 한다.
+-- id = runId:sweepWindowStart (창당 1행 멱등). 파일 전체 재실행 안전(if not exists).
+create table if not exists public.paper_trading_autopilot_screener_snapshots (
+  id         text        primary key,          -- `${run_id}:${sweep_window_start}`
+  run_id     text        not null,
+  owner      text        not null,
+  payload    jsonb       not null,             -- AutopilotScreenerSnapshot 전체
+  created_at timestamptz not null default now()
+);
+
+create index if not exists paper_trading_autopilot_snapshots_run_idx
+  on public.paper_trading_autopilot_screener_snapshots (run_id, created_at desc);
+
+alter table public.paper_trading_autopilot_screener_snapshots enable row level security;

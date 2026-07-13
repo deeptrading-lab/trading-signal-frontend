@@ -7537,3 +7537,87 @@
   > - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
+
+### 2026-07-13 — feat(intraday): 단타 오토파일럿 PR-1 — 자동 포트폴리오 스크리너·로테이션 코어 (#348)
+
+- **slug**: `intraday-autopilot-core` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/348
+- **요약**: feat(intraday): 단타 오토파일럿 PR-1 — 자동 포트폴리오 스크리너·로테이션 코어
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 
+  > 출근 전 버튼 하나로 AI 단타를 자동 운영하는 오토파일럿의 **서버 코어**입니다. 오토파일럿 "런"이 기존 단일종목 cli-agent 세션을 자식으로 생성/회수하며, 장중에 단타 적합 종목을 스스로 고르고(스크리너) 죽은 종목을 교체(로테이션)합니다. 기존 틱·judge·체결·자가채점·daily.mts 캘리브레이션 경로는 **무변경**(자식 = 일반 세션이라 관측성 공짜).
+  > 
+  > ## 구조
+  > 
+  > - **스크리너(결정론 2단)**: KIS 랭킹 4콜(거래대금·등락률·외인/기관 수급) union → 하드필터(정리매매/투자위험/투자경고·가격 1천~30만·거래대금 100억↓·등락률 +1~25%) → 1차 점수(모멘텀 0.45·유동성 0.35·수급 0.20, percentile 정규화, 단기과열 감점) → 상위 8 shortlist 당일 5분봉 → 2차 점수(ATR% 삼각 0.30·거래량z 0.25·VWAP 위치 0.25·구조 0.20). 종목 선정에 LLM 불개입(PR-4 conviction 역상관 교훈) — `rerank` 훅만 예약.
+  > - **로테이션**: 10분 창 스윕. flat 슬롯만 교체(★포지션 보유 슬롯 불가침 — 청산은 judge/하드스톱 전담), 교체 조건 = 랭킹 12위 밖 또는 무주문 6틱+conviction≤55. 쿨다운 30분, fill 창 09:05~14:00, 스윕당 2 fill 캡. 랭킹 미가용 시 무근거 교체 방지.
+  > - **스케줄러**: 기존 60초 사이클에 `closeOutAutopilotRuns`(①ᴮ)·`sweepAutopilotRuns`(②ᴮ) 2스테이지 삽입. 자식 세션 틱은 기존 스테이지가 자동 처리.
+  > - **다중 운영자 격리**: 런 owner=operator 엄격 일치만 스윕/마감. 오늘 running 티커(소유자 무관) 사전 제외 + 생성 후 owner/autopilotRunId 검증으로 친구 서버·수동 세션과 경합/흡수 없음.
+  > - **영속**: `paper_trading_autopilot_runs`(payload jsonb) write-through + 부팅 hydrate(내 owner 만). 재시작 후 슬롯·쿨다운·스윕 창 복원.
+  > - **API**: `GET/POST /api/paper-trading/autopilot`(시작은 09:00 이전·KIS 미설정에도 허용, kisReady 힌트), `PATCH .../[runId]`(중지 — 자식 세션은 건드리지 않음).
+  > 
+  > ## 검증
+  > 
+  > - `npm test` 1281 passed(신규 41: rotation/screener/runStore — 포지션 불가침·창 게이트·쿨다운·멱등가드 충돌·owner 게이트·창 dedup)
+  > - `tsc --noEmit` / `eslint` / `next build` 통과
+  > - 라이브 검증은 평일 장중 로컬 dev 로 진행 예정(가이드: 본문 하단)
+  > 
+  > ## ⚠️ 수동 스텝
+  > 
+  > - Supabase SQL Editor 에서 `docs/sql/paper-trading-autopilot.sql` 1회 실행(테이블 생성). 미실행이어도 인메모리로 동작(재시작 시 런 소실만).
+  > 
+  > ## 라이브 검증 가이드
+  > 
+  > 1. 평일 08:50 dev 기동 → `curl -X POST localhost:3000/api/paper-trading/autopilot -H 'Content-Type: application/json' -d '{}'`
+  > 2. 09:05+ `[autopilot]` 로그로 유니버스/fill 확인, 워치 표에 자식 세션 등장
+  > 3. 교체 강제 유발: `AUTOPILOT_REPLACE_RANK_THRESHOLD=3`
+  > 4. 15:41 후 런·자식 completed, 다음날 daily.mts 집계 포함 확인
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2 `feature/intraday-autopilot-ui`: /intraday 오토파일럿 카드(시작/중지·슬롯 칩·손익·로테이션 히스토리) + 워치 표 "오토" 배지 + 훅
+  - 평일 라이브 검증(스크리너 품질 관찰 → env 임계 튜닝)
+  - 후속: LLM 스카우트 재랭킹 훅 실험(결정론 대비 A/B)
+
+### 2026-07-13 — fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소 (#347)
+
+- **slug**: `scorecard-index-field-fix` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/347
+- **요약**: fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > AI 종합분석 결과의 자가채점(`signal_scorecard`)이 **2026-06-26 이후 전면 정체**돼 있었습니다. 사후검증 감사 중 발견:
+  > 
+  > - 원장 69행 중 채점 완료는 6/23의 d1 6건뿐, 이후 w1/w2/m1 전량 pending
+  > - KV 마커 `scorecard:cron:meta`는 매 영업일 `ok:true, errors:0, scored:0, pendingKept:234` — "성공적으로 아무것도 안 하는" 조용한 실패
+  > - cron 트리거(GHA flow-snapshot)와 판정 로직 자체는 건강
+  > 
+  > ## 근본 원인
+  > 
+  > `inquire-daily-indexchartprice`(TR `FHKUP03500100`) 응답의 지수 종가를 **존재하지 않는 `bstp_nmix_clpr` 필드로 매핑**하고 있었습니다. 실제 KIS 응답 필드는 `bstp_nmix_prpr`이며, 저장소 자체 문서(`docs/references/kis-api/domestic-stock-quotations.md` L248)에는 이미 올바르게 적혀 있었습니다.
+  > 
+  > - `toNumber(undefined)` → 0 → `close > 0` 필터에서 전 봉 탈락 → **지수 일봉이 항상 빈 배열**
+  > - v2 채점(excess)은 벤치마크 지수가 없으면 fail-soft로 pending 유지 → `errors=0`인 채 무한 보류
+  > - v1(절대수익)이 마지막으로 돌던 6/23까지만 채점이 존재하고, v2(#149, 6/26 머지) 배포 후 채점 성공 0건
+  > 
+  > 로컬 dry-run으로 재현·수정 확인: 지수 일봉 `0봉 → 91봉`, `scored: 0 → 9`(hit/miss/flat + excess 정상 산출).
+  > 
+  > ## 변경
+  > 
+  > - **`index-chart.ts` / `types.ts`**: 종가 필드 `bstp_nmix_clpr` → `bstp_nmix_prpr`
+  > - **`index-chart.ts` 스키마 가드**: `output2`에 봉이 있는데 매핑 결과가 0건이면 throw. 향후 같은 종류의 필드명 회귀가 **조용한 pending 대신 `errors` 카운터·KV 마커로 드러나도록** 함
+  > - **`indexChartChunked.ts`**: `CHUNK_DAYS` 130 → 60. 이 TR은 실측 1콜 최대 50봉만 반환하고 범위가 넓어도 최근 50봉만 주고 과거를 조용히 버리는데, 130일(≈88영업봉) 청크는 과거 봉을 소실시켜 베타 추정 윈도우(60영업일)에 구멍을 냈음
+  > - **`index-chart.test.ts`**: 필드명·스키마 가드·빈 응답·rt_cd 회귀 테스트 4종 신규 (기존 스코어카드 테스트 125건 + 신규 4건 전부 통과)
+  > 
+  > ## 배포 영향
+  > 
+  > 배포 후 다음 채점 cron이 밀린 pending을 **설계상 자동 소급 채점**합니다(별도 백필 불필요). prod KIS prod 게이트에서만 지수 조회가 일어나므로 로컬/preview 무영향.
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 첫 cron(평일 16:10 KST 전후) 실행 뒤 `signal_scorecard`의 w1/w2/m1 status가 채워지는지, KV 마커 `scored > 0`인지 라이브 확인
+  - 채점 정체를 조기 감지할 관측 채널 검토 — `scorecard:cron:meta`를 `/api/flow/cron-status`류 라우트에 함께 노출
+  - (별건, 감사 후속) 판정 생성 개선: 약세 콜 target/stop 세맨틱 모순 정리, verdict/confidence 분포 붕괴(전원 MEDIUM·약세 편중), 베타/알파 미구분 — 분석 프롬프트 차원

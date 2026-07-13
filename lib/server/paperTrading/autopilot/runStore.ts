@@ -27,6 +27,7 @@ import {
 import {
   loadPersistedAutopilotRuns,
   persistAutopilotRun,
+  persistAutopilotScreenerSnapshot,
 } from "@/lib/server/paperTrading/autopilot/persistence";
 import {
   buildSlotSessionView,
@@ -47,6 +48,7 @@ import { floorToTickWindow } from "@/lib/server/paperTrading/time";
 import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 import type {
   AutopilotRun,
+  AutopilotScreenerSnapshot,
   AutopilotScreenerSummary,
   StartAutopilotRunRequest,
 } from "@/lib/types/paperTrading/autopilot";
@@ -212,6 +214,7 @@ export type AutopilotSweepDeps = {
   listSessions?: typeof listPaperTradingSessions;
   getSessionDetail?: typeof getPaperTradingSessionDetail;
   cliGate?: typeof getPaperTradingAiCliGate;
+  persistSnapshot?: typeof persistAutopilotScreenerSnapshot;
 };
 
 /** 스윕 중첩 방지(스케줄러 사이클 60초 < 스윕 소요 가능성 대비). */
@@ -266,6 +269,23 @@ async function sweepOneRun(
   const patchSessionStatus = deps.patchSessionStatus ?? patchPaperTradingSessionStatus;
   const listSessions = deps.listSessions ?? listPaperTradingSessions;
   const getSessionDetail = deps.getSessionDetail ?? getPaperTradingSessionDetail;
+  const persistSnapshot = deps.persistSnapshot ?? persistAutopilotScreenerSnapshot;
+  // 스냅샷 골격 — 스윕이 어느 분기로 끝나든 이 창의 선정 근거를 남긴다(종목 선정 사후 검증 데이터).
+  const sweepWindowStart = run.lastSweepWindowStart ?? nowIso;
+  const snapshot: AutopilotScreenerSnapshot = {
+    id: `${run.id}:${sweepWindowStart}`,
+    runId: run.id,
+    owner: run.owner,
+    at: nowIso,
+    sweepWindowStart,
+    status: "ok",
+    universeSize: 0,
+    excludedTickers: [],
+    ranking: [],
+    rejected: [],
+    picks: [],
+    replaced: [],
+  };
 
   // ① 슬롯 세션 뷰 + 제외 집합 조립.
   const slotViews = new Map<string, AutopilotSlotSessionView>();
@@ -292,6 +312,7 @@ async function sweepOneRun(
   }
 
   // ② 스크리너.
+  snapshot.excludedTickers = [...excludeTickers];
   const result = await screener({ excludeTickers });
   if (result.status === "unavailable") {
     run.lastScreenerSummary = {
@@ -307,8 +328,16 @@ async function sweepOneRun(
       slotIndex: null,
       note: `스크리너 미가용 — ${result.reason}`,
     });
+    snapshot.status = "unavailable";
+    snapshot.unavailableReason = result.reason;
+    void persistSnapshot(snapshot);
     return;
   }
+  // 스냅샷 랭킹 — shortlist 는 2차·최종 점수가 병합된 fillRanking 사본으로 대체(전 필드 보존).
+  const fillByTicker = new Map(result.fillRanking.map((c) => [c.ticker, c]));
+  snapshot.universeSize = result.universeSize;
+  snapshot.ranking = result.stage1Ranking.map((c) => fillByTicker.get(c.ticker) ?? c);
+  snapshot.rejected = result.rejected;
   const finalScoreByTicker = new Map(result.fillRanking.map((c) => [c.ticker, c.finalScore]));
   run.lastScreenerSummary = {
     at: nowIso,
@@ -340,6 +369,11 @@ async function sweepOneRun(
       await patchSessionStatus(replacement.sessionId, "completed"); // 자가채점 훅 자동 발동.
       run.cooldownUntilByTicker[replacement.ticker] = cooldownUntil(now);
       emptySlot(run, replacement.slotIndex);
+      snapshot.replaced.push({
+        ticker: replacement.ticker,
+        sessionId: replacement.sessionId,
+        reason: replacement.reason,
+      });
       run.rotationLog.push({
         at: nowIso,
         kind: "replace",
@@ -368,6 +402,7 @@ async function sweepOneRun(
         slotIndex: null,
         note: "AI CLI 미설치 — fill 건너뜀",
       });
+      void persistSnapshot(snapshot);
       return;
     }
     for (const fill of plan.fills) {
@@ -403,6 +438,12 @@ async function sweepOneRun(
         slot.sessionId = session.id;
         slot.ticker = candidate.ticker;
         slot.filledAt = nowIso;
+        snapshot.picks.push({
+          ticker: candidate.ticker,
+          slotIndex: fill.slotIndex,
+          sessionId: session.id,
+          score: Number((candidate.finalScore ?? candidate.score1).toFixed(3)),
+        });
         run.rotationLog.push({
           at: nowIso,
           kind: "fill",
@@ -429,6 +470,9 @@ async function sweepOneRun(
       }
     }
   }
+
+  // ⑤ 스크리너 스냅샷 영속(fire-and-forget) — 이 창의 랭킹·탈락·편입/교체 전수 기록.
+  void persistSnapshot(snapshot);
 }
 
 function emptySlot(run: AutopilotRun, slotIndex: number): void {
