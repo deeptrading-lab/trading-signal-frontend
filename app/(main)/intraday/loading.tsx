@@ -4,8 +4,8 @@
  * 배경: async(권한 판정 await) 라우트인데 로딩 경계가 없어 BottomNav "AI 단타" 탭 클릭 후
  * 직전 화면이 얼어붙었다(`stock/[ticker]/loading.tsx` 와 동일 패턴의 복제).
  *
- * 무-jump: `IntradayWatchWorkspace` 첫 화면 구조(오토파일럿 컨트롤 행 → AI 자동 단타 카드 →
- * 워치 검색바 → 추천 칩 2줄 → 날짜 그룹 표)를 블록 단위로 미러.
+ * 무-jump: `IntradayWatchWorkspace` 첫 화면 구조(오토파일럿 컨트롤 행 → 워치 검색바 →
+ * 추천 칩 2줄 → 날짜 그룹 표)를 블록 단위로 미러.
  */
 
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -21,9 +21,6 @@ export default function IntradayLoading() {
 
       {/* 오토파일럿 컨트롤 행 자리 */}
       <Skeleton variant="line" className="mb-0 h-6 w-48" />
-
-      {/* AI 자동 단타 카드 자리 */}
-      <Skeleton variant="block" className="h-36 w-full rounded-lg" />
 
       {/* 워치 검색바 자리 */}
       <Skeleton variant="block" className="h-14 w-full rounded-md" />
