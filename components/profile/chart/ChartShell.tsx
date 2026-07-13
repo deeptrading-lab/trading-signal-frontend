@@ -102,6 +102,7 @@ export function ChartShell({
   onChartTypeChange,
   overlays,
   onToggleOverlay,
+  allowMinute = true,
 }: {
   children: React.ReactNode;
   expanded?: boolean;
@@ -119,13 +120,17 @@ export function ChartShell({
   onChartTypeChange: (t: ChartType) => void;
   overlays: ChartOptions;
   onToggleOverlay: (key: keyof ChartOptions) => void;
+  /** 분봉 선택 허용 — 미국 종목은 분봉 미지원(Toss minute=KR 전용)이라 false 로 분봉 탭을 숨긴다. */
+  allowMinute?: boolean;
 }) {
   const { isMobile } = useBreakpoint();
   const hasToggle = onExpand || onCollapse;
   const isMinute = interval === "m";
 
-  // 봉 종류(분봉/일봉/주봉/월봉) 선택기 옵션.
-  const intervalOptions = INTERVALS.map((it) => ({ label: it.label, value: it.interval }));
+  // 봉 종류(분봉/일봉/주봉/월봉) 선택기 옵션 — 분봉 미허용(미국) 시 "m" 제외.
+  const intervalOptions = INTERVALS.filter(
+    (it) => allowMinute || it.interval !== "m",
+  ).map((it) => ({ label: it.label, value: it.interval }));
   // 분봉 간격(1/3/5/10/15분) 선택기 옵션 — 분봉일 때만 렌더.
   const timeframeOptions = MINUTE_TIMEFRAMES.map((t) => ({ label: t.label, value: t.timeframe }));
 

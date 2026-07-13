@@ -210,10 +210,20 @@ export type KisInquireTimeItemChartItem = {
   acml_tr_pbmn?: string;
 };
 
+/** 검색 결과 시장 라벨 — 국내(KOSPI/KOSDAQ) + 미국 거래소(us-stock-support). 배지 표시용. */
+export type StockSearchMarket =
+  | "KOSPI"
+  | "KOSDAQ"
+  | "NASDAQ"
+  | "NYSE"
+  | "AMEX"
+  | "ARCA"
+  | "CBOE";
+
 export type StockSearchResult = {
   ticker: string;
   name: string;
-  market: "KOSPI" | "KOSDAQ";
+  market: StockSearchMarket;
 };
 
 /**

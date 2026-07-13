@@ -57,7 +57,6 @@ import {
 } from "@/lib/copy/profile/stockDetail";
 import {
   PERIOD_UNIT,
-  CHART_AXIS_WIDTH,
   CHART_MA_LABEL,
   MA_PERIODS,
   type ChartType,
@@ -69,6 +68,7 @@ import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
+import { isUsTicker } from "@/lib/utils/isUsTicker";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag, lastPriceTagWidth } from "./chart/LastPriceTag";
 import { AiLevelAxisLabels, aiLabelMaxWidth } from "./chart/AiLevelAxisLabels";
@@ -128,6 +128,8 @@ export interface StockDailyChartProps {
   aiLevels?: AiVerdictLevels | null;
   /** AI 레벨 오버레이 표시 여부(배너 토글). aiLevels 있을 때만 유효. */
   showAiLevels?: boolean;
+  /** 분봉 선택 허용 — 미국 종목은 분봉 미지원이라 false 로 분봉 탭 숨김(us-stock-support). */
+  allowMinute?: boolean;
 }
 
 export function StockDailyChart({
@@ -149,9 +151,13 @@ export function StockDailyChart({
   onToggleOverlay,
   aiLevels,
   showAiLevels,
+  allowMinute,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
     useChartData(ticker, interval, days, timeframe, minutePriorDays);
+
+  // 미국 종목(달러) — y축·툴팁을 원화 만 단위 대신 달러 평문/$ 로(us-stock-support).
+  const isUs = isUsTicker(ticker);
 
   // 런타임 테마 색 — light/dark 전환 시 새 객체 reference 로 recharts 리렌더.
   const theme = useChartTheme();
@@ -178,7 +184,37 @@ export function StockDailyChart({
     [candleSeries, volSeries],
   );
 
-  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay };
+  // 우측 y축 폭 — 4개 스택 차트(가격·거래량·MACD·RSI)가 세로 정렬돼야 해 공통 폭 하나를 쓴다.
+  // 하드코딩(56) 대신 각 차트의 가장 넓은 눈금 라벨을 실측 추정해 "필요한 만큼만" 차지한다
+  // (us-stock-support: 미국은 값이 작아 라벨이 짧아 축이 좁아지고, 국내 대형가는 상한 56 유지).
+  const axisWidth = useMemo(() => {
+    const w = (t: string) => {
+      let px = 0;
+      for (const ch of t) px += ch.charCodeAt(0) > 0x2e80 ? 11 : 6.4; // CJK ~11 · 그 외 ~6.4px.
+      return px;
+    };
+    const labels = ["100"]; // RSI 상한(항상 후보).
+    const prices =
+      chartType === "candle"
+        ? candleSeries.flatMap((c) => [c.low, c.high])
+        : priceSeries.map((p) => p.price);
+    if (prices.length) {
+      labels.push(fmtYAxis(Math.max(...prices), isUs), fmtYAxis(Math.min(...prices), isUs));
+    }
+    const vols = volSeries.map((v) => v.volume ?? 0);
+    if (vols.length) labels.push(fmtVolAxis(Math.max(...vols)));
+    const macdVals = macdSeries.flatMap((m) =>
+      [m.macd, m.signal, m.histogram].filter((x): x is number => x != null),
+    );
+    if (macdVals.length) {
+      const maxAbs = Math.max(...macdVals.map(Math.abs));
+      labels.push((macdVals.some((x) => x < 0) ? -maxAbs : maxAbs).toFixed(0));
+    }
+    // 축선·눈금선 없음(axisProps: axisLine/tickLine false)이라 폭은 텍스트+소폭 여백만.
+    return Math.round(Math.min(54, Math.max(30, Math.max(...labels.map(w)) + 10)));
+  }, [chartType, candleSeries, priceSeries, volSeries, macdSeries, isUs]);
+
+  const shellProps = { expanded, onExpand, onCollapse, interval, days, timeframe, minutePriorDays, onIntervalChange, onDaysChange, onTimeframeChange, onMinutePriorDaysChange, chartType, onChartTypeChange, overlays, onToggleOverlay, allowMinute };
 
   // 클릭 툴팁 — 전 서브플롯을 **공유 클릭 인덱스**로 제어(syncId·trigger 미사용). recharts syncId 는
   //  hover 기반이라, 클릭 후 마우스를 보조지표로 옮기면 가격 차트 mouseLeave 로 동기화가 풀려 보조지표
@@ -340,10 +376,10 @@ export function StockDailyChart({
   }
   // 우측 축 라벨(y축서 시작해 오른쪽 확장) — 라벨이 축 폭보다 길면 그 넘침분만큼 margin.right 예약해
   //  잘리지 않게. AI 레벨 라벨과 현재가 알약 둘 다 좌정렬·우확장이라 각자 넘침분의 최댓값을 예약한다.
-  const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - CHART_AXIS_WIDTH + 4) : 0;
+  const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - axisWidth + 4) : 0;
   const lastPriceOverflow =
     lastClose != null
-      ? Math.max(0, lastPriceTagWidth(lastClose, lastPriceLabel) - CHART_AXIS_WIDTH + 4)
+      ? Math.max(0, lastPriceTagWidth(lastClose, lastPriceLabel) - axisWidth + 4)
       : 0;
   const rightReserve = Math.max(aiOverflow, lastPriceOverflow);
   const priceMargin = { top: 5, right: 4 + rightReserve, left: 0, bottom: 0 };
@@ -365,7 +401,7 @@ export function StockDailyChart({
     (v): v is number => v != null,
   );
   const priceTick = (
-    <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} />
+    <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} isUs={isUs} />
   );
 
   return (
@@ -387,8 +423,8 @@ export function StockDailyChart({
                 <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} activeDot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
-              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} />} />
+              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={(v) => fmtYAxis(v, isUs)} width={axisWidth} orientation="right" tick={priceTick} />
+              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} content={<CandleTooltip showMA={showMA} showVWAP={showVWAP} isUs={isUs} />} />
               <Bar dataKey="wickRange" shape={<CandleBar />} maxBarSize={12} isAnimationActive={false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 캔들 위에 표시 */}
               {showBB && (
@@ -434,8 +470,8 @@ export function StockDailyChart({
                 <Area type="monotone" dataKey="bbRange" stroke="none" fill={C.bb} fillOpacity={0.1} activeDot={false} isAnimationActive={false} tooltipType="none" legendType="none" />
               )}
               <XAxis dataKey="date" {...axisProps} dy={8} interval={xAxisInterval} minTickGap={40} ticks={xTicks} />
-              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={fmtYAxis} width={CHART_AXIS_WIDTH} orientation="right" tick={priceTick} />
-              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} contentStyle={tooltipStyle} formatter={fmtTooltipPrice} labelStyle={labelStyle} />
+              <YAxis domain={["auto", "auto"]} {...axisProps} tickFormatter={(v) => fmtYAxis(v, isUs)} width={axisWidth} orientation="right" tick={priceTick} />
+              <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} contentStyle={tooltipStyle} formatter={(v) => fmtTooltipPrice(v, isUs)} labelStyle={labelStyle} />
               <Area type="monotone" dataKey="price" stroke={C.stroke} strokeWidth={2} fillOpacity={1} fill="url(#sdcFill)" dot={false} activeDot={clickedIndex != null ? { r: 5, strokeWidth: 0 } : false} />
               {/* 볼린저 상·하단(실선)·중심선(SMA20 점선) — 가격 라인 위에 표시 */}
               {showBB && (
@@ -475,7 +511,7 @@ export function StockDailyChart({
           <ComposedChart data={volSeries} onClick={handleChartClick} margin={subMargin}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
             <XAxis dataKey="date" {...axisProps} dy={6} hide />
-            <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={CHART_AXIS_WIDTH} orientation="right" />
+            <YAxis {...axisProps} tickFormatter={fmtVolAxis} width={axisWidth} orientation="right" />
             <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} contentStyle={tooltipStyle} formatter={fmtTooltipVol} labelStyle={labelStyle} />
             <Bar dataKey="volume" maxBarSize={6} isAnimationActive={false}>
               {volSeries.map((entry, i) => (
@@ -499,7 +535,7 @@ export function StockDailyChart({
               <ComposedChart data={macdSeries} onClick={handleChartClick} margin={subMargin}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} hide />
-                <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={CHART_AXIS_WIDTH} orientation="right" />
+                <YAxis {...axisProps} tickFormatter={(v) => Number(v).toFixed(0)} width={axisWidth} orientation="right" />
                 <ReferenceLine y={0} stroke={C.refMid} strokeOpacity={0.5} />
                 <Tooltip trigger="click" active={tooltipActive} defaultIndex={tooltipIndex} contentStyle={tooltipStyle} formatter={fmtTooltipMACD} labelStyle={labelStyle} />
                 <Bar dataKey="histogram" maxBarSize={4} isAnimationActive={false}>
@@ -528,7 +564,7 @@ export function StockDailyChart({
               <LineChart data={rsiSeries} onClick={handleChartClick} margin={subMargin}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
                 <XAxis dataKey="date" {...axisProps} dy={6} hide />
-                <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={CHART_AXIS_WIDTH} orientation="right" />
+                <YAxis domain={[0, 100]} {...axisProps} ticks={[0, 30, 50, 70, 100]} width={axisWidth} orientation="right" />
                 <ReferenceLine y={70} stroke={C.refOB} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "70", position: "right", fill: C.refOB, fontSize: 10 }} />
                 <ReferenceLine y={30} stroke={C.refOS} strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: "30", position: "right", fill: C.refOS, fontSize: 10 }} />
                 <ReferenceLine y={50} stroke={C.refMid} strokeOpacity={0.4} />

@@ -19,6 +19,8 @@ interface PriceAxisTickProps {
   hidePrices: number[];
   /** 숨김 임계값(가격 폭). 숨김 가격과의 차이가 이 값보다 작으면 눈금 숨김. */
   hideThreshold: number;
+  /** 미국 종목(달러) — y축을 만 단위 대신 평문 숫자로(us-stock-support). */
+  isUs?: boolean;
   // recharts 주입
   x?: number;
   y?: number;
@@ -30,6 +32,7 @@ export function PriceAxisTick({
   tickFill,
   hidePrices,
   hideThreshold,
+  isUs = false,
   x = 0,
   y = 0,
   textAnchor,
@@ -51,7 +54,7 @@ export function PriceAxisTick({
       fontSize={11}
       dominantBaseline="central"
     >
-      {fmtYAxis(payload.value)}
+      {fmtYAxis(payload.value, isUs)}
     </text>
   );
 }

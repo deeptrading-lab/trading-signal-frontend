@@ -101,6 +101,9 @@ export const queryKeys = {
     /** 스파크라인 배치 — 티커 집합별 캐시(정렬·join 으로 안정 키, 순서 무관 동일 캐시). */
     sparklines: (tickers: readonly string[]) =>
       ["market", "sparklines", [...tickers].sort().join(",")] as const,
+    /** 환율(USD/KRW 등) — 미국 종목 원화 환산. base·quote 별 분리 캐시(us-stock-support). */
+    exchangeRate: (base: string, quote: string) =>
+      ["market", "exchange-rate", base, quote] as const,
   },
   watchlist: {
     list: (tickers: readonly string[]) =>

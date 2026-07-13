@@ -7497,3 +7497,43 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 첫 스케줄/수동 실행으로 실제 PR 생성 E2E 확인(secret 설정 후).
   - KIND 6자리 숫자 티커 한계(당일/영숫자 IPO 지연)는 주간 캐이던스로 자연 흡수 — 매드업 등은 다음 주 편입 예상.
+
+### 2026-07-13 — feat: 미국 주식 검색·조회 지원 (P0 검색 + P1 표시) (#346)
+
+- **slug**: `us-stock-display` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/346
+- **요약**: feat: 미국 주식 검색·조회 지원 (P0 검색 + P1 표시)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 미국 주식 검색·조회 지원 (P0 검색 + P1 표시)
+  > 
+  > PRD `docs/prd/us-stock-support.md`. 스코프 = **US 종목 검색 + 시세·차트·호가 조회**. P2(펀더멘털/AI 동급)는 백엔드 의존이라 비범위. 조회·분석 전용 원칙 준수(주문 없음). **로컬 스파이크로 US Toss 데이터 검증 완료**(AAPL/NVDA/TSLA), 전 과정 격리 워크트리 작업(공유 트리 무영향).
+  > 
+  > ### P0 — 검색
+  > - **US 심볼 인덱스** `lib/api/marketdata/us-symbols.json`(NASDAQ Trader 소스, 10,618종목, 보통주+ETF·파생 제외) + 생성 스크립트 `scripts/update-us-symbols.py`.
+  > - **한글명 보강** `scripts/enrich-us-korean-names.ts`(Toss batch, koName 10,367/10,618=97.6%).
+  > - **검색 통합+랭킹** `search.ts`: KR+US 통합, 정확티커→이름접두→부분 랭킹(ETF 후순위), **한글명 매칭**("애플"→AAPL), **별칭**(구글→알파벳), 결과 한글명 표시. `StockSearchMarket` 타입 확장. getCorpCode/getMarketByTicker는 KR 전용 유지(US=null→스코어카드 무회귀).
+  > - 단위테스트 17(US 8 + KR 9).
+  > 
+  > ### P1 — 표시
+  > - **KR 전용 섹션 숨김**(회사개요·공시·수급 — DART·KIS 소스) via `isUsTicker` 게이트.
+  > - **분봉 탭 숨김**(US 분봉 미지원) via ChartShell `allowMinute`.
+  > - **통화 표시**: 헤더 USD·y축 평문숫자·툴팁 $ (원화 만/억 오포맷 제거).
+  > - **원화 환산 병기**: Toss `/exchange-rate`(USD/KRW) → BFF 라우트+훅 → 헤더 "$314.97 · 약 474,628원"(데스크탑 전체·모바일 만단위 축약, 등락률 줄바꿈 방지).
+  > - **차트 y축 동적 폭**: 하드코딩 56 → 4차트 공통 최대 라벨폭 실측(정렬 유지), US는 값이 작아 축 축소(우측 여백 감소).
+  > - 헤더·일봉·호가·체결·시그널은 기존 Toss 경로로 US 작동(로컬 MARKET_DATA_SOURCE=toss).
+  > 
+  > ### 검증
+  > - tsc·eslint·vitest(search 17 + chartConfig 6) 통과.
+  > - 브라우저 육안(사용자): 검색(한글+영문·별칭)·US 상세(섹션 숨김·통화·환율·분봉없음)·KR 무회귀 확인 완료.
+  > 
+  > ### 알려진 한계 / 다음 작업
+  > - **prod Toss 미설정**: US 시세/차트는 현재 **로컬(MARKET_DATA_SOURCE=toss)에서만** 동작. prod 반영은 티커포맷 라우팅(US=Toss·KR=KIS 유지) 별도 결정(Q3 보류).
+  > - 시총 헤더(net-new)·US 분봉/장중(P1.5)·백엔드 US AI(P2) 미범위.
+  > - 차트 알약 예약 여백(현재가/AI 알약이 축 밖 확장)은 별도 레버 — 필요 시 후속.
+  > - KIND/NASDAQ 소스 주간 자동화(us-symbols) 편입 여지.
+  > 
+  > ## 다음 작업
+  > - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
