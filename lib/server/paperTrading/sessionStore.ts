@@ -244,6 +244,9 @@ export async function createPaperTradingSession(
     positionHardStopPct,
     sessionHardStopPct,
     aiProvider: decisionProvider === "cli-agent" ? request.aiProvider : undefined,
+    // 오토파일럿 자식 스탬프(intraday-autopilot) — 스윕(fill)만 채운다. undefined 는 JSON 직렬화에서
+    // 탈락해 payload 무변경(수동 세션 무회귀).
+    autopilotRunId: request.autopilotRunId,
     // 소유자 스탬프(intraday-session-owner) — 이 서버 운영자로 고정. 공유 Supabase 로 영속(payload
     // 통째 저장)돼 다른 서버의 스케줄러가 own-or-unowned 게이트로 남의 세션을 틱하지 않게 한다.
     // 모든 provider 에 스탬프(mock 은 스케줄 대상이 아니라 무해, 규칙 일관).
