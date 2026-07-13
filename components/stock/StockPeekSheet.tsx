@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { X } from "lucide-react";
 import { StockPeekContent } from "@/components/stock/StockPeekContent";
 import { MiniStockChart } from "@/components/stock/MiniStockChart";
+import { useOverlayBackClose } from "@/hooks/utils/useOverlayBackClose";
 import { DURATION, EASE } from "@/lib/motion/tokens";
 import { stockDetailPath } from "@/lib/utils/stockDetailPath";
 import {
@@ -51,6 +52,11 @@ export function StockPeekSheet({ target, onClose }: StockPeekSheetProps) {
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
+
+  // 모바일 뒤로가기 → 시트만 닫기(라우트 유지) — AI 패널·체결내역 시트·업종 모달과 동일 패턴
+  // (overlay-back-close). 열릴 때만 마운트되는 컴포넌트라 open=true 고정. 상세 진입(goDetail)의
+  // router.push 경로는 훅이 marker 를 소비하거나(선행 시) 매몰 처리(후행 시)해 어느 쪽도 안전.
+  useOverlayBackClose(true, onClose);
 
   const goDetail = () => {
     onClose();
