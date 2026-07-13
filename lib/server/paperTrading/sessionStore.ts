@@ -334,6 +334,113 @@ export async function patchPaperTradingSessionStatus(
   return patchPaperTradingSession(sessionId, { status });
 }
 
+export type CompletePaperTradingPortfolioResult = {
+  portfolioId: string;
+  completedSessionIds: string[];
+  alreadyCompletedSessionIds: string[];
+};
+
+/**
+ * 자동 포트폴리오 일괄 종료 — 이 서버 소유(또는 레거시 미지정) 세션만 대상으로 한다.
+ * 보유 포지션은 최신 가격으로 EXIT 체결한 뒤에만 completed 전환한다. 세션 tickChain 을 공유해
+ * 진행 중인 자동 틱과 직렬화하며, 재호출 시 이미 완료된 세션은 건너뛰는 멱등 동작이다.
+ */
+export async function completePaperTradingPortfolio(
+  portfolioId: string,
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
+): Promise<CompletePaperTradingPortfolioResult | null> {
+  await ensureHydrated();
+  const operator = resolveServerOperator();
+  const entries = Array.from(getStore().sessions.values()).filter(
+    (entry) =>
+      entry.session.portfolioId === portfolioId &&
+      (!entry.session.owner || entry.session.owner === operator),
+  );
+  if (entries.length === 0) return null;
+
+  const completedSessionIds: string[] = [];
+  const alreadyCompletedSessionIds: string[] = [];
+  const failures: string[] = [];
+  for (const entry of entries) {
+    if (entry.session.status === "completed") {
+      alreadyCompletedSessionIds.push(entry.session.id);
+      continue;
+    }
+    const task = (entry.tickChain ?? Promise.resolve()).then(() =>
+      closeAndCompletePortfolioEntry(entry, options),
+    );
+    entry.tickChain = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    try {
+      await task;
+      completedSessionIds.push(entry.session.id);
+    } catch (error) {
+      failures.push(
+        error instanceof Error
+          ? error.message
+          : `${entry.session.stocks[0]?.name ?? "종목"}을 청산하지 못했어요.`,
+      );
+    }
+  }
+  if (failures.length > 0) throw new Error(failures.join(" "));
+  return { portfolioId, completedSessionIds, alreadyCompletedSessionIds };
+}
+
+async function closeAndCompletePortfolioEntry(
+  entry: StoredSession,
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date },
+): Promise<void> {
+  if (entry.session.status === "completed") return;
+  const held = entry.positions.some((position) => position.quantity > 0);
+  if (held) {
+    const tickWindowStart = (options.now ?? new Date()).toISOString();
+    const exitResolver = async (): Promise<IntradayTickResult> => ({
+      decision: {
+        action: "EXIT",
+        targetAllocationPct: 0,
+        targetAllocations: [],
+        confidence: "HIGH",
+        rationale: "사용자가 자동 포트폴리오를 종료해 보유 수량을 전량 청산합니다.",
+        riskNotes: [],
+        source: "cli-agent",
+      },
+      forcedExit: { targetPrice: null, stopPrice: null, flattenAll: true },
+    });
+    const result = await runPaperTradingTick({
+      session: entry.session,
+      positions: entry.positions,
+      existingTicks: entry.ticks,
+      triggeredBy: "user",
+      tickWindowStart,
+      priceSnapshotProvider: options.priceSnapshotProvider,
+      intradayResolver: exitResolver,
+    });
+    const fullyClosed = result.positions.every((position) => position.quantity === 0);
+    const sellRecorded = result.tick.orders.some((order) => order.side === "SELL");
+    if (!fullyClosed || !sellRecorded) {
+      throw new Error(`${entry.session.stocks[0]?.name ?? "종목"} 청산 가격을 확인하지 못했어요.`);
+    }
+    entry.session = result.session;
+    entry.positions = result.positions;
+    if (!entry.ticks.some((tick) => tick.id === result.tick.id)) {
+      entry.ticks = [...entry.ticks, result.tick];
+      void persistPaperTick(result.tick);
+    }
+  }
+
+  const now = new Date().toISOString();
+  entry.session = {
+    ...entry.session,
+    status: "completed",
+    endedAt: now,
+    updatedAt: now,
+  };
+  void persistPaperSession(entry.session, entry.positions);
+  scheduleSessionTickLabeling(entry.session, [...entry.ticks]);
+}
+
 export async function runPaperTradingSessionTick(
   sessionId: string,
   options: {

@@ -286,6 +286,12 @@ export type RunPaperTradingTickRequest = {
   tickWindowStart?: string;
 };
 
+export type CompletePaperTradingPortfolioResponse = {
+  portfolioId: string;
+  completedSessionIds: string[];
+  alreadyCompletedSessionIds: string[];
+};
+
 /** 세션 부분 수정 — 상태 전환 또는 판단 주기 변경(세션 중에도). 둘 중 하나 이상 지정. */
 export type PatchPaperTradingSessionRequest = {
   status?: Extract<PaperTradingSessionStatus, "running" | "paused" | "completed">;

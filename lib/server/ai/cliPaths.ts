@@ -1,7 +1,11 @@
 import { accessSync, constants } from "node:fs";
 import { delimiter, join, isAbsolute } from "node:path";
 
-const CODEX_APP_BUNDLE_CLI = "/Applications/Codex.app/Contents/Resources/codex";
+/** macOS 데스크톱 앱에 번들된 Codex CLI 경로 — 독립 Codex 앱과 ChatGPT 통합 앱을 모두 지원. */
+const CODEX_APP_BUNDLE_CLIS = [
+  "/Applications/Codex.app/Contents/Resources/codex",
+  "/Applications/ChatGPT.app/Contents/Resources/codex",
+] as const;
 
 function isExecutable(path: string): boolean {
   try {
@@ -35,6 +39,7 @@ export function resolveClaudeCliPath(): string {
 export function resolveCodexCliPath(): string {
   if (process.env.CODEX_CLI_PATH?.trim()) return process.env.CODEX_CLI_PATH;
   if (binaryAvailable("codex")) return "codex";
-  if (binaryAvailable(CODEX_APP_BUNDLE_CLI)) return CODEX_APP_BUNDLE_CLI;
+  const bundledCli = CODEX_APP_BUNDLE_CLIS.find(binaryAvailable);
+  if (bundledCli) return bundledCli;
   return "codex";
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Square } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { IntradayCompletePortfolioDialog } from "@/components/intraday/IntradayCompletePortfolioDialog";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
 import {
@@ -14,13 +16,20 @@ import type {
   PaperTradingSessionDetail,
 } from "@/lib/types/paperTrading/paperTrading";
 import { INTRADAY_AUTO_PORTFOLIO_COPY as C } from "@/lib/copy/intraday/autoPortfolio";
+import { buildIntradayPortfolioStockStatuses } from "@/lib/intraday/portfolioStatus";
+import { isApiError } from "@/lib/api/errors";
+import type { CompletePaperTradingPortfolioResponse } from "@/lib/types/paperTrading/paperTrading";
 
 type Props = {
   candidates: IntradayPortfolioCandidate[];
-  sessions: PaperTradingSession[];
+  portfolioSessions: PaperTradingSession[];
+  portfolioDetails: PaperTradingSessionDetail[];
+  portfolioDetailsLoading: boolean;
+  isCompleting: boolean;
   unavailableTickers: ReadonlySet<string>;
   candidatesLoading: boolean;
   onStart: (plan: IntradayPortfolioPlan) => Promise<PaperTradingSessionDetail[]>;
+  onComplete: (portfolioId: string) => Promise<CompletePaperTradingPortfolioResponse>;
 };
 
 function errorMessage(error: unknown): string {
@@ -28,28 +37,36 @@ function errorMessage(error: unknown): string {
   return C.startError;
 }
 
-function latestPortfolio(sessions: PaperTradingSession[]): PaperTradingSession[] {
-  const grouped = new Map<string, PaperTradingSession[]>();
-  for (const session of sessions) {
-    if (!session.portfolioId) continue;
-    grouped.set(session.portfolioId, [...(grouped.get(session.portfolioId) ?? []), session]);
-  }
-  return [...grouped.values()].sort((a, b) =>
-    (b[0]?.createdAt ?? "").localeCompare(a[0]?.createdAt ?? ""),
-  )[0] ?? [];
+function kstTime(iso: string): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
 }
 
 export function IntradayAutoPortfolio({
   candidates,
-  sessions,
+  portfolioSessions,
+  portfolioDetails,
+  portfolioDetailsLoading,
+  isCompleting,
   unavailableTickers,
   candidatesLoading,
   onStart,
+  onComplete,
 }: Props) {
   const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const portfolio = useMemo(() => latestPortfolio(sessions), [sessions]);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
+  const portfolio = portfolioSessions;
+  const stockStatuses = useMemo(
+    () => buildIntradayPortfolioStockStatuses(portfolio, portfolioDetails),
+    [portfolio, portfolioDetails],
+  );
   const availableCandidates = useMemo(
     () => candidates.filter((candidate) => !unavailableTickers.has(candidate.ticker)),
     [candidates, unavailableTickers],
@@ -58,6 +75,11 @@ export function IntradayAutoPortfolio({
   const totalValue = portfolio.reduce((sum, session) => sum + session.portfolioValue, 0);
   const returnPct = totalInitial > 0 ? ((totalValue - totalInitial) / totalInitial) * 100 : 0;
   const runningCount = portfolio.filter((session) => session.status === "running").length;
+  const activeCount = portfolio.filter((session) => session.status !== "completed").length;
+  const isPortfolioActive = activeCount > 0;
+  const portfolioId = portfolio.find((session) => session.portfolioId)?.portfolioId;
+  const startDisabled =
+    isStarting || candidatesLoading || availableCandidates.length < 2 || isPortfolioActive;
 
   const submit = async () => {
     setError(null);
@@ -70,6 +92,17 @@ export function IntradayAutoPortfolio({
       setError(errorMessage(cause));
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const complete = async () => {
+    if (!portfolioId) return;
+    setCompleteError(null);
+    try {
+      await onComplete(portfolioId);
+      setConfirmingComplete(false);
+    } catch (cause) {
+      setCompleteError(isApiError(cause) ? cause.message : C.completeError);
     }
   };
 
@@ -97,6 +130,7 @@ export function IntradayAutoPortfolio({
               value={cash}
               onChange={(event) => setCash(formatKrwInput(event.target.value))}
               inputMode="numeric"
+              disabled={isPortfolioActive}
               aria-label={C.cashAria}
               className="h-12 min-w-0 flex-1 bg-transparent text-right text-h2 font-bold tabular-nums text-text-strong outline-none"
             />
@@ -105,26 +139,50 @@ export function IntradayAutoPortfolio({
           <button
             type="button"
             onClick={submit}
-            disabled={isStarting || candidatesLoading || availableCandidates.length < 2}
+            disabled={startDisabled}
             className={cn(
               "h-12 shrink-0 rounded-lg px-xl text-body-md font-bold transition-colors",
-              isStarting || candidatesLoading || availableCandidates.length < 2
+              startDisabled
                 ? "cursor-not-allowed bg-surface-muted text-text-muted"
                 : "cursor-pointer bg-accent-vivid text-surface hover:opacity-90",
             )}
           >
-            {isStarting ? C.starting : C.start}
+            {isStarting ? C.starting : isPortfolioActive ? C.running : C.start}
           </button>
         </div>
 
         <p className="text-caption text-text-muted">
           {C.rule}
         </p>
+        {isPortfolioActive ? (
+          <p className="text-caption text-accent-vivid">{C.startDisabled}</p>
+        ) : null}
         {error ? <p role="alert" className="text-body-sm text-signal-down">{error}</p> : null}
       </div>
 
       {portfolio.length > 0 ? (
         <div className="border-t border-border-line bg-surface-muted px-lg py-md md:px-xl">
+          <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
+            <div className="flex items-center gap-sm">
+              <Badge variant={isPortfolioActive ? "info" : "accent"}>
+                {isPortfolioActive ? C.running : C.completed}
+              </Badge>
+              {isPortfolioActive ? (
+                <span className="text-caption text-text-muted">{C.runningDescription}</span>
+              ) : null}
+            </div>
+            {isPortfolioActive && portfolioId ? (
+              <button
+                type="button"
+                onClick={() => setConfirmingComplete(true)}
+                disabled={isCompleting}
+                className="inline-flex items-center gap-xs rounded-pill border border-critical px-md py-xs text-caption font-bold text-critical transition-colors hover:bg-critical-soft cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Square className="size-3" aria-hidden />
+                {isCompleting ? C.completing : C.complete}
+              </button>
+            ) : null}
+          </div>
           <div className="grid grid-cols-2 gap-md md:grid-cols-4">
             <PortfolioMetric label={C.metrics.stocks} value={`${portfolio.length}개`} sub={C.metrics.running(runningCount)} />
             <PortfolioMetric label={C.metrics.initial} value={`${formatMoney(totalInitial)}원`} />
@@ -135,14 +193,74 @@ export function IntradayAutoPortfolio({
               tone={returnPct > 0 ? "up" : returnPct < 0 ? "down" : "neutral"}
             />
           </div>
-          <div className="mt-md flex flex-wrap gap-xs">
-            {portfolio.map((session) => (
-              <span key={session.id} className="rounded-pill bg-surface-base px-sm py-xs text-caption text-text-muted">
-                {session.stocks[0]?.name ?? session.tickers[0]} {session.portfolioAllocationPct?.toFixed(1)}%
-              </span>
-            ))}
-          </div>
+          {portfolioDetailsLoading ? (
+            <p className="mt-md text-caption text-text-muted">{C.loadingTrades}</p>
+          ) : (
+            <div className="mt-md divide-y divide-border-line border-t border-border-line">
+              {stockStatuses.map(({ session, position, latestOrder }) => {
+                const name = session.stocks[0]?.name ?? session.tickers[0];
+                const pnlPct = position?.unrealizedPnlPct ?? session.returnPct;
+                return (
+                  <div
+                    key={session.id}
+                    className="grid gap-xs py-sm text-body-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-center sm:gap-md"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-text-strong">{name}</p>
+                      <p className="text-caption text-text-muted">
+                        배정 {session.portfolioAllocationPct?.toFixed(1) ?? "—"}%
+                      </p>
+                    </div>
+                    <div className="min-w-0 text-caption tabular-nums">
+                      <p className="text-text-strong">
+                        {position
+                          ? C.holding(position.quantity, formatMoney(position.avgEntryPrice))
+                          : C.noPosition}
+                      </p>
+                      <p className="truncate text-text-muted">
+                        {latestOrder
+                          ? latestOrder.side === "BUY"
+                            ? C.latestBuy(latestOrder.quantity, formatMoney(latestOrder.price))
+                            : `${C.latestSell(latestOrder.quantity, formatMoney(latestOrder.price))}${
+                                latestOrder.realizedPnl == null
+                                  ? ""
+                                  : ` · ${C.realized(
+                                      `${latestOrder.realizedPnl >= 0 ? "+" : ""}${formatMoney(latestOrder.realizedPnl)}`,
+                                    )}`
+                              }`
+                          : C.waiting}
+                        {latestOrder ? ` · ${kstTime(latestOrder.at)}` : ""}
+                      </p>
+                    </div>
+                    <p
+                      className={cn(
+                        "text-right font-bold tabular-nums",
+                        pnlPct > 0
+                          ? "text-signal-up"
+                          : pnlPct < 0
+                            ? "text-signal-down"
+                            : "text-text-muted",
+                      )}
+                    >
+                      {pnlPct >= 0 ? "+" : ""}
+                      {pnlPct.toFixed(2)}%
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {completeError ? (
+            <p role="alert" className="mt-sm text-body-sm text-critical">{completeError}</p>
+          ) : null}
         </div>
+      ) : null}
+      {confirmingComplete ? (
+        <IntradayCompletePortfolioDialog
+          busy={isCompleting}
+          onConfirm={complete}
+          onCancel={() => setConfirmingComplete(false)}
+        />
       ) : null}
     </section>
   );

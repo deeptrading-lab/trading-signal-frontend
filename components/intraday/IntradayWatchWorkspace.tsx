@@ -188,7 +188,10 @@ export function IntradayWatchWorkspace() {
   const { data: flow, isLoading: flowLoading } = useQueryFlowTop10("today");
   const { data: volumeRank, isLoading: volumeLoading } = useQueryVolumeRank();
   const {
-    sessions,
+    autoPortfolioSessions,
+    autoPortfolioDetails,
+    autoPortfolioDetailsLoading,
+    isCompletingAutoPortfolio,
     sessionByTicker,
     todaySessionStocks,
     pastSessions,
@@ -196,6 +199,7 @@ export function IntradayWatchWorkspace() {
     currentOperator,
     start,
     startPortfolio,
+    completeAutoPortfolio,
   } = useIntradayPaperWatch();
   // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
   useIntradayPaperRefresh(runningSessionIds);
@@ -375,10 +379,14 @@ export function IntradayWatchWorkspace() {
 
       <IntradayAutoPortfolio
         candidates={autoPortfolioCandidates}
-        sessions={sessions}
+        portfolioSessions={autoPortfolioSessions}
+        portfolioDetails={autoPortfolioDetails}
+        portfolioDetailsLoading={autoPortfolioDetailsLoading}
+        isCompleting={isCompletingAutoPortfolio}
         unavailableTickers={unavailablePortfolioTickers}
         candidatesLoading={flowLoading || volumeLoading}
         onStart={startPortfolio}
+        onComplete={completeAutoPortfolio}
       />
 
       {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}

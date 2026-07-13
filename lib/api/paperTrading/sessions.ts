@@ -2,11 +2,21 @@ import { httpClient } from "@/lib/api/client";
 import type {
   CreatePaperTradingSessionRequest,
   CreatePaperTradingSessionResponse,
+  CompletePaperTradingPortfolioResponse,
   PaperTradingSessionResponse,
   PaperTradingSessionsResponse,
   PatchPaperTradingSessionRequest,
   RunPaperTradingTickRequest,
 } from "@/lib/types/paperTrading/paperTrading";
+
+export async function completePaperTradingPortfolio(
+  portfolioId: string,
+): Promise<CompletePaperTradingPortfolioResponse> {
+  const response = await httpClient.post<CompletePaperTradingPortfolioResponse>(
+    `/paper-trading/portfolios/${encodeURIComponent(portfolioId)}/complete`,
+  );
+  return response.data;
+}
 
 export async function fetchPaperTradingSessions(): Promise<PaperTradingSessionsResponse> {
   const response = await httpClient.get<PaperTradingSessionsResponse>(

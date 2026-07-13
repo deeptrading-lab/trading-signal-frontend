@@ -11,7 +11,10 @@
 
 import { useMemo } from "react";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
+import { useQueryPaperTradingSessionDetails } from "@/hooks/query/useQueryPaperTradingSessionDetails";
+import { useMutationCompletePaperTradingPortfolio } from "@/hooks/query/useMutationCompletePaperTradingPortfolio";
 import { isoToKstDate, todayKstDate } from "@/lib/api/toss/kst";
+import { latestIntradayPortfolio } from "@/lib/intraday/portfolioStatus";
 import type {
   PaperTradingSelectedStock,
   PaperTradingSession,
@@ -120,6 +123,30 @@ export function useIntradayPaperWatch() {
     [cliSessions, todayKey],
   );
 
+  // 새로고침 뒤에도 서버 세션 원장에서 실행 중 자동 포트폴리오를 복원한다. 상세 조회는 해당 묶음의
+  // 종목별 포지션·체결 표시만 담당하며, 기존 단일 종목 세션/틱 실행 경로에는 영향을 주지 않는다.
+  const autoPortfolioSessions = useMemo(
+    () =>
+      latestIntradayPortfolio(
+        cliSessions.filter(
+          (session) =>
+            isSessionStartedOnKstDate(session, todayKey) &&
+            (!session.owner || !currentOperator || session.owner === currentOperator),
+        ),
+      ),
+    [cliSessions, currentOperator, todayKey],
+  );
+  const autoPortfolioSessionIds = useMemo(
+    () => autoPortfolioSessions.map((session) => session.id),
+    [autoPortfolioSessions],
+  );
+  const autoPortfolioQueries = useQueryPaperTradingSessionDetails(autoPortfolioSessionIds);
+  const completeAutoPortfolioMutation =
+    useMutationCompletePaperTradingPortfolio(autoPortfolioSessionIds);
+  const autoPortfolioDetails = autoPortfolioQueries.flatMap((query) =>
+    query.data ? [query.data] : [],
+  );
+
   const start = (
     stock: PaperTradingSelectedStock,
     initialCash: number,
@@ -167,7 +194,10 @@ export function useIntradayPaperWatch() {
   };
 
   return {
-    sessions: cliSessions,
+    autoPortfolioSessions,
+    autoPortfolioDetails,
+    autoPortfolioDetailsLoading: autoPortfolioQueries.some((query) => query.isLoading),
+    isCompletingAutoPortfolio: completeAutoPortfolioMutation.isPending,
     sessionByTicker,
     todaySessionStocks,
     pastSessions,
@@ -177,5 +207,7 @@ export function useIntradayPaperWatch() {
     isCreating,
     start,
     startPortfolio,
+    completeAutoPortfolio: (portfolioId: string) =>
+      completeAutoPortfolioMutation.mutateAsync(portfolioId),
   };
 }
