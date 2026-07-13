@@ -7783,3 +7783,45 @@
   - [ ] PR2 `feature/nav-loading-ux` — async 라우트 5곳 loading.tsx + useLinkStatus 네비 즉시 피드백
   - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
   - [ ] PR1+본 PR 머지 후 모바일 실기기에서 탭 킬 재발 여부 며칠 관찰 (DevTools Memory 힙 스냅샷으로 30분 후 차트 배열 해제 확인 가능)
+
+### 2026-07-13 — feat(nav-loading): async 라우트 5곳 loading.tsx + 네비 pending 즉시 피드백 (#357)
+
+- **slug**: `nav-loading-ux` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/357
+- **요약**: feat(nav-loading): async 라우트 5곳 loading.tsx + 네비 pending 즉시 피드백
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 모바일 BottomNav 이동 딜레이의 직접 원인: async 서버 라우트(`hasServerRole`·`cookies()` await)는 로딩 경계가 없으면 **RSC 응답까지 직전 화면이 얼어붙는다**. 이 프리즈는 `stock/[ticker]/loading.tsx` 가 이미 진단·해결한 패턴인데, BottomNav 직접 대상인 `/analyze`·`/intraday`·`/profile` 등 5개 라우트에 그대로 남아 있었다. 또한 탭을 눌러도 페인트까지 아무 시각 반응이 없어 '안 눌린 줄 알고 또 누르는' 체감 지연을 키웠다. (mobile-perf 이니셔티브 PR — #355 번들, #356 메모리와 독립)
+  > 
+  > ## 변경
+  > 
+  > ### 1. loading.tsx 5곳 신설 (`stock/[ticker]` 패턴 복제)
+  > | 라우트 | 스켈레톤 (첫 화면 미러) |
+  > |---|---|
+  > | `/analyze` | 탭 pill + 분석 카드 4행(`ResultsSkeleton` 과 동일 구조) |
+  > | `/intraday` | 오토파일럿 행 + AI 단타 카드 + 검색바 + 추천 칩 + 표 5행 |
+  > | `/intraday/[sessionId]` | 컨테이너 자체 isLoading 분기와 **동일 스켈레톤**(시프트 0) |
+  > | `/profile` | 아바타 hero + 내 자산 블록 + 2-column 그리드 |
+  > | `/dashboard/scorecard` | 타이틀/부제 + 표 블록(운영자 뷰, 최소) |
+  > 
+  > 공통: 서버 컴포넌트 · `aria-busy` + sr-only 한글 라벨(`ROUTE_LOADING`, navCopy) · 기존 `Skeleton` 원자만 사용. 권한 거부(AccessDeniedView)가 스켈레톤 뒤에 뜨는 것은 허용(프리즈보다 낫다).
+  > 
+  > ### 2. 네비 클릭 즉시 피드백 — `useLinkStatus` (next 16.2.6)
+  > - `NavLinkPending` 신설: Link **내부** 자식에서 `useLinkStatus().pending` 을 읽어 `.nav-link-pending` 조건부 부여. BottomNav·Sidebar(펼침/접힘 모두) 적용 — 래퍼가 부모 내부 레이아웃을 복제해 시각 무변경.
+  > - `.nav-link-pending`: **액센트 틴트 즉시**(탭 반응성) + **펄스 150ms 지연 시작**(즉시 완료 내비에선 한 프레임도 안 보임 — Next 공식 권장 패턴). `prefers-reduced-motion` 존중.
+  > - ⚠️ 속성 선택자(`[data-*]` + @apply) Turbopack 미방출 함정(#234) 회피 — 조건부 리터럴 클래스만 사용. 이징은 기존 모션 토큰(standard)만 — **신규 디자인 토큰 0, design:sync 불필요**.
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` 통과, vitest **1305 passed**, 프로덕션 빌드 74/74 페이지 정상
+  > - 브라우저: /profile·/analyze 렌더·전환 정상(사이드바 레이아웃 무변경), 콘솔 에러 0
+  > - 스켈레톤 체감은 스로틀 환경에서 유효 — 로컬은 즉시 완료라 펄스 지연(150ms) 덕에 플래시 없음(설계 의도)
+  > 
+  > ## QA 체크리스트
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] PR4 `feature/intraday-table-refactor` — 단타 표 행 분리·memo·펼침 아코디언화
+  - [ ] `/admin` loading.tsx (후속 chore — BottomNav 대상 아님)
+  - [ ] View Transitions API 는 이번 이니셔티브 제외(실험 플래그 리스크)

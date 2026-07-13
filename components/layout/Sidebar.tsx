@@ -33,6 +33,7 @@ import { usePathname } from "next/navigation";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { BrandPulseIcon } from "@/components/layout/BrandPulseIcon";
 import { getVisibleNavItems, isNavItemActive } from "@/components/layout/navItems";
+import { NavLinkPending } from "@/components/layout/NavLinkPending";
 import { useMe } from "@/hooks/auth/useMe";
 import {
   NAV_BRAND_LABEL,
@@ -112,27 +113,35 @@ export function Sidebar() {
               title={collapsed ? item.label : undefined}
               {...(item.path === "/stock" ? stockNavBinding(active) : {})}
             >
-              {/* iconbox — 접힘 시 36px 하이라이트 박스(활성=채운 배경). 펼침 시 크기 없는 통과 래퍼. */}
-              <span
+              {/* pending 피드백 래퍼 — 부모(.sidebar-nav-item)의 내부 레이아웃(펼침 row / 접힘 col)을 복제. */}
+              <NavLinkPending
                 className={cn(
-                  "sidebar-nav-item-iconbox",
-                  collapsed && "h-9 w-9 rounded-md",
-                  collapsed && active && "bg-accent-vivid-soft",
-                )}
-                aria-hidden="true"
-              >
-                <Icon className="sidebar-nav-item-icon" />
-              </span>
-              {/* 접힘: caption(12px) 뮤트 라벨, 활성 시 accent. */}
-              <span
-                className={cn(
-                  "sidebar-nav-item-label",
-                  collapsed && "text-caption text-text-muted",
-                  collapsed && active && "text-accent-vivid",
+                  "flex items-center gap-md",
+                  collapsed && "flex-col justify-center gap-xs",
                 )}
               >
-                {collapsed ? item.shortLabel : item.label}
-              </span>
+                {/* iconbox — 접힘 시 36px 하이라이트 박스(활성=채운 배경). 펼침 시 크기 없는 통과 래퍼. */}
+                <span
+                  className={cn(
+                    "sidebar-nav-item-iconbox",
+                    collapsed && "h-9 w-9 rounded-md",
+                    collapsed && active && "bg-accent-vivid-soft",
+                  )}
+                  aria-hidden="true"
+                >
+                  <Icon className="sidebar-nav-item-icon" />
+                </span>
+                {/* 접힘: caption(12px) 뮤트 라벨, 활성 시 accent. */}
+                <span
+                  className={cn(
+                    "sidebar-nav-item-label",
+                    collapsed && "text-caption text-text-muted",
+                    collapsed && active && "text-accent-vivid",
+                  )}
+                >
+                  {collapsed ? item.shortLabel : item.label}
+                </span>
+              </NavLinkPending>
             </Link>
           );
         })}

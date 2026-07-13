@@ -35,6 +35,12 @@ export const NAV_MENU_PROFILE_SHORT = "마이";
 export const NAV_SIDEBAR_COLLAPSE_ARIA = "메뉴 접기";
 export const NAV_SIDEBAR_EXPAND_ARIA = "메뉴 펼치기";
 
+/**
+ * 라우트 로딩 경계(loading.tsx) 공통 sr-only 라벨 — async 서버 라우트 전환 중 스크린리더 안내.
+ * (nav-loading-ux — `/stock/[ticker]` 의 STOCK_DETAIL_LOADING 과 동일 문구, 셸 공통이라 여기 위치.)
+ */
+export const ROUTE_LOADING = "불러오는 중…";
+
 export const HEADER_PROFILE_ARIA = "프로필 메뉴";
 
 export const HEADER_MARKET_TICKER_ARIA = "글로벌 마켓 시세";
