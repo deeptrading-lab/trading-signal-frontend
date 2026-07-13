@@ -7537,3 +7537,45 @@
   > - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - prod US=Toss 라우팅 결정 + 시총·분봉(P1.5) + 백엔드 US 분석(P2)은 별도 트랙.
+
+### 2026-07-13 — fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소 (#347)
+
+- **slug**: `scorecard-index-field-fix` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/347
+- **요약**: fix(scorecard): 지수 일봉 종가 필드명 오기 수정 — excess 채점 무한 pending 해소
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > AI 종합분석 결과의 자가채점(`signal_scorecard`)이 **2026-06-26 이후 전면 정체**돼 있었습니다. 사후검증 감사 중 발견:
+  > 
+  > - 원장 69행 중 채점 완료는 6/23의 d1 6건뿐, 이후 w1/w2/m1 전량 pending
+  > - KV 마커 `scorecard:cron:meta`는 매 영업일 `ok:true, errors:0, scored:0, pendingKept:234` — "성공적으로 아무것도 안 하는" 조용한 실패
+  > - cron 트리거(GHA flow-snapshot)와 판정 로직 자체는 건강
+  > 
+  > ## 근본 원인
+  > 
+  > `inquire-daily-indexchartprice`(TR `FHKUP03500100`) 응답의 지수 종가를 **존재하지 않는 `bstp_nmix_clpr` 필드로 매핑**하고 있었습니다. 실제 KIS 응답 필드는 `bstp_nmix_prpr`이며, 저장소 자체 문서(`docs/references/kis-api/domestic-stock-quotations.md` L248)에는 이미 올바르게 적혀 있었습니다.
+  > 
+  > - `toNumber(undefined)` → 0 → `close > 0` 필터에서 전 봉 탈락 → **지수 일봉이 항상 빈 배열**
+  > - v2 채점(excess)은 벤치마크 지수가 없으면 fail-soft로 pending 유지 → `errors=0`인 채 무한 보류
+  > - v1(절대수익)이 마지막으로 돌던 6/23까지만 채점이 존재하고, v2(#149, 6/26 머지) 배포 후 채점 성공 0건
+  > 
+  > 로컬 dry-run으로 재현·수정 확인: 지수 일봉 `0봉 → 91봉`, `scored: 0 → 9`(hit/miss/flat + excess 정상 산출).
+  > 
+  > ## 변경
+  > 
+  > - **`index-chart.ts` / `types.ts`**: 종가 필드 `bstp_nmix_clpr` → `bstp_nmix_prpr`
+  > - **`index-chart.ts` 스키마 가드**: `output2`에 봉이 있는데 매핑 결과가 0건이면 throw. 향후 같은 종류의 필드명 회귀가 **조용한 pending 대신 `errors` 카운터·KV 마커로 드러나도록** 함
+  > - **`indexChartChunked.ts`**: `CHUNK_DAYS` 130 → 60. 이 TR은 실측 1콜 최대 50봉만 반환하고 범위가 넓어도 최근 50봉만 주고 과거를 조용히 버리는데, 130일(≈88영업봉) 청크는 과거 봉을 소실시켜 베타 추정 윈도우(60영업일)에 구멍을 냈음
+  > - **`index-chart.test.ts`**: 필드명·스키마 가드·빈 응답·rt_cd 회귀 테스트 4종 신규 (기존 스코어카드 테스트 125건 + 신규 4건 전부 통과)
+  > 
+  > ## 배포 영향
+  > 
+  > 배포 후 다음 채점 cron이 밀린 pending을 **설계상 자동 소급 채점**합니다(별도 백필 불필요). prod KIS prod 게이트에서만 지수 조회가 일어나므로 로컬/preview 무영향.
+  > 
+  > ## 다음 작업
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 배포 후 첫 cron(평일 16:10 KST 전후) 실행 뒤 `signal_scorecard`의 w1/w2/m1 status가 채워지는지, KV 마커 `scored > 0`인지 라이브 확인
+  - 채점 정체를 조기 감지할 관측 채널 검토 — `scorecard:cron:meta`를 `/api/flow/cron-status`류 라우트에 함께 노출
+  - (별건, 감사 후속) 판정 생성 개선: 약세 콜 target/stop 세맨틱 모순 정리, verdict/confidence 분포 붕괴(전원 MEDIUM·약세 편중), 베타/알파 미구분 — 분석 프롬프트 차원
