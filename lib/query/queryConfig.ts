@@ -272,6 +272,11 @@ export const queryConfig = {
       staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /** 오토파일럿 런 — 스윕이 10분 주기라 30s 신선도면 슬롯·로그가 늦지 않게 보인다. */
+    autopilot: {
+      staleTime: 30 * SECOND,
+      gcTime: 5 * MINUTE,
+    },
   },
   auth: {
     /**

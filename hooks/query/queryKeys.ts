@@ -127,6 +127,8 @@ export const queryKeys = {
     sessions: ["paper-trading", "sessions"] as const,
     /** AI 모의투자 세션 상세 — 세션별 tick/포지션/자산곡선. */
     session: (sessionId: string) => ["paper-trading", "session", sessionId] as const,
+    /** 단타 오토파일럿 런(자동 포트폴리오) — 이 서버 운영자의 오늘 런. 인자 없는 단일 키. */
+    autopilot: ["paper-trading", "autopilot"] as const,
   },
   auth: {
     /** 현재 세션 신원(role/email) — role-aware UI(관리자 전용 표시). 인자 없는 단일 키. */
