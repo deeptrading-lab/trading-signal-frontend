@@ -7699,3 +7699,44 @@
   - 배포 후 신규 분석이 쌓이면 `/dashboard/scorecard`에서 confidence 분포(HIGH/MEDIUM/LOW 실제 분화 여부)·excess 적중률 추이를 추적
   - 여력 시 기존 ab-harness로 구/신 프롬프트 A/B(동일 골든셋) — confidence 분화·excess 개선 정량 비교
   - (감사 phase-2) target/무효화 터치 기반 채점 도입 — 이제 약세 콜 방향 밴드가 반대라 판별력 확보(#350)
+
+### 2026-07-13 — refactor(intraday): 워치 표 행 분리(memo) + 펼침 아코디언(폴링 1행 상한) (#358)
+
+- **slug**: `intraday-table-refactor` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/358
+- **요약**: refactor(intraday): 워치 표 행 분리(memo) + 펼침 아코디언(폴링 1행 상한)
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > `IntradayWatchTable.tsx` 는 1,228줄 단일 컴포넌트로, ① 30초 세션 invalidation·3초 패널 폴링·시트 상태가 표 전체를 재렌더시키고(행 memo 없음 — 프로젝트 전체 memo 2곳뿐), ② 행마다 독립 `expanded` useState 라 **여러 행 동시 펼침 = 행 수 × (호가+체결강도) × 3초 폴링 중첩**이 가능했다. 모바일 단타 화면의 프레임 드랍·부하 기여 요인. (mobile-perf 이니셔티브 PR 4/4)
+  > 
+  > ⚠️ **베이스 = `feature/mobile-perf-bundle` (#355 스택)** — 미니차트 dynamic import 이동이 겹쳐 #355 머지 후 자동 리타겟됩니다. 머지 순서: #355 → 본 PR.
+  > 
+  > ## 변경
+  > 
+  > ### 1. 행 분리 — `IntradayWatchRow.tsx` 신설 (~950줄 이동)
+  > - `WatchRow` + 전속 부품(OwnerBadge · useFixedMenu/MenuPanel · IntervalSelect · HardStopSelect · CashInput · 컴팩트 버튼 상수 · 포맷 헬퍼) 이동. 코드 자체는 무수정 이동(diff 는 크지만 로직 변경은 아래 2·3뿐).
+  > - `IntradayWatchTable.tsx` 는 표 셸(날짜 그룹핑·그룹 헤더·그룹 펼침 제어)만 잔류(~350줄). `groupWatchItemsByDate`·`WatchDateGroup` 등 기존 export 유지 — 워크스페이스·기존 테스트 무수정 통과.
+  > 
+  > ### 2. memo 유효화
+  > - `export const IntradayWatchRow = memo(WatchRow)`
+  > - `onRemove={() => onRemove(item.ticker)}` 인라인 클로저 제거 → `(ticker) => void` 시그니처로 부모 콜백 직결(행 내부에서 `onRemove(item.ticker)`)
+  > - 효과: 세션 폴링 1주기에 props 무변경 행 재렌더 0 (시세 갱신 시엔 quote 참조가 바뀌어 의도대로 재렌더)
+  > 
+  > ### 3. 펼침 아코디언 — 폴링 구조적 상한
+  > - 행 내부 `expanded` useState → 표 레벨 `expandedTicker: string | null` 승격, `onExpandChange(ticker, expanded)` 안정 콜백(useCallback + 함수형 업데이트)으로 행에 전달
+  > - `runRead`/`handleStart` 오류 시 자동 펼침도 동일 경로로 치환
+  > - 효과: **동시 펼침 1행 → 펼침 패널 3초 폴링이 행 수와 무관하게 최대 1쌍(호가+체결강도)** — env 손잡이 없이 코드 구조로 고정
+  > 
+  > **동작 변화(의도)**: 이전엔 여러 행을 동시에 펼쳐둘 수 있었으나, 이제 다른 행을 펼치면 이전 행이 접힌다(아코디언).
+  > 
+  > ## 검증
+  > 
+  > - `tsc --noEmit` 통과, vitest **1305 passed** (`groupWatchItemsByDate`·`tradeMarkerGeometry`·워크스페이스 테스트 무수정 통과), 프로덕션 빌드 정상
+  > - 브라우저 실검증: /intraday 표 렌더 → 레메디 펼침(차트+호가+체결강도) → 모나미 펼침 시 **레메디 자동 접힘** 확인, 콘솔 에러 0
+  > 
+  > ## QA 체크리스트
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] #355 머지 후 본 PR 리타겟(자동)·머지
+  - [ ] RealtimeRankingSection RankRow memo 는 범위 제외(≤14행, 효과 미미 — 후속 chore 메모)
