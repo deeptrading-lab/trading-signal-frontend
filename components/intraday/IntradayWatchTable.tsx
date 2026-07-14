@@ -316,8 +316,9 @@ export function IntradayWatchTable({
                           {(sum.wins > 0 || sum.losses > 0) && (
                             <span className="text-text-muted">{T.groupWinLoss(sum.wins, sum.losses)}</span>
                           )}
+                          {/* 실행 카운트 — 행 상태 필과 같은 녹색(실행=market-open 문법, intraday-session-status). */}
                           {sum.running > 0 && (
-                            <span className="text-accent-vivid">{T.groupRunning(sum.running)}</span>
+                            <span className="text-market-open">{T.groupRunning(sum.running)}</span>
                           )}
                         </span>
                       )}
