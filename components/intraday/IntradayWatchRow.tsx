@@ -51,6 +51,7 @@ import {
   type PaperTradingSelectedStock,
   type PaperTradingSession,
   type PaperTradingSessionDetail,
+  type PaperTradingSessionStatus,
 } from "@/lib/types/paperTrading/paperTrading";
 import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
@@ -472,6 +473,94 @@ function OwnerBadge({
   );
 }
 
+/**
+ * 세션 상태 필 — 색+모양+텍스트 삼중 부호(색약 안전). 실행 중=녹색 필+맥박 점(장중 배지
+ * `market-badge-open` 과 같은 문법), 판단 끊김=앰버 경고, 일시정지=회색 필+정지 아이콘(의도된
+ * 정지), 완료=테두리만 남긴 조용한 필, 실패=critical. 상태 클래스는 조건부 리터럴
+ * (속성 선택자 + `@apply` Turbopack 누락 함정 회피).
+ */
+const STATUS_PILL_BASE =
+  "inline-flex items-center gap-xs rounded-pill px-sm text-caption font-medium whitespace-nowrap";
+
+function StatusPill({
+  status,
+  stalled,
+}: {
+  status: PaperTradingSessionStatus;
+  stalled: boolean;
+}) {
+  if (stalled) {
+    return (
+      <span title={P.stalledHint} className={cn(STATUS_PILL_BASE, "bg-warn-soft text-warn")}>
+        <span className="h-sm w-sm rounded-pill bg-current" aria-hidden />
+        {P.stalled}
+      </span>
+    );
+  }
+  if (status === "running") {
+    return (
+      <span className={cn(STATUS_PILL_BASE, "bg-market-open-soft text-market-open")}>
+        <span
+          className="h-sm w-sm rounded-pill bg-current motion-safe:animate-pulse"
+          aria-hidden
+        />
+        {STATUS_LABEL.running}
+      </span>
+    );
+  }
+  if (status === "paused") {
+    return (
+      <span
+        className={cn(
+          STATUS_PILL_BASE,
+          "border border-border-line bg-surface-muted text-text-muted",
+        )}
+      >
+        <Pause className="size-3" aria-hidden />
+        {STATUS_LABEL.paused}
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className={cn(STATUS_PILL_BASE, "bg-critical-soft text-critical")}>
+        {STATUS_LABEL.failed}
+      </span>
+    );
+  }
+  return (
+    <span className={cn(STATUS_PILL_BASE, "border border-border-line text-text-muted")}>
+      {STATUS_LABEL.completed}
+    </span>
+  );
+}
+
+/**
+ * 행 좌측 상태 스트라이프 색 — 필과 같은 매핑을 주변시로도 잡히게 세로 바로 반복.
+ * 실행=녹색·판단 끊김=앰버·일시정지=희미한 회색, 완료/실패/무세션=없음(null).
+ */
+function stripeColor(
+  status: PaperTradingSessionStatus | undefined,
+  stalled: boolean,
+): string | null {
+  if (!status) return null;
+  if (stalled) return "bg-warn";
+  if (status === "running") return "bg-market-open";
+  if (status === "paused") return "bg-border-line";
+  return null;
+}
+
+/** 좌측 상태 스트라이프 — 첫 셀(relative) 안 absolute 세로 바. 펼침 행에도 같은 색으로 이어 붙인다. */
+function StatusStripe({ color }: { color: string | null }) {
+  if (!color) return null;
+  return (
+    <span
+      className={cn("absolute inset-y-xs left-0 w-xs rounded-r-pill", color)}
+      aria-hidden
+    />
+  );
+}
+
 export interface IntradayWatchRowProps {
   item: WatchItem;
   quote: WatchlistQuote | null;
@@ -534,8 +623,12 @@ function WatchRow({
   const position = detail?.positions.find((p) => p.quantity >= 1) ?? null;
   const lastTick = detail?.ticks.at(-1) ?? null;
   const running = current?.status === "running";
-  // 장중인데 자동 판단이 끊긴 running 세션 = "멈춤"(스케줄러 hang). refresh 폴링 재렌더마다 재평가.
+  // 장중인데 자동 판단이 끊긴 running 세션 = "판단 끊김"(스케줄러 hang). refresh 폴링 재렌더마다 재평가.
   const stalled = current ? isPaperSessionStalled(current) : false;
+  // 좌측 상태 스트라이프 + 일시정지 절충 디밍(intraday-session-status) — 색이 살아있는 행 =
+  // 지금 돌고 있는 세션. 완료 세션은 당일 성과 비교 대상이라 디밍하지 않는다.
+  const stripe = stripeColor(current?.status, stalled);
+  const dimmed = current?.status === "paused";
   // 체결 전체(시간순) — 차트 탭 마커용. 미니 로그는 최근 5건(최신 위), 전체·손익 합계는 시트.
   const allOrders = (detail?.ticks ?? []).flatMap((tick) =>
     tick.orders.map((order) => ({ ...order, at: tick.tickWindowStart })),
@@ -583,10 +676,18 @@ function WatchRow({
           selected && "bg-accent-soft",
         )}
       >
-        {/* 종목 — 코드 없이 이름만 + 매수 유의 칩 + 세션 상태 */}
-        <td className="py-sm pl-lg pr-md">
+        {/* 종목 — 코드 없이 이름만 + 매수 유의 칩 + 세션 상태 필(+좌측 스트라이프) */}
+        <td className="relative py-sm pl-lg pr-md">
+          <StatusStripe color={stripe} />
           <div className="flex items-center gap-xs whitespace-nowrap">
-            <span className="text-body-sm-strong text-text-strong">{item.name}</span>
+            <span
+              className={cn(
+                "text-body-sm-strong",
+                dimmed ? "text-text-muted" : "text-text-strong",
+              )}
+            >
+              {item.name}
+            </span>
             <StockWarningBadges warnings={warnings} max={1} size="sm" />
             <OwnerBadge owner={current?.owner} currentOperator={currentOperator} />
             {/* 오토파일럿 자식 세션 — 자동 편입 종목 구분(intraday-autopilot). */}
@@ -595,20 +696,15 @@ function WatchRow({
                 {A.rowBadge}
               </Badge>
             ) : null}
-            {current ? (
-              stalled ? (
-                <Badge variant="warn" title={P.stalledHint}>
-                  {P.stalled}
-                </Badge>
-              ) : (
-                <span className="text-caption text-text-muted">
-                  {STATUS_LABEL[current.status]}
-                </span>
-              )
-            ) : null}
+            {current ? <StatusPill status={current.status} stalled={stalled} /> : null}
           </div>
         </td>
-        <td className="py-sm pr-md text-right tabular-nums text-text-strong">
+        <td
+          className={cn(
+            "py-sm pr-md text-right tabular-nums",
+            dimmed ? "text-text-muted" : "text-text-strong",
+          )}
+        >
           {quote ? (
             formatMoney(quote.price)
           ) : quotesLoading ? (
@@ -620,7 +716,7 @@ function WatchRow({
         <td
           className={cn(
             "py-sm pr-md text-right tabular-nums",
-            quote ? changeTone(quote.changePercent) : "text-text-muted",
+            quote && !dimmed ? changeTone(quote.changePercent) : "text-text-muted",
           )}
         >
           {quote ? (
@@ -634,12 +730,17 @@ function WatchRow({
         <td
           className={cn(
             "border-l border-border-line py-sm pl-md pr-md text-right tabular-nums text-body-sm-strong",
-            current ? changeTone(current.returnPct) : "text-text-muted",
+            current && !dimmed ? changeTone(current.returnPct) : "text-text-muted",
           )}
         >
           {current ? formatPct(current.returnPct) : T.none}
         </td>
-        <td className="py-sm pr-md text-right tabular-nums text-text-strong">
+        <td
+          className={cn(
+            "py-sm pr-md text-right tabular-nums",
+            dimmed ? "text-text-muted" : "text-text-strong",
+          )}
+        >
           {current ? formatMoney(current.portfolioValue) : T.none}
         </td>
         <td className="py-sm pr-md text-right tabular-nums text-text-muted">
@@ -836,10 +937,11 @@ function WatchRow({
         </td>
       </motion.tr>
 
-      {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내 */}
+      {/* 펼침 — 판단 결과 카드 · 체결 내역 진입 · 안내. 스트라이프를 이어 붙여 어느 세션의 펼침인지 표시. */}
       {expanded ? (
         <tr className="border-t border-border-line">
-          <td colSpan={13} className="bg-surface-muted px-lg py-md">
+          <td colSpan={13} className="relative bg-surface-muted px-lg py-md">
+            <StatusStripe color={stripe} />
             <div className="flex flex-col gap-sm">
               {startError ? (
                 <p className="text-caption text-signal-down" role="alert">
