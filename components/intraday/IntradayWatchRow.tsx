@@ -610,8 +610,9 @@ function WatchRow({
   // 세션 생성 중 표시·disabled 모두 **이 행 한정**(starting). 전역 isCreating 은 다른 종목 시작까지
   // 막던 버그라 제거 — 세션은 종목당 1개·병렬 허용이므로 각 행은 자기 생성 중에만 잠긴다(사용자 지적).
   const [starting, setStarting] = useState(false);
-  // 펼침 탭 — 차트(당일 분봉+체결 마커) 기본, 체결 내역(미니 로그) 전환.
-  const [tab, setTab] = useState<"chart" | "orders">("chart");
+  // 펼침 탭 — 체결 내역(판단 메모 포함) 기본, 차트(당일 분봉+체결 마커) 전환(사용자 지정 순서).
+  // 부수 효과: recharts 지연 로드가 차트 탭 첫 진입까지 미뤄져 펼침 기본 경로가 더 가볍다.
+  const [tab, setTab] = useState<"chart" | "orders">("orders");
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
   const { detail, isPatching, setStatus, setInterval } = usePaperTradingSession(session?.id ?? "");
@@ -630,8 +631,13 @@ function WatchRow({
   const stripe = stripeColor(current?.status, stalled);
   const dimmed = current?.status === "paused";
   // 체결 전체(시간순) — 차트 탭 마커용. 미니 로그는 최근 5건(최신 위), 전체·손익 합계는 시트.
+  // rationale 은 틱 레벨 판단 메모 — 체결별 "왜 샀/팔았나"를 미니 로그 우측에 보여준다.
   const allOrders = (detail?.ticks ?? []).flatMap((tick) =>
-    tick.orders.map((order) => ({ ...order, at: tick.tickWindowStart })),
+    tick.orders.map((order) => ({
+      ...order,
+      at: tick.tickWindowStart,
+      rationale: tick.rationale,
+    })),
   );
   const recentOrders = allOrders.slice(-5).reverse();
   // 차트 분봉 단위 — 세션 주기에서 파생(세션 없으면 드랍다운 선택값 기준).
@@ -966,9 +972,9 @@ function WatchRow({
                 </p>
               ) : null}
 
-              {/* 펼침 탭 — 차트 | 체결 내역 */}
+              {/* 펼침 탭 — 체결 내역 | 차트 (체결 내역 기본, 사용자 지정 순서) */}
               <div className="flex items-center gap-md border-b border-border-line" role="tablist">
-                {(["chart", "orders"] as const).map((key) => (
+                {(["orders", "chart"] as const).map((key) => (
                   <button
                     key={key}
                     type="button"
@@ -1016,29 +1022,50 @@ function WatchRow({
                   {recentOrders.length === 0 ? (
                     <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
                   ) : (
-                    <ul className="flex flex-col gap-xs text-body-sm tabular-nums">
+                    // 보이지 않는 그리드 정렬 — ul 이 5트랙(시각·구분·수량×가격·손익·메모)을 소유하고
+                    // 각 li 가 subgrid 로 트랙을 공유해, 행마다 팩트 폭이 달라도 컬럼이 딱 맞는다.
+                    // 손익 셀은 null 이어도 자리를 차지(빈 span)해 메모 트랙이 밀리지 않는다.
+                    <ul className="grid grid-cols-[auto_auto_auto_auto_1fr] gap-x-md gap-y-xs text-body-sm tabular-nums">
                       {recentOrders.map((order, index) => (
-                        <li key={`${order.at}-${index}`} className="flex flex-wrap items-center gap-sm">
-                          <span className="text-text-muted">{kstHhmm(order.at)}</span>
+                        <li
+                          key={`${order.at}-${index}`}
+                          className="col-span-full grid grid-cols-subgrid items-baseline"
+                        >
+                          <span className="whitespace-nowrap text-text-muted">
+                            {kstHhmm(order.at)}
+                          </span>
                           <span
                             className={cn(
-                              "font-medium",
+                              "whitespace-nowrap font-medium",
                               order.side === "BUY" ? "text-signal-up" : "text-signal-down",
                             )}
                           >
                             {order.side === "BUY" ? P.sheet.sideBuy : P.sheet.sideSell}
                           </span>
-                          <span className="text-text-strong">
+                          <span className="whitespace-nowrap text-text-strong">
                             {order.quantity}주 × {formatMoney(order.price)}
                           </span>
-                          {order.realizedPnl != null ? (
+                          <span
+                            className={cn(
+                              "whitespace-nowrap",
+                              order.realizedPnl != null &&
+                                (order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"),
+                            )}
+                          >
+                            {order.realizedPnl != null ? (
+                              <>
+                                {order.realizedPnl >= 0 ? "+" : ""}
+                                {formatMoney(order.realizedPnl)}
+                              </>
+                            ) : null}
+                          </span>
+                          {/* 판단 메모 — 최대 2줄 말줄임(hover 전문). 모바일은 팩트 아래 전폭 랩. */}
+                          {order.rationale ? (
                             <span
-                              className={
-                                order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"
-                              }
+                              className="col-span-full min-w-0 text-caption leading-snug text-text-muted line-clamp-2 sm:col-span-1 sm:col-start-5"
+                              title={order.rationale}
                             >
-                              {order.realizedPnl >= 0 ? "+" : ""}
-                              {formatMoney(order.realizedPnl)}
+                              {order.rationale}
                             </span>
                           ) : null}
                         </li>
