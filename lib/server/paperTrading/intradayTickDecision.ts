@@ -15,6 +15,7 @@ import {
 } from "@/lib/api/kis/minuteChartChunked";
 import { isKisConfigured } from "@/lib/api/kis";
 import { dailyRegimeFromCandles } from "@/lib/signal/intradayProfile";
+import { formatDailyContext } from "@/lib/signal/dailyContext";
 import { decideIntradayWithCli } from "@/lib/server/paperTrading/decisionProviders/intradayCli";
 import { detectProviders } from "@/lib/server/ai/detectCli";
 import {
@@ -60,7 +61,7 @@ const priorMinuteCache = new Map<string, StockMinuteCandle[]>();
  * 매 틱 재페치는 낭비이고, 동시 세션 부하 시 KIS rate-limit → 페치 실패 → regime 0 폴백으로
  * veto 가 무력화되는 회귀를 부른다(200→400일 창 확대로 페치량 2배라 특히). 성공값만 캐시.
  */
-const dailyRegimeCache = new Map<string, -1 | 0 | 1>();
+const dailyContextCache = new Map<string, { regime: -1 | 0 | 1; context: string }>();
 
 function todayYmd(): string {
   const d = new Date();
@@ -204,16 +205,18 @@ export async function resolveIntradayTickDecision(
   // KIS 미설정 → 데이터 없음. 폴백(빈 분봉 → 결정론 HOLD).
   let minuteCandles: StockMinuteCandle[] = [];
   let dailyRegime: -1 | 0 | 1 = 0;
+  let dailyContextText = "";
   if (isKisConfigured()) {
     try {
       minuteCandles = await getMinuteCandles(stock.ticker, timeframe);
     } catch {
       minuteCandles = [];
     }
-    const regimeKey = `${stock.ticker}|${todayYmd()}`;
-    const cachedRegime = dailyRegimeCache.get(regimeKey);
-    if (cachedRegime !== undefined) {
-      dailyRegime = cachedRegime;
+    const dailyKey = `${stock.ticker}|${todayYmd()}`;
+    const cached = dailyContextCache.get(dailyKey);
+    if (cached) {
+      dailyRegime = cached.regime;
+      dailyContextText = cached.context;
     } else {
       try {
         // 400 달력일 ≈ 269 거래일 — 레짐 SMA(≈130봉) 기울기 산출에 필요한 이력.
@@ -221,7 +224,8 @@ export async function resolveIntradayTickDecision(
         //   (일봉상 명백한 상승/하락 종목도 0)으로 레짐 veto 가 상시 무력화되던 버그.
         const daily = await fetchDailyChunked(stock.ticker, nDaysAgoYyyymmdd(400), todayYmd());
         dailyRegime = dailyRegimeFromCandles(daily);
-        dailyRegimeCache.set(regimeKey, dailyRegime); // 성공만 캐시(실패는 다음 틱 재시도).
+        dailyContextText = formatDailyContext(daily); // I1 — 일봉 흐름 요약(MACD/RSI/이평/위치)
+        dailyContextCache.set(dailyKey, { regime: dailyRegime, context: dailyContextText }); // 성공만 캐시.
       } catch {
         dailyRegime = 0;
       }
@@ -237,6 +241,7 @@ export async function resolveIntradayTickDecision(
     timeframe,
     tickIntervalMinutes: session.tickIntervalMinutes,
     dailyRegime,
+    dailyContextText,
     price,
     nowHhmm,
     position,

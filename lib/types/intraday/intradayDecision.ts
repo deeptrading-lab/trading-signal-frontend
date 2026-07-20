@@ -86,6 +86,12 @@ export interface IntradayContext {
    * 끼운다. 봉 부족 시 빈 문자열(무주입).
    */
   featuresText?: string;
+  /**
+   * 일봉 흐름 요약(I1) — MACD 크로스·RSI·이평 배열·전고/전저 대비 위치. 분봉 진입을 상위
+   * 타임프레임에 정렬하도록 프롬프트에 주입한다(`lib/signal/dailyContext`). 봉 부족·미설정 시
+   * 빈 문자열(무주입 → 기존 레짐 한 줄만).
+   */
+  dailyContextText?: string;
   /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") — 사전 게이트의 LLM 스킵을 뚫는 트리거. */
   structureEvent?: string | null;
   /**

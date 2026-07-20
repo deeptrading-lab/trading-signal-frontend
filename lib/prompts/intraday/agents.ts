@@ -65,6 +65,8 @@ export function formatIntradayContext(ctx: IntradayContext): string {
     "",
     `[분봉 시그널] 종합 ${s.action} | 점수 ${s.score.toFixed(0)}/100 | 동의도 ${Math.round(s.confidence * 100)}% | 일봉 큰 흐름 ${regimeLabel}`,
     `  축별: ${axes}`,
+    // 일봉 흐름 상세(I1) — 상위 타임프레임 정렬. 봉 부족/미설정 시 빈 문자열(무주입).
+    ...(ctx.dailyContextText ? [ctx.dailyContextText] : []),
     "",
     `[구조 레벨] 박스 ${won(lv.boxLow)} ~ ${won(lv.boxHigh)}`,
     `  구조 목표가 ${won(lv.tpPrice)} (${pct(lv.tpPct)}, ${levelSource(lv.tpSource)}) | 구조 손절가 ${won(lv.slPrice)} (${pct(lv.slPct)}, ${levelSource(lv.slSource)}) | 손익비 ${lv.rrr?.toFixed(2) ?? "—"}`,

@@ -80,6 +80,8 @@ export interface IntradayCliInput {
   tickIntervalMinutes: number;
   /** 일봉 레짐(-1/0/1) — 분봉 평가 regimeOverride. */
   dailyRegime: RuleDirection;
+  /** 일봉 흐름 요약 텍스트(I1) — MACD/RSI/이평/위치. 프롬프트 주입용, 미주입 시 빈 문자열. */
+  dailyContextText?: string;
   /** 현재가(원). */
   price: number;
   /** 장중 시각 "HH:mm"(KST). */
@@ -243,6 +245,7 @@ function buildContext(
     previousDecision: input.previousDecision,
     nowHhmm: input.nowHhmm,
     featuresText,
+    dailyContextText: input.dailyContextText,
     structureEvent,
   };
 }
