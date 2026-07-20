@@ -123,6 +123,51 @@ describe("runPaperTradingTick — cli-agent 분기", () => {
     expect(result.tick.guardAdjustments.join(" ")).toContain("손절선");
   });
 
+  it("triggeredBy=risk 강제청산은 스텁('청산 조건 미도달') 대신 실제 사유(손절선)를 decision 에 기록", async () => {
+    const held: PaperTradingPosition = {
+      ticker: "005930",
+      name: "삼성전자",
+      quantity: 30,
+      avgEntryPrice: 10_000,
+      lastPrice: 10_000,
+      marketValue: 300_000,
+      unrealizedPnl: 0,
+      unrealizedPnlPct: 0,
+      allocationPct: 30,
+      updatedAt: "2026-06-29T00:55:00.000Z",
+    };
+    // 60초 리스크 스윕 스텁 — rationale 을 '미도달'로 시작하고 forcedExit 를 얹는다.
+    const riskStub = async (): Promise<IntradayTickResult> => ({
+      decision: {
+        action: "HOLD",
+        targetAllocationPct: 0,
+        targetAllocations: [],
+        confidence: "LOW",
+        rationale: "60초 리스크 점검 — 청산 조건 미도달.",
+        riskNotes: [],
+        source: "cli-agent",
+      },
+      forcedExit: { targetPrice: 10_400, stopPrice: 9_800, flattenAll: false },
+    });
+
+    const result = await runPaperTradingTick({
+      session: session({ cash: 700_000 }),
+      positions: [held],
+      existingTicks: [],
+      triggeredBy: "risk",
+      tickWindowStart: "2026-06-29T01:00:00.000Z",
+      priceSnapshotProvider: priceAt(9_700), // 손절가 아래
+      intradayResolver: riskStub,
+    });
+
+    expect(result.positions).toHaveLength(0);
+    // 스텁의 HOLD·"미도달"이 아니라 실제 청산 사유로 기록돼야 한다.
+    expect(result.tick.decision.action).toBe("EXIT");
+    expect(result.tick.decision.rationale).toContain("손절선");
+    expect(result.tick.decision.rationale).not.toContain("미도달");
+    expect(result.tick.rationale).toContain("손절선");
+  });
+
   it("포지션 하드스톱(−5%) 배선 — 동적 손절선 없이 급락해도 runTick 이 세션 설정으로 청산(B)", async () => {
     const held: PaperTradingPosition = {
       ticker: "005930",
