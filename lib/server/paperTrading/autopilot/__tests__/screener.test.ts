@@ -5,9 +5,9 @@ import {
   computeAtrPct,
   extractStage2Features,
   runAutopilotScreener,
+  saturatingScore,
   scoreStage1,
   scoreStage2,
-  triangularScore,
 } from "@/lib/server/paperTrading/autopilot/screener";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type { AutopilotCandidate } from "@/lib/types/paperTrading/autopilot";
@@ -51,17 +51,22 @@ function makeCandles(opts: { bars?: number; price?: number; volume?: number } = 
   });
 }
 
-describe("triangularScore", () => {
-  it("best 에서 1, min/max 밖에서 0, 사이 선형", () => {
-    expect(triangularScore(0.8, 0.25, 0.8, 2.0)).toBe(1);
-    expect(triangularScore(0.25, 0.25, 0.8, 2.0)).toBe(0);
-    expect(triangularScore(2.5, 0.25, 0.8, 2.0)).toBe(0);
-    const rising = triangularScore(0.5, 0.25, 0.8, 2.0);
-    const falling = triangularScore(1.5, 0.25, 0.8, 2.0);
+describe("saturatingScore", () => {
+  it("min 이하 0, min→plateau 상승, plateau~extreme 만점(고변동성 무감점), extreme 초과 soft 감점", () => {
+    // min(0.25) 이하 = 0(죽은 변동성).
+    expect(saturatingScore(0.2, 0.25, 1.5, 6.0)).toBe(0);
+    expect(saturatingScore(0.25, 0.25, 1.5, 6.0)).toBe(0);
+    // min→plateau 선형 상승.
+    const rising = saturatingScore(0.8, 0.25, 1.5, 6.0);
     expect(rising).toBeGreaterThan(0);
     expect(rising).toBeLessThan(1);
-    expect(falling).toBeGreaterThan(0);
-    expect(falling).toBeLessThan(1);
+    // ★ plateau~extreme 는 만점 유지 — 삼각과 달리 고ATR(2·3%) 감점 안 함(결함 수정 핵심).
+    expect(saturatingScore(1.5, 0.25, 1.5, 6.0)).toBe(1);
+    expect(saturatingScore(3.0, 0.25, 1.5, 6.0)).toBe(1);
+    expect(saturatingScore(6.0, 0.25, 1.5, 6.0)).toBe(1);
+    // extreme 초과 = soft 감점(0 으로 죽이지 않고 0.3 floor).
+    expect(saturatingScore(9.0, 0.25, 1.5, 6.0)).toBeCloseTo(0.5, 5);
+    expect(saturatingScore(100, 0.25, 1.5, 6.0)).toBe(0.3);
   });
 });
 
@@ -225,6 +230,9 @@ describe("runAutopilotScreener (deps 주입 e2e)", () => {
     for (const c of result.fillRanking) {
       expect(c.finalScore).toBeGreaterThan(0);
       expect(c.score2).toBeDefined();
+      // 2차 원재료가 후보에 실려야 스냅샷 영속 → 스코어링 반사실 튜닝 가능.
+      expect(c.stage2?.atrPct).not.toBeUndefined();
+      expect(typeof c.stage2?.todayTradingValueKrw).toBe("number");
     }
   });
 

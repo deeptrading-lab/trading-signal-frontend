@@ -8075,3 +8075,44 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 체결 메모 클릭 시 전문 확장(현재 hover title만) 검토
   - 세션 상세(/intraday/[sessionId]) 체결 테이블에도 동일 그리드 정렬 적용 검토
+
+### 2026-07-20 — feat(intraday): 오토파일럿 스크리너 ATR 결함 수정 + 2차 피처 영속·선정품질 eval (#369)
+
+- **slug**: `autopilot-screener-tune` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/369
+- **요약**: feat(intraday): 오토파일럿 스크리너 ATR 결함 수정 + 2차 피처 영속·선정품질 eval
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경 — 측정으로 확인한 것
+  > 
+  > 스크리너 스냅샷(가격 포함, 4일 축적)으로 **judge와 무관한 선정 품질**을 처음 측정했습니다. 스냅샷은 각 종목이 여러 스윕(10분)에 걸쳐 랭킹에 등장할 때마다 가격이 찍혀 있어, 그 자체가 forward 가격경로(KIS 재조회·만료 무관)입니다.
+  > 
+  > | | 7/13 | 7/14 | 7/15 | 7/20 | 풀링 |
+  > |---|---|---|---|---|---|
+  > | scoreSpear(점수→range) | +0.12 | +0.22 | +0.17 | +0.27 | **+0.19** (n=4,789) |
+  > 
+  > - ★ **스크리너 점수가 forward range(움직임 폭)를 일관되게 양으로 예측** — judge 트랙의 convSpear(~0)·sigSpear(−0.10)과 대조. **선정에는 실제 스킬이 있음**(방향 retSpear~0 은 예상대로, 이 속도로 방향 예측 불가·스크리너 임무도 아님).
+  > - 하드필터 정상: 탈락 종목 range 1.61% vs 통과 3%+.
+  > - **결함**: 최종 선정 마진에서 뽑힌 종목(range 3.19%)이 미선정 상위5(3.51%)보다 **덜 움직임**. 2차 ATR 삼각(0.25/0.8/2.0)의 고변동성 감점(2%↑→0)이 최대 무버를 상위에서 끌어내린 것이 원인.
+  > 
+  > ## 변경
+  > 
+  > 1. **ATR 삼각 → 포화(saturating)**: `saturatingScore(min 0.25 / plateau 1.5 / extreme 6.0)` — min→plateau 상승, plateau~extreme 만점(**고변동성 무감점**), extreme 초과만 soft 감점(상한가·VI 근처 체결 리스크, 0.3 floor로 0 안 죽임). forward range 가 검증된 타깃이라 움직임 큰 종목을 끌어내릴 이유가 없음. **stage1(1차 점수)은 무변경** — 데이터상 정상(scoreSpear +0.19 는 stage1 포함 결과, '유동성 이중계산' 가설은 반증됨).
+  > 2. **2차 피처 영속**: `AutopilotStage2Features`(atrPct·volumeZ·vwapGap 등)를 `candidate.stage2` 로 저장 → 스냅샷 자동 편입. 원재료가 있어야 "ATR 가중을 바꾸면 더 나은가"를 소급 반사실 재점수 가능(과거 분봉은 만료돼 재조회 불가).
+  > 3. **`scripts/intraday/screener-eval.mts`**: 선정 품질 측정 도구(daily.mts 대칭·judge 무관·읽기 전용). scoreSpear + 뽑음/미선정/탈락 group range 를 매일 추적.
+  > 
+  > ## 검증
+  > 
+  > - `npm test` 1306 pass(신규: saturatingScore 프로파일·stage2 영속). `tsc`/`eslint(lib)` 통과.
+  > - eval 스크립트 4일 실측 재현 확인.
+  > - ⚠️ 스코어링 변경 효과는 **다음 며칠 라이브 + eval 로 반사실 검증** 예정(지금은 마진 결함의 유력 원인 수정 + 측정 인프라). 효과 없으면 되돌리기 쉬움(constants 3줄).
+  > 
+  > ## 다음 작업
+  > 
+  > - dev 재시작 후 며칠 라이브 → `screener-eval.mts` 로 '뽑음 range% ≥ 미선정상위' 로 역전됐는지 확인(포화 수정 효과).
+  > - stage2 피처가 쌓이면 ATR 외 2차 가중(volumeZ·VWAP·structure)도 forward range 반사실로 재튜닝.
+  > - 선정 품질이 확정되면, 산출물로서의 워치리스트(decision-support 피벗 대비) 가치 검토.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - dev 재시작 후 며칠 라이브 → `screener-eval.mts` 로 '뽑음 range% ≥ 미선정상위' 로 역전됐는지 확인(포화 수정 효과).
+  - stage2 피처가 쌓이면 ATR 외 2차 가중(volumeZ·VWAP·structure)도 forward range 반사실로 재튜닝.
+  - 선정 품질이 확정되면, 산출물로서의 워치리스트(decision-support 피벗 대비) 가치 검토.
