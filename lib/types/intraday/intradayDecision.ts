@@ -92,6 +92,12 @@ export interface IntradayContext {
    * 빈 문자열(무주입 → 기존 레짐 한 줄만).
    */
   dailyContextText?: string;
+  /**
+   * 수급 선행(order flow) 요약(I3) — 체결강도·호가 잔량 불균형. LLM 호출 경로에서만 fail-soft 로
+   * 조회(`orderFlowContext`). 가격 후행이 못 잡는 실시간 수급을 진입 확인/거부권으로 쓴다. 미설정·
+   * 빈값이면 빈 문자열(무주입).
+   */
+  orderFlowText?: string;
   /** 매수 관심 구조 이벤트(예: "전고 돌파 진행") — 사전 게이트의 LLM 스킵을 뚫는 트리거. */
   structureEvent?: string | null;
   /**

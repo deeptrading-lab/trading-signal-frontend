@@ -11,6 +11,7 @@
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
 import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
+import { buildOrderFlowText } from "@/lib/server/paperTrading/orderFlowContext";
 import { isEntryBlockingWarning } from "@/lib/copy/stock/warnings";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
 import {
@@ -723,7 +724,14 @@ export async function decideIntradayWithCli(
   // 이미 중단된 틱이면 조회 자체를 생략(리뷰 F-1 — abort 경로 불필요 대기 제거). 조회 중 중단은
   // fetchActiveWarnings 가 바운드(≤5s)·never-throw 라 판단을 깨지 않는다.
   if (!input.abortSignal.aborted) {
-    ctx.warnings = await fetchActiveWarnings(input.ticker);
+    // 매수 유의(경보·VI) + 수급 선행(체결강도·호가, I3)을 병렬 fail-soft 조회. 둘 다 never-throw·
+    // 바운드라 판단을 깨지 않고, 토스 미설정이면 빈 값(프롬프트 무변경).
+    const [warnings, orderFlowText] = await Promise.all([
+      fetchActiveWarnings(input.ticker),
+      buildOrderFlowText(input.ticker),
+    ]);
+    ctx.warnings = warnings;
+    ctx.orderFlowText = orderFlowText;
   }
 
   const provider: AIAnalysisProvider = input.provider ?? "claude";
