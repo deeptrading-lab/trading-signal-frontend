@@ -136,6 +136,12 @@ export async function runPaperTradingTick(
   const now = new Date().toISOString();
   const status = executed.skippedReason ? "skipped" : "executed";
 
+  // 60초 리스크 스윕의 강제청산은 스텁 decision(HOLD·"청산 조건 미도달")이 아니라 실제 트리거(손절가/
+  // 익절가/장막판) 사유를 기록한다 — 리스크 스윕은 청산 체결이 있을 때만 틱을 남기므로 스텁이 곧 오표기.
+  // 5분 LLM 틱은 스냅샷·conviction 관측값 보존을 위해 무변경(강제청산 사유는 guardAdjustments 로 유지).
+  const recordedDecision =
+    input.triggeredBy === "risk" && executed.forcedExitDecision ? executed.forcedExitDecision : decision;
+
   const tick: PaperTradingTick = {
     id: randomUUID(),
     sessionId: input.session.id,
@@ -150,10 +156,10 @@ export async function runPaperTradingTick(
     cashBefore: round(input.session.cash),
     cashAfter: round(executed.cash),
     returnPctAfter: round(returnPctAfter),
-    decision,
+    decision: recordedDecision,
     priceSnapshot,
     orders: executed.orders,
-    rationale: executed.skippedReason ?? decision.rationale,
+    rationale: executed.skippedReason ?? recordedDecision.rationale,
     guardAdjustments: executed.guardAdjustments,
     errorMessage: null,
     createdAt: now,

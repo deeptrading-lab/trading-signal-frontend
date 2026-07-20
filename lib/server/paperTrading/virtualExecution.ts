@@ -54,6 +54,12 @@ export type VirtualExecutionResult = {
   returnPct: number;
   guardAdjustments: string[];
   skippedReason: string | null;
+  /**
+   * 강제청산(손절/익절/하드스톱/장막판)이 발동했을 때의 EXIT 결정(정확한 사유 rationale 포함).
+   * 무발동이면 null. 60초 리스크 스윕은 스텁 rationale("청산 조건 미도달") 대신 이걸 틱에 기록해야
+   * "조건 도달로 청산했는데 라벨은 미도달" 표기 버그를 피한다.
+   */
+  forcedExitDecision?: PaperTradingDecision | null;
 };
 
 export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecutionResult {
@@ -225,7 +231,10 @@ export function executeVirtualTrade(input: VirtualExecutionInput): VirtualExecut
   const portfolioAfter = nextCash + sumMarketValue(nextPositions);
   const allocatedPositions = withAllocations(nextPositions, portfolioAfter);
 
-  return buildResult(nextCash, allocatedPositions, orders, portfolioAfter, guardAdjustments, null);
+  return {
+    ...buildResult(nextCash, allocatedPositions, orders, portfolioAfter, guardAdjustments, null),
+    forcedExitDecision: forced?.decision ?? null,
+  };
 }
 
 /** forced-exit 판정 결과 — EXIT 결정 + 관측용 손절 기준선(슬리피지 노트). */
