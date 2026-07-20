@@ -34,6 +34,27 @@ export type AutopilotCandidateSource =
   | "flow-frgn"
   | "flow-orgn";
 
+/**
+ * 2차(당일 분봉) 결정론 피처 — shortlist 종목에 대해 추출. 스코어링 반사실 튜닝(선정 품질 평가)을
+ * 위해 스냅샷에 함께 영속한다(원재료가 있어야 "ATR 가중을 바꾸면 더 나은가"를 소급 재점수 가능).
+ */
+export type AutopilotStage2Features = {
+  /** 최근 마감봉 ATR% (TR 평균/현재가×100). 봉 부족 시 null. */
+  atrPct: number | null;
+  /** 마지막 마감봉 log-거래량 z-score(gradedVolumeAxis 산식 공유). */
+  volumeZ: number | null;
+  /** 당일 VWAP 이격%(+ = 위). null = 미산출. */
+  vwapGapPct: number | null;
+  aboveVwap: boolean;
+  orBreakout: boolean;
+  vwapReclaim: boolean;
+  volumeZSurge: boolean;
+  /** 스윙 시퀀스가 상승 구조(HH·HL)인가. */
+  swingUptrend: boolean;
+  /** 당일 체결대금 합(원) — 유동성 재검증(1차에서 거래대금 미상이던 후보). */
+  todayTradingValueKrw: number;
+};
+
 /** 스크리너 후보 1종목 — 1차(랭킹 필드) → 2차(당일 분봉) 점수를 누적한다. */
 export type AutopilotCandidate = {
   ticker: string;
@@ -53,6 +74,8 @@ export type AutopilotCandidate = {
   score2?: number;
   /** 최종 점수 = 0.4×score1 + 0.6×score2. score2 미산출이면 undefined(=fill 후보 아님). */
   finalScore?: number;
+  /** 2차 점수 원재료(shortlist 만) — 스냅샷 영속으로 스코어링 반사실 튜닝의 근거. 미산출이면 undefined. */
+  stage2?: AutopilotStage2Features;
   /** 하드필터 탈락 사유(관측용) — 통과 후보는 undefined. */
   rejectedBy?: string;
 };

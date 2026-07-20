@@ -125,7 +125,15 @@ export const AUTOPILOT_HARD_EXCLUDE_WARNINGS: readonly string[] = [
 /** 1차 점수 상위 몇 종목의 분봉을 걷어 2차 점수를 낼지 — KIS 순차 호출 비용과의 균형. */
 export const AUTOPILOT_SHORTLIST_SIZE = envInt("AUTOPILOT_SHORTLIST_SIZE", 8, 3, 15);
 
-/** 2차 ATR% 삼각 프로파일 — 저점(죽은 변동성)/최적/상한(통제 불능) %. */
+/**
+ * 2차 ATR% 포화 프로파일 — 저점(죽은 변동성)/만점 플래토/극단(체결 불가·상한가·정지 근처) %.
+ *
+ * ★ 삼각(0.25/0.8/2.0)에서 포화로 전환(선정 품질 평가 근거): 스냅샷 4일 실측상 스크리너 점수가
+ *   forward range 를 +0.19(4일 일관 양)로 예측하나, **최종 선정 마진에서 뽑힌 종목(range 3.19%)이
+ *   미선정 상위(3.51%)보다 덜 움직임** — 삼각의 고ATR 감점(2%↑=0점)이 최대 무버를 상위에서 끌어내린
+ *   것이 유력 원인. forward range 자체가 검증된 타깃이므로 고변동성을 감점할 이유가 없다. min↑plateau
+ *   구간만 상승, plateau~extreme 는 만점 유지, extreme 초과만 soft 감점(상한가/VI 근처 체결 리스크).
+ */
 export const AUTOPILOT_ATR_PCT_MIN = envNumber("AUTOPILOT_ATR_PCT_MIN", 0.25, 0.05, 1);
-export const AUTOPILOT_ATR_PCT_BEST = envNumber("AUTOPILOT_ATR_PCT_BEST", 0.8, 0.2, 3);
-export const AUTOPILOT_ATR_PCT_MAX = envNumber("AUTOPILOT_ATR_PCT_MAX", 2.0, 0.5, 6);
+export const AUTOPILOT_ATR_PCT_PLATEAU = envNumber("AUTOPILOT_ATR_PCT_PLATEAU", 1.5, 0.5, 4);
+export const AUTOPILOT_ATR_PCT_EXTREME = envNumber("AUTOPILOT_ATR_PCT_EXTREME", 6.0, 3, 15);
