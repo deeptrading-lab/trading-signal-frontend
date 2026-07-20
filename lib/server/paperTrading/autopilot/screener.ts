@@ -25,9 +25,9 @@ import { isRegularStock } from "@/lib/server/rankingFilter";
 import { volumeZAt } from "@/lib/signal/intradayAxes";
 import { extractIntradayFeatures } from "@/lib/signal/intradayFeatures";
 import {
-  AUTOPILOT_ATR_PCT_BEST,
-  AUTOPILOT_ATR_PCT_MAX,
+  AUTOPILOT_ATR_PCT_EXTREME,
   AUTOPILOT_ATR_PCT_MIN,
+  AUTOPILOT_ATR_PCT_PLATEAU,
   AUTOPILOT_HARD_EXCLUDE_WARNINGS,
   AUTOPILOT_MAX_CHANGE_PCT,
   AUTOPILOT_MAX_PRICE_KRW,
@@ -41,6 +41,7 @@ import type { StockWarningItem } from "@/lib/types/stock/warnings";
 import type {
   AutopilotCandidate,
   AutopilotCandidateSource,
+  AutopilotStage2Features,
 } from "@/lib/types/paperTrading/autopilot";
 
 const log = createLogger("autopilot-screen");
@@ -101,11 +102,23 @@ function percentileRank(sortedValues: number[], value: number): number {
   return below / sortedValues.length;
 }
 
-/** 삼각 프로파일 — min 이하 0, best 에서 1, max 이상 0(사이 선형). */
-export function triangularScore(value: number, min: number, best: number, max: number): number {
-  if (!Number.isFinite(value) || value <= min || value >= max) return 0;
-  if (value === best) return 1;
-  return value < best ? (value - min) / (best - min) : (max - value) / (max - best);
+/**
+ * 포화 프로파일 — min 이하 0, min→plateau 선형 상승, plateau~extreme 만점, extreme 초과 soft 감점.
+ *
+ * 삼각과 달리 **고변동성을 감점하지 않는다**(plateau 도달 후 만점 유지). forward range 가 검증된
+ * 선정 타깃이라 움직임이 큰 종목을 끌어내릴 이유가 없고, 극단(상한가·VI 근처)만 체결 리스크로
+ * soft 감점(0.3 floor — 0 으로 죽이지 않음, 여전히 움직이는 종목).
+ */
+export function saturatingScore(
+  value: number,
+  min: number,
+  plateau: number,
+  extreme: number,
+): number {
+  if (!Number.isFinite(value) || value <= min) return 0;
+  if (value < plateau) return (value - min) / (plateau - min);
+  if (value <= extreme) return 1;
+  return Math.max(0.3, 1 - (value - extreme) / extreme);
 }
 
 /**
@@ -173,24 +186,6 @@ export function scoreStage1(
   );
 }
 
-/** 2차 점수의 결정론 피처 — 당일 5분봉에서 추출. */
-export type AutopilotStage2Features = {
-  /** 최근 마감봉 ATR% (TR 평균/현재가×100). 봉 부족 시 null. */
-  atrPct: number | null;
-  /** 마지막 마감봉 log-거래량 z-score(gradedVolumeAxis 산식 공유). */
-  volumeZ: number | null;
-  /** 당일 VWAP 이격%(+ = 위). null = 미산출. */
-  vwapGapPct: number | null;
-  aboveVwap: boolean;
-  orBreakout: boolean;
-  vwapReclaim: boolean;
-  volumeZSurge: boolean;
-  /** 스윙 시퀀스가 상승 구조(HH·HL)인가. */
-  swingUptrend: boolean;
-  /** 당일 체결대금 합(원) — 유동성 재검증(1차에서 거래대금 미상이던 후보). */
-  todayTradingValueKrw: number;
-};
-
 /** 마감봉 기준 ATR%(True Range 평균 / 마지막 종가 ×100). 봉 부족 시 null. */
 export function computeAtrPct(candles: StockMinuteCandle[], bars: number = ATR_BARS): number | null {
   // 마지막 봉은 진행 중(미확정)일 수 있어 제외(intradayFeatures 꼬리 읽기 규칙 동일).
@@ -243,11 +238,11 @@ export function scoreStage2(features: AutopilotStage2Features): number {
   const atr =
     features.atrPct === null
       ? 0
-      : triangularScore(
+      : saturatingScore(
           features.atrPct,
           AUTOPILOT_ATR_PCT_MIN,
-          AUTOPILOT_ATR_PCT_BEST,
-          AUTOPILOT_ATR_PCT_MAX,
+          AUTOPILOT_ATR_PCT_PLATEAU,
+          AUTOPILOT_ATR_PCT_EXTREME,
         );
   const volz = features.volumeZ === null ? 0.3 : clip(features.volumeZ, 0, 3) / 3;
   let vwapScore = 0.3; // VWAP 아래 = 약세 기본값.
@@ -419,6 +414,8 @@ export async function runAutopilotScreener(
         ...candidate,
         score2,
         finalScore: 0.4 * candidate.score1 + 0.6 * score2,
+        // 2차 원재료 영속 — 스냅샷에 실려 스코어링 반사실 튜닝(선정 품질 평가)의 근거가 된다.
+        stage2: features,
       });
     } catch (error) {
       log.warn(`shortlist 분봉 실패 ticker=${candidate.ticker} — 이번 스윕 제외`, error);
