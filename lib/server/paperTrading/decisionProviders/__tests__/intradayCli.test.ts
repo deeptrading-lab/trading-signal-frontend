@@ -224,9 +224,9 @@ describe("deriveStructureEvent (preGate 교차 트리거 확장, PR-3b)", () => 
 // ─── 확신 점수 결정론 컷·사이징 (PR-3a, AC-10) ────────────────────────────────
 
 describe("deriveActionFromConviction (결정론 컷)", () => {
-  it("컷 경계 — 65(기본 컷)→BUY, 64→HOLD (AC-10)", () => {
-    expect(deriveActionFromConviction(65, false)).toBe("BUY");
-    expect(deriveActionFromConviction(64, false)).toBe("HOLD");
+  it("컷 경계 — 58(기본 컷)→BUY, 57→HOLD (AC-10)", () => {
+    expect(deriveActionFromConviction(58, false)).toBe("BUY");
+    expect(deriveActionFromConviction(57, false)).toBe("HOLD");
   });
   it("보유 중 — 40(기본 컷)→SELL, 41→HOLD", () => {
     expect(deriveActionFromConviction(40, true)).toBe("SELL");
@@ -241,10 +241,10 @@ describe("deriveActionFromConviction (결정론 컷)", () => {
 });
 
 describe("convictionEntryPositionPct (결정론 사이징)", () => {
-  it("컷 기준점 65→20%, 80→50%, 95→80%", () => {
-    expect(convictionEntryPositionPct(65)).toBe(20);
-    expect(convictionEntryPositionPct(80)).toBe(50);
-    expect(convictionEntryPositionPct(95)).toBe(80);
+  it("컷 기준점 58→20%, 80→64%, 95→80%(clamp)", () => {
+    expect(convictionEntryPositionPct(58)).toBe(20);
+    expect(convictionEntryPositionPct(80)).toBe(64); // 20+(80−58)×2
+    expect(convictionEntryPositionPct(95)).toBe(80); // 20+(95−58)×2=94 → 80 캡
   });
   it("상한 clamp — 100점도 80% 캡", () => {
     expect(convictionEntryPositionPct(100)).toBe(80);
@@ -283,12 +283,12 @@ describe("normalizeLlm — v2(convictionScore) / v1(레거시) 듀얼 스키마"
     ...over,
   });
 
-  it("v2 무포지션 80점 → BUY 파생(사이징 50%·진입구간 현재가 근방·HIGH·마커)", () => {
+  it("v2 무포지션 80점 → BUY 파생(사이징 64%·진입구간 현재가 근방·HIGH·마커)", () => {
     const r = normalizeLlm(v2(80), ctx());
     expect(r).toMatchObject({
       action: "BUY",
       confidence: "HIGH",
-      entryPositionPct: 50,
+      entryPositionPct: 64,
       sellRatioPct: null,
       convictionScore: 80,
       judgeSchema: "v2",

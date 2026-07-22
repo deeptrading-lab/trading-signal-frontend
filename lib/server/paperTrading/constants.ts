@@ -87,12 +87,15 @@ export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = 5;
 /**
  * judge 확신 점수(convictionScore 0~100) 결정론 컷 — LLM 은 점수만 내고, BUY/SELL 판정은
  * 코드가 한다(PRD intraday-decision-overhaul PR-3a: judge 942회 실질 100% HOLD 의 해체).
- * 초기값 65/40 은 PM 권고(§9 q1 — LLM 점수가 5단위로 군집해 60은 모달 BUY 가 됨).
- * env 라 PR-4 장중 실검증에서 무코드 튜닝.
+ * 초기값 65/40 은 PM 권고(§9 q1 — LLM 점수가 5단위로 군집).
+ * ★2026-07-22 재보정 65→58: I1~I3(일봉 컨텍스트·A+셋업 우선순위·수급 필터) 적용 후 judge 가
+ * 훨씬 보수적이 되어 conviction 분포가 통째로 하향(개선 2일 평균 44·최대 68) → 65 컷이 사실상
+ * 미달(실매매 ~0건). 58 = 개선 2일(7/21·22) claude conviction P82(상위 18% 통과) — 개선된 선별
+ * 판단이 실제 매매로 '실현' 데이터를 쌓게 여는 값(과선별 해소). 반사실 convSpear 는 양전이나 매매 0.
  */
 export const PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN = envInt(
   "INTRADAY_BUY_CONVICTION_MIN",
-  65,
+  58,
   50,
   90,
 );
