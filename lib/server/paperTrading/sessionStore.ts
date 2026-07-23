@@ -13,6 +13,8 @@ import { addTickWindow, floorToTickWindow, riskSweepTickWindow } from "@/lib/ser
 import { kstHhmm, type IntradayTickResult } from "@/lib/server/paperTrading/intradayTickDecision";
 import {
   loadPersistedPaperTrading,
+  loadPersistedPaperTradingSessionSummaries,
+  loadPersistedPaperTradingTicks,
   persistPaperSession,
   persistPaperTick,
 } from "@/lib/server/paperTrading/persistence";
@@ -58,10 +60,10 @@ type PaperTradingStore = {
 };
 
 /**
- * 타 운영자 세션 DB 재조회 TTL(ms) — 잦은 폴링·새로고침이 매번 전량 리로드하지 않게 한다.
- * 단타 판단은 5분 주기라 20초 신선도면 "최근 판단"이 멈춰 보이지 않으면서 DB 부하도 낮다.
+ * 타 운영자 세션 DB 재조회 TTL(ms) — 잦은 폴링·새로고침이 매번 요약을 다시 읽지 않게 한다.
+ * 단타 판단은 5분 주기라 60초 신선도면 "최근 판단"이 멈춰 보이지 않으면서 egress 도 낮다.
  */
-const FOREIGN_REFRESH_TTL_MS = 20_000;
+const FOREIGN_REFRESH_TTL_MS = 60_000;
 
 const STORE_KEY = "__paperTradingStore";
 
@@ -123,6 +125,7 @@ async function ensureHydrated(): Promise<void> {
  *   세션만 갱신한다.
  * ★ 내/레거시(미소유) 세션은 이 서버가 직접 틱하므로 메모리가 항상 최신 — 덮어쓰지 않는다(소유자
  *   게이트 `!owner || owner === operator` 와 대칭).
+ * - 목록 동기화는 세션/포지션 요약만 읽고 틱은 받지 않는다. 타 운영자 상세는 아래 증분 로드가 담당.
  * - 실패 시 `foreignRefreshedAt` 미갱신 → 다음 접근에서 재시도. single-flight 로 중복 로드 방지.
  */
 async function refreshForeignSessions(operator: string, now = Date.now()): Promise<void> {
@@ -130,7 +133,7 @@ async function refreshForeignSessions(operator: string, now = Date.now()): Promi
   if (store.foreignRefresh) return store.foreignRefresh;
   if (store.foreignRefreshedAt && now - store.foreignRefreshedAt < FOREIGN_REFRESH_TTL_MS) return;
   store.foreignRefresh = (async () => {
-    const loaded = await loadPersistedPaperTrading();
+    const loaded = await loadPersistedPaperTradingSessionSummaries();
     if (loaded.status !== "ok") return; // disabled/error → TTL 미갱신, 다음 접근 재시도.
     for (const entry of loaded.sessions) {
       const owner = entry.session.owner;
@@ -139,7 +142,8 @@ async function refreshForeignSessions(operator: string, now = Date.now()): Promi
       store.sessions.set(entry.session.id, {
         session: entry.session,
         positions: entry.positions,
-        ticks: entry.ticks,
+        // 목록 동기화는 틱을 읽지 않는다. 기존 틱은 보존하고 새 상세는 증분 로드에서 채운다.
+        ticks: existing?.ticks ?? [],
         tickChain: existing?.tickChain, // 방어적 보존(남의 세션엔 보통 없음).
       });
     }
@@ -150,6 +154,27 @@ async function refreshForeignSessions(operator: string, now = Date.now()): Promi
       store.foreignRefresh = undefined;
     });
   return store.foreignRefresh;
+}
+
+/** 타 운영자 상세의 새 틱만 읽어 메모리에 합친다(기존 틱 전량 재다운로드 방지). */
+async function refreshForeignSessionTicks(sessionId: string): Promise<void> {
+  const entry = getStore().sessions.get(sessionId);
+  if (!entry) return;
+  const afterTickIndex = entry.ticks.reduce(
+    (latest, tick) => Math.max(latest, tick.tickIndex),
+    -1,
+  );
+  const loaded = await loadPersistedPaperTradingTicks(
+    sessionId,
+    afterTickIndex >= 0 ? afterTickIndex : undefined,
+  );
+  if (loaded.status !== "ok" || loaded.ticks.length === 0) return;
+
+  const knownIds = new Set(entry.ticks.map((tick) => tick.id));
+  for (const tick of loaded.ticks) {
+    if (!knownIds.has(tick.id)) entry.ticks.push(tick);
+  }
+  entry.ticks.sort((a, b) => a.tickIndex - b.tickIndex);
 }
 
 export async function listPaperTradingSessions(): Promise<PaperTradingSession[]> {
@@ -171,7 +196,11 @@ export async function getPaperTradingSessionDetail(
   if (!existing || (existing.session.owner && existing.session.owner !== operator)) {
     await refreshForeignSessions(operator);
   }
-  const entry = getStore().sessions.get(sessionId);
+  let entry = getStore().sessions.get(sessionId);
+  if (entry?.session.owner && entry.session.owner !== operator) {
+    await refreshForeignSessionTicks(sessionId);
+    entry = getStore().sessions.get(sessionId);
+  }
   if (!entry) return null;
   return toDetail(entry);
 }
