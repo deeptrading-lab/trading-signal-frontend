@@ -9,6 +9,7 @@
 
 import type { AnalysisConfigOverride } from "@/lib/server/ai/analysisConfig";
 import { createLogger } from "@/lib/server/logTag";
+import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 
 const abLog = createLogger("ab-run-config");
 
@@ -51,10 +52,7 @@ export type AbConfigWriteResult =
   | { ok: false; skipped: false; error: string };
 
 function supabaseConfig(): { url: string; key: string } | null {
-  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
-  return { url: url.replace(/\/+$/, ""), key };
+  return getSupabaseServiceConfig();
 }
 
 function headers(key: string): HeadersInit {

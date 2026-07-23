@@ -27,6 +27,7 @@ import {
 } from "@/lib/api/kis/minuteChartChunked";
 import { minutesOfDay } from "@/lib/api/kis/minuteResample";
 import { createLogger } from "@/lib/server/logTag";
+import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 import {
   PAPER_TRADING_CLOSE_FLATTEN_HHMM,
   deriveIntradayTimeframe,
@@ -69,10 +70,7 @@ const EXPIRY_MINUTES = (() => {
 // ─── Supabase REST 공통(persistence.ts 관례) ─────────────────────────────────
 
 function supabaseConfig(): { url: string; key: string } | null {
-  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
-  return { url: url.replace(/\/+$/, ""), key };
+  return getSupabaseServiceConfig();
 }
 
 function headers(key: string, extra?: Record<string, string>): HeadersInit {
