@@ -10,7 +10,6 @@
  */
 
 import { createLogger } from "@/lib/server/logTag";
-import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 import type {
   AutopilotRun,
   AutopilotScreenerSnapshot,
@@ -31,7 +30,10 @@ export type LoadAutopilotResult =
   | { status: "ok"; runs: AutopilotRun[] };
 
 function supabaseConfig(): { url: string; key: string } | null {
-  return getSupabaseServiceConfig();
+  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key) return null;
+  return { url: url.replace(/\/+$/, ""), key };
 }
 
 function headers(key: string, extra?: Record<string, string>): HeadersInit {

@@ -28,14 +28,6 @@ for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
 }
 
-const { isSupabaseEgressDisabled } = await import("@/lib/server/supabase/egressGuard");
-if (isSupabaseEgressDisabled()) {
-  console.error(
-    "Supabase Egress 차단 모드라 일일 리포트의 원격 데이터 적재를 건너뜁니다.",
-  );
-  process.exit(0);
-}
-
 const { labelTick, kstMinuteStamp } = await import("@/lib/server/intraday/tickLabels");
 const { deriveIntradayTimeframe } = await import("@/lib/server/paperTrading/constants");
 const { fetchTodayMinuteCandles, fetchMinuteCandlesForDate } = await import("@/lib/api/kis/minuteChartChunked");

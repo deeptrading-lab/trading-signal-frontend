@@ -24,11 +24,6 @@ for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
 }
-const { isSupabaseEgressDisabled } = await import("@/lib/server/supabase/egressGuard");
-if (isSupabaseEgressDisabled()) {
-  console.error("Supabase Egress 차단 모드라 스크리너 평가의 원격 데이터 적재를 건너뜁니다.");
-  process.exit(0);
-}
 const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)!.replace(/\/+$/, "");
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const H = { apikey: key, Authorization: `Bearer ${key}` };

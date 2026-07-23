@@ -16,7 +16,6 @@ import type {
   ProfileRole,
   ProfileStatus,
 } from "@/lib/types/auth/profile";
-import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 
 const TABLE = "profiles";
 const SELECT_COLS = "sub,email,role,status,display_name,created_at,updated_at";
@@ -42,7 +41,10 @@ type ProfileRow = {
 type SupabaseConfig = { url: string; key: string };
 
 function supabaseConfig(): SupabaseConfig | null {
-  return getSupabaseServiceConfig();
+  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key) return null;
+  return { url: url.replace(/\/+$/, ""), key };
 }
 
 /** 미설정이면 throw — 인증은 fail-soft 대상이 아니다(못 읽으면 접근 거부). */

@@ -14,7 +14,6 @@ import type {
   FinalDecision,
   SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
-import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 
 type SupabaseDecisionRow = {
   ticker: string;
@@ -35,7 +34,10 @@ export type DecisionStoreWriteResult =
   | { ok: false; skipped: false; error: string };
 
 function supabaseConfig(): { url: string; key: string } | null {
-  return getSupabaseServiceConfig();
+  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key) return null;
+  return { url: url.replace(/\/+$/, ""), key };
 }
 
 function headers(key: string): HeadersInit {
