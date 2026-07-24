@@ -10,6 +10,8 @@ AI 단타(cli-agent) 판단의 `convictionScore`가 실제 방향 예측력을 �
 # repo 루트에서, 장 마감(15:40) 이후 저녁에
 npx tsx scripts/intraday/daily.mts               # 오늘(KST) 자동
 npx tsx scripts/intraday/daily.mts 2026-07-13    # 특정일(당일·최근 며칠만)
+# provider 비교가 필요할 때만 명시 필터(기본은 전체 provider 포함)
+INTRADAY_DAILY_PROVIDER=codex npx tsx scripts/intraday/daily.mts 2026-07-13
 ```
 
 ## 전제
@@ -18,6 +20,7 @@ npx tsx scripts/intraday/daily.mts 2026-07-13    # 특정일(당일·최근 며�
 2. **15:40(자동 종료) 이후** 실행 — 세션이 completed 이고 KIS 당일 분봉이 조회된다.
 3. **반드시 당일 저녁에** 실행 — KIS 과거 분봉은 최근 며칠만 제공한다. 일주일 뒤 몰아서 라벨링하면 UNRESOLVED 만 남는다.
 4. `.env.local` 에 `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` + KIS 키가 있어야 한다.
+5. provider는 기본 제외하지 않는다. provider별 비교는 `INTRADAY_DAILY_PROVIDER`로 명시한다.
 
 ## 출력 (`output/`, gitignore — 로컬 누적)
 

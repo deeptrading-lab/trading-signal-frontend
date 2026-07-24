@@ -9,6 +9,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
@@ -27,6 +28,8 @@ import {
 } from "@/components/intraday/IntradayWatchTable";
 import { IntradayAutopilotCard } from "@/components/intraday/IntradayAutopilotCard";
 import { IntradayCalibrationPanel } from "@/components/intraday/IntradayCalibrationPanel";
+import { IntradayResearchAutopilotCard } from "@/components/intraday/IntradayResearchAutopilotCard";
+import { BookOpenCheck, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { todayKstDate } from "@/lib/api/toss/kst";
 import {
@@ -325,31 +328,49 @@ export function IntradayWatchWorkspace() {
       {/* 문서 아웃라인용 접근성 제목(항상 sr-only) — 시각 타이틀은 전 페이지 공통으로 제거(홈 정합).
        *  장중 자동 판단 배지만 라이브 상태로 상단에 남긴다(active 일 때만). */}
       <h1 className="sr-only">{W.title}</h1>
-      {autoActive || hasForeignSessions ? (
-        <div className="flex items-center gap-md">
-          {autoActive ? <Badge variant="info">{P.autoTicking}</Badge> : null}
-          {/* 공유 Supabase 다중 서버일 때만 노출 — 다른 서버 소유 세션 숨김 토글. */}
-          {hasForeignSessions ? (
-            <button
-              type="button"
-              onClick={() => setMineOnly((v) => !v)}
-              aria-pressed={mineOnly}
-              title={P.owner.mineOnlyHint}
-              className={cn(
-                "ml-auto inline-flex items-center gap-xs rounded-pill border px-sm py-xs text-caption transition-colors cursor-pointer",
-                mineOnly
-                  ? "border-accent-vivid bg-accent-soft text-accent-vivid"
-                  : "border-border-line text-text-muted hover:bg-surface-muted",
-              )}
-            >
-              {P.owner.mineOnly}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* 오토파일럿 — 자동 포트폴리오 시작/중지·슬롯 현황(로컬 dev 전용, 컴포넌트가 자체 게이트). */}
+      <div className="flex justify-end">
+        <Link
+          href="/intraday/mistake-note"
+          className="button-secondary inline-flex items-center gap-xs"
+        >
+          <BookOpenCheck className="size-4" aria-hidden />
+          AI 단타 오답노트
+        </Link>
+      </div>
+      {/* 오늘 가이드 상품 — 시작·현재 행동·수행 원장이 첫 번째 시각 위계. */}
       <IntradayAutopilotCard />
+
+      <details className="group rounded-xl border border-border-line bg-surface-base">
+        <summary className="flex cursor-pointer list-none items-center gap-sm p-lg text-body-md font-bold text-text-strong marker:hidden">
+          <SlidersHorizontal className="size-5 text-text-muted" aria-hidden />
+          직접 분석 도구
+          <span className="hidden text-caption font-normal text-text-muted sm:inline">종목 검색·상세 모의투자</span>
+          <ChevronDown className="ml-auto size-5 text-text-muted transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="flex flex-col gap-lg border-t border-border-line p-lg">
+          <IntradayResearchAutopilotCard />
+          {autoActive || hasForeignSessions ? (
+            <div className="flex items-center gap-md">
+              {autoActive ? <Badge variant="info">{P.autoTicking}</Badge> : null}
+              {/* 공유 Supabase 다중 서버일 때만 노출 — 다른 서버 소유 세션 숨김 토글. */}
+              {hasForeignSessions ? (
+                <button
+                  type="button"
+                  onClick={() => setMineOnly((v) => !v)}
+                  aria-pressed={mineOnly}
+                  title={P.owner.mineOnlyHint}
+                  className={cn(
+                    "ml-auto inline-flex items-center gap-xs rounded-pill border px-sm py-xs text-caption transition-colors cursor-pointer",
+                    mineOnly
+                      ? "border-accent-vivid bg-accent-soft text-accent-vivid"
+                      : "border-border-line text-text-muted hover:bg-surface-muted",
+                  )}
+                >
+                  {P.owner.mineOnly}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
       {/* 종목 검색 — 추천 UI 와 분리해 최상단 단독 배치(피드백). */}
       <StockSearchPicker
@@ -434,6 +455,8 @@ export function IntradayWatchWorkspace() {
 
       {/* 판단 캘리브레이션(관리자) — 틱 자가채점 라벨 요약·백필 실행. 노출 규칙은 페이지와 동일. */}
       <IntradayCalibrationPanel />
+        </div>
+      </details>
     </div>
   );
 }

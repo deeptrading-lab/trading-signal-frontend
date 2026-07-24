@@ -324,7 +324,11 @@ describe("labelSessionTicks — 멱등 upsert + 페치 dedupe + 미설정 skip",
       bar("2026-07-08T10:10", 10_100, 9_800, 9_900), // t2(10:05) → LOSS
     ]);
     const ticks = [
-      makeTick({ id: "t1", windowKst: "2026-07-08T10:00" }),
+      makeTick({
+        id: "t1",
+        windowKst: "2026-07-08T10:00",
+        decision: { convictionScore: 67 },
+      }),
       makeTick({ id: "t2", tickIndex: 1, windowKst: "2026-07-08T10:05" }),
     ];
     const result = await labelSessionTicks(makeSession(), ticks);
@@ -349,8 +353,8 @@ describe("labelSessionTicks — 멱등 upsert + 페치 dedupe + 미설정 skip",
       source: "intraday-fallback",
       label: "WIN",
     });
-    // payload — 시그널 점수·레벨·conviction placeholder 가 진화 가능한 jsonb 로 실린다.
-    expect(body[0].payload).toMatchObject({ signalScore: 55, conviction: null, timeframe: 5 });
+    // payload — 라벨 단독 캘리브레이션이 가능하도록 원본 conviction도 함께 실린다.
+    expect(body[0].payload).toMatchObject({ signalScore: 55, conviction: 67, timeframe: 5 });
 
     // 재실행(멱등) — 같은 tick_id 로 다시 upsert 해도 merge-duplicates 라 안전.
     await labelSessionTicks(makeSession(), ticks);

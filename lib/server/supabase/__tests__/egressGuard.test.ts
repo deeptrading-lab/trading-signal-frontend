@@ -32,21 +32,24 @@ describe("Supabase egress guard", () => {
     });
   });
 
-  it("Vercel은 별도 값이 없어도 기본 차단하고, 명시적 0으로만 재활성화한다", () => {
+  it("Vercel도 별도 값이 없으면 활성이고, 명시적 1로만 차단한다", () => {
     const vercelEnv = {
       VERCEL: "1",
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
     };
 
-    expect(isSupabaseEgressDisabled(vercelEnv)).toBe(true);
-    expect(getSupabaseServiceConfig(vercelEnv)).toBeNull();
+    expect(isSupabaseEgressDisabled(vercelEnv)).toBe(false);
+    expect(getSupabaseServiceConfig(vercelEnv)).toEqual({
+      url: "https://example.supabase.co",
+      key: "service-role",
+    });
     expect(
       isSupabaseEgressDisabled({
         ...vercelEnv,
-        SUPABASE_EGRESS_DISABLED: "0",
+        SUPABASE_EGRESS_DISABLED: "1",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("URL 또는 service role key가 없으면 미설정으로 처리한다", () => {

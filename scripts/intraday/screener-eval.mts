@@ -18,6 +18,7 @@
  */
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { AutopilotScreenerSnapshot } from "@/lib/types/paperTrading/autopilot";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
@@ -32,9 +33,9 @@ if (isSupabaseEgressDisabled()) {
 const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)!.replace(/\/+$/, "");
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const H = { apikey: key, Authorization: `Bearer ${key}` };
-const q = async (p: string) => {
+const q = async <T>(p: string): Promise<T[]> => {
   const r = await fetch(`${url}/rest/v1/${p}`, { headers: H });
-  return r.ok ? ((await r.json()) as any[]) : [];
+  return r.ok ? ((await r.json()) as T[]) : [];
 };
 const kstD = (iso: string) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(iso));
@@ -58,14 +59,15 @@ function spearman(pairs: [number, number][]): number | null {
 const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
 const f2 = (x: number) => (Number.isFinite(x) ? x.toFixed(2) : "—");
 
-const snaps = (await q("paper_trading_autopilot_screener_snapshots?select=payload&order=created_at.asc&limit=1000"))
-  .map((r) => r.payload)
-  .filter((s: any) => s.status === "ok");
-const byDate: Record<string, any[]> = {};
+const snaps = (await q<{ payload: AutopilotScreenerSnapshot }>("paper_trading_autopilot_screener_snapshots?select=payload&order=created_at.asc&limit=1000"))
+  .map((row) => row.payload)
+  .filter((snapshot) => snapshot.status === "ok");
+const byDate: Record<string, AutopilotScreenerSnapshot[]> = {};
 for (const s of snaps) (byDate[kstD(s.at)] ??= []).push(s);
 
 const poolPairs: [number, number][] = [];
 const pool = { picked: [] as number[], passed: [] as number[], rejected: [] as number[] };
+type ForwardMove = { range: number; ret: number };
 
 console.log(`\n지평 ${HORIZON_MIN}분 · forwardRange = 향후 (고가−저가)/기준가 · scoreSpear = 점수 vs range 순위상관\n`);
 console.log("날짜        | 후보 | scoreSpear | retSpear | 뽑음 range% | 미선정상위 % | 탈락 % | 뽑음 ret%");
@@ -94,7 +96,7 @@ for (const [date, ds] of Object.entries(byDate).sort()) {
 
   const pairs: [number, number][] = [];
   const retPairs: [number, number][] = [];
-  const grp = { picked: [] as any[], passed: [] as any[], rejected: [] as number[] };
+  const grp = { picked: [] as ForwardMove[], passed: [] as ForwardMove[], rejected: [] as number[] };
   for (const s of ds) {
     const m = (new Date(s.at).getTime() - t0) / 60000;
     const ranking = s.ranking ?? [];

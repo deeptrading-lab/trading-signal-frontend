@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "namespace": "ai-daily:operator-b483e233",
+  "date": "2026-07-21",
+  "operator": "찬민",
+  "inputHash": "e6fcfeed83525749d9865cbbd6ac4e0688fbe514869a5d2d317b6137a702e54d",
+  "status": "READY",
+  "skipReasons": [],
+  "quality": {
+    "completedSessions": 8,
+    "totalSessions": 8,
+    "ticks": 185,
+    "labelCoverageRate": 1,
+    "unresolvedLabelRate": 0.1459,
+    "fallbackRate": 0.3892,
+    "owners": [
+      "찬민"
+    ]
+  },
+  "actual": {
+    "closedTrades": 7,
+    "wins": 1,
+    "losses": 6,
+    "winRate": 0.1429,
+    "netPnlKrw": -47524,
+    "costsKrw": 8652,
+    "portfolioReturnPct": -0.475,
+    "maxSessionDrawdownPct": -0.7,
+    "forcedExitTrades": 7,
+    "proactiveExitTrades": 0
+  },
+  "counterfactualBuy": {
+    "wins": 2,
+    "losses": 5,
+    "neutral": 0,
+    "unresolved": 0,
+    "winRate": 0.2857,
+    "avgGrossReturnPct": -0.332
+  },
+  "selection": {
+    "snapshots": 35,
+    "evaluable": false,
+    "note": "선정 당시 랭킹은 있음; 미선정 후보의 동일 horizon 미래성과가 없어 승격 근거로는 보류"
+  },
+  "candidates": [
+    {
+      "key": "entry-confirmation-before-cut",
+      "scope": "ENTRY",
+      "condition": "저항근접+돌파확인전/거래량부족+확신컷경계",
+      "action": "돌파안착·거래량동반 재확인, 그전 점수는 BUY컷 아래",
+      "avoid": "확인필요를 적고 즉시진입",
+      "keywords": [
+        "저항",
+        "거래량",
+        "돌파확인",
+        "컷경계"
+      ],
+      "supports": true,
+      "independentSamples": 3,
+      "closedTrades": 7,
+      "netPnlKrw": -47524,
+      "wins": 1,
+      "losses": 6,
+      "note": "주의문구 진입 6/7건"
+    },
+    {
+      "key": "same-ticker-stop-reentry",
+      "scope": "REENTRY",
+      "condition": "동일종목 손절후 재진입",
+      "action": "새 구조이벤트+거래량 확인 전 재진입 보류",
+      "avoid": "컷만 재충족한 반복진입",
+      "keywords": [
+        "재진입",
+        "손절후",
+        "구조변화",
+        "종목집중"
+      ],
+      "supports": true,
+      "independentSamples": 2,
+      "closedTrades": 7,
+      "netPnlKrw": -47524,
+      "wins": 1,
+      "losses": 6,
+      "note": "005930:4회,483650:2회"
+    },
+    {
+      "key": "proactive-exit-before-stop",
+      "scope": "EXIT",
+      "condition": "보유중 저항/흐름둔화인데 SELL판단없음",
+      "action": "목표여력축소·논거훼손 시 선제청산 점수 재평가",
+      "avoid": "모든 청산을 스톱에 의존",
+      "keywords": [
+        "선제청산",
+        "스톱의존",
+        "논거훼손",
+        "목표여력"
+      ],
+      "supports": true,
+      "independentSamples": 3,
+      "closedTrades": 7,
+      "netPnlKrw": -47524,
+      "wins": 1,
+      "losses": 6,
+      "note": "선제청산 0/7건"
+    },
+    {
+      "key": "conviction-buy-calibration",
+      "scope": "CALIBRATION",
+      "condition": "conviction≥BUY컷",
+      "action": "고확신=강화 금지, 실제체결·OOS로 방향성 재검증",
+      "avoid": "반복틱 승률을 독립표본으로 해석",
+      "keywords": [
+        "conviction",
+        "OOS",
+        "독립표본",
+        "반사실"
+      ],
+      "supports": true,
+      "independentSamples": 3,
+      "closedTrades": 7,
+      "netPnlKrw": -47524,
+      "wins": 2,
+      "losses": 5,
+      "note": "반사실은 원인탐색 전용·실제손익과 분리"
+    }
+  ],
+  "generatedAt": "2026-07-22T10:33:59.515Z"
+}

@@ -17,6 +17,32 @@ import type {
  * `completed`(마감·크로스데이 자동 확정).
  */
 export type AutopilotRunStatus = "active" | "stopped" | "completed";
+/** guide=사용자 상품 경험, research=판단·가상체결 데이터 수집. 레거시 런은 research로 해석한다. */
+export type AutopilotRunPurpose = "guide" | "research";
+
+/** 사용자가 AI 가이드 한 건에 남긴 최종 응답. 추천 원본(tick.orders)은 수정하지 않는다. */
+export type AutopilotGuideResponseKind = "performed" | "passed";
+
+/**
+ * 가이드 응답 원장 — 서버가 source tick/order를 다시 조회해 스냅샷을 채운다.
+ * 클라이언트가 보낸 가격·수량을 신뢰하지 않아 가상 주문과 사용자 수행 기록이 뒤섞이지 않는다.
+ */
+export type AutopilotGuideResponse = {
+  guideId: string;
+  sessionId: string;
+  tickId: string;
+  orderIndex: number;
+  ticker: string;
+  name: string;
+  side: "BUY" | "SELL";
+  recommendedPrice: number;
+  recommendedQuantity: number;
+  recommendedAt: string;
+  /** 수행 시 가이드 원장에 반영한 수량. 패스는 0, 매도는 당시 가이드 보유 수량이 상한이다. */
+  executedQuantity: number;
+  response: AutopilotGuideResponseKind;
+  respondedAt: string;
+};
 
 /** 포트폴리오 슬롯 — 자식 세션 1개 자리. sessionId=null 이면 빈 슬롯(다음 스윕에서 fill 후보). */
 export type AutopilotSlot = {
@@ -140,6 +166,8 @@ export type AutopilotScreenerSnapshot = {
 export type AutopilotRun = {
   id: string;
   status: AutopilotRunStatus;
+  /** 실행 진입점의 목적. 미기록 레거시 런은 research다. */
+  purpose?: AutopilotRunPurpose;
   /**
    * 이 런을 만든 서버 운영자 — 공유 Supabase 다중 서버 격리 키. 세션 게이트(own-or-unowned)와
    * 달리 런은 신규 개념이라 레거시 미지정 호환이 없다: **엄격히 owner === operator 만** 스윕/마감.
@@ -161,6 +189,11 @@ export type AutopilotRun = {
   /** 마지막 스윕의 창 시작(ISO) — 재시작 후에도 같은 창 이중 스윕 방지(영속 dedup 키). */
   lastSweepWindowStart: string | null;
   lastScreenerSummary?: AutopilotScreenerSummary;
+  /**
+   * `${sessionId}:${tickId}:${orderIndex}` → 사용자 응답. 레거시 런은 미기록일 수 있어 optional.
+   * 같은 guideId는 단 한 번만 확정하며 기존 AI 가상 체결 원본과 별도로 영속한다.
+   */
+  guideResponses?: Record<string, AutopilotGuideResponse>;
   startedAt: string;
   endedAt: string | null;
   createdAt: string;
@@ -169,6 +202,7 @@ export type AutopilotRun = {
 
 /** 런 시작 요청 — 전부 optional(서버 기본값 채움). */
 export type StartAutopilotRunRequest = {
+  purpose?: AutopilotRunPurpose;
   totalCapital?: number;
   slotCount?: number;
   riskMode?: PaperTradingRiskMode;
@@ -187,7 +221,15 @@ export type AutopilotRunResponse = {
 
 /** PATCH /api/paper-trading/autopilot/[runId] 요청 — 중지만 허용. */
 export type PatchAutopilotRunRequest = {
-  status: Extract<AutopilotRunStatus, "stopped">;
+  /** 런 중지 명령. guideResponse와 동시에 보낼 수 없다. */
+  status?: Extract<AutopilotRunStatus, "stopped">;
+  /** research 수동 중지 시 해당 런의 진행 중 자식 모의세션도 청산·완료한다. */
+  completeChildSessions?: boolean;
+  /** 가이드 응답 명령. 서버는 guideId의 원본 주문을 재조회한다. */
+  guideResponse?: {
+    guideId: string;
+    response: AutopilotGuideResponseKind;
+  };
 };
 
 /** 런 손익 집계에 쓰는 자식 세션 뷰(클라 계산용 헬퍼 타입). */

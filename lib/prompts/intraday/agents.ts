@@ -100,8 +100,13 @@ export const FLOW_ANALYST_SYSTEM = `당신은 한국 주식 단타(데이트레�
 - 한국어 개조식(명사 종결)으로 간결하게. 서술에는 "RRR" 대신 "손익비"라고 쓰세요.
 - JSON 이 아니라 짧은 진단문으로 답하세요.`;
 
-export function buildFlowAnalystUser(ctx: IntradayContext): string {
-  return `${formatIntradayContext(ctx)}\n\n위 정량 데이터로 지금 셋업을 진단하세요(3~5문장).`;
+export function buildFlowAnalystUser(ctx: IntradayContext, mistakeNotes = ""): string {
+  return [
+    formatIntradayContext(ctx),
+    ...(mistakeNotes ? ["", mistakeNotes] : []),
+    "",
+    "위 정량 데이터로 지금 셋업을 진단하세요(3~5문장).",
+  ].join("\n");
 }
 
 // ─── ② 진입·청산 판단가 ───────────────────────────────────────────────────────
@@ -181,13 +186,18 @@ export const JUDGE_SYSTEM = `당신은 한국 주식 단타 판단 보조자입�
   "riskNotes": ["<0~2개>"]
 }`;
 
-export function buildJudgeUser(ctx: IntradayContext, analystNote: string): string {
+export function buildJudgeUser(
+  ctx: IntradayContext,
+  analystNote: string,
+  mistakeNotes = "",
+): string {
   const note = analystNote.trim() ? analystNote.trim() : "(분석가 진단 없음 — 정량 데이터로 직접 판단)";
   return [
     formatIntradayContext(ctx),
     "",
     "[흐름·세력 분석가 진단]",
     note,
+    ...(mistakeNotes ? ["", mistakeNotes] : []),
     "",
     "위 데이터로 지금 이 종목의 단기 방향 확신 점수(convictionScore)를 JSON 으로 출력하세요.",
   ].join("\n");

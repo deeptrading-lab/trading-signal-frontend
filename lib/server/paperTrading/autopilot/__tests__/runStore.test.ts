@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   closeOutAutopilotRuns,
   resetAutopilotStoreForTest,
+  respondToAutopilotGuide,
   seedAutopilotRunForTest,
   startAutopilotRun,
   stopAutopilotRun,
@@ -115,6 +116,55 @@ function toDetail(session: PaperTradingSession): PaperTradingSessionDetail {
   return { session, positions: [], ticks: [], equityCurve: [], latestDecision: null };
 }
 
+function guideDetail(runId: string, side: "BUY" | "SELL"): PaperTradingSessionDetail {
+  const session = makeSession({ id: "guide-session", autopilotRunId: runId });
+  return {
+    ...toDetail(session),
+    ticks: [
+      {
+        id: `tick-${side.toLowerCase()}`,
+        sessionId: session.id,
+        tickIndex: 1,
+        status: "executed",
+        triggeredBy: "auto",
+        tickWindowStart: "2026-07-13T01:00:00.000Z",
+        pricedAt: "2026-07-13T01:00:00.000Z",
+        priceFreshnessSeconds: 0,
+        portfolioValueBefore: 3_333_333,
+        portfolioValueAfter: 3_333_333,
+        cashBefore: 3_333_333,
+        cashAfter: 3_333_333,
+        returnPctAfter: 0,
+        decision: {
+          action: side,
+          targetAllocationPct: side === "BUY" ? 50 : 0,
+          targetAllocations: [],
+          confidence: "HIGH",
+          rationale: "테스트 판단",
+          riskNotes: [],
+          source: "cli-agent",
+        },
+        priceSnapshot: [],
+        orders: [
+          {
+            ticker: "100001",
+            name: "종목",
+            side,
+            quantity: 10,
+            price: 10_000,
+            notional: 100_000,
+            reason: "테스트 주문",
+          },
+        ],
+        rationale: "테스트 판단",
+        guardAdjustments: [],
+        errorMessage: null,
+        createdAt: "2026-07-13T01:00:00.000Z",
+      },
+    ],
+  };
+}
+
 /** 기본 fake deps — createSession 은 요청을 그대로 세션으로 반영(멱등가드 미개입 경로). */
 function makeDeps(over: Partial<AutopilotSweepDeps> = {}) {
   const created: CreatePaperTradingSessionRequest[] = [];
@@ -159,6 +209,15 @@ describe("startAutopilotRun / stopAutopilotRun", () => {
     expect(first.slots).toHaveLength(3);
   });
 
+  it("상품 가이드와 오답노트용 모의투자의 실행 목적을 구분해 저장한다", async () => {
+    const research = await startAutopilotRun({ purpose: "research" });
+    expect(research.purpose).toBe("research");
+
+    resetAutopilotStoreForTest();
+    const guide = await startAutopilotRun({ purpose: "guide" });
+    expect(guide.purpose).toBe("guide");
+  });
+
   it("중지 — active→stopped, 남의 런은 null", async () => {
     const run = await startAutopilotRun({});
     const stopped = await stopAutopilotRun(run.id);
@@ -168,6 +227,66 @@ describe("startAutopilotRun / stopAutopilotRun", () => {
     const foreign = makeRun({ owner: "friend-op" });
     seedAutopilotRunForTest(foreign);
     expect(await stopAutopilotRun(foreign.id)).toBeNull();
+  });
+
+  it("research 수동 중지는 자식 세션 완료 함수를 함께 호출한다", async () => {
+    const run = await startAutopilotRun({ purpose: "research" });
+    const completedRunIds: string[] = [];
+
+    const stopped = await stopAutopilotRun(run.id, {
+      completeChildSessions: true,
+      completeSessions: async (runId) => {
+        completedRunIds.push(runId);
+        return { runId, completedSessionIds: ["child-1"], alreadyCompletedSessionIds: [] };
+      },
+    });
+
+    expect(stopped?.status).toBe("stopped");
+    expect(completedRunIds).toEqual([run.id]);
+  });
+});
+
+describe("respondToAutopilotGuide", () => {
+  it("원본 주문에서 수행 스냅샷을 만들고 동일 응답 재시도는 멱등 처리한다", async () => {
+    const run = makeRun();
+    seedAutopilotRunForTest(run);
+    const detail = guideDetail(run.id, "BUY");
+    const guideId = `${detail.session.id}:${detail.ticks[0].id}:0`;
+    const getDetail = async () => detail;
+
+    const first = await respondToAutopilotGuide(run.id, guideId, "performed", getDetail);
+    const second = await respondToAutopilotGuide(run.id, guideId, "performed", getDetail);
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(Object.keys(run.guideResponses ?? {})).toEqual([guideId]);
+    expect(run.guideResponses?.[guideId]).toMatchObject({
+      ticker: "100001",
+      side: "BUY",
+      recommendedPrice: 10_000,
+      recommendedQuantity: 10,
+      executedQuantity: 10,
+      response: "performed",
+    });
+  });
+
+  it("확정 응답 변경은 conflict, 수행 매수가 없는 SELL은 no_position", async () => {
+    const run = makeRun();
+    seedAutopilotRunForTest(run);
+    const buy = guideDetail(run.id, "BUY");
+    const buyId = `${buy.session.id}:${buy.ticks[0].id}:0`;
+    await respondToAutopilotGuide(run.id, buyId, "passed", async () => buy);
+    expect(await respondToAutopilotGuide(run.id, buyId, "performed", async () => buy)).toEqual({
+      ok: false,
+      reason: "conflict",
+    });
+
+    const sell = guideDetail(run.id, "SELL");
+    const sellId = `${sell.session.id}:${sell.ticks[0].id}:0`;
+    expect(await respondToAutopilotGuide(run.id, sellId, "performed", async () => sell)).toEqual({
+      ok: false,
+      reason: "no_position",
+    });
   });
 });
 

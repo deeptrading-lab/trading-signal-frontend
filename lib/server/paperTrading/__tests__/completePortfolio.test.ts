@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  completePaperTradingAutopilotRun,
   completePaperTradingPortfolio,
   getPaperTradingSessionDetail,
   resetPaperTradingStoreForTest,
@@ -84,6 +85,41 @@ describe("completePaperTradingPortfolio", () => {
       quantity: 50,
     });
     expect(detail?.ticks.at(-1)?.orders[0]?.realizedPnl).toBeTypeOf("number");
+  });
+
+  it("오토파일럿 런 자식 세션도 최신 가격으로 청산·완료한다", async () => {
+    const session = {
+      ...portfolioSession("000660"),
+      portfolioId: undefined,
+      autopilotRunId: "research-run-1",
+    } satisfies PaperTradingSession;
+    seedPaperTradingSessionForTest(session, {
+      positions: [
+        {
+          ticker: "000660",
+          name: "SK하이닉스",
+          quantity: 20,
+          avgEntryPrice: 10_000,
+          lastPrice: 10_500,
+          marketValue: 210_000,
+          unrealizedPnl: 10_000,
+          unrealizedPnlPct: 5,
+          allocationPct: 20,
+          updatedAt: session.updatedAt,
+        },
+      ],
+    });
+
+    const result = await completePaperTradingAutopilotRun("research-run-1", {
+      priceSnapshotProvider: priceProvider,
+      now: new Date("2026-07-13T01:05:00.000Z"),
+    });
+    const detail = await getPaperTradingSessionDetail("000660");
+
+    expect(result.completedSessionIds).toEqual(["000660"]);
+    expect(detail?.session.status).toBe("completed");
+    expect(detail?.positions).toHaveLength(0);
+    expect(detail?.ticks.at(-1)?.orders[0]).toMatchObject({ side: "SELL", quantity: 20 });
   });
 
   it("이미 완료된 세션은 체결을 중복 생성하지 않는다", async () => {

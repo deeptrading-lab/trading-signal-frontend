@@ -288,7 +288,8 @@ function toLabelRow(
     slSource: snapshot?.levels.slSource ?? null,
     structureEvent: snapshot?.structureEvent ?? null,
     timeframe,
-    conviction: null, // PR-3a 에서 judge 점수화가 채운다(placeholder).
+    // 원본 틱에도 있지만 라벨 단독 집계가 매번 대용량 tick join을 요구하지 않게 함께 보존한다.
+    conviction: tick.decision.convictionScore ?? null,
     reason: comp.reason,
   };
   return {

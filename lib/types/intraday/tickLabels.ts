@@ -19,7 +19,7 @@ export type IntradayTickLabelSource = "intraday-cli" | "intraday-fallback";
 
 /**
  * 라벨 payload(jsonb) — 판단 시점 정량 요약. 스키마 진화 여지(conviction 은 PR-3a 에서 채워질
- * placeholder)라 컬럼 대신 jsonb 로 싣는다(무마이그레이션).
+ * 값)라 컬럼 대신 jsonb 로 싣는다(무마이그레이션).
  */
 export interface IntradayTickLabelPayload {
   /** 분봉 결정론 시그널 요약(intradaySnapshot.signal). */
@@ -40,7 +40,7 @@ export interface IntradayTickLabelPayload {
   structureEvent: string | null;
   /** 채점에 쓴 분봉 단위(분). */
   timeframe: number;
-  /** 방향확신 점수(PR-3a) placeholder — 현재 판단엔 없어 null. */
+  /** 방향확신 점수(PR-3a). 레거시·결정론 폴백 틱은 null. */
   conviction: number | null;
   /** UNRESOLVED 사유(진단) — 확정 라벨은 null. */
   reason: string | null;

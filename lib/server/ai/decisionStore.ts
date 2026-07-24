@@ -14,6 +14,10 @@ import type {
   FinalDecision,
   SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
+import type {
+  AIDecisionListItem,
+  AIDecisionTokens,
+} from "@/lib/types/stock/aiAnalysisDecisions";
 import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 
 type SupabaseDecisionRow = {
@@ -28,6 +32,31 @@ type SupabaseDecisionRow = {
 
 /** 조회 select 컬럼 — name 포함(legacy 행은 null). */
 const SELECT_COLS = "ticker,name,provider,decision,sentiment,signal,updated_at";
+const CARD_LIST_RPC = "get_ai_decision_card_summaries";
+const CARD_LIST_LIMIT = 20;
+const CARD_SELECT_COLS =
+  "ticker,name,provider,updated_at," +
+  "verdict:decision->>verdict,time_horizon:decision->>time_horizon," +
+  "limited_data:decision->limitedData,bars:decision->bars,signal_score:signal->score";
+
+type SupabaseDecisionCardRow = {
+  ticker: string;
+  name: string | null;
+  provider: AIAnalysisProvider;
+  updated_at: string;
+  verdict: AIDecisionListItem["decision"]["verdict"];
+  time_horizon: AIDecisionListItem["decision"]["time_horizon"];
+  limited_data: boolean | null;
+  bars: number | null;
+  signal_score: number | string | null;
+  run_id?: string | null;
+  total_input_tokens?: number | string | null;
+  total_output_tokens?: number | string | null;
+  total_cost_usd?: number | string | null;
+  measured?: boolean | null;
+};
+
+export type AIDecisionCardSummary = Omit<AIDecisionListItem, "reanalysis">;
 
 export type DecisionStoreWriteResult =
   | { ok: true; skipped: false }
@@ -55,6 +84,39 @@ function toSnapshot(row: SupabaseDecisionRow): AIAnalysisDecisionSnapshot {
     sentiment: row.sentiment ?? null,
     signal: row.signal ?? null,
     updatedAt: row.updated_at,
+  };
+}
+
+function nullableNumber(value: number | string | null | undefined): number | null {
+  if (value == null) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toCardSummary(row: SupabaseDecisionCardRow): AIDecisionCardSummary {
+  const tokens: AIDecisionTokens | null = row.run_id
+    ? {
+        runId: row.run_id,
+        totalInputTokens: nullableNumber(row.total_input_tokens),
+        totalOutputTokens: nullableNumber(row.total_output_tokens),
+        totalCostUsd: nullableNumber(row.total_cost_usd),
+        measured: row.measured ?? false,
+      }
+    : null;
+  const signalScore = nullableNumber(row.signal_score);
+  return {
+    ticker: row.ticker,
+    name: row.name ?? null,
+    provider: row.provider,
+    decision: {
+      verdict: row.verdict,
+      time_horizon: row.time_horizon,
+      limitedData: row.limited_data ?? false,
+      bars: row.bars ?? 0,
+    },
+    signal: signalScore == null ? null : { score: signalScore },
+    updatedAt: row.updated_at,
+    tokens,
   };
 }
 
@@ -136,6 +198,57 @@ export async function getAllAIDecisions(
 
   const rows = (await res.json().catch(() => [])) as SupabaseDecisionRow[];
   return Array.isArray(rows) ? rows.map(toSnapshot) : [];
+}
+
+/**
+ * 분석 결과 목록 카드 전용 경량 조회.
+ *
+ * 1순위: DB 함수가 최신 run 토큰을 DB 안에서 집계해 최신 20건 요약만 반환한다.
+ * 2순위: 함수 미적용/일시 오류 시에도 decision JSON 전체나 usage 1,000행으로 되돌아가지 않고,
+ *        PostgREST JSON 필드 projection으로 같은 20건을 토큰 없이 반환한다.
+ */
+export async function getAIDecisionCardSummaries(
+  limit = CARD_LIST_LIMIT,
+): Promise<AIDecisionCardSummary[]> {
+  const config = supabaseConfig();
+  if (!config) return [];
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), CARD_LIST_LIMIT));
+
+  const rpcUrl = new URL(`${config.url}/rest/v1/rpc/${CARD_LIST_RPC}`);
+  rpcUrl.searchParams.set("p_limit", String(safeLimit));
+  const rpcRes = await fetch(rpcUrl, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch(() => null);
+
+  if (rpcRes?.ok) {
+    const rows = (await rpcRes.json().catch(() => [])) as SupabaseDecisionCardRow[];
+    return Array.isArray(rows) ? rows.map(toCardSummary) : [];
+  }
+  if (rpcRes) {
+    console.warn(
+      `[ai-decision-store] 카드 요약 RPC 실패 status=${rpcRes.status} — 저용량 projection 폴백`,
+    );
+  }
+
+  const fallbackUrl = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
+  fallbackUrl.searchParams.set("select", CARD_SELECT_COLS);
+  fallbackUrl.searchParams.set("order", "updated_at.desc");
+  fallbackUrl.searchParams.set("limit", String(safeLimit));
+  const fallbackRes = await fetch(fallbackUrl, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch(() => null);
+  if (!fallbackRes?.ok) {
+    if (fallbackRes) {
+      console.warn(`[ai-decision-store] 카드 projection 실패 status=${fallbackRes.status}`);
+    }
+    return [];
+  }
+  const rows = (await fallbackRes.json().catch(() => [])) as SupabaseDecisionCardRow[];
+  return Array.isArray(rows) ? rows.map(toCardSummary) : [];
 }
 
 /**
