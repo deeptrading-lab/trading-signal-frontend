@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
 
 const DEFAULT_CAPITAL = 10_000_000;
+const GUIDE_ACTION_BUTTON_CLASS =
+  "inline-flex h-button-primary-h w-full shrink-0 items-center justify-center gap-xs whitespace-nowrap sm:w-auto";
 
 function kstTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("ko-KR", {
@@ -372,21 +374,41 @@ function GuideActionCard({
             <p className="font-bold text-text-strong">{C.confirmTitle(item.side)}</p>
             <p className="mt-xs text-caption text-text-muted">{C.confirmBody}</p>
             <div className="mt-md flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
-              <Button variant="secondary" onClick={onCancelConfirm} disabled={isResponding}>{C.cancel}</Button>
-              <Button loading={isResponding} onClick={() => onRespond("performed")}>
-                <Check className="size-4" aria-hidden />
+              <Button
+                variant="secondary"
+                onClick={onCancelConfirm}
+                disabled={isResponding}
+                className={GUIDE_ACTION_BUTTON_CLASS}
+              >
+                {C.cancel}
+              </Button>
+              <Button
+                loading={isResponding}
+                onClick={() => onRespond("performed")}
+                className={GUIDE_ACTION_BUTTON_CLASS}
+              >
+                <Check className="size-4 shrink-0" aria-hidden />
                 {isResponding ? C.responding : C.confirm}
               </Button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => onRespond("passed")} disabled={isResponding}>
+            <Button
+              variant="secondary"
+              onClick={() => onRespond("passed")}
+              disabled={isResponding}
+              className={GUIDE_ACTION_BUTTON_CLASS}
+            >
               {C.pass}
             </Button>
-            <Button onClick={onConfirm} disabled={isResponding}>
+            <Button
+              onClick={onConfirm}
+              disabled={isResponding}
+              className={GUIDE_ACTION_BUTTON_CLASS}
+            >
               {item.side === "BUY" ? C.buyAction : C.sellAction}
-              <ChevronRight className="size-4" aria-hidden />
+              <ChevronRight className="size-4 shrink-0" aria-hidden />
             </Button>
           </div>
         )}
