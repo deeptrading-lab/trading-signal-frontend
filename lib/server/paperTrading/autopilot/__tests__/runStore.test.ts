@@ -291,8 +291,11 @@ describe("respondToAutopilotGuide", () => {
 });
 
 describe("sweepAutopilotRuns", () => {
-  it("장외(프리마켓)면 -1, active 런 없으면 0", async () => {
+  it("프리마켓·정규장 종료 뒤면 -1, 정규장에 active 런이 없으면 0", async () => {
     expect(await sweepAutopilotRuns(PREMARKET, makeDeps().deps)).toBe(-1);
+    expect(
+      await sweepAutopilotRuns(new Date("2026-07-13T06:35:00Z"), makeDeps().deps),
+    ).toBe(-1);
     expect(await sweepAutopilotRuns(MARKET_OPEN, makeDeps().deps)).toBe(0);
   });
 

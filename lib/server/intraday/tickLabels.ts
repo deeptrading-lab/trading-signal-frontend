@@ -49,6 +49,7 @@ import type {
   IntradayScoreBandBucket,
   IntradayTickLabelValue,
 } from "@/lib/types/intraday/tickLabels";
+import { isKstAfterMarketClose } from "@/lib/utils/kstMarketHours";
 
 const log = createLogger("tick-labels");
 
@@ -393,14 +394,17 @@ export async function labelSessionTicks(
 
 /**
  * 세션 완료 전이 훅 — fire-and-forget · 프로세스당 세션 1회(중복 전이 가드). 관측 전용이라
- * 어떤 실패도 삼킨다. 멱등 upsert 라 재시작 후 run 라우트로 다시 돌려도 안전하다.
+ * 어떤 실패도 삼킨다. 15:40 마감 자동 완료에서는 KIS/Supabase 후속 호출을 만들지 않고,
+ * 필요할 때 관리자가 `/api/intraday/labels/run`을 수동 실행한다.
  */
 const completedOnce = new Set<string>();
 export function scheduleSessionTickLabeling(
   session: PaperTradingSession,
   ticks: PaperTradingTick[],
+  now: Date = new Date(),
 ): void {
   if (session.decisionProvider !== "cli-agent") return;
+  if (isKstAfterMarketClose(now)) return;
   if (completedOnce.has(session.id)) return;
   completedOnce.add(session.id);
   void labelSessionTicks(session, [...ticks]).catch(() => undefined);

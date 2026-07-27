@@ -13,6 +13,7 @@ import type {
   AutopilotRunResponse,
   StartAutopilotRunRequest,
 } from "@/lib/types/paperTrading/autopilot";
+import { isKstAfterMarketClose } from "@/lib/utils/kstMarketHours";
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
@@ -37,6 +38,13 @@ export async function GET(request: NextRequest): Promise<Response> {
 export async function POST(request: NextRequest): Promise<Response> {
   const denied = await requireProdAdminApi(request);
   if (denied) return denied;
+
+  if (isKstAfterMarketClose()) {
+    return NextResponse.json(
+      { error: "15시 40분 이후에는 오토파일럿을 시작하지 않아요." },
+      { status: 409, headers: NO_STORE },
+    );
+  }
 
   try {
     const body = (await request.json().catch(() => ({}))) as Partial<StartAutopilotRunRequest>;

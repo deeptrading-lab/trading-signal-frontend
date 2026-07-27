@@ -3,7 +3,7 @@
  * (sessionStore 패턴 미러). intraday-autopilot.
  *
  * 런의 수명: startAutopilotRun(멱등) → [스케줄러 사이클마다 sweepAutopilotRuns — 10분 창 dedup]
- * → stopAutopilotRun(수동) 또는 closeOutAutopilotRuns(15:41+/크로스데이 자동 완료).
+ * → stopAutopilotRun(수동) 또는 closeOutAutopilotRuns(15:40+/크로스데이 자동 완료).
  *
  * 스윕 1회 = 슬롯 reconcile → 스크리너 → planRotation(순수) → 교체 실행(완료 patch — 자가채점
  * 훅 자동 발동) → fill 실행(자식 세션 생성, 직렬). 자식 세션은 일반 cli-agent 세션이라
@@ -46,7 +46,7 @@ import {
   patchPaperTradingSessionStatus,
 } from "@/lib/server/paperTrading/sessionStore";
 import { floorToTickWindow } from "@/lib/server/paperTrading/time";
-import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { isKstAfterMarketClose, isKstMarketHours } from "@/lib/utils/kstMarketHours";
 import type {
   AutopilotGuideResponseKind,
   AutopilotRun,
@@ -345,7 +345,7 @@ export async function sweepAutopilotRuns(
   now: Date = new Date(),
   deps: AutopilotSweepDeps = {},
 ): Promise<number> {
-  if (sweepRunning || !isKstMarketHoursWithCloseGrace(now)) return -1;
+  if (sweepRunning || !isKstMarketHours(now)) return -1;
   sweepRunning = true;
   try {
     await ensureHydrated();
@@ -604,7 +604,7 @@ let closeOutRunning = false;
 
 /**
  * 런 자동 완료 — (a) 시작일(KST)이 오늘보다 이전인 active 런은 시간대 무관 완료(다운타임 복구,
- * closeOutStaleCrossdaySessions 미러) (b) 15:41+ 이면 오늘 active 런 완료. 자식 세션은 기존
+ * closeOutStaleCrossdaySessions 미러) (b) 15:40+ 이면 오늘 active 런 완료. 자식 세션은 기존
  * 마감 스윕(④)이 별도로 완료 처리한다. 반환: 완료한 런 수(-1 = 중첩 미실행).
  */
 export async function closeOutAutopilotRuns(now: Date = new Date()): Promise<number> {

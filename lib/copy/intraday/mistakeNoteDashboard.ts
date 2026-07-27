@@ -2,7 +2,7 @@ export const MISTAKE_NOTE_DASHBOARD_COPY = {
   title: "AI 단타 오답노트",
   subtitle: "실제 체결과 반사실 진단을 분리해, 다음 장에 쓸 짧은 규칙만 남겨요.",
   localOnly: "로컬 전용",
-  autoRefresh: "30초마다 자동 갱신",
+  autoRefresh: "장중 30초 자동 갱신",
   refresh: "지금 갱신",
   refreshing: "갱신 중",
   back: "단타 워크스페이스",

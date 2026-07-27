@@ -28,9 +28,9 @@ npm run intraday:notes:render
 
 `review`는 `date + inputHash`가 같으면 `UNCHANGED`로 끝난다. 휴장·데이터 없음·미완료 세션·owner 오염·라벨 품질 실패 시 `SKIPPED` 기록만 만들고 `CM.md`는 바꾸지 않는다. 파일은 임시 파일을 거친 원자적 rename으로 갱신한다.
 
-## 매일 16:30 KST 운영
+## 장 마감 후 수동 운영
 
-1. 15:41 세션·오토파일럿 완료 확인
+1. 15:40 세션·오토파일럿 완료 확인
 2. owner/완료/라벨 커버리지/UNRESOLVED/CLI 폴백 품질 게이트
 3. 실제 비용 후 round-trip과 run 손익 산출
 4. BUY 반사실 라벨은 별도 진단
@@ -39,7 +39,9 @@ npm run intraday:notes:render
 7. 후보 생성 → `SHADOW` → `ACTIVE` 또는 퇴역
 8. 일일 리뷰·정형 source·CM·HTML 재생성 및 검증
 
-평일 16:30 KST에 아래 명령을 로컬 `launchd`/cron에서 실행한다. 이 저장소는 Vercel에서 로컬 파일을 영속할 수 없고, 기존 16:10 KST cron과 KIS 호출 경합도 피해야 하므로 서버리스 cron에는 배선하지 않는다.
+오답노트는 상주 프로세스가 아니라 명령 1회로 끝나는 로컬 배치다. 장 마감 뒤 자동 분석·호출이
+계속되지 않도록 저장소에서는 `launchd`/cron을 설치하지 않으며, 필요한 날 16:30 KST 이후 운영자가
+아래 명령을 수동 실행한다. Vercel 서버리스 cron에는 배선하지 않는다.
 
 ```bash
 cd /Users/a454155/Documents/Projects/trading-signal/trading-signal-frontend && npm run intraday:notes:review

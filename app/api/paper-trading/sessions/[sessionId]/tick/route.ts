@@ -6,6 +6,7 @@ import {
   runPaperTradingSessionTick,
 } from "@/lib/server/paperTrading/sessionStore";
 import type { RunPaperTradingTickRequest } from "@/lib/types/paperTrading/paperTrading";
+import { isKstMarketHours } from "@/lib/utils/kstMarketHours";
 
 type RouteContext = {
   params: Promise<{ sessionId: string }>;
@@ -15,6 +16,13 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
   // 재판단(틱) 실행 — prod 만 admin+(로컬 전체). cliGate 는 로컬 CLI 게이트지 role 이 아님.
   const denied = await requireProdAdminApi(request);
   if (denied) return denied;
+
+  if (!isKstMarketHours()) {
+    return NextResponse.json(
+      { error: "정규장 시간에만 단타 재판단을 실행할 수 있어요." },
+      { status: 409, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const { sessionId } = await context.params;
   try {

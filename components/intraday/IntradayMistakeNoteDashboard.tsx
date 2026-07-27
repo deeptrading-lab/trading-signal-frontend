@@ -21,11 +21,12 @@ import { MISTAKE_NOTE_DASHBOARD_COPY as C } from "@/lib/copy/intraday/mistakeNot
 import type { MistakeNoteDashboardData } from "@/lib/types/intraday/mistakeNoteDashboard";
 import { cn } from "@/lib/utils/cn";
 import { formatPct } from "@/lib/utils/formatPct";
+import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 
 const REFRESH_INTERVAL_MS = 30_000;
 
 const PROCESS_STEPS: Array<{ label: string; description: string; icon: LucideIcon }> = [
-  { label: "15:41", description: "세션 완료", icon: Database },
+  { label: "15:40", description: "세션 완료", icon: Database },
   { label: "품질", description: "owner·라벨 게이트", icon: ShieldCheck },
   { label: "분리", description: "실제·반사실·선정", icon: GitMerge },
   { label: "OOS", description: "전일 규칙 검증", icon: Target },
@@ -107,7 +108,10 @@ export function IntradayMistakeNoteDashboard({ data }: { data: MistakeNoteDashbo
 
   const refresh = () => startRefresh(() => router.refresh());
   useEffect(() => {
-    const timer = window.setInterval(() => startRefresh(() => router.refresh()), REFRESH_INTERVAL_MS);
+    const timer = window.setInterval(() => {
+      if (!isKstMarketHoursWithCloseGrace()) return;
+      startRefresh(() => router.refresh());
+    }, REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [router]);
 

@@ -133,7 +133,7 @@ export function planRotation(input: {
     }
     const view = slotViews.get(slot.sessionId);
     if (!view || view.status !== "running") {
-      // 외부 종료(15:41 마감·수동 중지·크로스데이 정리) 또는 store 소멸 — 슬롯만 비운다.
+      // 외부 종료(15:40 마감·수동 중지·크로스데이 정리) 또는 store 소멸 — 슬롯만 비운다.
       plan.reconciled.push({
         slotIndex: slot.slotIndex,
         sessionId: slot.sessionId,
