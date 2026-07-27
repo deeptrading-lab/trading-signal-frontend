@@ -6,9 +6,8 @@
  * - **게이트**: KIS 미설정/비-prod → 채점 skip + 헬스 마커 후 200(fail-soft, 재시도 폭주 방지).
  * - **로직**: pending horizon 행을 찾아 평가 시점 종가로 hit/miss/flat 확정(runScoring).
  *
- * 정기 실행은 단일 디스패처(`flow-snapshot`)가 flow 스냅샷 후 runScoring 을 순차 호출한다
- * (`vercel.json` cron 1개 — Hobby 1일 1회 한도). 본 라우트는 수동/독립 호출용으로도 유효
- * (디스패처와 동일 로직 공유). 각각 독립 try/catch 로 한 단계 실패가 다른 단계를 막지 않는다.
+ * 예약 실행은 중지되어 있다. 필요할 때 단일 디스패처(`flow-snapshot`) 또는 본 라우트를
+ * 인증된 수동 호출로 실행한다. 각각 독립 try/catch 로 한 단계 실패가 다른 단계를 막지 않는다.
  */
 
 import { NextRequest, NextResponse } from "next/server";

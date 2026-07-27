@@ -30,14 +30,14 @@ export function isKstMarketHours(now: Date = new Date()): boolean {
 }
 
 /**
- * 정규장 + 마감 유예(~15:40) — 단타 자동 틱 폴링용. 15:20 전량 청산은 15:30 창 틱에서
+ * 정규장 + 마감 유예(15:40 미만) — 단타 자동 틱 폴링용. 15:20 전량 청산은 15:30 창 틱에서
  * 발동하는데, 폴링 게이트가 15:30 에 딱 닫히면 busy 스킵 한 번으로 그 유일한 기회가
  * 사라져 포지션이 오버나잇으로 남는다(코드리뷰 #7). 유예 동안의 여분 호출은 서버가
  * 같은 창으로 dedup 하므로 무해.
  */
 export function isKstMarketHoursWithCloseGrace(now: Date = new Date()): boolean {
   const mins = kstMinutesOfWeekday(now);
-  return mins != null && mins >= 9 * 60 && mins <= 15 * 60 + 40;
+  return mins != null && mins >= 9 * 60 && mins < 15 * 60 + 40;
 }
 
 /**
@@ -54,14 +54,14 @@ export function isKstWeekend(now: Date = new Date()): boolean {
 }
 
 /**
- * 평일 마감 유예(15:40)를 지난 시각이면 true — 단타 세션 **마감 자동 완료** 게이트.
+ * 평일 마감 유예 종료(15:40) 시각부터 true — 단타 세션 **마감 자동 완료** 게이트.
  * 장중·프리마켓(09:00 이전)·주말은 false. 15:20 전량 청산이 이미 지나 종료 시 열린 포지션은 없다.
  *
- * `isKstMarketHoursWithCloseGrace`(≤15:40)와 겹치지 않게 **초과(>15:40)** 로 판정한다 —
- * 15:40 까지는 틱, 15:41 부터 종료 스윕이라 마지막 틱과 종료가 서로 밟지 않는다.
+ * `isKstMarketHoursWithCloseGrace`(<15:40)와 겹치지 않게 **이상(>=15:40)** 으로 판정한다 —
+ * 15:39 까지는 틱, 15:40 부터 종료 스윕이라 장 마감 뒤 새 분석을 시작하지 않는다.
  * 프리마켓을 제외하는 이유: 09:00 직전에 미리 만들어 둔 세션을 개장 전에 완료시키지 않기 위함.
  */
 export function isKstAfterMarketClose(now: Date = new Date()): boolean {
   const mins = kstMinutesOfWeekday(now);
-  return mins != null && mins > 15 * 60 + 40;
+  return mins != null && mins >= 15 * 60 + 40;
 }

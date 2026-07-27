@@ -1,8 +1,9 @@
 name: 종목 검색 시드 주간 최신화
 
 # 종목명 검색 시드(lib/api/kis/symbols.json)는 정적 번들이라 수동 재실행 없이는 신규 상장이
-# 검색되지 않는다. 주 1회 KRX KIND + OpenDART 를 재수집해 변경이 있으면 PR 을 연다(자동 머지 X —
-# 사람이 신규/폐지 델타를 확인하고 게이트 부여 후 머지). Vercel Hobby cron 은 미발화라 GHA 사용.
+# 검색되지 않는다. 장 마감 뒤 자동 외부 호출을 중지하는 정책에 따라 예약 실행은 두지 않고,
+# 운영자가 필요할 때 KRX KIND + OpenDART 를 수동 재수집해 변경 PR 을 연다(자동 머지 X —
+# 사람이 신규/폐지 델타를 확인하고 게이트 부여 후 머지).
 #
 # ★사전 준비(1회):
 #   1. 리포 Secret 에 OPENDART_API_KEY 추가(앱과 별개 전용 키 권장 — CORPCODE.xml 다운로드가
@@ -10,8 +11,6 @@ name: 종목 검색 시드 주간 최신화
 #   2. Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests" 활성화.
 
 on:
-  schedule:
-    - cron: "0 18 * * 0" # 매주 일 18:00 UTC = 월 03:00 KST(앱 트래픽 적은 야간, DART 할당량 배려)
   workflow_dispatch: {} # 수동 실행(신규 상장 즉시 반영하고 싶을 때)
 
 permissions:

@@ -13,6 +13,11 @@
     "test:watch": "vitest",
     "analyze:worker": "node --env-file=.env.local --import tsx scripts/analysisWorker.ts",
     "backfill:decision-names": "node --env-file=.env.local --import tsx scripts/backfillDecisionNames.ts",
+    "intraday:notes:review": "node --env-file=.env.local --import tsx packages/intraday-mistake-note/src/cli.ts review",
+    "intraday:notes:dry": "node --env-file=.env.local --import tsx packages/intraday-mistake-note/src/cli.ts dry",
+    "intraday:notes:merge": "node --import tsx packages/intraday-mistake-note/src/cli.ts merge",
+    "intraday:notes:validate": "node --import tsx packages/intraday-mistake-note/src/cli.ts validate",
+    "intraday:notes:render": "node --import tsx packages/intraday-mistake-note/src/cli.ts render",
     "toss:smoke": "node --env-file=.env.local scripts/tossSmokeTest.mjs",
     "all": "concurrently -n dev,worker -c blue,green \"npm run dev\" \"npm run analyze:worker\"",
     "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs && node scripts/inject-shadows.mjs && node scripts/inject-motion.mjs"

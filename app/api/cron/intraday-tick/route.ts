@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runPaperTradingSessionTick } from "@/lib/server/paperTrading/sessionStore";
+import { isKstMarketHours } from "@/lib/utils/kstMarketHours";
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -24,6 +25,13 @@ export async function GET(request: NextRequest) {
     if (auth !== `Bearer ${secret}` && q !== secret) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+  }
+
+  if (!isKstMarketHours()) {
+    return NextResponse.json(
+      { ok: false, reason: "market-closed" },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const sessionId = (request.nextUrl.searchParams.get("session") ?? "").trim();

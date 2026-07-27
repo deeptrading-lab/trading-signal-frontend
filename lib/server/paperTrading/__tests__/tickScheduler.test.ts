@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   closeOutRunningSessionsAtClose,
   closeOutStaleCrossdaySessions,
+  resetIntradaySchedulerStateForTest,
   runIntradayRiskSweep,
+  runIntradaySchedulerCycle,
   runScheduledIntradayTicks,
   runWithLimit,
   selectSchedulableSessions,
@@ -19,6 +21,10 @@ import type {
   PaperTradingSession,
   PaperTradingTick,
 } from "@/lib/types/paperTrading/paperTrading";
+
+beforeEach(() => {
+  resetIntradaySchedulerStateForTest();
+});
 
 function session(over: Partial<PaperTradingSession>): PaperTradingSession {
   return {
@@ -117,6 +123,11 @@ describe("runScheduledIntradayTicks (장중 게이트)", () => {
     // 금 21:00 KST — 틱은 안 돌고(-1), 종료 스윕이 별도로 처리한다.
     expect(await runScheduledIntradayTicks(new Date("2026-07-03T12:00:00.000Z"))).toBe(-1);
   });
+
+  it("정규장 종료 뒤 마감 유예 중에도 새 LLM 틱을 시작하지 않는다", async () => {
+    resetPaperTradingStoreForTest();
+    expect(await runScheduledIntradayTicks(new Date("2026-07-03T06:35:00.000Z"))).toBe(-1);
+  });
 });
 
 describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", () => {
@@ -127,12 +138,14 @@ describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", 
     expect(await closeOutRunningSessionsAtClose(new Date("2026-07-04T06:41:00.000Z"))).toBe(-1); // 토 15:41 KST 주말
   });
 
-  it("마감 유예 경계(15:40)는 아직 종료하지 않는다(-1) — 마지막 틱과 겹침 방지", async () => {
+  it("마감 유예 종료 시각(15:40)부터 즉시 종료한다", async () => {
     resetPaperTradingStoreForTest();
-    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:40:00.000Z"))).toBe(-1); // 금 15:40 KST
+    seedPaperTradingSessionForTest(session({ id: "at-close" }));
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:40:00.000Z"))).toBe(1);
+    expect((await getPaperTradingSessionDetail("at-close"))?.session.status).toBe("completed");
   });
 
-  it("마감 후(15:41+)이고 대상 세션이 없으면 0", async () => {
+  it("마감 후이고 대상 세션이 없으면 0", async () => {
     resetPaperTradingStoreForTest();
     expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:41:00.000Z"))).toBe(0); // 금 15:41 KST
   });
@@ -143,11 +156,43 @@ describe("closeOutRunningSessionsAtClose (마감 후 자동 완료 게이트)", 
     seedPaperTradingSessionForTest(session({ id: "mine", owner: me }));
     seedPaperTradingSessionForTest(session({ id: "legacy" })); // owner 미지정
     seedPaperTradingSessionForTest(session({ id: "friend", owner: "friend-op" }));
-    // 금 15:41 KST — 마감 스윕 발화. 내 것 2건만 완료, 친구 세션은 그의 서버 몫으로 남긴다.
-    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:41:00.000Z"))).toBe(2);
+    // 금 15:40 KST — 마감 스윕 발화. 내 것 2건만 완료, 친구 세션은 그의 서버 몫으로 남긴다.
+    expect(await closeOutRunningSessionsAtClose(new Date("2026-07-03T06:40:00.000Z"))).toBe(2);
     expect((await getPaperTradingSessionDetail("mine"))?.session.status).toBe("completed");
     expect((await getPaperTradingSessionDetail("legacy"))?.session.status).toBe("completed");
     expect((await getPaperTradingSessionDetail("friend"))?.session.status).toBe("running");
+  });
+});
+
+describe("runIntradaySchedulerCycle (장 마감 후 호출 정지)", () => {
+  it("15:40에 진행 틱 취소→런/세션 종료를 한 번만 실행하고 이후 외부 호출은 없다", async () => {
+    const abortTicks = vi.fn(async () => 1);
+    const closeAutopilotRuns = vi.fn(async () => 1);
+    const closeSessions = vi.fn(async () => 2);
+    const closeStaleSessions = vi.fn(async () => 0);
+    const riskSweep = vi.fn(async () => 0);
+    const runTicks = vi.fn(async () => 0);
+    const sweepAutopilot = vi.fn(async () => 0);
+    const deps = {
+      abortTicks,
+      closeAutopilotRuns,
+      closeSessions,
+      closeStaleSessions,
+      riskSweep,
+      runTicks,
+      sweepAutopilot,
+    };
+
+    await runIntradaySchedulerCycle(new Date("2026-07-03T06:40:00.000Z"), deps);
+    await runIntradaySchedulerCycle(new Date("2026-07-03T06:41:00.000Z"), deps);
+
+    expect(abortTicks).toHaveBeenCalledTimes(1);
+    expect(closeAutopilotRuns).toHaveBeenCalledTimes(1);
+    expect(closeSessions).toHaveBeenCalledTimes(1);
+    expect(closeStaleSessions).not.toHaveBeenCalled();
+    expect(riskSweep).not.toHaveBeenCalled();
+    expect(runTicks).not.toHaveBeenCalled();
+    expect(sweepAutopilot).not.toHaveBeenCalled();
   });
 });
 

@@ -1,0 +1,14 @@
+{
+  "name": "@trading-signal/intraday-mistake-note",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI 단타 장마감 오답노트 수집·검증·Compact Memory 생성 패키지",
+  "scripts": {
+    "review": "node --import tsx src/cli.ts review",
+    "dry": "node --import tsx src/cli.ts dry",
+    "merge": "node --import tsx src/cli.ts merge",
+    "validate": "node --import tsx src/cli.ts validate",
+    "render": "node --import tsx src/cli.ts render"
+  }
+}

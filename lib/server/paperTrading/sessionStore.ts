@@ -372,24 +372,16 @@ export type CompletePaperTradingPortfolioResult = {
   alreadyCompletedSessionIds: string[];
 };
 
-/**
- * 자동 포트폴리오 일괄 종료 — 이 서버 소유(또는 레거시 미지정) 세션만 대상으로 한다.
- * 보유 포지션은 최신 가격으로 EXIT 체결한 뒤에만 completed 전환한다. 세션 tickChain 을 공유해
- * 진행 중인 자동 틱과 직렬화하며, 재호출 시 이미 완료된 세션은 건너뛰는 멱등 동작이다.
- */
-export async function completePaperTradingPortfolio(
-  portfolioId: string,
-  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
-): Promise<CompletePaperTradingPortfolioResult | null> {
-  await ensureHydrated();
-  const operator = resolveServerOperator();
-  const entries = Array.from(getStore().sessions.values()).filter(
-    (entry) =>
-      entry.session.portfolioId === portfolioId &&
-      (!entry.session.owner || entry.session.owner === operator),
-  );
-  if (entries.length === 0) return null;
+export type CompletePaperTradingAutopilotRunResult = {
+  runId: string;
+  completedSessionIds: string[];
+  alreadyCompletedSessionIds: string[];
+};
 
+async function completePaperTradingEntries(
+  entries: StoredSession[],
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date },
+): Promise<{ completedSessionIds: string[]; alreadyCompletedSessionIds: string[] }> {
   const completedSessionIds: string[] = [];
   const alreadyCompletedSessionIds: string[] = [];
   const failures: string[] = [];
@@ -417,7 +409,45 @@ export async function completePaperTradingPortfolio(
     }
   }
   if (failures.length > 0) throw new Error(failures.join(" "));
-  return { portfolioId, completedSessionIds, alreadyCompletedSessionIds };
+  return { completedSessionIds, alreadyCompletedSessionIds };
+}
+
+/**
+ * 자동 포트폴리오 일괄 종료 — 이 서버 소유(또는 레거시 미지정) 세션만 대상으로 한다.
+ * 보유 포지션은 최신 가격으로 EXIT 체결한 뒤에만 completed 전환한다. 세션 tickChain 을 공유해
+ * 진행 중인 자동 틱과 직렬화하며, 재호출 시 이미 완료된 세션은 건너뛰는 멱등 동작이다.
+ */
+export async function completePaperTradingPortfolio(
+  portfolioId: string,
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
+): Promise<CompletePaperTradingPortfolioResult | null> {
+  await ensureHydrated();
+  const operator = resolveServerOperator();
+  const entries = Array.from(getStore().sessions.values()).filter(
+    (entry) =>
+      entry.session.portfolioId === portfolioId &&
+      (!entry.session.owner || entry.session.owner === operator),
+  );
+  if (entries.length === 0) return null;
+  return { portfolioId, ...(await completePaperTradingEntries(entries, options)) };
+}
+
+/**
+ * 오토파일럿 런 수동 종료 — 해당 런이 만든 이 서버 소유 자식 세션만 최신 가격으로 청산·완료한다.
+ * 아직 슬롯이 채워지지 않은 런도 정상적인 빈 결과를 반환해 중지 명령을 멱등 처리한다.
+ */
+export async function completePaperTradingAutopilotRun(
+  runId: string,
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
+): Promise<CompletePaperTradingAutopilotRunResult> {
+  await ensureHydrated();
+  const operator = resolveServerOperator();
+  const entries = Array.from(getStore().sessions.values()).filter(
+    (entry) =>
+      entry.session.autopilotRunId === runId &&
+      (!entry.session.owner || entry.session.owner === operator),
+  );
+  return { runId, ...(await completePaperTradingEntries(entries, options)) };
 }
 
 async function closeAndCompletePortfolioEntry(

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isVercelEnv } from "@/lib/server/env";
 import { isKisConfigured } from "@/lib/api/kis";
 import { readIntraday } from "@/lib/server/intraday/read";
+import { isKstMarketHours } from "@/lib/utils/kstMarketHours";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
@@ -20,6 +21,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json(
       { error: "장중 단타 판단은 로컬 환경(next dev)에서만 사용할 수 있어요." },
       { status: 503, headers: NO_STORE },
+    );
+  }
+
+  if (!isKstMarketHours()) {
+    return NextResponse.json(
+      { error: "정규장 시간에만 단타 판단을 새로 실행할 수 있어요." },
+      { status: 409, headers: NO_STORE },
     );
   }
 

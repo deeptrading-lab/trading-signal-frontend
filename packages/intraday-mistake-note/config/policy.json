@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "timezone": "Asia/Seoul",
+  "runAfterKst": "16:30",
+  "goalZonePct": [1, 2],
+  "memory": {
+    "maxRules": 12,
+    "maxChars": 1800,
+    "runtimeMaxRules": 6,
+    "runtimeMaxChars": 900
+  },
+  "quality": {
+    "maxUnresolvedLabelRate": 0.2,
+    "requireCompletedSessions": true,
+    "allowMultipleOwners": false
+  },
+  "promotion": {
+    "minSupportDays": 3,
+    "minIndependentSamples": 20,
+    "minClosedTrades": 20,
+    "productionGateClosedTrades": 100,
+    "productionGateTradingDays": 20,
+    "productionGateTickerDays": 20,
+    "minProfitFactor": 1.3
+  },
+  "retirement": {
+    "reviewAfterDays": 10,
+    "reviewAfterIndependentSamples": 50,
+    "contradictionWindows": 2
+  }
+}

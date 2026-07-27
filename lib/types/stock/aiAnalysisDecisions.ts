@@ -2,11 +2,15 @@
  * AI 분석 결과 카드 목록 타입 — `/api/stock/ai-analysis/decisions` 응답.
  *
  * 종목당 최신 결론 1건(ai_analysis_decisions upsert)에, 그 종목의 최신 실행(run)에 들어간
- * 토큰/비용 합계(ai_agent_usage 집계)를 붙인 형태. 결론 전체(decision·sentiment)를 포함하므로
- * 카드 클릭 시 상세는 추가 페치 없이 즉시 렌더한다.
+ * 토큰/비용 합계(ai_agent_usage DB 내부 집계)를 붙인 카드 전용 요약이다.
+ * 상세 결론은 카드 선택 시 기존 단건 API(`/decision?ticker=...`)로 지연 조회한다.
  */
 
-import type { AIAnalysisDecisionSnapshot } from "@/lib/types/stock/aiAnalysis";
+import type {
+  AIAnalysisProvider,
+  DecisionSignal,
+  FinalDecision,
+} from "@/lib/types/stock/aiAnalysis";
 import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
 
 /**
@@ -34,8 +38,23 @@ export interface AIDecisionTokens {
   measured: boolean;
 }
 
-/** 결론 스냅샷 + 토큰 합계(없으면 null) + (재분석 진행중이면) 인플라이트 표시. */
-export interface AIDecisionListItem extends AIAnalysisDecisionSnapshot {
+/** 목록 카드가 실제로 쓰는 최소 결론 필드. reasoning·전략·감성은 상세 조회에서만 받는다. */
+export type AIDecisionCardDecision = Pick<
+  FinalDecision,
+  "verdict" | "time_horizon" | "limitedData" | "bars"
+>;
+
+/** 목록 카드가 실제로 쓰는 최소 시그널 필드. */
+export type AIDecisionCardSignal = Pick<DecisionSignal, "score">;
+
+/** 카드 전용 요약 + 토큰 합계(없으면 null) + (재분석 진행중이면) 인플라이트 표시. */
+export interface AIDecisionListItem {
+  ticker: string;
+  name: string | null;
+  provider: AIAnalysisProvider;
+  decision: AIDecisionCardDecision;
+  signal: AIDecisionCardSignal | null;
+  updatedAt: string;
   tokens: AIDecisionTokens | null;
   /** 이 종목을 지금 재분석 중이면 표시(완료 결과는 그대로 유지). 없으면 null. */
   reanalysis?: AnalysisInflight | null;

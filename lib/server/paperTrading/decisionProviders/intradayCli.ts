@@ -25,6 +25,7 @@ import {
   PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX,
   PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS,
 } from "@/lib/server/paperTrading/constants";
+import { loadMistakeNoteContext } from "@/lib/server/paperTrading/mistakeNoteContext";
 import {
   FLOW_ANALYST_SYSTEM,
   JUDGE_SYSTEM,
@@ -723,6 +724,13 @@ export async function decideIntradayWithCli(
     ctx.warnings = await fetchActiveWarnings(input.ticker);
   }
 
+  // 장마감 검증을 통과한 Compact Memory만 범위·문자 상한을 적용해 주입한다.
+  // 파일 부재/읽기 실패는 빈 문자열 fail-soft라 기존 판단 경로와 비트 동일하다.
+  const [entryMistakeNotes, judgeMistakeNotes] = await Promise.all([
+    loadMistakeNoteContext(["ENTRY", "REENTRY", "CALIBRATION"]),
+    loadMistakeNoteContext(["ENTRY", "REENTRY", "EXIT", "CALIBRATION", "RISK"]),
+  ]);
+
   const provider: AIAnalysisProvider = input.provider ?? "claude";
   // 에이전트별 모델 분리 — 분석가(요약, 싸고 빠르게)와 판단가(필요 시 더 무겁게)를 따로 둔다.
   // 미설정 시 INTRADAY_MODEL, 그래도 없으면 invokeAgentCliStream 이 CLAUDE_CLI_MODEL 로 폴백.
@@ -758,7 +766,7 @@ export async function decideIntradayWithCli(
       provider,
       {
         systemPrompt: FLOW_ANALYST_SYSTEM,
-        userPrompt: buildFlowAnalystUser(ctx),
+        userPrompt: buildFlowAnalystUser(ctx, entryMistakeNotes),
         tools: [],
         timeoutMs: AGENT_TIMEOUT_MS,
         effort: intradayEffort(analystModel),
@@ -792,7 +800,7 @@ export async function decideIntradayWithCli(
         provider,
         {
           systemPrompt: JUDGE_SYSTEM,
-          userPrompt: buildJudgeUser(ctx, analystNote),
+          userPrompt: buildJudgeUser(ctx, analystNote, judgeMistakeNotes),
           tools: [],
           timeoutMs: AGENT_TIMEOUT_MS,
           effort: intradayEffort(judgeModel),

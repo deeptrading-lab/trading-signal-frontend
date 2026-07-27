@@ -14,6 +14,7 @@
  */
 
 import { createLogger } from "@/lib/server/logTag";
+import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 import type {
   PaperTradingPosition,
   PaperTradingSession,
@@ -24,8 +25,11 @@ const log = createLogger("paper-persist");
 
 const SESSIONS_TABLE = "paper_trading_sessions";
 const TICKS_TABLE = "paper_trading_ticks";
-/** hydrate 시 복원할 최근 세션 수 상한 — 오래된 실험 세션이 무한히 붙는 것 방지. */
-const HYDRATE_SESSION_LIMIT = 50;
+/**
+ * 반복 목록 동기화와 부팅 복원에 포함할 최근 세션 수 상한.
+ * 오래된 완료 세션 원본은 Supabase에 보존하되 기본 화면/메모리에는 최신 20건만 올린다.
+ */
+const HYDRATE_SESSION_LIMIT = 20;
 /**
  * 틱 페이지 크기/총량 상한 — PostgREST 는 무제한 쿼리를 max-rows(기본 1000)에서 **조용히**
  * 자르므로(리뷰 #3) 명시 페이지네이션으로 전부 걷되, 폭주 방지 총량 캡을 둔다(1분 주기
@@ -61,10 +65,7 @@ export type LoadPersistedTicksResult =
   | { status: "ok"; ticks: PaperTradingTick[] };
 
 function supabaseConfig(): { url: string; key: string } | null {
-  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
-  return { url: url.replace(/\/+$/, ""), key };
+  return getSupabaseServiceConfig();
 }
 
 function headers(key: string, extra?: Record<string, string>): HeadersInit {

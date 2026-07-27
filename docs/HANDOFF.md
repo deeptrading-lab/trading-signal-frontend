@@ -8116,3 +8116,37 @@
   - dev 재시작 후 며칠 라이브 → `screener-eval.mts` 로 '뽑음 range% ≥ 미선정상위' 로 역전됐는지 확인(포화 수정 효과).
   - stage2 피처가 쌓이면 ATR 외 2차 가중(volumeZ·VWAP·structure)도 forward range 반사실로 재튜닝.
   - 선정 품질이 확정되면, 산출물로서의 워치리스트(decision-support 피벗 대비) 가치 검토.
+
+### 2026-07-27 — feat(intraday): AI 단타 가이드·오답노트와 장마감 호출 제어 (#371)
+
+- **slug**: `ai-intraday-guide-product` · **author**: @devbob0701
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/371
+- **요약**: feat(intraday): AI 단타 가이드·오답노트와 장마감 호출 제어
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 변경 내용
+  > - Supabase Egress 긴급 차단 스위치와 저용량 조회 경로를 추가합니다.
+  > - AI 단타 가이드, 오답노트 수집·검증·Compact Memory 흐름과 운영 UI를 추가합니다.
+  > - 가이드 액션 버튼 배치를 정리하고 사용자 조작 흐름을 개선합니다.
+  > - KST 평일 15:40부터 진행 중 자동 틱을 취소하고 오토파일럿·단타 세션을 완료 처리합니다.
+  > - 신규 AI 분석, 가격 리스크 점검, 화면 폴링, 자동 라벨링을 장마감 뒤 중단합니다.
+  > - Vercel·GitHub Actions 예약 실행을 제거하고 관련 작업을 수동 실행 전용으로 전환합니다.
+  > 
+  > ## 원인 및 영향
+  > 기존에는 Supabase 반복 조회와 장외 스케줄러·cron 호출이 계속될 수 있었고, 단타 가이드 결과를 장기적으로 검증하고 재사용할 구조가 없었습니다. 이번 변경으로 Egress를 즉시 차단할 수 있으며, 15:40 종료 상태 저장 뒤 같은 날 자동 외부 호출을 반복하지 않습니다.
+  > 
+  > ## 검증
+  > - 전체 Vitest: 1,341 passed / 3 skipped
+  > - 집중 Vitest: 75 passed
+  > - `npm run lint`
+  > - `npm run typecheck`
+  > - 셸 문법 검사 및 `git diff --check`
+  > 
+  > ## 다음 작업
+  > - 장중 운영 환경에서 15:30 신규 분석 중단과 15:40 자동 종료 로그를 확인합니다.
+  > - KRX 공휴일 캘린더 연동 여부를 후속 검토합니다.
+  > - 오답노트 OOS 표본을 누적해 Compact Memory 승격 기준을 점검합니다.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 장중 운영 환경에서 15:30 신규 분석 중단과 15:40 자동 종료 로그를 확인합니다.
+  - KRX 공휴일 캘린더 연동 여부를 후속 검토합니다.
+  - 오답노트 OOS 표본을 누적해 Compact Memory 승격 기준을 점검합니다.
