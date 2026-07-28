@@ -63,6 +63,10 @@ import {
   isMarketAnalysisFresh,
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
+import {
+  normalizeConfidence,
+  normalizeTimeHorizon,
+} from "@/lib/server/ai/normalizeDecisionEnums";
 import { tryAcquire, release } from "@/lib/server/ai/concurrencyGate";
 import {
   startProcessing,
@@ -891,6 +895,11 @@ export async function POST(req: NextRequest): Promise<Response> {
               const d = parsed as Record<string, unknown>;
               const VERDICTS = new Set(["BUY", "OVERWEIGHT", "HOLD", "UNDERWEIGHT", "REDUCE", "SELL"]);
               if (VERDICTS.has(d.verdict as string)) {
+                // enum 해석 실패를 로그로 드러낸다 — 조용한 폴백이 신호를 죽이던 회귀 재발 방지.
+                const reportEnumFallback = (field: string, raw: unknown) =>
+                  aiLog.warn(
+                    `PM ${field} 해석 실패 — 기본값 사용(raw=${JSON.stringify(raw)}). 프롬프트/스키마 불일치 의심.`,
+                  );
                 const rawTarget = typeof d.target_pct === "number" ? d.target_pct : null;
                 const rawStop = typeof d.stop_loss_pct === "number" ? d.stop_loss_pct : -5;
                 // stop_loss_pct = 테제 무효화 라인. 방향은 verdict 가 단일 기준(LLM 부호 오류 무관):
@@ -907,10 +916,11 @@ export async function POST(req: NextRequest): Promise<Response> {
                   key_risks: Array.isArray(d.key_risks)
                     ? d.key_risks.filter((x): x is string => typeof x === "string")
                     : [],
-                  confidence: (["HIGH", "MEDIUM", "LOW"].includes(d.confidence as string)
-                    ? d.confidence : "MEDIUM") as FinalDecision["confidence"],
-                  time_horizon: (["단기", "중기", "장기"].includes(d.time_horizon as string)
-                    ? d.time_horizon : "중기") as FinalDecision["time_horizon"],
+                  // enum 은 관대 정규화(대소문자·한글 동의어 흡수) + 해석 불가 시 warn.
+                  // 과거 정확일치 폴백이 조용히 기본값으로 덮어 confidence 100% MEDIUM ·
+                  // time_horizon 100% 중기 로 신호가 죽어 있었다(normalizeDecisionEnums 주석 참조).
+                  confidence: normalizeConfidence(d.confidence, reportEnumFallback),
+                  time_horizon: normalizeTimeHorizon(d.time_horizon, reportEnumFallback),
                   new_entry_strategy: typeof d.new_entry_strategy === "string" ? d.new_entry_strategy : "",
                   holder_strategy: typeof d.holder_strategy === "string" ? d.holder_strategy : "",
                   target_pct: rawTarget,
