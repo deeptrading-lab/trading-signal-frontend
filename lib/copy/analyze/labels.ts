@@ -33,6 +33,23 @@ export const resultsCount = (n: number): string => `종목 ${n}개`;
 /** 카드·플레이스홀더 진행 상태 배지. */
 export const INFLIGHT_PROCESSING = "분석 중";
 export const INFLIGHT_PENDING = "대기 중";
+
+// ─── 테제 무효화 배지 ────────────────────────────────────────────────────────
+/**
+ * 현재가가 판정의 무효화/손절 라인을 넘었을 때 카드에 다는 배지.
+ * 약세 판정의 상방 돌파 = 판단 근거가 깨진 것 / 강세 판정의 하방 이탈 = 손절 라인 이탈.
+ */
+export const THESIS_INVALIDATED = "무효화";
+export const THESIS_STOP_HIT = "손절 이탈";
+/** 배지 title(마우스오버) — 어느 가격을 얼마나 넘었는지. */
+export const thesisBreachTitle = (
+  kind: "invalidation" | "stop",
+  linePrice: string,
+  overshootPct: number,
+): string =>
+  kind === "invalidation"
+    ? `무효화 라인 ${linePrice}원 돌파 (+${overshootPct.toFixed(1)}%) — 약세 판단 근거가 깨졌어요. 재분석을 권해요.`
+    : `손절 라인 ${linePrice}원 이탈 (-${overshootPct.toFixed(1)}%) — 강세 판단 근거가 깨졌어요. 재분석을 권해요.`;
 /** 첫 분석(완료 결과 없음) 플레이스홀더 카드 보조 안내. */
 export const INFLIGHT_PLACEHOLDER_HINT = "분석이 끝나면 결과가 여기에 표시돼요.";
 /** 진행중 작업 출처 배지(봇 요청만 노출, prod·local 은 숨김). */

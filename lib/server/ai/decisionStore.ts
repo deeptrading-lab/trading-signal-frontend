@@ -18,6 +18,7 @@ import type {
   AIDecisionListItem,
   AIDecisionTokens,
 } from "@/lib/types/stock/aiAnalysisDecisions";
+import type { ThesisBreachInput } from "@/lib/stock/thesisBreach";
 import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 
 type SupabaseDecisionRow = {
@@ -249,6 +250,60 @@ export async function getAIDecisionCardSummaries(
   }
   const rows = (await fallbackRes.json().catch(() => [])) as SupabaseDecisionCardRow[];
   return Array.isArray(rows) ? rows.map(toCardSummary) : [];
+}
+
+/**
+ * 테제 무효화 배지용 레벨 조회 — ticker 별 `verdict·base_price·target_pct·stop_loss_pct` 만.
+ *
+ * 카드 요약 projection 은 payload 를 줄이려 레벨 필드를 싣지 않는다(모바일 성능). 배지는 이 4개만
+ * 있으면 되므로, 카드 RPC 를 바꿔 마이그레이션을 유발하는 대신 JSONB 필드만 뽑는 경량 조회를 둔다.
+ * 실패는 fail-soft(빈 배열) — 배지는 부가 정보라 목록 자체를 막지 않는다.
+ */
+export async function getDecisionThesisLevels(
+  tickers: string[],
+): Promise<Map<string, ThesisBreachInput>> {
+  const out = new Map<string, ThesisBreachInput>();
+  const config = supabaseConfig();
+  if (!config || tickers.length === 0) return out;
+
+  const url = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
+  url.searchParams.set(
+    "select",
+    "ticker,verdict:decision->>verdict,base_price:decision->base_price," +
+      "target_pct:decision->target_pct,stop_loss_pct:decision->stop_loss_pct",
+  );
+  url.searchParams.set("ticker", `in.(${tickers.join(",")})`);
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch(() => null);
+  if (!res?.ok) {
+    if (res) console.warn(`[ai-decision-store] 판정 레벨 조회 실패 status=${res.status}`);
+    return out;
+  }
+
+  const rows = (await res.json().catch(() => [])) as Array<{
+    ticker: string;
+    verdict: string | null;
+    base_price: number | string | null;
+    target_pct: number | string | null;
+    stop_loss_pct: number | string | null;
+  }>;
+  if (!Array.isArray(rows)) return out;
+
+  for (const row of rows) {
+    const stop = nullableNumber(row.stop_loss_pct);
+    if (!row.verdict || stop === null) continue; // 무효화 라인 없으면 배지 대상 아님.
+    out.set(row.ticker, {
+      verdict: row.verdict as ThesisBreachInput["verdict"],
+      base_price: nullableNumber(row.base_price),
+      target_pct: nullableNumber(row.target_pct),
+      stop_loss_pct: stop,
+    });
+  }
+  return out;
 }
 
 /**
