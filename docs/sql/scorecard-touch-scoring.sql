@@ -33,8 +33,11 @@ alter table public.signal_scorecard add column if not exists stop_hit_date date;
 alter table public.signal_scorecard add column if not exists touch_scanned_through date;
 
 -- 스캔 대상(커서 없음·오래된 커서) 빠른 탐색. nulls first 로 미스캔 행이 앞에 온다.
-create index if not exists signal_scorecard_touch_cursor_idx
-  on public.signal_scorecard (touch_scanned_through nulls first, entry_date);
+-- 2차 키는 **entry_date desc** — 스캐너가 활성 구간(최신 판정)을 먼저 처리하도록 정렬을 맞춘다.
+-- ※ 이미 asc 버전(signal_scorecard_touch_cursor_idx)을 만들었다면 아래 desc 인덱스만 추가하면 된다
+--    (create index if not exists 는 기존 인덱스를 교체하지 않는다). 행 수가 적을 땐 선택 사항.
+create index if not exists signal_scorecard_touch_cursor_desc_idx
+  on public.signal_scorecard (touch_scanned_through nulls first, entry_date desc);
 
 comment on column public.signal_scorecard.target_price is
   '판정의 목표가(강세) 또는 재진입 구간(약세) 절대가(KRW) = live_price × (1 + target_pct/100). 삽입 시점 해석 동결';
@@ -46,3 +49,8 @@ comment on column public.signal_scorecard.stop_hit_date is
   '무효화/손절 최초 터치일. 약세 무효화는 고가 ≥ stop_price(상방 돌파), 강세 손절은 저가 ≤ stop_price(하방 이탈). 미터치면 null';
 comment on column public.signal_scorecard.touch_scanned_through is
   '터치 스캔 커서 — 이 날짜까지 일봉을 확인함(증분·멱등). null 이면 미스캔';
+
+-- ⚠️ 집계 주의: #350 이전 legacy 약세 행(verdict 가 약세인데 stop_loss_pct < 0)은 target·stop 이
+--    둘 다 하방이라 두 라인이 같은 사건을 가리킨다(감사에서 39건 중 19건이 같은 날 동시 터치).
+--    터치 선후를 집계할 때는 그 행들을 반드시 제외한다 — 코드에선 lib/server/scorecard/touchScoring
+--    의 isLegacyBearishSemantics() 를 쓴다.

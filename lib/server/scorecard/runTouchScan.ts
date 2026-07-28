@@ -11,11 +11,13 @@
  */
 
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
-import { fetchWithTransientRetryOrThrow } from "@/lib/server/bffUtils";
+import { delay, fetchWithTransientRetryOrThrow } from "@/lib/server/bffUtils";
 import { getTouchScanRows, updateTouchScan } from "@/lib/server/scorecard/scorecardStore";
 import {
+  hasScannableLevels,
   isScanComplete,
   levelsOnlyUpdate,
+  scanWindowEnd,
   scanEndDate,
   scanStartDate,
   scanTouches,
@@ -73,6 +75,15 @@ export async function runTouchScan(now: Date = new Date()): Promise<TouchScanRes
       continue;
     }
 
+    // 레벨이 둘 다 없고 산출도 불가하면 일봉을 받아봐야 볼 것이 없다 — **조회 전에** 걸러
+    // 커서를 창 끝까지 밀어 영구 완료 처리한다(매일 KIS 1콜을 헛되이 태우지 않도록).
+    if (!hasScannableLevels(row)) {
+      const wrote = await updateTouchScan(row.id, { touchScannedThrough: scanWindowEnd(row) });
+      if (wrote.ok) result.completed += 1;
+      else result.errors += 1;
+      continue;
+    }
+
     const from = scanStartDate(row);
     const to = scanEndDate(row, todayDash);
     if (from > to) {
@@ -110,7 +121,7 @@ export async function runTouchScan(now: Date = new Date()): Promise<TouchScanRes
       result.errors += 1;
     }
 
-    await new Promise((r) => setTimeout(r, SCORE_TICKER_DELAY_MS));
+    await delay(SCORE_TICKER_DELAY_MS);
   }
 
   return result;

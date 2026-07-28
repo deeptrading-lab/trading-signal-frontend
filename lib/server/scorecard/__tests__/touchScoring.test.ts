@@ -9,8 +9,11 @@ import { describe, it, expect } from "vitest";
 import {
   scanTouches,
   deriveLevel,
+  isLegacyBearishSemantics,
+  hasScannableLevels,
   isScanComplete,
   levelsOnlyUpdate,
+  scanWindowEnd,
   scanStartDate,
   scanEndDate,
   touchOrderOf,
@@ -157,5 +160,46 @@ describe("levelsOnlyUpdate — 봉 없이도 레벨은 채운다(당일 진입)"
 
   it("기준가 없으면 산출 불가 → null", () => {
     expect(levelsOnlyUpdate(row({ livePrice: null }))).toBeNull();
+  });
+});
+
+describe("isLegacyBearishSemantics — 집계 필터(#350 이전 노이즈 차단)", () => {
+  it("약세인데 stop 이 하방(음수)이면 legacy — 두 라인이 같은 방향이라 선후가 무의미", () => {
+    expect(isLegacyBearishSemantics("UNDERWEIGHT", -8)).toBe(true);
+    expect(isLegacyBearishSemantics("REDUCE", -5)).toBe(true);
+    expect(isLegacyBearishSemantics("SELL", -6)).toBe(true);
+  });
+
+  it("신규 시맨틱(약세+상방 무효화)과 강세는 legacy 아님", () => {
+    expect(isLegacyBearishSemantics("UNDERWEIGHT", 6)).toBe(false);
+    expect(isLegacyBearishSemantics("OVERWEIGHT", -6)).toBe(false);
+    expect(isLegacyBearishSemantics("HOLD", -7)).toBe(false);
+    expect(isLegacyBearishSemantics(null, -8)).toBe(false);
+    expect(isLegacyBearishSemantics("UNDERWEIGHT", null)).toBe(false);
+  });
+});
+
+describe("레벨 산출 불가 행 — 일봉 조회 전에 걸러 영구 완료(헛돌기 방지)", () => {
+  it("hasScannableLevels 가 false → 호출부가 KIS 조회 없이 건너뛴다", () => {
+    expect(hasScannableLevels(row({ livePrice: null }))).toBe(false);
+    expect(hasScannableLevels(row())).toBe(true); // 산출 가능
+    expect(hasScannableLevels(row({ livePrice: null, stopPrice: 10_600 }))).toBe(true); // 이미 있음
+  });
+
+  it("커서를 **창 끝**까지 밀어야 영구 완료 — 오늘로만 밀면 내일 또 후보가 된다", () => {
+    const r = row({ livePrice: null, entryDate: "2026-07-20" });
+    const windowEnd = scanWindowEnd(r); // 2026-09-03
+    expect(scanWindowEnd(r)).toBe("2026-09-03");
+    // 오늘로 밀면 내일 다시 미완료
+    expect(isScanComplete({ ...r, touchScannedThrough: TODAY }, "2026-07-29")).toBe(false);
+    // 창 끝으로 밀면 이후 어떤 날에도 완료
+    expect(isScanComplete({ ...r, touchScannedThrough: windowEnd }, "2026-07-29")).toBe(true);
+    expect(isScanComplete({ ...r, touchScannedThrough: windowEnd }, "2027-01-01")).toBe(true);
+  });
+
+  it("scanTouches 방어 경로도 창 끝으로 반환", () => {
+    const u = scanTouches(row({ livePrice: null, entryDate: "2026-07-20" }), [], TODAY)!;
+    expect(u.touchScannedThrough).toBe("2026-09-03");
+    expect(u.targetPrice).toBeUndefined();
   });
 });
