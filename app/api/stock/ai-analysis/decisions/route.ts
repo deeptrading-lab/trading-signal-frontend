@@ -12,8 +12,11 @@
 import { NextResponse } from "next/server";
 import {
   getAIDecisionCardSummaries,
+  getDecisionThesisLevels,
   isAIDecisionStoreConfigured,
 } from "@/lib/server/ai/decisionStore";
+import { fetchIntstockMultprice, isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
+import { evaluateThesisBreach } from "@/lib/stock/thesisBreach";
 import { getActiveJobs } from "@/lib/server/ai/queueStore";
 import { mergeActiveJobs } from "@/lib/server/ai/inflightMerge";
 import {
@@ -21,9 +24,44 @@ import {
   withTimeout,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
-import type { AIDecisionListResponse } from "@/lib/types/stock/aiAnalysisDecisions";
+import type {
+  AIDecisionListItem,
+  AIDecisionListResponse,
+} from "@/lib/types/stock/aiAnalysisDecisions";
 
 const FALLBACK_TIMEOUT_MESSAGE = "분석 결과 조회가 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
+
+/** 배지용 시세 조회 예산 — 목록 응답을 붙잡지 않도록 짧게. 초과 시 배지 없이 진행. */
+const BREACH_QUOTE_TIMEOUT_MS = 2_500;
+
+/**
+ * 각 카드에 테제 무효화 여부를 붙인다(in-place). 실패·미설정·타임아웃이면 조용히 no-op —
+ * 배지는 부가 정보이므로 목록 응답을 절대 막지 않는다.
+ *
+ * 시세는 `intstock_multprice` 일괄 1콜(soft cap 30, 카드 목록은 최대 20건이라 1콜로 덮임).
+ * KIS 미설정/비-prod 환경에서는 조회를 시도하지 않는다(mock 시세로 오배지 방지).
+ */
+async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
+  try {
+    if (items.length === 0) return;
+    if (!isKisConfigured() || resolveKisEnv() !== "prod") return;
+
+    const tickers = items.map((i) => i.ticker);
+    const [levels, quotes] = await withTimeout(
+      Promise.all([getDecisionThesisLevels(tickers), fetchIntstockMultprice(tickers)]),
+      BREACH_QUOTE_TIMEOUT_MS,
+    );
+    const priceByTicker = new Map(quotes.map((q) => [q.ticker, q.price]));
+
+    for (const item of items) {
+      const level = levels.get(item.ticker);
+      if (!level) continue;
+      item.thesisBreach = evaluateThesisBreach(level, priceByTicker.get(item.ticker));
+    }
+  } catch {
+    // 타임아웃·시세 실패·부분 응답 — 배지 없이 진행.
+  }
+}
 
 export async function GET(): Promise<Response> {
   try {
@@ -37,6 +75,10 @@ export async function GET(): Promise<Response> {
 
     // 완료 결과 + 활성 작업 합성 — 재분석중은 item.reanalysis, 결과없는 진행중은 inflight 플레이스홀더(순수 함수).
     const { items, inflight } = mergeActiveJobs(decisions, activeJobs ?? []);
+
+    // 테제 무효화 배지 — 라이브 시세 대비 무효화/손절 라인 돌파 여부. 전 구간 fail-soft:
+    // 시세·레벨 조회가 실패하거나 느려도 배지만 빠지고 목록은 정상 응답한다(부가 정보).
+    await attachThesisBreach(items);
 
     const payload: AIDecisionListResponse = {
       configured: isAIDecisionStoreConfigured(),

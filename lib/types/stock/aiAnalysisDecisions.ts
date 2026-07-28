@@ -12,6 +12,7 @@ import type {
   FinalDecision,
 } from "@/lib/types/stock/aiAnalysis";
 import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
+import type { ThesisBreach } from "@/lib/stock/thesisBreach";
 
 /**
  * 진행중 작업 표시(unified-analysis-jobs) — queue active 행을 카드용으로 압축.
@@ -58,6 +59,11 @@ export interface AIDecisionListItem {
   tokens: AIDecisionTokens | null;
   /** 이 종목을 지금 재분석 중이면 표시(완료 결과는 그대로 유지). 없으면 null. */
   reanalysis?: AnalysisInflight | null;
+  /**
+   * 현재가가 테제 무효화/손절 라인을 넘었으면 표시 — 목록에서 "깨진 판정"을 한눈에 보기 위함.
+   * 라이브 시세 조회 실패·legacy(base_price 없음)·미돌파면 null(배지 없음, fail-soft).
+   */
+  thesisBreach?: ThesisBreach | null;
 }
 
 /**

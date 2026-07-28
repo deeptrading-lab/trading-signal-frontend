@@ -31,6 +31,7 @@ import type { FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { AIDecisionCardMenu } from "./AIDecisionCardMenu";
 import { InflightBadge } from "./InflightBadge";
+import { ThesisBreachBadge } from "./ThesisBreachBadge";
 import { CARD_TOKENS_NONE, MEASURE_BADGE_UNMEASURED } from "@/lib/copy/analyze/labels";
 
 type Tone = "bull" | "bear" | "neutral";
@@ -128,6 +129,8 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
           </span>
           {/* 재분석 진행중이면 배지(이전 결론은 그대로 유지). */}
           {item.reanalysis && <InflightBadge status={item.reanalysis.status} />}
+          {/* 현재가가 무효화/손절 라인을 넘었으면 경고 배지 — 깨진 판정을 목록에서 바로 식별. */}
+          {item.thesisBreach && <ThesisBreachBadge breach={item.thesisBreach} />}
         </div>
         <div className="mt-xs flex flex-wrap items-center gap-x-xs gap-y-xs text-caption text-text-muted">
           {metaParts.map((part, i) => (
