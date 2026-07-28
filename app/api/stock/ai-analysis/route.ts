@@ -63,6 +63,8 @@ import {
   isMarketAnalysisFresh,
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
+import { computePriceLevels } from "@/lib/signal/levels/priceLevels";
+import { formatPriceLevelsForPrompt } from "@/lib/signal/levels/formatPriceLevels";
 import {
   normalizeConfidence,
   normalizeTimeHorizon,
@@ -95,7 +97,20 @@ const STAGE_BY_AGENT: Record<AgentKey, "A" | "B" | "C"> = {
   portfolio_manager: "C",
 };
 
-const CHART_DAYS = 200;
+/**
+ * 분석용 일봉 조회 창(캘린더일). 200일(≈134봉)에서 **365일(≈245봉)** 로 확대.
+ *
+ * 200일 창의 문제(실측): ① 반년 전 형성된 매물대가 통째로 안 잡혀 "아래 매물대 공백"으로 오판
+ * (두산에너빌리티 — 1년 창에선 현재가 자리에 비중 10%대 매물대가 잡히는데 200일 창에선 0건),
+ * ② 현재가가 창 안 최저면 되돌릴 파동이 없어 피보나치가 아예 생성되지 않음,
+ * ③ 120일선 신뢰도와 limitedData 임계(130봉)에 여유가 없음(실측 bars 131~134로 턱걸이).
+ * ④ **레짐 veto 상시 무력화** — computeRegime 은 SMA120[i-20] 을 보므로 **최소 140봉**이 필요한데
+ * 200일 창은 134봉이라 전 종목 regime=0(중립)으로 고정됐다(= 약세 레짐에서 BUY 를 막는 안전장치가
+ * 죽어 있었다). 365일에서 실제로 살아난다(실측 두산에너빌리티 regime 0 → -1).
+ * 원시 봉은 프롬프트에 실리지 않고 파생 지표로만 요약되므로 토큰 증가는 미미하다.
+ * 부수 효과: 52주 고저(candles.slice(-252))도 200일 창에선 실질 6.5개월 고저였던 것이 제 이름값을 찾는다.
+ */
+const CHART_DAYS = 365;
 /**
  * 최신 일봉이 기준일로부터 이 **영업일(평일)** 수를 초과해 노후하면 분석 조기 중단
  * (콜드스타트·휴장 옛 가격 방지). 주말은 카운트에서 제외되고, 긴 연휴의 소수 공휴일은
@@ -794,6 +809,20 @@ export async function POST(req: NextRequest): Promise<Response> {
         const investorData = investorSettled.status === "fulfilled" ? investorSettled.value : null;
         const warningsData = warningsSettled.status === "fulfilled" ? warningsSettled.value : [];
         state.priceContext = formatPriceContextForPrompt(sorted, signalResult, priceData, investorData, warningsData);
+
+        // 가격 레벨(이동평균·볼린저·피보나치·매물대 배치) **실측값** 주입 — 없으면 모델이 레벨을
+        // 추정해 서술하는 문제가 있었다(실측: "233,000원(20일선)" vs 실제 20일선 276,350원).
+        // 매물대는 현재가 위/아래로 나눠 줘야 "더 빠질 자리가 남았는지"를 근거로 말할 수 있다.
+        try {
+          const levelPrice = priceData?.price ?? sorted[sorted.length - 1]?.close ?? 0;
+          const levelsBlock = formatPriceLevelsForPrompt(
+            computePriceLevels(sorted, levelPrice),
+            levelPrice,
+          );
+          if (levelsBlock) state.priceContext = `${state.priceContext}\n\n${levelsBlock}`;
+        } catch (error) {
+          aiLog.warn("가격 레벨 컨텍스트 생성 실패 — 레벨 없이 진행", error);
+        }
         if (warningsData.length > 0) {
           aiLog(`시장경보 컨텍스트 주입 — ${warningsData.map((w) => w.warningType).join(",")}`);
         }
