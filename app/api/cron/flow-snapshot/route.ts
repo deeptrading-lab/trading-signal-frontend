@@ -6,7 +6,8 @@
  *
  * - 장 마감 뒤 자동 호출 중지 정책으로 Vercel/GitHub 예약 스케줄은 제거했다. 필요할 때
  *   GitHub `workflow_dispatch` 또는 인증된 수동 호출로만 ①수급 스냅샷 적립 → ②결정 원장 backfill
- *   → ③AI 판정 채점(relativeRunScoring)을 **순차 실행**한다. 각 단계는 **독립 try/catch** —
+ *   → ③AI 판정 채점(relativeRunScoring) → ④목표·무효화 터치 스캔(runTouchScan)을 **순차 실행**한다.
+ *   각 단계는 **독립 try/catch** —
  *   한 단계 실패가 다른 단계를 막지 않는다.
  * - **인증**: `Authorization: Bearer ${CRON_SECRET}` 필수(Vercel Cron 자동 부착). 미일치 401.
  * - 외국인·기관 각각 `fetchForeignInstitutionTotal` → **전 행** 저장(top10 slice 안 함, 누적 커버리지).
@@ -25,6 +26,7 @@ import {
 import { saveFlowSnapshot, saveFlowCronMeta } from "@/lib/server/flowSnapshotStore";
 import { delay, fetchWithTransientRetry } from "@/lib/server/bffUtils";
 import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
+import { runTouchScan, type TouchScanResult } from "@/lib/server/scorecard/runTouchScan";
 import { runBackfillDecisions } from "@/lib/server/scorecard/runBackfillDecisions";
 import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
 import type { RelativeScoreResult } from "@/lib/server/scorecard/relativeScoreDecisions";
@@ -106,5 +108,19 @@ export async function GET(request: NextRequest) {
     await saveScorecardCronMeta({ at: new Date().toISOString(), ok: false, reason: "scoring-error", env });
   }
 
-  return NextResponse.json({ ok: true, saved, backfill, scoring }, { status: 200 });
+  // ── 단계 ④ 목표·무효화 터치 스캔 (phase-2, 독립 try/catch) ──
+  //    판정이 스스로 내건 라인이 실제로 닿았는지 기록한다. 방향 채점(③)과 달리 "판정 자신의 약속"을 본다.
+  let touch: TouchScanResult | null = null;
+  try {
+    touch = await runTouchScan();
+    console.info(
+      `[flow-snapshot] touch candidates=${touch.candidates} scanned=${touch.scanned} ` +
+        `targetHits=${touch.targetHits} stopHits=${touch.stopHits} ` +
+        `completed=${touch.completed} errors=${touch.errors}`,
+    );
+  } catch (error) {
+    console.warn("[flow-snapshot] 터치 스캔 실패 — 디스패처는 200", error);
+  }
+
+  return NextResponse.json({ ok: true, saved, backfill, scoring, touch }, { status: 200 });
 }

@@ -31,7 +31,14 @@ import type { FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { AIDecisionCardMenu } from "./AIDecisionCardMenu";
 import { InflightBadge } from "./InflightBadge";
-import { CARD_TOKENS_NONE, MEASURE_BADGE_UNMEASURED } from "@/lib/copy/analyze/labels";
+import { ThesisBreachBadge } from "./ThesisBreachBadge";
+import {
+  CARD_TOKENS_NONE,
+  MEASURE_BADGE_UNMEASURED,
+  OUTCOME_HORIZON_LABEL,
+  OUTCOME_STATUS_LABEL,
+  outcomeTitle,
+} from "@/lib/copy/analyze/labels";
 
 type Tone = "bull" | "bear" | "neutral";
 
@@ -91,6 +98,34 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
   metaParts.push(<span className="tabular-nums">{tokenMetaLabel(item)}</span>);
   metaParts.push(formatRelativeTime(item.updatedAt));
 
+  // 채점 결과 — "이 판단이 맞았나". 방향(강세 빨강/약세 파랑)과 혼동되지 않도록 방향 무관 톤 사용.
+  const outcome = item.outcome;
+  const outcomeNode = outcome ? (
+    <span
+      className="inline-flex items-center gap-x-xs"
+      title={outcomeTitle(
+        OUTCOME_HORIZON_LABEL[outcome.horizon],
+        OUTCOME_STATUS_LABEL[outcome.status],
+        outcome.excessReturnPct,
+      )}
+    >
+      {OUTCOME_HORIZON_LABEL[outcome.horizon]}
+      <span
+        className={cn(
+          "font-medium",
+          outcome.status === "hit"
+            ? "text-accent-vivid"
+            : outcome.status === "miss"
+              ? "text-warn"
+              : "text-text-muted",
+        )}
+      >
+        {OUTCOME_STATUS_LABEL[outcome.status]}
+      </span>
+    </span>
+  ) : null;
+  if (outcomeNode) metaParts.push(outcomeNode);
+
   return (
     <ListRow
       role="listitem"
@@ -121,13 +156,15 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
 
       {/* 종목명 + 판정 / 보조 메타 */}
       <div className="min-w-0">
-        <div className="flex items-center gap-sm">
+        <div className="flex flex-wrap items-center gap-sm">
           <span className="truncate text-body-sm-strong text-text-strong">{name}</span>
           <span className={cn("shrink-0 text-body-sm-strong", TONE_TEXT[tone])}>
             {VERDICT_LABEL[verdict]}
           </span>
           {/* 재분석 진행중이면 배지(이전 결론은 그대로 유지). */}
           {item.reanalysis && <InflightBadge status={item.reanalysis.status} />}
+          {/* 현재가가 무효화/손절 라인을 넘었으면 경고 배지 — 깨진 판정을 목록에서 바로 식별. */}
+          {item.thesisBreach && <ThesisBreachBadge breach={item.thesisBreach} />}
         </div>
         <div className="mt-xs flex flex-wrap items-center gap-x-xs gap-y-xs text-caption text-text-muted">
           {metaParts.map((part, i) => (
