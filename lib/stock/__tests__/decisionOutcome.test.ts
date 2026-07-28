@@ -15,12 +15,14 @@ const CARD_AT = "2026-07-13T10:00:00.000Z";
 
 function row(over: {
   decidedAt: string;
+  runId?: string | null;
   statuses?: Partial<Record<ScorecardHorizon, HorizonStatus>>;
   excess?: Partial<Record<ScorecardHorizon, number | null>>;
 }): OutcomeCandidate {
   return {
     ticker: "005930",
     decidedAt: over.decidedAt,
+    runId: over.runId ?? null,
     statuses: { d1: "pending", w1: "pending", w2: "pending", m1: "pending", ...over.statuses },
     excess: { d1: null, w1: null, w2: null, m1: null, ...over.excess },
   };
@@ -33,9 +35,20 @@ describe("pickOutcomeRow — 카드↔원장 매칭", () => {
     expect(pickOutcomeRow([far, near], CARD_AT)).toBe(near);
   });
 
-  it("48시간을 넘게 벌어진 행은 다른 실행으로 보고 붙이지 않는다(오귀속 방지)", () => {
-    const stale = row({ decidedAt: "2026-07-10T10:00:00.000Z" }); // 3일 전
+  it("창(10분)을 넘게 벌어진 행은 다른 실행으로 보고 붙이지 않는다(오귀속 방지)", () => {
+    const stale = row({ decidedAt: "2026-07-13T09:30:00.000Z" }); // 30분 전 = 직전 실행
     expect(pickOutcomeRow([stale], CARD_AT)).toBeNull();
+  });
+
+  it("run_id 가 있으면 시각과 무관하게 정확 일치를 우선한다", () => {
+    const exact = row({ decidedAt: "2026-07-11T03:00:00.000Z", runId: "run-A" }); // 창 밖이어도
+    const near = row({ decidedAt: CARD_AT, runId: "run-B" });
+    expect(pickOutcomeRow([near, exact], CARD_AT, "run-A")).toBe(exact);
+  });
+
+  it("run_id 불일치면 시각 근접으로 폴백", () => {
+    const near = row({ decidedAt: CARD_AT, runId: "run-B" });
+    expect(pickOutcomeRow([near], CARD_AT, "run-없음")).toBe(near);
   });
 
   it("후보 없음·잘못된 시각 문자열이면 null", () => {
@@ -87,7 +100,7 @@ describe("resolveDecisionOutcome — 통합", () => {
   it("매칭 + 선택이 한 번에 동작", () => {
     const out = resolveDecisionOutcome(
       [
-        row({ decidedAt: "2026-07-10T10:00:00.000Z", statuses: { m1: "hit" } }), // 창 밖
+        row({ decidedAt: "2026-07-13T08:00:00.000Z", statuses: { m1: "hit" } }), // 창 밖(2시간 전)
         row({ decidedAt: "2026-07-13T10:02:00.000Z", statuses: { w1: "miss" }, excess: { w1: -4.1 } }),
       ],
       CARD_AT,

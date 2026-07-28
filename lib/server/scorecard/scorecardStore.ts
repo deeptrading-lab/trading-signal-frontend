@@ -435,17 +435,24 @@ export async function updateHorizonScore(
 }
 
 /**
- * /analyze 카드 결과 표시용 — 지정 ticker 들의 최근 채점 원장 행을 가볍게 조회한다.
+ * /analyze 카드 결과 표시용 — 지정 ticker 들의 채점 원장 행을 가볍게 조회한다.
  *
  * 카드에 "이 판단이 맞았나"를 붙이려면 판정별 horizon 상태가 필요한데, 집계용
  * `getAllScorecardRows`(2,000행·전 컬럼)는 목록 엔드포인트에 과하다. 배지에 필요한 컬럼만,
- * 해당 종목만 뽑는다. 매칭·표시 선택은 순수 로직(`lib/stock/decisionOutcome`)이 담당한다.
+ * 해당 종목만, **시간 범위까지 좁혀서** 뽑는다.
  *
+ * ⚠️ 이 엔드포인트는 30s(진행중 15s) 주기로 폴링되므로 상한 없는 조회는 Egress 를 계속 태운다
+ * (`lib/server/supabase/egressGuard` 원칙). `sinceIso` 로 카드가 가리킬 수 있는 구간만 읽고,
+ * 그 덕에 limit 로 **가장 오래된 카드(= m1 까지 성숙해 보여줄 값이 가장 큰 카드)** 가 조용히
+ * 잘려나가던 문제도 사라진다.
+ *
+ * 매칭·표시 선택은 순수 로직(`lib/stock/decisionOutcome`)이 담당한다.
  * 실패·미설정은 fail-soft(빈 배열) — 결과 표시는 부가 정보라 목록을 막지 않는다.
  */
 export async function getRecentOutcomeRows(
   tickers: string[],
-  limitPerFetch = 200,
+  sinceIso: string,
+  limit = 200,
 ): Promise<OutcomeCandidate[]> {
   const config = supabaseConfig();
   if (!config || tickers.length === 0) return [];
@@ -453,18 +460,23 @@ export async function getRecentOutcomeRows(
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
   url.searchParams.set(
     "select",
-    "ticker,decided_at,d1_status,w1_status,w2_status,m1_status," +
+    "ticker,decided_at,run_id,d1_status,w1_status,w2_status,m1_status," +
       "d1_excess_return_pct,w1_excess_return_pct,w2_excess_return_pct,m1_excess_return_pct",
   );
   url.searchParams.set("ticker", `in.(${tickers.join(",")})`);
+  url.searchParams.set("decided_at", `gte.${sinceIso}`);
   url.searchParams.set("order", "decided_at.desc");
-  url.searchParams.set("limit", String(limitPerFetch));
+  url.searchParams.set("limit", String(limit));
 
   const res = await fetch(url, {
     method: "GET",
     headers: { ...headers(config.key), Accept: "application/json" },
     cache: "no-store",
-  }).catch(() => null);
+  }).catch((error: unknown) => {
+    // 조용한 실패 금지 — 결과가 안 보이는 원인을 로그로 남긴다.
+    console.warn("[scorecard-store] 카드 결과 조회 네트워크 실패", error);
+    return null;
+  });
   if (!res?.ok) {
     if (res) console.warn(`[scorecard-store] 카드 결과 조회 실패 status=${res.status}`);
     return [];
@@ -473,13 +485,18 @@ export async function getRecentOutcomeRows(
   const rows = (await res.json().catch(() => [])) as Array<Record<string, unknown>>;
   if (!Array.isArray(rows)) return [];
 
-  const num = (v: unknown): number | null =>
-    typeof v === "number" && Number.isFinite(v) ? v : null;
+  // ⚠️ 모듈 상단 `num` 을 가리지 않도록 별도 이름 — PostgREST numeric 은 문자열로 올 수 있어
+  //    숫자만 받으면 초과수익이 조용히 사라진다.
+  const toNum = (v: unknown): number | null => {
+    const n = typeof v === "string" ? Number(v) : v;
+    return typeof n === "number" && Number.isFinite(n) ? n : null;
+  };
   const st = (v: unknown): HorizonStatus => (typeof v === "string" ? (v as HorizonStatus) : "pending");
 
   return rows.map((r) => ({
     ticker: String(r.ticker),
     decidedAt: String(r.decided_at),
+    runId: typeof r.run_id === "string" ? r.run_id : null,
     statuses: {
       d1: st(r.d1_status),
       w1: st(r.w1_status),
@@ -487,10 +504,10 @@ export async function getRecentOutcomeRows(
       m1: st(r.m1_status),
     },
     excess: {
-      d1: num(r.d1_excess_return_pct),
-      w1: num(r.w1_excess_return_pct),
-      w2: num(r.w2_excess_return_pct),
-      m1: num(r.m1_excess_return_pct),
+      d1: toNum(r.d1_excess_return_pct),
+      w1: toNum(r.w1_excess_return_pct),
+      w2: toNum(r.w2_excess_return_pct),
+      m1: toNum(r.m1_excess_return_pct),
     },
   }));
 }

@@ -67,14 +67,22 @@ export const OUTCOME_STATUS_LABEL: Record<"hit" | "miss" | "flat", string> = {
   miss: "빗나감",
   flat: "보합",
 };
-/** 결과 title(마우스오버) — 무엇을 기준으로 맞다/틀리다 하는지 오해 방지. */
+/**
+ * 결과 title(마우스오버) — 무엇을 기준으로 맞다/틀리다 하는지 오해 방지.
+ *
+ * ⚠️ 초과수익의 **부호를 그대로 노출하면 약세 판정에서 거꾸로 읽힌다**. 약세군은 excess 가 음수여야
+ * 적중이라 "빗나감 · +6.7%p" 같은 표기가 "올랐는데 왜 빗나감?"으로 보인다. 그래서 부호 대신
+ * **가격이 시장 대비 어느 쪽으로 움직였는지**를 문장으로 말한다(판정 방향과 무관하게 항상 참).
+ */
 export const outcomeTitle = (
   horizonLabel: string,
   statusLabel: string,
   excessPct: number | null,
 ): string =>
   `${horizonLabel} 뒤 ${statusLabel}` +
-  (excessPct !== null ? ` · 시장 대비 ${excessPct > 0 ? "+" : ""}${excessPct.toFixed(1)}%p` : "") +
+  (excessPct !== null
+    ? ` · 시장 대비 ${Math.abs(excessPct).toFixed(1)}%p ${excessPct >= 0 ? "더 상승" : "더 하락"}`
+    : "") +
   " (자가 채점 · 초과수익 기준)";
 
 /** 첫 분석(완료 결과 없음) 플레이스홀더 카드 보조 안내. */

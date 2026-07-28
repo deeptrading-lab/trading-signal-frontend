@@ -114,7 +114,7 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
         className={cn(
           "font-medium",
           outcome.status === "hit"
-            ? "text-primary"
+            ? "text-accent-vivid"
             : outcome.status === "miss"
               ? "text-warn"
               : "text-text-muted",

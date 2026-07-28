@@ -18,7 +18,10 @@ import {
 import { fetchIntstockMultprice, isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { evaluateThesisBreach } from "@/lib/stock/thesisBreach";
 import { getRecentOutcomeRows } from "@/lib/server/scorecard/scorecardStore";
-import { resolveDecisionOutcome } from "@/lib/stock/decisionOutcome";
+import {
+  resolveDecisionOutcome,
+  OUTCOME_MATCH_WINDOW_MS,
+} from "@/lib/stock/decisionOutcome";
 import { getActiveJobs } from "@/lib/server/ai/queueStore";
 import { mergeActiveJobs } from "@/lib/server/ai/inflightMerge";
 import {
@@ -88,8 +91,21 @@ async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
 async function attachOutcome(items: AIDecisionListItem[]): Promise<void> {
   try {
     if (items.length === 0) return;
+    const tickers = items.map((i) => i.ticker).filter((t) => KR_TICKER_RE.test(t));
+    if (tickers.length === 0) return;
+
+    // 조회 범위를 카드가 가리킬 수 있는 구간으로 좁힌다 — 30s 폴링 엔드포인트라 상한 없는
+    // 조회는 Egress 를 계속 태우고(egressGuard 원칙), limit 로 가장 오래된 카드가 잘려나간다.
+    const oldest = items.reduce(
+      (min, i) => Math.min(min, new Date(i.updatedAt).getTime() || Number.POSITIVE_INFINITY),
+      Number.POSITIVE_INFINITY,
+    );
+    const sinceIso = new Date(
+      (Number.isFinite(oldest) ? oldest : Date.now()) - OUTCOME_MATCH_WINDOW_MS,
+    ).toISOString();
+
     const rows = await withTimeout(
-      getRecentOutcomeRows(items.map((i) => i.ticker)),
+      getRecentOutcomeRows(tickers, sinceIso),
       OUTCOME_QUERY_TIMEOUT_MS,
     );
     if (rows.length === 0) return;
@@ -103,7 +119,7 @@ async function attachOutcome(items: AIDecisionListItem[]): Promise<void> {
     for (const item of items) {
       const candidates = byTicker.get(item.ticker);
       if (!candidates) continue;
-      item.outcome = resolveDecisionOutcome(candidates, item.updatedAt);
+      item.outcome = resolveDecisionOutcome(candidates, item.updatedAt, item.tokens?.runId ?? null);
     }
   } catch (error) {
     console.warn(
@@ -128,10 +144,8 @@ export async function GET(): Promise<Response> {
 
     // 테제 무효화 배지 — 라이브 시세 대비 무효화/손절 라인 돌파 여부. 전 구간 fail-soft:
     // 시세·레벨 조회가 실패하거나 느려도 배지만 빠지고 목록은 정상 응답한다(부가 정보).
-    await attachThesisBreach(items);
-
-    // 채점 결과(이 판단이 맞았나) — 원장에서 같은 실행 행을 찾아 가장 성숙한 시점 1건을 붙인다.
-    await attachOutcome(items);
+    // 배지(현재 무효화 여부)와 채점 결과(지난 판정 성패)는 서로 독립 — 병렬로 붙여 지연을 합치지 않는다.
+    await Promise.all([attachThesisBreach(items), attachOutcome(items)]);
 
     const payload: AIDecisionListResponse = {
       configured: isAIDecisionStoreConfigured(),

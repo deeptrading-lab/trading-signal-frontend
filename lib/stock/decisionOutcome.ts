@@ -8,9 +8,11 @@
  * 고리다.
  *
  * ## 매칭 규칙
- * 카드는 종목당 **최신 결론 1건**(upsert)이고 채점 원장은 **실행마다 append** 라, 같은 판정을 가리키려면
- * ticker + 시각 근접으로 맞춘다(실측 오차 0분, 재분석 시 새 행이 생기므로 가장 가까운 행을 고른다).
- * 48시간을 넘게 벌어지면 다른 실행으로 보고 결과를 붙이지 않는다(오귀속 방지).
+ * 카드는 종목당 **최신 결론 1건**(upsert)이고 채점 원장은 **실행마다 append** 라 같은 판정을 가리킬 키가 필요하다.
+ *   1순위 **run_id 정확 일치** — 양쪽 모두 실행 단위로 갖고 있어 모호함이 없다.
+ *   2순위 시각 근접 — run_id 가 없는 행(토큰 미기록 등) 폴백. 라이브는 같은 요청에서 upsert→insert 라
+ *   초 단위, backfill 은 `decidedAt = updatedAt`(오차 0)이므로 창을 **분 단위로 좁게** 잡는다.
+ *   창을 넓게 두면 최신 실행의 원장 insert 가 빠졌을 때 **어제 실행 결과가 오늘 카드에 붙는다**(오귀속).
  *
  * ## 표시 선택
  * 네 시점을 다 보여주면 카드가 시끄러워지므로 **가장 성숙한(먼) 채점 완료 시점 하나**만 고른다
@@ -33,6 +35,8 @@ export interface DecisionOutcome {
 export interface OutcomeCandidate {
   ticker: string;
   decidedAt: string;
+  /** 실행 식별자(원장 run_id). 카드의 tokens.runId 와 정확 일치가 1순위 매칭 키. 없으면 null. */
+  runId: string | null;
   statuses: Record<ScorecardHorizon, HorizonStatus>;
   excess: Record<ScorecardHorizon, number | null>;
 }
@@ -40,8 +44,11 @@ export interface OutcomeCandidate {
 /** 성숙도 내림차순 — 가장 먼 시점부터 고른다. */
 const HORIZON_BY_MATURITY: ScorecardHorizon[] = ["m1", "w2", "w1", "d1"];
 
-/** 카드 결정 시각과 원장 행이 같은 실행인지 볼 허용 오차(ms). */
-export const OUTCOME_MATCH_WINDOW_MS = 48 * 60 * 60 * 1000;
+/**
+ * run_id 폴백 시 같은 실행으로 볼 허용 오차(ms). 라이브 insert 는 초 단위·backfill 은 0 이라
+ * 10분이면 충분하고, 이보다 넓히면 직전 실행 결과를 최신 카드에 잘못 붙일 위험이 커진다.
+ */
+export const OUTCOME_MATCH_WINDOW_MS = 10 * 60 * 1000;
 
 function timeOf(iso: string): number | null {
   const t = new Date(iso).getTime();
@@ -55,7 +62,15 @@ function timeOf(iso: string): number | null {
 export function pickOutcomeRow(
   candidates: OutcomeCandidate[],
   decisionUpdatedAt: string,
+  runId?: string | null,
 ): OutcomeCandidate | null {
+  // 1순위 — run_id 정확 일치(모호함 없음).
+  if (runId) {
+    const exact = candidates.find((row) => row.runId === runId);
+    if (exact) return exact;
+  }
+
+  // 2순위 — 시각 근접(좁은 창).
   const target = timeOf(decisionUpdatedAt);
   if (target === null) return null;
 
@@ -88,6 +103,7 @@ export function selectDecisionOutcome(row: OutcomeCandidate | null): DecisionOut
 export function resolveDecisionOutcome(
   candidates: OutcomeCandidate[],
   decisionUpdatedAt: string,
+  runId?: string | null,
 ): DecisionOutcome | null {
-  return selectDecisionOutcome(pickOutcomeRow(candidates, decisionUpdatedAt));
+  return selectDecisionOutcome(pickOutcomeRow(candidates, decisionUpdatedAt, runId));
 }
