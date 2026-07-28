@@ -127,14 +127,15 @@ function zonesOf(candles: StockDailyCandle[], current: number): VolumeZone[] {
 
   return vp.bins
     .map((b) => {
-      const distPct = ((current - b.mid) / b.mid) * 100;
-      // distPct 부호: 현재가가 구간보다 위면 양수. 사용자 관점은 "구간이 현재가 위/아래"이므로 반전해 표기.
+      // "현재가 대비 구간이 얼마나 위(+)/아래(-)인지" — **분모는 현재가**.
+      // 구간가를 분모로 쓰면 먼 구간에서 -100% 를 넘는 불가능한 값이 나온다(가격은 -100% 아래로 못 감).
+      const distPct = ((b.mid - current) / current) * 100;
       const side: VolumeZone["side"] =
-        Math.abs(distPct) <= AT_ZONE_PCT ? "at" : distPct > 0 ? "below" : "above";
+        Math.abs(distPct) <= AT_ZONE_PCT ? "at" : distPct < 0 ? "below" : "above";
       return {
         price: Math.round(b.mid),
         weightPct: (b.volume / total) * 100,
-        distPct: -distPct, // 구간 기준: 현재가 대비 구간이 얼마나 위(+)/아래(-)인지
+        distPct,
         side,
       };
     })

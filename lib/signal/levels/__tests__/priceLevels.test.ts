@@ -113,3 +113,19 @@ describe("formatPriceLevelsForPrompt", () => {
     expect(formatPriceLevelsForPrompt(computePriceLevels([], 0), 0)).toBe("");
   });
 });
+
+describe("VolumeZone.distPct — 분모는 현재가(불가능한 -100% 이하 방지)", () => {
+  it("현재가 대비 거리는 -100% 아래로 내려가지 않는다", () => {
+    // 현재가가 매물대보다 훨씬 위(2배 이상)여도 -100% 를 넘지 않아야 한다.
+    const closes = Array.from({ length: 200 }, (_, i) => (i < 150 ? 50 : 200));
+    const volumes = closes.map((c) => (c === 50 ? 9000 : 500));
+    const lv = computePriceLevels(series(closes, volumes), 200);
+    for (const z of lv.zones) {
+      expect(z.distPct).toBeGreaterThan(-100);
+    }
+    const support = lv.nearestSupport!;
+    // 50 근처 매물대는 현재가 200 대비 약 -75%(표시가는 반올림이라 소수점 오차 허용).
+    expect(support.distPct).toBeCloseTo(((support.price - 200) / 200) * 100, 0);
+    expect(support.distPct).toBeLessThan(-70);
+  });
+});
