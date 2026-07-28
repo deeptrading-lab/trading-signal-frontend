@@ -32,7 +32,13 @@ import type { AIDecisionListItem } from "@/lib/types/stock/aiAnalysisDecisions";
 import { AIDecisionCardMenu } from "./AIDecisionCardMenu";
 import { InflightBadge } from "./InflightBadge";
 import { ThesisBreachBadge } from "./ThesisBreachBadge";
-import { CARD_TOKENS_NONE, MEASURE_BADGE_UNMEASURED } from "@/lib/copy/analyze/labels";
+import {
+  CARD_TOKENS_NONE,
+  MEASURE_BADGE_UNMEASURED,
+  OUTCOME_HORIZON_LABEL,
+  OUTCOME_STATUS_LABEL,
+  outcomeTitle,
+} from "@/lib/copy/analyze/labels";
 
 type Tone = "bull" | "bear" | "neutral";
 
@@ -91,6 +97,34 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
   metaParts.push(item.decision.time_horizon);
   metaParts.push(<span className="tabular-nums">{tokenMetaLabel(item)}</span>);
   metaParts.push(formatRelativeTime(item.updatedAt));
+
+  // 채점 결과 — "이 판단이 맞았나". 방향(강세 빨강/약세 파랑)과 혼동되지 않도록 방향 무관 톤 사용.
+  const outcome = item.outcome;
+  const outcomeNode = outcome ? (
+    <span
+      className="inline-flex items-center gap-x-xs"
+      title={outcomeTitle(
+        OUTCOME_HORIZON_LABEL[outcome.horizon],
+        OUTCOME_STATUS_LABEL[outcome.status],
+        outcome.excessReturnPct,
+      )}
+    >
+      {OUTCOME_HORIZON_LABEL[outcome.horizon]}
+      <span
+        className={cn(
+          "font-medium",
+          outcome.status === "hit"
+            ? "text-accent-vivid"
+            : outcome.status === "miss"
+              ? "text-warn"
+              : "text-text-muted",
+        )}
+      >
+        {OUTCOME_STATUS_LABEL[outcome.status]}
+      </span>
+    </span>
+  ) : null;
+  if (outcomeNode) metaParts.push(outcomeNode);
 
   return (
     <ListRow
