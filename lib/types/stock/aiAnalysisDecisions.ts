@@ -13,6 +13,7 @@ import type {
 } from "@/lib/types/stock/aiAnalysis";
 import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
 import type { ThesisBreach } from "@/lib/stock/thesisBreach";
+import type { DecisionOutcome } from "@/lib/stock/decisionOutcome";
 
 /**
  * 진행중 작업 표시(unified-analysis-jobs) — queue active 행을 카드용으로 압축.
@@ -64,6 +65,11 @@ export interface AIDecisionListItem {
    * 라이브 시세 조회 실패·legacy(base_price 없음)·미돌파면 null(배지 없음, fail-soft).
    */
   thesisBreach?: ThesisBreach | null;
+  /**
+   * 이 판정의 채점 결과(가장 성숙한 채점 완료 시점 1건) — "이 판단이 맞았나".
+   * 아직 채점 전이거나 원장 매칭 실패면 null(표시 없음).
+   */
+  outcome?: DecisionOutcome | null;
 }
 
 /**

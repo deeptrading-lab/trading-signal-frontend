@@ -21,6 +21,7 @@ import type {
   ScorecardWriteResult,
 } from "@/lib/types/scorecard/scorecard";
 import type { HorizonStatus, ScorecardRegime } from "@/lib/types/scorecard/scorecard";
+import type { OutcomeCandidate } from "@/lib/stock/decisionOutcome";
 import type { AIAnalysisProvider, FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { SignalAction } from "@/lib/types/signal";
 import { createLogger } from "@/lib/server/logTag";
@@ -431,4 +432,65 @@ export async function updateHorizonScore(
     };
   }
   return { ok: true, skipped: false };
+}
+
+/**
+ * /analyze 카드 결과 표시용 — 지정 ticker 들의 최근 채점 원장 행을 가볍게 조회한다.
+ *
+ * 카드에 "이 판단이 맞았나"를 붙이려면 판정별 horizon 상태가 필요한데, 집계용
+ * `getAllScorecardRows`(2,000행·전 컬럼)는 목록 엔드포인트에 과하다. 배지에 필요한 컬럼만,
+ * 해당 종목만 뽑는다. 매칭·표시 선택은 순수 로직(`lib/stock/decisionOutcome`)이 담당한다.
+ *
+ * 실패·미설정은 fail-soft(빈 배열) — 결과 표시는 부가 정보라 목록을 막지 않는다.
+ */
+export async function getRecentOutcomeRows(
+  tickers: string[],
+  limitPerFetch = 200,
+): Promise<OutcomeCandidate[]> {
+  const config = supabaseConfig();
+  if (!config || tickers.length === 0) return [];
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set(
+    "select",
+    "ticker,decided_at,d1_status,w1_status,w2_status,m1_status," +
+      "d1_excess_return_pct,w1_excess_return_pct,w2_excess_return_pct,m1_excess_return_pct",
+  );
+  url.searchParams.set("ticker", `in.(${tickers.join(",")})`);
+  url.searchParams.set("order", "decided_at.desc");
+  url.searchParams.set("limit", String(limitPerFetch));
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch(() => null);
+  if (!res?.ok) {
+    if (res) console.warn(`[scorecard-store] 카드 결과 조회 실패 status=${res.status}`);
+    return [];
+  }
+
+  const rows = (await res.json().catch(() => [])) as Array<Record<string, unknown>>;
+  if (!Array.isArray(rows)) return [];
+
+  const num = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const st = (v: unknown): HorizonStatus => (typeof v === "string" ? (v as HorizonStatus) : "pending");
+
+  return rows.map((r) => ({
+    ticker: String(r.ticker),
+    decidedAt: String(r.decided_at),
+    statuses: {
+      d1: st(r.d1_status),
+      w1: st(r.w1_status),
+      w2: st(r.w2_status),
+      m1: st(r.m1_status),
+    },
+    excess: {
+      d1: num(r.d1_excess_return_pct),
+      w1: num(r.w1_excess_return_pct),
+      w2: num(r.w2_excess_return_pct),
+      m1: num(r.m1_excess_return_pct),
+    },
+  }));
 }

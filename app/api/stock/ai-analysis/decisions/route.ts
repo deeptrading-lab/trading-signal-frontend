@@ -17,6 +17,8 @@ import {
 } from "@/lib/server/ai/decisionStore";
 import { fetchIntstockMultprice, isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { evaluateThesisBreach } from "@/lib/stock/thesisBreach";
+import { getRecentOutcomeRows } from "@/lib/server/scorecard/scorecardStore";
+import { resolveDecisionOutcome } from "@/lib/stock/decisionOutcome";
 import { getActiveJobs } from "@/lib/server/ai/queueStore";
 import { mergeActiveJobs } from "@/lib/server/ai/inflightMerge";
 import {
@@ -36,6 +38,9 @@ const FALLBACK_TIMEOUT_MESSAGE = "분석 결과 조회가 지연되고 있어요
  * 목록 조회(5s) **뒤에 순차** 실행이라 이 값이 곧 최악 지연 증가분이다.
  */
 const BREACH_QUOTE_TIMEOUT_MS = 1_500;
+
+/** 채점 원장 조회 예산 — Supabase 단일 쿼리라 짧게. 초과 시 결과 표시 없이 진행. */
+const OUTCOME_QUERY_TIMEOUT_MS = 1_500;
 
 /** 국내 6자리 티커만 배치 대상 — US 등 비정형 티커가 섞이면 KIS 1콜이 통째로 실패해 전 배지가 사라진다. */
 const KR_TICKER_RE = /^\d{6}$/;
@@ -76,6 +81,38 @@ async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
   }
 }
 
+/**
+ * 각 카드에 채점 결과를 붙인다(in-place). 실패·미설정이면 조용히 no-op — 부가 정보라 목록을 막지 않는다.
+ * 원장은 append(실행마다 1행)이고 카드는 최신 결론 1건이라, 매칭·선택은 순수 로직에 위임한다.
+ */
+async function attachOutcome(items: AIDecisionListItem[]): Promise<void> {
+  try {
+    if (items.length === 0) return;
+    const rows = await withTimeout(
+      getRecentOutcomeRows(items.map((i) => i.ticker)),
+      OUTCOME_QUERY_TIMEOUT_MS,
+    );
+    if (rows.length === 0) return;
+
+    const byTicker = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const list = byTicker.get(row.ticker) ?? [];
+      list.push(row);
+      byTicker.set(row.ticker, list);
+    }
+    for (const item of items) {
+      const candidates = byTicker.get(item.ticker);
+      if (!candidates) continue;
+      item.outcome = resolveDecisionOutcome(candidates, item.updatedAt);
+    }
+  } catch (error) {
+    console.warn(
+      "[ai-decisions] 채점 결과 부착 skip —",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
 export async function GET(): Promise<Response> {
   try {
     const [decisions, activeJobs] = await withTimeout(
@@ -92,6 +129,9 @@ export async function GET(): Promise<Response> {
     // 테제 무효화 배지 — 라이브 시세 대비 무효화/손절 라인 돌파 여부. 전 구간 fail-soft:
     // 시세·레벨 조회가 실패하거나 느려도 배지만 빠지고 목록은 정상 응답한다(부가 정보).
     await attachThesisBreach(items);
+
+    // 채점 결과(이 판단이 맞았나) — 원장에서 같은 실행 행을 찾아 가장 성숙한 시점 1건을 붙인다.
+    await attachOutcome(items);
 
     const payload: AIDecisionListResponse = {
       configured: isAIDecisionStoreConfigured(),

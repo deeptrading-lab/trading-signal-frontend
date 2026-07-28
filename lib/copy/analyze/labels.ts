@@ -50,6 +50,33 @@ export const thesisBreachTitle = (
   kind === "invalidation"
     ? `무효화 라인 ${linePrice}원 돌파 (+${overshootPct.toFixed(1)}%) — 약세 판단 근거가 깨졌어요. 재분석을 권해요.`
     : `손절 라인 ${linePrice}원 이탈 (-${overshootPct.toFixed(1)}%) — 강세 판단 근거가 깨졌어요. 재분석을 권해요.`;
+// ─── 채점 결과 ("이 판단이 맞았나") ─────────────────────────────────────────
+/** 채점 시점 라벨 — signal_scorecard 의 d1/w1/w2/m1. */
+export const OUTCOME_HORIZON_LABEL: Record<"d1" | "w1" | "w2" | "m1", string> = {
+  d1: "1일",
+  w1: "1주",
+  w2: "2주",
+  m1: "1달",
+};
+/**
+ * 결과 라벨. 기준은 **초과수익**(벤치 지수 대비)이라 "시장 대비" 성패다.
+ * flat 은 ±기준 밴드 안이라 적중/빗나감 어느 쪽도 아님(집계 분모에서도 빠진다).
+ */
+export const OUTCOME_STATUS_LABEL: Record<"hit" | "miss" | "flat", string> = {
+  hit: "적중",
+  miss: "빗나감",
+  flat: "보합",
+};
+/** 결과 title(마우스오버) — 무엇을 기준으로 맞다/틀리다 하는지 오해 방지. */
+export const outcomeTitle = (
+  horizonLabel: string,
+  statusLabel: string,
+  excessPct: number | null,
+): string =>
+  `${horizonLabel} 뒤 ${statusLabel}` +
+  (excessPct !== null ? ` · 시장 대비 ${excessPct > 0 ? "+" : ""}${excessPct.toFixed(1)}%p` : "") +
+  " (자가 채점 · 초과수익 기준)";
+
 /** 첫 분석(완료 결과 없음) 플레이스홀더 카드 보조 안내. */
 export const INFLIGHT_PLACEHOLDER_HINT = "분석이 끝나면 결과가 여기에 표시돼요.";
 /** 진행중 작업 출처 배지(봇 요청만 노출, prod·local 은 숨김). */
