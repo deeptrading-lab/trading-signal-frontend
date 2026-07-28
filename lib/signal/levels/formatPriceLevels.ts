@@ -37,9 +37,11 @@ export function formatPriceLevelsForPrompt(levels: PriceLevels, current: number)
 
   if (levels.bollinger) {
     const b = levels.bollinger;
+    // 변동성이 극단적이면 하단(중심-2σ)이 0 이하가 될 수 있다 — 그때 "하단 대비 %" 는
+    // 0 나눗셈(Infinity)이나 부호가 뒤집힌 헛값이 되므로 가격만 쓰고 % 는 생략한다.
+    const vsLower = b.lower > 0 ? ` — 현재가는 하단 대비 ${pct(((current - b.lower) / b.lower) * 100)}` : "";
     lines.push(
-      `볼린저(20,2): 상단 ${won(b.upper)} | 중심 ${won(b.mid)} | 하단 ${won(b.lower)}` +
-        ` — 현재가는 하단 대비 ${pct(((current - b.lower) / b.lower) * 100)}`,
+      `볼린저(20,2): 상단 ${won(b.upper)} | 중심 ${won(b.mid)} | 하단 ${won(b.lower)}${vsLower}`,
     );
   }
 

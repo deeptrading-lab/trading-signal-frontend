@@ -16,6 +16,10 @@
  * 순수 함수(IO 없음) — 값 계산만 하고, 문구 조립은 호출부가 한다.
  */
 
+// 매물대는 **차트가 그리는 것과 같은 계산**을 써야 한다 — 사용자가 차트에서 눈으로 읽은 매물대와
+// AI 가 근거로 쓴 매물대가 어긋나면 안 되기 때문. 그래서 같은 signal 도메인의 calcVolumeProfile
+// (typical price 를 한 bin 에 점 배정)이 아니라, 차트 오버레이가 쓰는 computeVolumeProfile
+// (봉의 [low, high] 구간에 거래량을 균등 분배 — 더 정교한 근사)을 쓴다. 순수 함수라 의존성 없음.
 import { computeVolumeProfile } from "@/lib/utils/volumeProfile";
 import type { StockDailyCandle } from "@/lib/api/kis/types";
 
