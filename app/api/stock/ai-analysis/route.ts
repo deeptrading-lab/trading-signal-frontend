@@ -63,6 +63,8 @@ import {
   isMarketAnalysisFresh,
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
+import { computePriceLevels } from "@/lib/signal/levels/priceLevels";
+import { formatPriceLevelsForPrompt } from "@/lib/signal/levels/formatPriceLevels";
 import {
   normalizeConfidence,
   normalizeTimeHorizon,
@@ -794,6 +796,20 @@ export async function POST(req: NextRequest): Promise<Response> {
         const investorData = investorSettled.status === "fulfilled" ? investorSettled.value : null;
         const warningsData = warningsSettled.status === "fulfilled" ? warningsSettled.value : [];
         state.priceContext = formatPriceContextForPrompt(sorted, signalResult, priceData, investorData, warningsData);
+
+        // 가격 레벨(이동평균·볼린저·피보나치·매물대 배치) **실측값** 주입 — 없으면 모델이 레벨을
+        // 추정해 서술하는 문제가 있었다(실측: "233,000원(20일선)" vs 실제 20일선 276,350원).
+        // 매물대는 현재가 위/아래로 나눠 줘야 "더 빠질 자리가 남았는지"를 근거로 말할 수 있다.
+        try {
+          const levelPrice = priceData?.price ?? sorted[sorted.length - 1]?.close ?? 0;
+          const levelsBlock = formatPriceLevelsForPrompt(
+            computePriceLevels(sorted, levelPrice),
+            levelPrice,
+          );
+          if (levelsBlock) state.priceContext = `${state.priceContext}\n\n${levelsBlock}`;
+        } catch (error) {
+          aiLog.warn("가격 레벨 컨텍스트 생성 실패 — 레벨 없이 진행", error);
+        }
         if (warningsData.length > 0) {
           aiLog(`시장경보 컨텍스트 주입 — ${warningsData.map((w) => w.warningType).join(",")}`);
         }
