@@ -45,6 +45,16 @@ export function evaluateThesisBreach(
 ): ThesisBreach | null {
   if (typeof livePrice !== "number" || !Number.isFinite(livePrice) || livePrice <= 0) return null;
 
+  // ⚠️ legacy 약세(#350 이전: 약세 verdict 인데 stop 이 하방 음수)는 배지를 내지 않는다.
+  // 그 행에서 주가가 stop 아래로 가는 건 약세 판정이 **맞아가는** 것인데, 부호만 보면 role=stop 으로
+  // 잡혀 "손절 이탈 — 판단 근거가 깨졌어요"라는 정반대 경고가 붙는다. 시맨틱이 모호한 구간이므로
+  // 잘못된 경고 대신 침묵을 택한다.
+  const bearish =
+    decision.verdict === "UNDERWEIGHT" ||
+    decision.verdict === "REDUCE" ||
+    decision.verdict === "SELL";
+  if (bearish && decision.stop_loss_pct < 0) return null;
+
   // base_price 없는 legacy 판정은 절대가 파생 불가 → 배지 없음(차트 오버레이와 동일 정책).
   const levels = deriveAiVerdictLevels(decision);
   if (!levels) return null;

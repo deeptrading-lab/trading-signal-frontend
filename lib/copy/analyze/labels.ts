@@ -48,8 +48,8 @@ export const thesisBreachTitle = (
   overshootPct: number,
 ): string =>
   kind === "invalidation"
-    ? `무효화 라인 ${linePrice} 돌파 (+${overshootPct.toFixed(1)}%) — 약세 판단 근거가 깨졌어요. 재분석을 권해요.`
-    : `손절 라인 ${linePrice} 이탈 (-${overshootPct.toFixed(1)}%) — 강세 판단 근거가 깨졌어요. 재분석을 권해요.`;
+    ? `무효화 라인 ${linePrice}원 돌파 (+${overshootPct.toFixed(1)}%) — 약세 판단 근거가 깨졌어요. 재분석을 권해요.`
+    : `손절 라인 ${linePrice}원 이탈 (-${overshootPct.toFixed(1)}%) — 강세 판단 근거가 깨졌어요. 재분석을 권해요.`;
 /** 첫 분석(완료 결과 없음) 플레이스홀더 카드 보조 안내. */
 export const INFLIGHT_PLACEHOLDER_HINT = "분석이 끝나면 결과가 여기에 표시돼요.";
 /** 진행중 작업 출처 배지(봇 요청만 노출, prod·local 은 숨김). */

@@ -1,7 +1,7 @@
 /**
  * normalizeDecisionEnums 회귀 — confidence·time_horizon 관대 정규화와 폴백 통지를 고정한다.
  *
- * 배경: 정확일치 폴백이 조용히 기본값으로 덮어 저장 결정 50건이 confidence 100% MEDIUM ·
+ * 배경: 정확일치 폴백이 조용히 기본값으로 덮어 저장 결정 91건이 confidence 100% MEDIUM ·
  * time_horizon 100% 중기 로 고정됐던 사건(같은 응답의 verdict 는 정상 분산). 아래 케이스가
  * 그 회귀(정규 표기 외 변형이 전부 기본값으로 삼켜지는 것)를 잡는다.
  */

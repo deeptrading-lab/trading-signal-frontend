@@ -4,7 +4,7 @@
  * ## 배경 — 조용한 폴백이 신호 차원을 통째로 죽인 사건
  *
  * route handler 는 원래 `["HIGH","MEDIUM","LOW"].includes(raw) ? raw : "MEDIUM"` 처럼 **정확 일치**만
- * 통과시키고 나머지는 말없이 기본값으로 떨어뜨렸다. 그 결과 저장된 결정 50건이
+ * 통과시키고 나머지는 말없이 기본값으로 떨어뜨렸다. 그 결과 저장된 결정 91건이
  * **confidence 100% MEDIUM · time_horizon 100% 중기** — 같은 응답의 `verdict` 는 정상 분산
  * (UNDERWEIGHT/OVERWEIGHT/REDUCE/HOLD)되는데 두 필드만 폴백 기본값에 고정됐다.
  * verdict 는 폴백 없이 **검증 실패 처리**라 살아남았고, 두 필드만 삼켜진 것이다.

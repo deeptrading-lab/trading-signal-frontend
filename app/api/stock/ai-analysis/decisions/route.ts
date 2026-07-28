@@ -31,8 +31,14 @@ import type {
 
 const FALLBACK_TIMEOUT_MESSAGE = "분석 결과 조회가 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 
-/** 배지용 시세 조회 예산 — 목록 응답을 붙잡지 않도록 짧게. 초과 시 배지 없이 진행. */
-const BREACH_QUOTE_TIMEOUT_MS = 2_500;
+/**
+ * 배지용 시세 조회 예산 — 목록 응답을 붙잡지 않도록 짧게. 초과 시 배지 없이 진행.
+ * 목록 조회(5s) **뒤에 순차** 실행이라 이 값이 곧 최악 지연 증가분이다.
+ */
+const BREACH_QUOTE_TIMEOUT_MS = 1_500;
+
+/** 국내 6자리 티커만 배치 대상 — US 등 비정형 티커가 섞이면 KIS 1콜이 통째로 실패해 전 배지가 사라진다. */
+const KR_TICKER_RE = /^\d{6}$/;
 
 /**
  * 각 카드에 테제 무효화 여부를 붙인다(in-place). 실패·미설정·타임아웃이면 조용히 no-op —
@@ -46,7 +52,9 @@ async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
     if (items.length === 0) return;
     if (!isKisConfigured() || resolveKisEnv() !== "prod") return;
 
-    const tickers = items.map((i) => i.ticker);
+    const tickers = items.map((i) => i.ticker).filter((t) => KR_TICKER_RE.test(t));
+    if (tickers.length === 0) return;
+
     const [levels, quotes] = await withTimeout(
       Promise.all([getDecisionThesisLevels(tickers), fetchIntstockMultprice(tickers)]),
       BREACH_QUOTE_TIMEOUT_MS,
@@ -58,8 +66,13 @@ async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
       if (!level) continue;
       item.thesisBreach = evaluateThesisBreach(level, priceByTicker.get(item.ticker));
     }
-  } catch {
-    // 타임아웃·시세 실패·부분 응답 — 배지 없이 진행.
+  } catch (error) {
+    // 타임아웃·시세 실패·부분 응답 — 배지 없이 진행하되 **조용히 넘기지 않는다**
+    // (이 PR 의 원칙: 폴백은 허용하되 관측 가능해야 한다).
+    console.warn(
+      "[ai-decisions] 테제 무효화 배지 계산 skip —",
+      error instanceof Error ? error.message : error,
+    );
   }
 }
 

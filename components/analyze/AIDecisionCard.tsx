@@ -122,7 +122,7 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
 
       {/* 종목명 + 판정 / 보조 메타 */}
       <div className="min-w-0">
-        <div className="flex items-center gap-sm">
+        <div className="flex flex-wrap items-center gap-sm">
           <span className="truncate text-body-sm-strong text-text-strong">{name}</span>
           <span className={cn("shrink-0 text-body-sm-strong", TONE_TEXT[tone])}>
             {VERDICT_LABEL[verdict]}

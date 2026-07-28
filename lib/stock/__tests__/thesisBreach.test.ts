@@ -64,9 +64,14 @@ describe("evaluateThesisBreach — 방어", () => {
     expect(evaluateThesisBreach(dec({}), Number.NaN)).toBeNull();
   });
 
-  it("legacy 약세(stop 음수)는 하방 손절로 해석 — 상방 급등은 배지 없음", () => {
-    const legacy = dec({ stop_loss_pct: -8 }); // 구 시맨틱: 약세인데 하방
-    expect(evaluateThesisBreach(legacy, 12_000)).toBeNull();
-    expect(evaluateThesisBreach(legacy, 9_000)?.kind).toBe("stop");
+  it("legacy 약세(#350 이전, stop 음수)는 방향 무관 배지 없음 — 정반대 경고 방지", () => {
+    // 약세인데 stop 이 하방이면 주가 하락은 판정이 맞아가는 것 → "손절 이탈" 경고는 오해.
+    const legacy = dec({ stop_loss_pct: -8 });
+    expect(evaluateThesisBreach(legacy, 9_000)).toBeNull(); // 하방 이탈해도 침묵
+    expect(evaluateThesisBreach(legacy, 12_000)).toBeNull(); // 상방 급등도 침묵
+  });
+
+  it("강세(HOLD 포함)는 stop 음수가 정상 시맨틱이라 배지 유지", () => {
+    expect(evaluateThesisBreach(dec({ verdict: "HOLD", target_pct: 10, stop_loss_pct: -7 }), 9_000)?.kind).toBe("stop");
   });
 });
