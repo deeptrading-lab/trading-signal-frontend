@@ -18,6 +18,12 @@
  */
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { StockMinuteCandle } from "@/lib/api/kis/types";
+import type {
+  PaperTradingDecision,
+  PaperTradingSession,
+  PaperTradingTick,
+} from "@/lib/types/paperTrading/paperTrading";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const OUT = fileURLToPath(new URL("./output/", import.meta.url));
@@ -26,6 +32,14 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
+}
+
+const { isSupabaseEgressDisabled } = await import("@/lib/server/supabase/egressGuard");
+if (isSupabaseEgressDisabled()) {
+  console.error(
+    "Supabase Egress 차단 모드라 일일 리포트의 원격 데이터 적재를 건너뜁니다.",
+  );
+  process.exit(0);
 }
 
 const { labelTick, kstMinuteStamp } = await import("@/lib/server/intraday/tickLabels");
@@ -44,25 +58,31 @@ const P = (s = "") => { out.push(s); console.log(s); };
 
 // ── 적재(전 provider) ──
 const sres = await fetch(`${url}/rest/v1/paper_trading_sessions?select=payload&order=updated_at.desc&limit=200`, { headers: H });
-const daySessions = (await sres.json()).map((r: any) => r.payload).filter((p: any) => p.decisionProvider === "cli-agent" && kstDate(p.createdAt) === DAY);
-const ids = daySessions.map((s: any) => s.id);
-const dayTicks: any[] = [];
+const daySessions = ((await sres.json()) as Array<{ payload: PaperTradingSession }>)
+  .map((row) => row.payload)
+  .filter((session) => session.decisionProvider === "cli-agent" && kstDate(session.createdAt) === DAY);
+const ids = daySessions.map((session) => session.id);
+const dayTicks: PaperTradingTick[] = [];
 for (let off = 0; ids.length; off += 1000) {
   const tr = await fetch(`${url}/rest/v1/paper_trading_ticks?select=payload&session_id=in.(${ids.join(",")})&order=session_id.asc,tick_index.asc&limit=1000&offset=${off}`, { headers: H });
-  const page = (await tr.json()).map((r: any) => r.payload);
+  const page = ((await tr.json()) as Array<{ payload: PaperTradingTick }>).map((row) => row.payload);
   dayTicks.push(...page);
   if (page.length < 1000) break;
 }
 fs.writeFileSync(`${OUT}today-sessions-${DAY}.json`, JSON.stringify(daySessions));
 fs.writeFileSync(`${OUT}today-ticks-${DAY}.json`, JSON.stringify(dayTicks));
 
-const providerOf = (s: any): "claude" | "codex" => (s.aiProvider === "codex" ? "codex" : "claude");
+const providerOf = (session: PaperTradingSession): "claude" | "codex" =>
+  session.aiProvider === "codex" ? "codex" : "claude";
 P(`# 단타 일일 리포트 ${DAY}`);
 P(`전체 세션 ${daySessions.length} / 틱 ${dayTicks.length} — provider별 분리 분석(모델 다르면 섞지 않음)`);
 if (dayTicks.length === 0) { P("\n틱 없음 — 종료(장중 서버 미가동 or 미래일)."); fs.writeFileSync(`${OUT}report-${DAY}.txt`, out.join("\n")); process.exit(0); }
 
 // ── 공용 헬퍼 ──
-const cache = new Map<string, any[]>();
+type ConvictionTick = PaperTradingTick & {
+  decision: PaperTradingDecision & { convictionScore: number };
+};
+const cache = new Map<string, StockMinuteCandle[]>();
 async function candlesFor(tk: string, tf: number) {
   const k = `${tk}|${tf}`;
   if (!cache.has(k)) {
@@ -71,7 +91,7 @@ async function candlesFor(tk: string, tf: number) {
   }
   return cache.get(k)!;
 }
-function fwd(candles: any[], stamp: string, base: number, Hm: number): number | null {
+function fwd(candles: StockMinuteCandle[], stamp: string, base: number, Hm: number): number | null {
   const d = stamp.slice(0, 10), dm = minutesOfDay(stamp);
   if (dm < 0) return null;
   const a = candles.filter((c) => c.date.slice(0, 10) === d && c.date > stamp && minutesOfDay(c.date) >= dm + Hm);
@@ -83,14 +103,28 @@ type R = { conv: number; sig: number | null; label: string; ret: number | null; 
 const wr = (rs: R[]) => { const w = rs.filter((r) => r.label === "WIN").length, l = rs.filter((r) => r.label === "LOSS").length; return { w, l, pct: w + l ? (w / (w + l)) * 100 : null }; };
 
 // ── provider 그룹 1개 분석 ──
-async function analyzeGroup(provider: string, sess: any[], ticks: any[]): Promise<string[] | null> {
+async function analyzeGroup(
+  provider: string,
+  sess: PaperTradingSession[],
+  ticks: PaperTradingTick[],
+): Promise<string[] | null> {
   if (sess.length === 0) return null;
   const byOwner: Record<string, number> = {};
   for (const s of sess) byOwner[s.owner ?? "(미지정)"] = (byOwner[s.owner ?? "(미지정)"] || 0) + 1;
-  const v2 = ticks.filter((t) => t.decision.judgeSchema === "v2" && t.decision.convictionScore != null);
+  const v2 = ticks.filter(
+    (tick): tick is ConvictionTick =>
+      tick.decision.judgeSchema === "v2" && tick.decision.convictionScore != null,
+  );
   const holdN = ticks.filter((t) => t.decision.action === "HOLD").length;
   const failKinds: Record<string, number> = {};
-  for (const t of ticks) { const ad = t.decision.agentDiagnostics; if (ad) for (const k of ["analyst", "judge"]) if (ad[k]?.failureKind) failKinds[ad[k].failureKind] = (failKinds[ad[k].failureKind] || 0) + 1; }
+  for (const tick of ticks) {
+    const diagnostics = tick.decision.agentDiagnostics;
+    if (!diagnostics) continue;
+    for (const agent of ["analyst", "judge"] as const) {
+      const failureKind = diagnostics[agent]?.failureKind;
+      if (failureKind) failKinds[failureKind] = (failKinds[failureKind] || 0) + 1;
+    }
+  }
   const convVals = v2.map((t) => t.decision.convictionScore);
   const convMean = convVals.length ? convVals.reduce((a, b) => a + b, 0) / convVals.length : null;
   const degenerate = v2.length < ticks.length * 0.15; // 대량 CLI 실패(노이즈)
@@ -110,7 +144,7 @@ async function analyzeGroup(provider: string, sess: any[], ticks: any[]): Promis
     for (const t of v2.filter((x) => x.sessionId === s.id)) {
       const base = t.decision.intradaySnapshot?.basePrice;
       if (!base) continue;
-      const comp = labelTick(t as any, candles as any);
+      const comp = labelTick(t, candles);
       const stamp = kstMinuteStamp(t.tickWindowStart || t.pricedAt || t.createdAt);
       recs.push({ conv: t.decision.convictionScore, sig: t.decision.intradaySnapshot?.signal?.score ?? null, label: comp.label, ret: comp.label === "UNRESOLVED" ? null : comp.returnPct, f30: fwd(candles, stamp, base, 30) });
     }
@@ -152,10 +186,10 @@ async function analyzeGroup(provider: string, sess: any[], ticks: any[]): Promis
 
 // ── provider별 분석 + 로그 ──
 const rows: string[][] = [];
-for (const provider of ["claude", "codex"]) {
-  const gs = daySessions.filter((s: any) => providerOf(s) === provider);
-  const gids = new Set(gs.map((s: any) => s.id));
-  const gt = dayTicks.filter((t) => gids.has(t.sessionId));
+for (const provider of ["claude", "codex"] as const) {
+  const gs = daySessions.filter((session) => providerOf(session) === provider);
+  const gids = new Set(gs.map((session) => session.id));
+  const gt = dayTicks.filter((tick) => gids.has(tick.sessionId));
   const row = await analyzeGroup(provider, gs, gt);
   if (row) rows.push(row);
 }

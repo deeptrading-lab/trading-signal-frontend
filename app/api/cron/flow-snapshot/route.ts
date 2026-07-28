@@ -4,10 +4,10 @@
  * PRD `investor-flow-cumulative` §4.A / §6 + `signal-scorecard` §3-2 / §9 D4 +
  * `scorecard-backfill-decisions`(결정 원장 → 채점 원장 멱등 backfill).
  *
- * - **Vercel Cron** 이 호출(`vercel.json` crons, KST 16:10 = UTC 07:10, 평일). cron 항목 1개 유지
- *   (Hobby 1일 1회 한도) → 이 슬롯 안에서 ①수급 스냅샷 적립 → ②결정 원장 backfill → ③AI 판정
- *   채점(relativeRunScoring)을 **순차 호출**한다. backfill 을 채점 앞에 둬, 새로 append 된 행이
- *   같은 패스 채점에서 잡히게 한다. 각 단계는 **독립 try/catch** — 한 단계 실패가 다른 단계를 막지 않는다.
+ * - 장 마감 뒤 자동 호출 중지 정책으로 Vercel/GitHub 예약 스케줄은 제거했다. 필요할 때
+ *   GitHub `workflow_dispatch` 또는 인증된 수동 호출로만 ①수급 스냅샷 적립 → ②결정 원장 backfill
+ *   → ③AI 판정 채점(relativeRunScoring)을 **순차 실행**한다. 각 단계는 **독립 try/catch** —
+ *   한 단계 실패가 다른 단계를 막지 않는다.
  * - **인증**: `Authorization: Bearer ${CRON_SECRET}` 필수(Vercel Cron 자동 부착). 미일치 401.
  * - 외국인·기관 각각 `fetchForeignInstitutionTotal` → **전 행** 저장(top10 slice 안 함, 누적 커버리지).
  * - transient(EGW00201/네트워크) 1회 재시도(`fetchWithTransientRetry`). 2콜 간 delay 로 한도 회피.

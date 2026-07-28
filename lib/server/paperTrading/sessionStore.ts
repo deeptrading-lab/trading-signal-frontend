@@ -13,6 +13,8 @@ import { addTickWindow, floorToTickWindow, riskSweepTickWindow } from "@/lib/ser
 import { kstHhmm, type IntradayTickResult } from "@/lib/server/paperTrading/intradayTickDecision";
 import {
   loadPersistedPaperTrading,
+  loadPersistedPaperTradingSessionSummaries,
+  loadPersistedPaperTradingTicks,
   persistPaperSession,
   persistPaperTick,
 } from "@/lib/server/paperTrading/persistence";
@@ -58,10 +60,10 @@ type PaperTradingStore = {
 };
 
 /**
- * 타 운영자 세션 DB 재조회 TTL(ms) — 잦은 폴링·새로고침이 매번 전량 리로드하지 않게 한다.
- * 단타 판단은 5분 주기라 20초 신선도면 "최근 판단"이 멈춰 보이지 않으면서 DB 부하도 낮다.
+ * 타 운영자 세션 DB 재조회 TTL(ms) — 잦은 폴링·새로고침이 매번 요약을 다시 읽지 않게 한다.
+ * 단타 판단은 5분 주기라 60초 신선도면 "최근 판단"이 멈춰 보이지 않으면서 egress 도 낮다.
  */
-const FOREIGN_REFRESH_TTL_MS = 20_000;
+const FOREIGN_REFRESH_TTL_MS = 60_000;
 
 const STORE_KEY = "__paperTradingStore";
 
@@ -123,6 +125,7 @@ async function ensureHydrated(): Promise<void> {
  *   세션만 갱신한다.
  * ★ 내/레거시(미소유) 세션은 이 서버가 직접 틱하므로 메모리가 항상 최신 — 덮어쓰지 않는다(소유자
  *   게이트 `!owner || owner === operator` 와 대칭).
+ * - 목록 동기화는 세션/포지션 요약만 읽고 틱은 받지 않는다. 타 운영자 상세는 아래 증분 로드가 담당.
  * - 실패 시 `foreignRefreshedAt` 미갱신 → 다음 접근에서 재시도. single-flight 로 중복 로드 방지.
  */
 async function refreshForeignSessions(operator: string, now = Date.now()): Promise<void> {
@@ -130,7 +133,7 @@ async function refreshForeignSessions(operator: string, now = Date.now()): Promi
   if (store.foreignRefresh) return store.foreignRefresh;
   if (store.foreignRefreshedAt && now - store.foreignRefreshedAt < FOREIGN_REFRESH_TTL_MS) return;
   store.foreignRefresh = (async () => {
-    const loaded = await loadPersistedPaperTrading();
+    const loaded = await loadPersistedPaperTradingSessionSummaries();
     if (loaded.status !== "ok") return; // disabled/error → TTL 미갱신, 다음 접근 재시도.
     for (const entry of loaded.sessions) {
       const owner = entry.session.owner;
@@ -139,7 +142,8 @@ async function refreshForeignSessions(operator: string, now = Date.now()): Promi
       store.sessions.set(entry.session.id, {
         session: entry.session,
         positions: entry.positions,
-        ticks: entry.ticks,
+        // 목록 동기화는 틱을 읽지 않는다. 기존 틱은 보존하고 새 상세는 증분 로드에서 채운다.
+        ticks: existing?.ticks ?? [],
         tickChain: existing?.tickChain, // 방어적 보존(남의 세션엔 보통 없음).
       });
     }
@@ -150,6 +154,27 @@ async function refreshForeignSessions(operator: string, now = Date.now()): Promi
       store.foreignRefresh = undefined;
     });
   return store.foreignRefresh;
+}
+
+/** 타 운영자 상세의 새 틱만 읽어 메모리에 합친다(기존 틱 전량 재다운로드 방지). */
+async function refreshForeignSessionTicks(sessionId: string): Promise<void> {
+  const entry = getStore().sessions.get(sessionId);
+  if (!entry) return;
+  const afterTickIndex = entry.ticks.reduce(
+    (latest, tick) => Math.max(latest, tick.tickIndex),
+    -1,
+  );
+  const loaded = await loadPersistedPaperTradingTicks(
+    sessionId,
+    afterTickIndex >= 0 ? afterTickIndex : undefined,
+  );
+  if (loaded.status !== "ok" || loaded.ticks.length === 0) return;
+
+  const knownIds = new Set(entry.ticks.map((tick) => tick.id));
+  for (const tick of loaded.ticks) {
+    if (!knownIds.has(tick.id)) entry.ticks.push(tick);
+  }
+  entry.ticks.sort((a, b) => a.tickIndex - b.tickIndex);
 }
 
 export async function listPaperTradingSessions(): Promise<PaperTradingSession[]> {
@@ -171,7 +196,11 @@ export async function getPaperTradingSessionDetail(
   if (!existing || (existing.session.owner && existing.session.owner !== operator)) {
     await refreshForeignSessions(operator);
   }
-  const entry = getStore().sessions.get(sessionId);
+  let entry = getStore().sessions.get(sessionId);
+  if (entry?.session.owner && entry.session.owner !== operator) {
+    await refreshForeignSessionTicks(sessionId);
+    entry = getStore().sessions.get(sessionId);
+  }
   if (!entry) return null;
   return toDetail(entry);
 }
@@ -343,24 +372,16 @@ export type CompletePaperTradingPortfolioResult = {
   alreadyCompletedSessionIds: string[];
 };
 
-/**
- * 자동 포트폴리오 일괄 종료 — 이 서버 소유(또는 레거시 미지정) 세션만 대상으로 한다.
- * 보유 포지션은 최신 가격으로 EXIT 체결한 뒤에만 completed 전환한다. 세션 tickChain 을 공유해
- * 진행 중인 자동 틱과 직렬화하며, 재호출 시 이미 완료된 세션은 건너뛰는 멱등 동작이다.
- */
-export async function completePaperTradingPortfolio(
-  portfolioId: string,
-  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
-): Promise<CompletePaperTradingPortfolioResult | null> {
-  await ensureHydrated();
-  const operator = resolveServerOperator();
-  const entries = Array.from(getStore().sessions.values()).filter(
-    (entry) =>
-      entry.session.portfolioId === portfolioId &&
-      (!entry.session.owner || entry.session.owner === operator),
-  );
-  if (entries.length === 0) return null;
+export type CompletePaperTradingAutopilotRunResult = {
+  runId: string;
+  completedSessionIds: string[];
+  alreadyCompletedSessionIds: string[];
+};
 
+async function completePaperTradingEntries(
+  entries: StoredSession[],
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date },
+): Promise<{ completedSessionIds: string[]; alreadyCompletedSessionIds: string[] }> {
   const completedSessionIds: string[] = [];
   const alreadyCompletedSessionIds: string[] = [];
   const failures: string[] = [];
@@ -388,7 +409,45 @@ export async function completePaperTradingPortfolio(
     }
   }
   if (failures.length > 0) throw new Error(failures.join(" "));
-  return { portfolioId, completedSessionIds, alreadyCompletedSessionIds };
+  return { completedSessionIds, alreadyCompletedSessionIds };
+}
+
+/**
+ * 자동 포트폴리오 일괄 종료 — 이 서버 소유(또는 레거시 미지정) 세션만 대상으로 한다.
+ * 보유 포지션은 최신 가격으로 EXIT 체결한 뒤에만 completed 전환한다. 세션 tickChain 을 공유해
+ * 진행 중인 자동 틱과 직렬화하며, 재호출 시 이미 완료된 세션은 건너뛰는 멱등 동작이다.
+ */
+export async function completePaperTradingPortfolio(
+  portfolioId: string,
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
+): Promise<CompletePaperTradingPortfolioResult | null> {
+  await ensureHydrated();
+  const operator = resolveServerOperator();
+  const entries = Array.from(getStore().sessions.values()).filter(
+    (entry) =>
+      entry.session.portfolioId === portfolioId &&
+      (!entry.session.owner || entry.session.owner === operator),
+  );
+  if (entries.length === 0) return null;
+  return { portfolioId, ...(await completePaperTradingEntries(entries, options)) };
+}
+
+/**
+ * 오토파일럿 런 수동 종료 — 해당 런이 만든 이 서버 소유 자식 세션만 최신 가격으로 청산·완료한다.
+ * 아직 슬롯이 채워지지 않은 런도 정상적인 빈 결과를 반환해 중지 명령을 멱등 처리한다.
+ */
+export async function completePaperTradingAutopilotRun(
+  runId: string,
+  options: { priceSnapshotProvider?: PaperTradingPriceSnapshotProvider; now?: Date } = {},
+): Promise<CompletePaperTradingAutopilotRunResult> {
+  await ensureHydrated();
+  const operator = resolveServerOperator();
+  const entries = Array.from(getStore().sessions.values()).filter(
+    (entry) =>
+      entry.session.autopilotRunId === runId &&
+      (!entry.session.owner || entry.session.owner === operator),
+  );
+  return { runId, ...(await completePaperTradingEntries(entries, options)) };
 }
 
 async function closeAndCompletePortfolioEntry(

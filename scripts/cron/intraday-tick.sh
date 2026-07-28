@@ -9,7 +9,7 @@
 # ── 설치 (crontab, 장중 평일 5분마다 — 맥 시스템 TZ = KST 가정) ──────────────────
 #   crontab -e
 #   */5 9-15 * * 1-5 INTRADAY_SESSION_ID=<세션UUID> /절대경로/scripts/cron/intraday-tick.sh >> /tmp/intraday-tick.log 2>&1
-#   (09:00 ~ 15:55, 평일. 세션은 미리 cli-agent provider 로 생성해 둘 것.)
+#   (cron 은 15:55까지 발화할 수 있지만 스크립트가 15:31부터 호출 없이 종료한다.)
 #
 # 환경변수:
 #   INTRADAY_SESSION_ID (필수) — tick 을 밀어넣을 paper-trading 세션 ID.
@@ -22,7 +22,14 @@
 
 set -uo pipefail
 
-TS="$(date '+%Y-%m-%d %H:%M:%S')"
+TS="$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')"
+KST_WEEKDAY="$(TZ=Asia/Seoul date '+%u')"
+KST_HHMM="$(TZ=Asia/Seoul date '+%H%M')"
+
+if [ "$KST_WEEKDAY" -gt 5 ] || [[ "$KST_HHMM" < "0900" || "$KST_HHMM" > "1530" ]]; then
+  echo "[$TS] SKIP — 단타 자동 호출 시간 밖(평일 09:00~15:30 KST)"
+  exit 0
+fi
 
 if [ -z "${INTRADAY_SESSION_ID:-}" ]; then
   echo "[$TS] SKIP — INTRADAY_SESSION_ID 미설정(crontab 환경변수 확인)"

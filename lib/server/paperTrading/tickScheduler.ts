@@ -5,7 +5,10 @@
  * 꺼도 dev 서버가 켜져 있으면** running cli-agent 세션이 주기마다 자동 판단·가상 체결된다.
  * (시황 refreshScheduler 선례. crontab 스크립트·수동 틱과 겹쳐도 세션 직렬화+창 dedup 으로 무해.)
  *
- * - 60초 체크, 평일 장중+마감 유예(09:00~15:40)만 발화 — 15:20 전량 청산 창 보장.
+ * - 60초 체크. LLM·스크리너는 정규장(09:00~15:30), 가격-only 리스크 점검은
+ *   마감 유예(15:40 미만)까지 발화해 15:20 전량 청산 창을 보장한다.
+ * - 15:40부터 진행 중 자동 틱을 취소하고 세션·오토파일럿을 한 번만 완료한다. 이후에는
+ *   날짜가 바뀔 때까지 타이머가 외부 API·Supabase를 호출하지 않는다.
  * - 세션 간 **병렬 처리**: 동시 `INTRADAY_TICK_CONCURRENCY`(기본 3, AI 종합분석 동시 3건과 동일
  *   폭의 별도 풀). 세션 내부(분석가→판단가)는 순차가 본질. CLI 는 호출마다 독립 프로세스라
  *   병렬 안전, 세션 상태는 tickChain 직렬화가 보호.
@@ -18,7 +21,12 @@ import {
   closeOutAutopilotRuns,
   sweepAutopilotRuns,
 } from "@/lib/server/paperTrading/autopilot/runStore";
-import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import {
+  isKstAfterMarketClose,
+  isKstMarketHours,
+  isKstMarketHoursWithCloseGrace,
+  isKstWeekend,
+} from "@/lib/utils/kstMarketHours";
 import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import {
   listPaperTradingSessions,
@@ -64,28 +72,49 @@ const ABORT_SETTLE_GRACE_MS = 15_000;
  * ② abort 로도 settle 되지 않는 hang(취소 미존중 경로)엔 `+ABORT_SETTLE_GRACE_MS` 백스톱 race 로
  *    사이클만은 확실히 진행(그 세션은 다음 재시작까지 degraded — #292 동작).
  */
-async function tickWithTimeout(sessionId: string): Promise<void> {
+type ActiveTick = {
+  controller: AbortController;
+  promise: Promise<void>;
+};
+
+const activeTicks = new Map<string, ActiveTick>();
+
+function tickWithTimeout(sessionId: string): Promise<void> {
   const controller = new AbortController();
-  let backstopTimer: ReturnType<typeof setTimeout> | undefined;
-  const abortTimer = setTimeout(() => controller.abort(), TICK_TIMEOUT_MS);
-  const backstop = new Promise<never>((_, reject) => {
-    backstopTimer = setTimeout(
-      () => reject(new Error(`tick-timeout ${TICK_TIMEOUT_MS}ms`)),
-      TICK_TIMEOUT_MS + ABORT_SETTLE_GRACE_MS,
-    );
+  const task = (async () => {
+    let backstopTimer: ReturnType<typeof setTimeout> | undefined;
+    const abortTimer = setTimeout(() => controller.abort(), TICK_TIMEOUT_MS);
+    const backstop = new Promise<never>((_, reject) => {
+      backstopTimer = setTimeout(
+        () => reject(new Error(`tick-timeout ${TICK_TIMEOUT_MS}ms`)),
+        TICK_TIMEOUT_MS + ABORT_SETTLE_GRACE_MS,
+      );
+    });
+    try {
+      await Promise.race([
+        runPaperTradingSessionTick(sessionId, {
+          triggeredBy: "auto",
+          abortSignal: controller.signal,
+        }),
+        backstop,
+      ]);
+    } finally {
+      clearTimeout(abortTimer);
+      if (backstopTimer) clearTimeout(backstopTimer);
+    }
+  })().finally(() => {
+    if (activeTicks.get(sessionId)?.controller === controller) activeTicks.delete(sessionId);
   });
-  try {
-    await Promise.race([
-      runPaperTradingSessionTick(sessionId, {
-        triggeredBy: "auto",
-        abortSignal: controller.signal,
-      }),
-      backstop,
-    ]);
-  } finally {
-    clearTimeout(abortTimer);
-    if (backstopTimer) clearTimeout(backstopTimer);
-  }
+  activeTicks.set(sessionId, { controller, promise: task });
+  return task;
+}
+
+/** 15:40 마감 시 진행 중인 자동 LLM/CLI 프로세스를 취소하고 settle까지 기다린다. */
+export async function abortActiveIntradayTicks(): Promise<number> {
+  const active = [...activeTicks.values()];
+  for (const { controller } of active) controller.abort();
+  await Promise.allSettled(active.map(({ promise }) => promise));
+  return active.length;
 }
 
 const STARTED_KEY = "__intradayTickSchedulerStarted";
@@ -141,7 +170,7 @@ let cycleRunning = false;
  * (now 주입으로 장중 게이트 확인). 반환: 시도한 세션 수(-1 = 게이트/중첩으로 미실행).
  */
 export async function runScheduledIntradayTicks(now: Date = new Date()): Promise<number> {
-  if (cycleRunning || !isKstMarketHoursWithCloseGrace(now)) return -1;
+  if (cycleRunning || !isKstMarketHours(now)) return -1;
   cycleRunning = true;
   try {
     const sessions = selectSchedulableSessions(await listPaperTradingSessions());
@@ -203,7 +232,7 @@ export async function runIntradayRiskSweep(
 let closeOutRunning = false;
 
 /**
- * 장 마감(평일 15:40 초과) 후 남은 running 단타 세션을 **완료로 자동 종료**한다.
+ * 장 마감 유예 종료(평일 15:40)부터 남은 running 단타 세션을 **완료로 자동 종료**한다.
  *
  * 단타 = 하루 1세션 — 자동 종료가 없으면 세션이 계속 running 으로 남아 (a) 다음 거래일 스케줄러가
  * 다시 틱해 크로스데이로 누적되고 (b) 워치 표에 어제 세션이 계속 자동 상주한다. 종료로 그날 결과를
@@ -244,7 +273,7 @@ function kstDateKey(date: Date): string {
 /**
  * **밀린 이전-거래일 running 세션을 시간대 무관하게 완료 처리**한다(서버 다운타임 복구용).
  *
- * `closeOutRunningSessionsAtClose` 는 평일 15:41~23:59 에만 발화하므로, dev 서버가 그 창에 꺼져
+ * `closeOutRunningSessionsAtClose` 는 평일 15:40~23:59 에만 발화하므로, dev 서버가 그 창에 꺼져
  * 있었으면(퇴근·주말) 세션이 계속 running 으로 남아 UI 에 "진행중"으로 상주하고 다음 거래일
  * 스케줄러가 크로스데이로 다시 틱한다. 이 스윕은 **세션 시작일(KST)이 오늘보다 이전**이면
  * 시간·요일과 무관하게 완료로 확정 → 서버가 언제 다시 켜지든(아침·주말 복귀) 잔여 세션이 정리된다.
@@ -276,6 +305,63 @@ export async function closeOutStaleCrossdaySessions(now: Date = new Date()): Pro
   }
 }
 
+type IntradaySchedulerDeps = {
+  abortTicks?: typeof abortActiveIntradayTicks;
+  closeAutopilotRuns?: typeof closeOutAutopilotRuns;
+  closeSessions?: typeof closeOutRunningSessionsAtClose;
+  closeStaleSessions?: typeof closeOutStaleCrossdaySessions;
+  riskSweep?: typeof runIntradayRiskSweep;
+  runTicks?: typeof runScheduledIntradayTicks;
+  sweepAutopilot?: typeof sweepAutopilotRuns;
+};
+
+let lastMaintenanceKstDate: string | undefined;
+let lastCloseOutKstDate: string | undefined;
+
+/**
+ * 60초 스케줄러 1사이클.
+ *
+ * - 장중: 하루 한 번 크로스데이 정리 후 리스크→LLM→오토파일럿 순서로 실행.
+ * - 15:40 이후: 진행 중 틱 취소→런/세션 완료를 하루 한 번만 실행.
+ * - 그 외 장외: 평일 프리마켓에만 하루 한 번 밀린 세션을 정리하고 외부 호출을 멈춘다.
+ */
+export async function runIntradaySchedulerCycle(
+  now: Date = new Date(),
+  deps: IntradaySchedulerDeps = {},
+): Promise<void> {
+  const dateKey = kstDateKey(now);
+  const abortTicks = deps.abortTicks ?? abortActiveIntradayTicks;
+  const closeAutopilot = deps.closeAutopilotRuns ?? closeOutAutopilotRuns;
+  const closeSessions = deps.closeSessions ?? closeOutRunningSessionsAtClose;
+  const closeStale = deps.closeStaleSessions ?? closeOutStaleCrossdaySessions;
+  const riskSweep = deps.riskSweep ?? runIntradayRiskSweep;
+  const runTicks = deps.runTicks ?? runScheduledIntradayTicks;
+  const sweepAutopilot = deps.sweepAutopilot ?? sweepAutopilotRuns;
+
+  if (isKstAfterMarketClose(now)) {
+    if (lastCloseOutKstDate === dateKey) return;
+    await abortTicks();
+    await closeAutopilot(now);
+    await closeSessions(now);
+    lastCloseOutKstDate = dateKey;
+    return;
+  }
+
+  const marketHours = isKstMarketHoursWithCloseGrace(now);
+  if (!marketHours && isKstWeekend(now)) return;
+
+  if (lastMaintenanceKstDate !== dateKey) {
+    await closeStale(now);
+    await closeAutopilot(now);
+    lastMaintenanceKstDate = dateKey;
+  }
+  if (!marketHours) return;
+
+  await riskSweep(now);
+  await runTicks(now);
+  await sweepAutopilot(now);
+}
+
 /** 서버 부팅 시 1회 기동(멱등). Vercel no-op. */
 export function startIntradayTickScheduler(): void {
   const g = globalThis as GlobalWithFlag;
@@ -283,21 +369,15 @@ export function startIntradayTickScheduler(): void {
   if (isVercelEnv()) return; // 서버리스: 타이머 미유지 + CLI 부재.
   g[STARTED_KEY] = true;
   log(
-    `단타 자동 틱 스케줄러 시작 — 60초 체크(리스크 스윕 + LLM 5분 틱) · 동시 ${TICK_CONCURRENCY}세션 · 평일 09:00~15:40(마감 유예) · 15:40 이후 running 세션 자동 완료 · 밀린 이전날 세션 상시 정리`,
+    `단타 자동 틱 스케줄러 시작 — LLM/스크리너 09:00~15:30 · 리스크 점검 15:40 미만 · 동시 ${TICK_CONCURRENCY}세션 · 15:40 running 세션/런 자동 완료 · 이후 외부 호출 정지`,
   );
-  // 매 사이클(순차): ① 밀린 이전-거래일 세션부터 종료(크로스데이 틱 방지) → ①ᴮ 오토파일럿 런
-  // 정리(크로스데이·마감 완료 — 좀비 런이 fill 못 하게 스윕보다 앞) → ②ᴬ 60초 리스크 스윕
-  // (LLM 앞 — 급락 포지션을 ~60초 내 청산) → ② 장중이면 오늘 세션 LLM 틱 → ②ᴮ 오토파일럿 스윕
-  // (스크리너+슬롯 로테이션, 10분 창 dedup — 이번 사이클 틱 결과를 본 최신 상태로 판단) → ③ 마감
-  // 후(15:41+)면 오늘 세션 종료 스윕. ②③ 은 시간대가 겹치지 않아 둘 중 하나만 실행.
-  const cycle = async () => {
-    await closeOutStaleCrossdaySessions();
-    await closeOutAutopilotRuns();
-    await runIntradayRiskSweep();
-    await runScheduledIntradayTicks();
-    await sweepAutopilotRuns();
-    await closeOutRunningSessionsAtClose();
-  };
-  void cycle();
-  setInterval(() => void cycle(), POLL_MS);
+  void runIntradaySchedulerCycle();
+  const timer = setInterval(() => void runIntradaySchedulerCycle(), POLL_MS);
+  timer.unref?.();
+}
+
+/** 테스트 격리 — 일 단위 마감/유지보수 메모를 초기화한다. */
+export function resetIntradaySchedulerStateForTest(): void {
+  lastMaintenanceKstDate = undefined;
+  lastCloseOutKstDate = undefined;
 }

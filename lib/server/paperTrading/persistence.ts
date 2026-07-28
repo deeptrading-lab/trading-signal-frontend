@@ -14,6 +14,7 @@
  */
 
 import { createLogger } from "@/lib/server/logTag";
+import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 import type {
   PaperTradingPosition,
   PaperTradingSession,
@@ -24,8 +25,11 @@ const log = createLogger("paper-persist");
 
 const SESSIONS_TABLE = "paper_trading_sessions";
 const TICKS_TABLE = "paper_trading_ticks";
-/** hydrate 시 복원할 최근 세션 수 상한 — 오래된 실험 세션이 무한히 붙는 것 방지. */
-const HYDRATE_SESSION_LIMIT = 50;
+/**
+ * 반복 목록 동기화와 부팅 복원에 포함할 최근 세션 수 상한.
+ * 오래된 완료 세션 원본은 Supabase에 보존하되 기본 화면/메모리에는 최신 20건만 올린다.
+ */
+const HYDRATE_SESSION_LIMIT = 20;
 /**
  * 틱 페이지 크기/총량 상한 — PostgREST 는 무제한 쿼리를 max-rows(기본 1000)에서 **조용히**
  * 자르므로(리뷰 #3) 명시 페이지네이션으로 전부 걷되, 폭주 방지 총량 캡을 둔다(1분 주기
@@ -42,17 +46,26 @@ export type PersistedSession = {
   ticks: PaperTradingTick[];
 };
 
+export type PersistedSessionSummary = Omit<PersistedSession, "ticks">;
+
 /** hydrate 결과 — error 는 호출측이 재시도할 수 있게 disabled(미설정)와 구분한다(리뷰 #4). */
 export type LoadPersistedResult =
   | { status: "disabled" }
   | { status: "error" }
   | { status: "ok"; sessions: PersistedSession[] };
 
+export type LoadPersistedSessionSummariesResult =
+  | { status: "disabled" }
+  | { status: "error" }
+  | { status: "ok"; sessions: PersistedSessionSummary[] };
+
+export type LoadPersistedTicksResult =
+  | { status: "disabled" }
+  | { status: "error" }
+  | { status: "ok"; ticks: PaperTradingTick[] };
+
 function supabaseConfig(): { url: string; key: string } | null {
-  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
-  return { url: url.replace(/\/+$/, ""), key };
+  return getSupabaseServiceConfig();
 }
 
 function headers(key: string, extra?: Record<string, string>): HeadersInit {
@@ -196,6 +209,95 @@ export async function loadPersistedPaperTrading(): Promise<LoadPersistedResult> 
     };
   } catch (error) {
     warnOnce("모의투자 저장본 로드 실패(네트워크/타임아웃)", error);
+    return { status: "error" };
+  }
+}
+
+/**
+ * 목록 동기화용 경량 로드 — 최근 세션/포지션만 읽고 대용량 틱 payload 는 받지 않는다.
+ *
+ * `sessionStore.refreshForeignSessions` 는 장중 화면 폴링 중 반복 호출된다. 기존에는 이 경로도
+ * `loadPersistedPaperTrading` 을 사용해 최근 50개 세션의 틱을 매번 전량 다운로드했고, Supabase
+ * PostgREST egress 가 데이터 크기에 비례해 폭증했다. 목록에서 필요한 것은 세션 상태와 포지션뿐이므로
+ * 틱은 상세 조회의 증분 로드로 분리한다.
+ */
+export async function loadPersistedPaperTradingSessionSummaries(): Promise<LoadPersistedSessionSummariesResult> {
+  const config = supabaseConfig();
+  if (!config) return { status: "disabled" };
+  try {
+    const res = await fetch(
+      `${config.url}/rest/v1/${SESSIONS_TABLE}?select=payload,positions&order=updated_at.desc&limit=${HYDRATE_SESSION_LIMIT}`,
+      {
+        headers: headers(config.key),
+        cache: "no-store",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      },
+    );
+    if (!res.ok) {
+      warnOnce(`세션 요약 로드 실패 HTTP ${res.status}`);
+      return { status: "error" };
+    }
+    const rows = (await res.json()) as Array<{
+      payload: PaperTradingSession;
+      positions: PaperTradingPosition[] | null;
+    }>;
+    return {
+      status: "ok",
+      sessions: rows.map((row) => ({
+        session: row.payload,
+        positions: row.positions ?? [],
+      })),
+    };
+  } catch (error) {
+    warnOnce("모의투자 세션 요약 로드 실패(네트워크/타임아웃)", error);
+    return { status: "error" };
+  }
+}
+
+/**
+ * 세션 상세 동기화용 틱 증분 로드.
+ *
+ * `afterTickIndex` 가 있으면 이미 메모리에 있는 틱 이후만 조회한다. 타 운영자 세션 상세를 30초마다
+ * 갱신해도 빈 배열 또는 새 틱 몇 건만 전송되므로, 과거 틱 전체를 반복 다운로드하지 않는다.
+ */
+export async function loadPersistedPaperTradingTicks(
+  sessionId: string,
+  afterTickIndex?: number,
+): Promise<LoadPersistedTicksResult> {
+  const config = supabaseConfig();
+  if (!config) return { status: "disabled" };
+  try {
+    const ticks: PaperTradingTick[] = [];
+    for (let offset = 0; offset < TICK_MAX_ROWS; offset += TICK_PAGE_SIZE) {
+      const url = new URL(`${config.url}/rest/v1/${TICKS_TABLE}`);
+      url.searchParams.set("select", "payload");
+      url.searchParams.set("session_id", `eq.${sessionId}`);
+      if (afterTickIndex !== undefined) {
+        url.searchParams.set("tick_index", `gt.${afterTickIndex}`);
+      }
+      url.searchParams.set("order", "tick_index.asc");
+      url.searchParams.set("limit", String(TICK_PAGE_SIZE));
+      url.searchParams.set("offset", String(offset));
+
+      const res = await fetch(url, {
+        headers: headers(config.key),
+        cache: "no-store",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        warnOnce(`세션 틱 증분 로드 실패 HTTP ${res.status}`);
+        return { status: "error" };
+      }
+      const page = (await res.json()) as Array<{ payload: PaperTradingTick }>;
+      ticks.push(...page.map((row) => row.payload));
+      if (page.length < TICK_PAGE_SIZE) break;
+      if (offset + TICK_PAGE_SIZE >= TICK_MAX_ROWS) {
+        log.warn(`세션 틱 증분 로드 ${TICK_MAX_ROWS}행 캡 도달 — 초과분 절단`);
+      }
+    }
+    return { status: "ok", ticks };
+  } catch (error) {
+    warnOnce("세션 틱 증분 로드 실패(네트워크/타임아웃)", error);
     return { status: "error" };
   }
 }

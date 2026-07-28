@@ -1,6 +1,7 @@
 import { httpClient } from "@/lib/api/client";
 import type {
   AutopilotRunResponse,
+  AutopilotGuideResponseKind,
   PatchAutopilotRunRequest,
   StartAutopilotRunRequest,
 } from "@/lib/types/paperTrading/autopilot";
@@ -20,8 +21,29 @@ export async function startAutopilotRun(
   return response.data;
 }
 
-export async function stopAutopilotRun(runId: string): Promise<{ run: AutopilotRunResponse["run"] }> {
-  const payload: PatchAutopilotRunRequest = { status: "stopped" };
+export async function stopAutopilotRun(
+  runId: string,
+  options: { completeChildSessions?: boolean } = {},
+): Promise<{ run: AutopilotRunResponse["run"] }> {
+  const payload: PatchAutopilotRunRequest = {
+    status: "stopped",
+    completeChildSessions: options.completeChildSessions,
+  };
+  const response = await httpClient.patch<{ run: AutopilotRunResponse["run"] }>(
+    `/paper-trading/autopilot/${runId}`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function respondToAutopilotGuide(
+  runId: string,
+  guideId: string,
+  responseKind: AutopilotGuideResponseKind,
+): Promise<{ run: AutopilotRunResponse["run"] }> {
+  const payload: PatchAutopilotRunRequest = {
+    guideResponse: { guideId, response: responseKind },
+  };
   const response = await httpClient.patch<{ run: AutopilotRunResponse["run"] }>(
     `/paper-trading/autopilot/${runId}`,
     payload,

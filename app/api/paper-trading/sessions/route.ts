@@ -15,6 +15,7 @@ import type {
   CreatePaperTradingSessionResponse,
   PaperTradingSessionsResponse,
 } from "@/lib/types/paperTrading/paperTrading";
+import { isKstAfterMarketClose } from "@/lib/utils/kstMarketHours";
 
 export async function GET(request: NextRequest): Promise<Response> {
   // 단타(모의투자) 세션 원장 — prod 만 admin+(로컬 전체), /intraday 페이지 게이트와 정합.
@@ -39,6 +40,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     const validation = validateCreateSessionRequest(body);
     if (validation) {
       return NextResponse.json({ error: validation }, { status: 422 });
+    }
+
+    if ((body.decisionProvider ?? "mock") === "cli-agent" && isKstAfterMarketClose()) {
+      return NextResponse.json(
+        { error: "15시 40분 이후에는 단타 세션을 새로 만들지 않아요." },
+        { status: 409, headers: { "Cache-Control": "no-store" } },
+      );
     }
 
     const cliGate = getPaperTradingAiCliGate();

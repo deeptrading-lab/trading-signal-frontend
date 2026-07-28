@@ -12,6 +12,7 @@ import { isVercelEnv } from "@/lib/server/env";
 import { isKisConfigured } from "@/lib/api/kis";
 import { readIntraday } from "@/lib/server/intraday/read";
 import { postIntradayReadToSlack } from "@/lib/server/intraday/slack";
+import { isKstMarketHours } from "@/lib/utils/kstMarketHours";
 import type { AIAnalysisProvider } from "@/lib/types/stock/aiAnalysis";
 
 export async function GET(request: NextRequest) {
@@ -22,6 +23,13 @@ export async function GET(request: NextRequest) {
     if (auth !== `Bearer ${secret}` && q !== secret) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+  }
+
+  if (!isKstMarketHours()) {
+    return NextResponse.json(
+      { ok: false, reason: "market-closed" },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   if (isVercelEnv() || !isKisConfigured()) {

@@ -13,6 +13,9 @@ import { useMutationStartAutopilotRun } from "@/hooks/query/useMutationStartAuto
 import { useMutationStopAutopilotRun } from "@/hooks/query/useMutationStopAutopilotRun";
 import { useQueryAutopilotRun } from "@/hooks/query/useQueryAutopilotRun";
 import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSessions";
+import { useQueryPaperTradingSessionDetails } from "@/hooks/query/useQueryPaperTradingSessionDetails";
+import { useMutationRespondAutopilotGuide } from "@/hooks/query/useMutationRespondAutopilotGuide";
+import { buildGuideHoldings, buildIntradayGuideItems } from "@/lib/intraday/guideFeed";
 import type {
   AutopilotRun,
   StartAutopilotRunRequest,
@@ -45,6 +48,7 @@ export function useIntradayAutopilot() {
   const { sessions } = usePaperTradingSessions();
   const startMutation = useMutationStartAutopilotRun();
   const stopMutation = useMutationStopAutopilotRun();
+  const respondMutation = useMutationRespondAutopilotGuide();
 
   const run = runQuery.data?.run ?? null;
 
@@ -58,6 +62,14 @@ export function useIntradayAutopilot() {
   }, [run, sessions]);
 
   const runPnl = useMemo(() => computeRunPnl(run, sessions), [run, sessions]);
+  const childSessionIds = useMemo(
+    () => sessions.filter((session) => session.autopilotRunId === run?.id).map((session) => session.id),
+    [run?.id, sessions],
+  );
+  const detailQueries = useQueryPaperTradingSessionDetails(childSessionIds);
+  const details = detailQueries.flatMap((query) => (query.data ? [query.data] : []));
+  const guideItems = useMemo(() => buildIntradayGuideItems(run, details), [run, details]);
+  const guideHoldings = useMemo(() => buildGuideHoldings(run?.guideResponses), [run?.guideResponses]);
 
   return {
     run,
@@ -68,7 +80,18 @@ export function useIntradayAutopilot() {
     isLoading: runQuery.isLoading,
     isStarting: startMutation.isPending,
     isStopping: stopMutation.isPending,
+    isResponding: respondMutation.isPending,
+    respondingGuideId: respondMutation.variables?.guideId ?? null,
+    guideItems,
+    guideHoldings,
+    guideLoading: detailQueries.some((query) => query.isLoading),
     start: (payload: StartAutopilotRunRequest) => startMutation.mutateAsync(payload),
-    stop: (runId: string) => stopMutation.mutateAsync(runId),
+    stop: (runId: string, options: { completeChildSessions?: boolean } = {}) =>
+      stopMutation.mutateAsync({ runId, ...options }),
+    respond: (
+      runId: string,
+      guideId: string,
+      response: "performed" | "passed",
+    ) => respondMutation.mutateAsync({ runId, guideId, response }),
   };
 }

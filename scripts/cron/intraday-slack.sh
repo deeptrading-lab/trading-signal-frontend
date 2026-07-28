@@ -17,7 +17,14 @@
 # ⚠️ 의사결정 보조 알림 — 자동 수익/집행 아님. 매매는 사람이 직접.
 
 set -uo pipefail
-TS="$(date '+%Y-%m-%d %H:%M:%S')"
+TS="$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')"
+KST_WEEKDAY="$(TZ=Asia/Seoul date '+%u')"
+KST_HHMM="$(TZ=Asia/Seoul date '+%H%M')"
+
+if [ "$KST_WEEKDAY" -gt 5 ] || [[ "$KST_HHMM" < "0900" || "$KST_HHMM" > "1530" ]]; then
+  echo "[$TS] SKIP — 단타 Slack 호출 시간 밖(평일 09:00~15:30 KST)"
+  exit 0
+fi
 
 if [ -z "${INTRADAY_SLACK_TICKERS:-}" ]; then
   echo "[$TS] SKIP — INTRADAY_SLACK_TICKERS 미설정"

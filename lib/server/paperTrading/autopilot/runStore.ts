@@ -3,7 +3,7 @@
  * (sessionStore 패턴 미러). intraday-autopilot.
  *
  * 런의 수명: startAutopilotRun(멱등) → [스케줄러 사이클마다 sweepAutopilotRuns — 10분 창 dedup]
- * → stopAutopilotRun(수동) 또는 closeOutAutopilotRuns(15:41+/크로스데이 자동 완료).
+ * → stopAutopilotRun(수동) 또는 closeOutAutopilotRuns(15:40+/크로스데이 자동 완료).
  *
  * 스윕 1회 = 슬롯 reconcile → 스크리너 → planRotation(순수) → 교체 실행(완료 patch — 자가채점
  * 훅 자동 발동) → fill 실행(자식 세션 생성, 직렬). 자식 세션은 일반 cli-agent 세션이라
@@ -39,14 +39,16 @@ import {
 import { runAutopilotScreener } from "@/lib/server/paperTrading/autopilot/screener";
 import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import {
+  completePaperTradingAutopilotRun,
   createPaperTradingSession,
   getPaperTradingSessionDetail,
   listPaperTradingSessions,
   patchPaperTradingSessionStatus,
 } from "@/lib/server/paperTrading/sessionStore";
 import { floorToTickWindow } from "@/lib/server/paperTrading/time";
-import { isKstAfterMarketClose, isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
+import { isKstAfterMarketClose, isKstMarketHours } from "@/lib/utils/kstMarketHours";
 import type {
+  AutopilotGuideResponseKind,
   AutopilotRun,
   AutopilotScreenerSnapshot,
   AutopilotScreenerSummary,
@@ -164,6 +166,7 @@ export async function startAutopilotRun(request: StartAutopilotRunRequest): Prom
   const run: AutopilotRun = {
     id: randomUUID(),
     status: "active",
+    purpose: request.purpose ?? "research",
     owner: operator,
     totalCapital,
     slotCount,
@@ -190,8 +193,21 @@ export async function startAutopilotRun(request: StartAutopilotRunRequest): Prom
   return run;
 }
 
-/** 런 중지 — 오케스트레이션만 멈춘다(자식 세션은 기존 수명관리 그대로). 남의 런이면 null. */
-export async function stopAutopilotRun(runId: string): Promise<AutopilotRun | null> {
+type StopAutopilotRunOptions = {
+  /** research 수동 중지용 — 현재 런 자식 세션을 최신 가격으로 청산·완료한다. */
+  completeChildSessions?: boolean;
+  /** 테스트 대역 주입. */
+  completeSessions?: typeof completePaperTradingAutopilotRun;
+};
+
+/**
+ * 런 중지 — 기본은 가이드 호환을 위해 오케스트레이션만 멈춘다. research 수동 중지는
+ * completeChildSessions=true로 자식 모의세션도 최신 가격 청산 후 완료한다. 남의 런이면 null.
+ */
+export async function stopAutopilotRun(
+  runId: string,
+  options: StopAutopilotRunOptions = {},
+): Promise<AutopilotRun | null> {
   await ensureHydrated();
   const run = getStore().runs.get(runId);
   if (!run || run.owner !== resolveServerOperator()) return null;
@@ -199,9 +215,109 @@ export async function stopAutopilotRun(runId: string): Promise<AutopilotRun | nu
     run.status = "stopped";
     run.endedAt = new Date().toISOString();
     touchAndPersist(run);
+  }
+  if (options.completeChildSessions && run.status === "stopped") {
+    // 청산 가격 조회가 일시 실패해도 같은 중지 요청으로 남은 세션을 재시도할 수 있게 stopped에서도 실행.
+    const result = await (options.completeSessions ?? completePaperTradingAutopilotRun)(run.id);
+    log(
+      `오토파일럿 중지 — run=${run.id.slice(0, 8)}(자식 세션 ${result.completedSessionIds.length}건 완료)`,
+    );
+  } else if (!options.completeChildSessions) {
     log(`오토파일럿 중지 — run=${run.id.slice(0, 8)}(자식 세션은 유지)`);
   }
   return run;
+}
+
+export type RespondToAutopilotGuideResult =
+  | { ok: true; run: AutopilotRun }
+  | { ok: false; reason: "not_found" | "conflict" | "no_position" | "invalid_guide" };
+
+function parseGuideId(
+  guideId: string,
+): { sessionId: string; tickId: string; orderIndex: number } | null {
+  const parts = guideId.split(":");
+  if (parts.length !== 3) return null;
+  const orderIndex = Number(parts[2]);
+  if (!parts[0] || !parts[1] || !Number.isInteger(orderIndex) || orderIndex < 0) return null;
+  return { sessionId: parts[0], tickId: parts[1], orderIndex };
+}
+
+function guideHoldingQuantity(run: AutopilotRun, ticker: string): number {
+  return Object.values(run.guideResponses ?? {}).reduce((quantity, item) => {
+    if (item.ticker !== ticker || item.response !== "performed") return quantity;
+    return item.side === "BUY"
+      ? quantity + item.executedQuantity
+      : Math.max(0, quantity - item.executedQuantity);
+  }, 0);
+}
+
+/**
+ * 가이드 응답 확정 — 원본 주문 검증 + guideId 멱등 + 사용자 수행 원장 보유량 게이트.
+ * 동일 응답 재시도는 기존 런을 반환하고, 수행/패스 상충은 conflict로 거절한다.
+ */
+export async function respondToAutopilotGuide(
+  runId: string,
+  guideId: string,
+  response: AutopilotGuideResponseKind,
+  getDetail: typeof getPaperTradingSessionDetail = getPaperTradingSessionDetail,
+): Promise<RespondToAutopilotGuideResult> {
+  await ensureHydrated();
+  const run = getStore().runs.get(runId);
+  if (!run || run.owner !== resolveServerOperator()) return { ok: false, reason: "not_found" };
+
+  const parsed = parseGuideId(guideId);
+  if (!parsed) return { ok: false, reason: "invalid_guide" };
+  const existing = run.guideResponses?.[guideId];
+  if (existing) {
+    return existing.response === response
+      ? { ok: true, run }
+      : { ok: false, reason: "conflict" };
+  }
+
+  const detail = await getDetail(parsed.sessionId);
+  if (!detail || detail.session.autopilotRunId !== run.id) {
+    return { ok: false, reason: "invalid_guide" };
+  }
+  const tick = detail.ticks.find((item) => item.id === parsed.tickId);
+  const order = tick?.orders[parsed.orderIndex];
+  if (!tick || !order) return { ok: false, reason: "invalid_guide" };
+
+  // 원본 조회 중 다른 요청이 먼저 확정됐을 수 있으므로 await 이후 멱등 상태를 다시 확인한다.
+  const raced = run.guideResponses?.[guideId];
+  if (raced) {
+    return raced.response === response
+      ? { ok: true, run }
+      : { ok: false, reason: "conflict" };
+  }
+
+  const holding = guideHoldingQuantity(run, order.ticker);
+  if (response === "performed" && order.side === "SELL" && holding < 1) {
+    return { ok: false, reason: "no_position" };
+  }
+  const executedQuantity =
+    response === "passed"
+      ? 0
+      : order.side === "BUY"
+        ? order.quantity
+        : Math.min(order.quantity, holding);
+  const item = {
+    guideId,
+    sessionId: parsed.sessionId,
+    tickId: parsed.tickId,
+    orderIndex: parsed.orderIndex,
+    ticker: order.ticker,
+    name: order.name,
+    side: order.side,
+    recommendedPrice: order.price,
+    recommendedQuantity: order.quantity,
+    recommendedAt: tick.createdAt,
+    executedQuantity,
+    response,
+    respondedAt: new Date().toISOString(),
+  } as const;
+  run.guideResponses = { ...(run.guideResponses ?? {}), [guideId]: item };
+  touchAndPersist(run);
+  return { ok: true, run };
 }
 
 // ─── 스케줄러 진입점 ──────────────────────────────────────────────────────────
@@ -229,7 +345,7 @@ export async function sweepAutopilotRuns(
   now: Date = new Date(),
   deps: AutopilotSweepDeps = {},
 ): Promise<number> {
-  if (sweepRunning || !isKstMarketHoursWithCloseGrace(now)) return -1;
+  if (sweepRunning || !isKstMarketHours(now)) return -1;
   sweepRunning = true;
   try {
     await ensureHydrated();
@@ -488,7 +604,7 @@ let closeOutRunning = false;
 
 /**
  * 런 자동 완료 — (a) 시작일(KST)이 오늘보다 이전인 active 런은 시간대 무관 완료(다운타임 복구,
- * closeOutStaleCrossdaySessions 미러) (b) 15:41+ 이면 오늘 active 런 완료. 자식 세션은 기존
+ * closeOutStaleCrossdaySessions 미러) (b) 15:40+ 이면 오늘 active 런 완료. 자식 세션은 기존
  * 마감 스윕(④)이 별도로 완료 처리한다. 반환: 완료한 런 수(-1 = 중첩 미실행).
  */
 export async function closeOutAutopilotRuns(now: Date = new Date()): Promise<number> {

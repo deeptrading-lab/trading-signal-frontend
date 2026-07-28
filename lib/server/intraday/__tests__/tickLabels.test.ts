@@ -324,7 +324,11 @@ describe("labelSessionTicks — 멱등 upsert + 페치 dedupe + 미설정 skip",
       bar("2026-07-08T10:10", 10_100, 9_800, 9_900), // t2(10:05) → LOSS
     ]);
     const ticks = [
-      makeTick({ id: "t1", windowKst: "2026-07-08T10:00" }),
+      makeTick({
+        id: "t1",
+        windowKst: "2026-07-08T10:00",
+        decision: { convictionScore: 67 },
+      }),
       makeTick({ id: "t2", tickIndex: 1, windowKst: "2026-07-08T10:05" }),
     ];
     const result = await labelSessionTicks(makeSession(), ticks);
@@ -349,8 +353,8 @@ describe("labelSessionTicks — 멱등 upsert + 페치 dedupe + 미설정 skip",
       source: "intraday-fallback",
       label: "WIN",
     });
-    // payload — 시그널 점수·레벨·conviction placeholder 가 진화 가능한 jsonb 로 실린다.
-    expect(body[0].payload).toMatchObject({ signalScore: 55, conviction: null, timeframe: 5 });
+    // payload — 라벨 단독 캘리브레이션이 가능하도록 원본 conviction도 함께 실린다.
+    expect(body[0].payload).toMatchObject({ signalScore: 55, conviction: 67, timeframe: 5 });
 
     // 재실행(멱등) — 같은 tick_id 로 다시 upsert 해도 merge-duplicates 라 안전.
     await labelSessionTicks(makeSession(), ticks);
@@ -397,20 +401,39 @@ describe("labelSessionTicks — 멱등 upsert + 페치 dedupe + 미설정 skip",
     const session = makeSession({ id: "session-once" });
     const ticks = [makeTick({ id: "t-once", sessionId: "session-once" })];
 
-    scheduleSessionTickLabeling(session, ticks);
+    const marketOpen = new Date("2026-07-08T01:00:00Z");
+    scheduleSessionTickLabeling(session, ticks, marketOpen);
     await vi.waitFor(() => {
       expect(calls.filter((c) => c.init?.method === "POST")).toHaveLength(1);
     });
 
     // 중복 완료 전이 — 같은 세션은 다시 라벨링하지 않는다.
-    scheduleSessionTickLabeling(session, ticks);
+    scheduleSessionTickLabeling(session, ticks, marketOpen);
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(calls.filter((c) => c.init?.method === "POST")).toHaveLength(1);
 
     // cli-agent 외 provider 는 스케줄 자체가 없다.
-    scheduleSessionTickLabeling(makeSession({ id: "session-mock", decisionProvider: "mock" }), ticks);
+    scheduleSessionTickLabeling(
+      makeSession({ id: "session-mock", decisionProvider: "mock" }),
+      ticks,
+      marketOpen,
+    );
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(calls.filter((c) => c.init?.method === "POST")).toHaveLength(1);
+  });
+
+  it("scheduleSessionTickLabeling — 15:40 이후에는 KIS/Supabase 후속 호출을 만들지 않는다", async () => {
+    mockFetchForDate.mockClear();
+    mockFetchToday.mockClear();
+    const session = makeSession({ id: "session-after-close" });
+    const ticks = [makeTick({ id: "t-after-close", sessionId: session.id })];
+
+    scheduleSessionTickLabeling(session, ticks, new Date("2026-07-08T06:40:00Z"));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(calls).toHaveLength(0);
+    expect(mockFetchForDate).not.toHaveBeenCalled();
+    expect(mockFetchToday).not.toHaveBeenCalled();
   });
 
   it("fetchLabeledTickIds — 기존 라벨 tick_id 집합(run 라우트 dedupe)", async () => {

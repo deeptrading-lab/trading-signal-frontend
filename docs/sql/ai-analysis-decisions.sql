@@ -38,3 +38,102 @@ comment on column public.ai_analysis_decisions.sentiment is
 
 comment on column public.ai_analysis_decisions.signal is
   '결정론 시그널 엔진(lib/signal) 압축 산출물(DecisionSignal). 분석 시점 가격 기반. 없으면 null(legacy)';
+
+-- /analyze 카드 목록 Egress 절감:
+-- 최신 결론 20건의 카드 필드만 projection하고, 종목별 최신 ai_agent_usage run 합계를 DB 안에서 계산한다.
+-- decision/sentiment 전체 JSON과 usage 원본 1,000행을 BFF로 전송하지 않는다.
+create index if not exists ai_agent_usage_ticker_created_idx
+  on public.ai_agent_usage (ticker, created_at desc);
+
+create or replace function public.get_ai_decision_card_summaries(p_limit integer default 20)
+returns table (
+  ticker text,
+  name text,
+  provider text,
+  updated_at timestamptz,
+  verdict text,
+  time_horizon text,
+  limited_data boolean,
+  bars integer,
+  signal_score numeric,
+  run_id uuid,
+  total_input_tokens bigint,
+  total_output_tokens bigint,
+  total_cost_usd numeric,
+  measured boolean
+)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  with latest_decisions as (
+    select d.*
+    from public.ai_analysis_decisions d
+    order by d.updated_at desc
+    limit greatest(1, least(coalesce(p_limit, 20), 20))
+  )
+  select
+    d.ticker,
+    d.name,
+    d.provider,
+    d.updated_at,
+    d.decision ->> 'verdict' as verdict,
+    d.decision ->> 'time_horizon' as time_horizon,
+    case
+      when jsonb_typeof(d.decision -> 'limitedData') = 'boolean'
+        then (d.decision ->> 'limitedData')::boolean
+      else false
+    end as limited_data,
+    case
+      when jsonb_typeof(d.decision -> 'bars') = 'number'
+        then (d.decision ->> 'bars')::integer
+      else 0
+    end as bars,
+    case
+      when jsonb_typeof(d.signal -> 'score') = 'number'
+        then (d.signal ->> 'score')::numeric
+      else null
+    end as signal_score,
+    usage_summary.run_id,
+    usage_summary.total_input_tokens,
+    usage_summary.total_output_tokens,
+    usage_summary.total_cost_usd,
+    usage_summary.measured
+  from latest_decisions d
+  left join lateral (
+    select
+      u.run_id,
+      case when bool_and(u.measured) then
+        sum(
+          coalesce(u.input_tokens, 0)
+          + coalesce(u.cache_creation_input_tokens, 0)
+          + coalesce(u.cache_read_input_tokens, 0)
+        )
+      else null end::bigint as total_input_tokens,
+      case when bool_and(u.measured)
+        then sum(coalesce(u.output_tokens, 0))
+        else null
+      end::bigint as total_output_tokens,
+      case when bool_and(u.measured)
+        then sum(coalesce(u.cost_usd, 0))
+        else null
+      end as total_cost_usd,
+      bool_and(u.measured) as measured
+    from public.ai_agent_usage u
+    where u.run_id = (
+      select latest_usage.run_id
+      from public.ai_agent_usage latest_usage
+      where latest_usage.ticker = d.ticker
+      order by latest_usage.created_at desc
+      limit 1
+    )
+    group by u.run_id
+  ) usage_summary on true
+  order by d.updated_at desc;
+$$;
+
+revoke all on function public.get_ai_decision_card_summaries(integer)
+  from public, anon, authenticated;
+grant execute on function public.get_ai_decision_card_summaries(integer)
+  to service_role;

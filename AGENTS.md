@@ -23,6 +23,7 @@
 - **코드 컨벤션**: 자세한 룰은 [`docs/rules/frontend.md`](docs/rules/frontend.md) — 카멜케이스, 커스텀훅 의무화, `cn` 헬퍼, 도메인 한 뎁스 폴더, `lib/copy/` 유지, query key 단일 위치, layout.tsx 컨벤션, 반응형. FE Dev·reviewer 는 본 파일을 1차 근거로 본다.
 - Supabase 키, Vercel 토큰, API secret 은 `.env.local` 또는 Vercel Environment Variables 에만 둔다.
 - 커밋 메시지는 한글 요약을 기본으로 한다.
+- AI 단타 판단·오답노트 작업에 한해서만 `packages/intraday-mistake-note/CM.md`를 읽는다. 일반 프론트엔드 작업에는 주입하지 않는다.
 
 ## 에이전트 역할
 
