@@ -22,6 +22,7 @@ import type {
 } from "@/lib/types/scorecard/scorecard";
 import type { HorizonStatus, ScorecardRegime } from "@/lib/types/scorecard/scorecard";
 import type { OutcomeCandidate } from "@/lib/stock/decisionOutcome";
+import type { TouchScanRow, TouchScanUpdate } from "@/lib/server/scorecard/touchScoring";
 import type { AIAnalysisProvider, FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import type { SignalAction } from "@/lib/types/signal";
 import { createLogger } from "@/lib/server/logTag";
@@ -510,4 +511,97 @@ export async function getRecentOutcomeRows(
       m1: toNum(r.m1_excess_return_pct),
     },
   }));
+}
+
+/**
+ * phase-2 터치 스캔 대상 조회 — 커서가 없거나 오래된 행부터(nulls first 인덱스 정합).
+ *
+ * 창(TOUCH_SCAN_WINDOW_DAYS)이 끝난 행은 순수 로직(`isScanComplete`)이 걸러내므로 여기서는
+ * entry_date 하한만 둔다(아주 오래된 원장을 매번 훑지 않도록). fail-soft — 실패 시 빈 배열.
+ */
+export async function getTouchScanRows(
+  limit: number,
+  entrySinceDash: string,
+): Promise<TouchScanRow[]> {
+  const config = supabaseConfig();
+  if (!config) return [];
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set(
+    "select",
+    "id,ticker,entry_date,live_price,target_pct,stop_loss_pct," +
+      "target_price,stop_price,target_hit_date,stop_hit_date,touch_scanned_through",
+  );
+  url.searchParams.set("entry_date", `gte.${entrySinceDash}`);
+  // 미스캔(nulls) 우선, 그 안에서는 **최신 판정 우선** — 활성 구간(창이 열려 있어 오늘도 터치가
+  // 일어날 수 있는 판정)이 배치를 먼저 차지해야 한다. 오래된 행은 다음 회차에 처리된다.
+  url.searchParams.set("order", "touch_scanned_through.asc.nullsfirst,entry_date.desc");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch((error: unknown) => {
+    log.warn("터치 스캔 대상 조회 네트워크 실패", error);
+    return null;
+  });
+  if (!res?.ok) {
+    if (res) log.warn(`터치 스캔 대상 조회 실패 status=${res.status}`);
+    return [];
+  }
+
+  const rows = (await res.json().catch(() => [])) as Array<Record<string, unknown>>;
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map((r) => ({
+    id: String(r.id),
+    ticker: String(r.ticker),
+    entryDate: String(r.entry_date),
+    livePrice: num((r.live_price ?? null) as number | string | null),
+    targetPct: num((r.target_pct ?? null) as number | string | null),
+    stopLossPct: num((r.stop_loss_pct ?? null) as number | string | null),
+    targetPrice: num((r.target_price ?? null) as number | string | null),
+    stopPrice: num((r.stop_price ?? null) as number | string | null),
+    targetHitDate: typeof r.target_hit_date === "string" ? r.target_hit_date : null,
+    stopHitDate: typeof r.stop_hit_date === "string" ? r.stop_hit_date : null,
+    touchScannedThrough:
+      typeof r.touch_scanned_through === "string" ? r.touch_scanned_through : null,
+  }));
+}
+
+/** 터치 스캔 결과 1행 부분 갱신(PATCH by id). 실패는 ok:false — 호출부가 카운트만 한다. */
+export async function updateTouchScan(
+  id: string,
+  update: TouchScanUpdate,
+): Promise<{ ok: boolean }> {
+  const config = supabaseConfig();
+  if (!config) return { ok: false };
+
+  const body: Record<string, unknown> = {};
+  if (update.touchScannedThrough !== undefined) {
+    body.touch_scanned_through = update.touchScannedThrough;
+  }
+  if (update.targetPrice !== undefined) body.target_price = update.targetPrice;
+  if (update.stopPrice !== undefined) body.stop_price = update.stopPrice;
+  if (update.targetHitDate !== undefined) body.target_hit_date = update.targetHitDate;
+  if (update.stopHitDate !== undefined) body.stop_hit_date = update.stopHitDate;
+  if (Object.keys(body).length === 0) return { ok: true }; // 쓸 것이 없으면 호출 자체를 생략.
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("id", `eq.${id}`);
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { ...headers(config.key), Prefer: "return=minimal" },
+    body: JSON.stringify(body),
+  }).catch((error: unknown) => {
+    log.warn("터치 스캔 갱신 네트워크 실패", error);
+    return null;
+  });
+  if (!res?.ok) {
+    if (res) log.warn(`터치 스캔 갱신 실패 status=${res.status}`);
+    return { ok: false };
+  }
+  return { ok: true };
 }
