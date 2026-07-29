@@ -132,6 +132,34 @@ describe("evaluatePreGate", () => {
     });
     expect(evaluatePreGate(c, false).callLlm).toBe(false);
   });
+  it("약세 레짐(-1)이면 변화 없음이어도 LLM 호출 — 관측 창(진입은 사후 veto 가 막음)", () => {
+    const c = ctx({
+      signal: signal({ action: "HOLD", regime: -1 }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+    });
+    expect(evaluatePreGate(c, false).callLlm).toBe(true);
+    // 중립·강세는 기존대로 스킵(비용 절감) — 관측 창은 약세 한정.
+    for (const regime of [0, 1] as const) {
+      const other = ctx({
+        signal: signal({ action: "HOLD", regime }),
+        previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+      });
+      expect(evaluatePreGate(other, false).callLlm).toBe(false);
+    }
+  });
+  it("약세 레짐이어도 신규 진입 불가(15:00+·일일손실·쿨다운)면 스킵 유지", () => {
+    const c = ctx({
+      nowHhmm: "15:05",
+      signal: signal({ action: "HOLD", regime: -1 }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+    });
+    expect(evaluatePreGate(c, false).callLlm).toBe(false);
+    const cooled = ctx({
+      signal: signal({ action: "HOLD", regime: -1 }),
+      previousDecision: { action: "HOLD", targetPrice: null, stopPrice: null, invalidationPrice: null, rationale: "" },
+    });
+    expect(evaluatePreGate(cooled, false, true).callLlm).toBe(false);
+  });
   it("재진입 쿨다운 → noNewEntry (구조 이벤트 LLM 관통도 차단)", () => {
     expect(evaluatePreGate(ctx(), false, true).noNewEntry).toBe(true);
     const c = ctx({

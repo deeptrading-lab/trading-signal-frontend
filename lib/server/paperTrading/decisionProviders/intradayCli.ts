@@ -288,6 +288,14 @@ export function evaluatePreGate(
     if (ctx.structureEvent && !noNewEntry) {
       return { callLlm: true, noNewEntry };
     }
+    // 약세 레짐 관측 창(2026-07-29) — regime -1 이면 4축이 *구조적으로* BUY 를 못 내므로
+    // "변화 없음" 스킵이 상시화돼 판단 기록이 통째로 사라진다(7/29 실측: 오전 스킵률 100%,
+    // 하루 67%). 스킵의 전제("언젠가 신호가 바뀌면 다시 묻는다")가 약세장에선 성립하지 않는다.
+    // → **호출만** 연다. 진입은 사후 게이트의 레짐 veto(applyPostGate ③)가 그대로 BUY→HOLD 로
+    //   강등시키므로 하락 국면 역행 매수 위험은 커지지 않는다(관측만 확보).
+    if (ctx.signal.regime === -1 && !noNewEntry) {
+      return { callLlm: true, noNewEntry };
+    }
     return { callLlm: false, noNewEntry, reason: "상황 변화 없음 — AI 호출 생략(포지션·신호 그대로)" };
   }
   return { callLlm: true, noNewEntry };
