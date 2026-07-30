@@ -64,7 +64,9 @@ import {
 } from "@/lib/market/analysisContext";
 import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { computePriceLevels } from "@/lib/signal/levels/priceLevels";
+import type { PriceLevels } from "@/lib/signal/levels/priceLevels";
 import { formatPriceLevelsForPrompt } from "@/lib/signal/levels/formatPriceLevels";
+import { checkReentryAnchor } from "@/lib/signal/levels/validateReentry";
 import {
   normalizeConfidence,
   normalizeTimeHorizon,
@@ -731,6 +733,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       }
 
       const runStart = Date.now();
+      // 가격 레벨 — 프롬프트 주입과 **재진입가 검증**이 같은 값을 써야 해서 바깥 스코프에 둔다.
+      let priceLevels: PriceLevels | null = null;
       try {
         // 1. 시세 & 시그널 계산 (재개 시에도 항상 최신 데이터 사용) ──────────
         const today = new Date();
@@ -810,12 +814,12 @@ export async function POST(req: NextRequest): Promise<Response> {
         // 가격 레벨(이동평균·볼린저·피보나치·매물대 배치) **실측값** 주입 — 없으면 모델이 레벨을
         // 추정해 서술하는 문제가 있었다(실측: "233,000원(20일선)" vs 실제 20일선 276,350원).
         // 매물대는 현재가 위/아래로 나눠 줘야 "더 빠질 자리가 남았는지"를 근거로 말할 수 있다.
+        // 계산 결과는 프롬프트 주입 후에도 살려둔다 — PM 이 낸 재진입가가 실제 지지에 앵커됐는지
+        // 검증하는 데 **같은 레벨**을 써야 하기 때문(추가 조회 0건).
         try {
           const levelPrice = priceData?.price ?? sorted[sorted.length - 1]?.close ?? 0;
-          const levelsBlock = formatPriceLevelsForPrompt(
-            computePriceLevels(sorted, levelPrice),
-            levelPrice,
-          );
+          priceLevels = computePriceLevels(sorted, levelPrice);
+          const levelsBlock = formatPriceLevelsForPrompt(priceLevels, levelPrice);
           if (levelsBlock) state.priceContext = `${state.priceContext}\n\n${levelsBlock}`;
         } catch (error) {
           aiLog.warn("가격 레벨 컨텍스트 생성 실패 — 레벨 없이 진행", error);
@@ -933,6 +937,23 @@ export async function POST(req: NextRequest): Promise<Response> {
                 const isBearishVerdict =
                   d.verdict === "UNDERWEIGHT" || d.verdict === "REDUCE" || d.verdict === "SELL";
                 const normalizedStop = isBearishVerdict ? Math.abs(rawStop) : -Math.abs(rawStop);
+
+                // 약세 재진입가(target_pct)가 **실측 지지에 앵커됐는지** 서버가 강제한다.
+                // 프롬프트에도 같은 규칙이 있지만 강제가 아니라, 무시되면 매물대 공백의 위험한
+                // 가격이 차트 오버레이·터치 채점을 구동한다(실측: 두산 -13% = 55,400원).
+                const decisionBase = priceData?.price ?? sorted[sorted.length - 1]?.close ?? null;
+                const anchorCheck = checkReentryAnchor(
+                  d.verdict as FinalDecision["verdict"],
+                  rawTarget,
+                  decisionBase,
+                  priceLevels,
+                );
+                if (anchorCheck.checked && !anchorCheck.anchored) {
+                  aiLog.warn(
+                    `재진입가 앵커 실패 — target_pct=${rawTarget}% 무효화(null). ${anchorCheck.reason}`,
+                  );
+                }
+                const enforcedTarget = anchorCheck.anchored ? rawTarget : null;
                 const finalDecision: FinalDecision = {
                   verdict: d.verdict as FinalDecision["verdict"],
                   reasoning: typeof d.reasoning === "string" ? d.reasoning : "",
@@ -949,8 +970,14 @@ export async function POST(req: NextRequest): Promise<Response> {
                   time_horizon: normalizeTimeHorizon(d.time_horizon, reportEnumFallback),
                   new_entry_strategy: typeof d.new_entry_strategy === "string" ? d.new_entry_strategy : "",
                   holder_strategy: typeof d.holder_strategy === "string" ? d.holder_strategy : "",
-                  target_pct: rawTarget,
+                  target_pct: enforcedTarget,
                   stop_loss_pct: normalizedStop,
+                  // 서버가 재진입가를 무효화했으면 사유를 남긴다(JSONB — 마이그레이션 불필요).
+                  // 프롬프트 준수율 계측기 역할: 발동률이 낮으면 규칙이 잘 듣는 것이고,
+                  // 높으면 프롬프트 문구 자체를 손봐야 한다는 신호.
+                  ...(anchorCheck.checked && !anchorCheck.anchored
+                    ? { target_pct_voided_reason: anchorCheck.reason }
+                    : {}),
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
                   // % 기준가 = LLM 에 넘긴 "현재가"(priceData?.price ?? 마지막 봉 종가). 절대가격 표기·재현용.
                   base_price: priceData?.price ?? sorted[sorted.length - 1]?.close ?? null,

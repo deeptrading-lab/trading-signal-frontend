@@ -53,6 +53,14 @@ export interface PriceLevels {
   } | null;
   /** 매물대 — 비중 큰 순. 현재가 위/아래가 섞여 있다. */
   zones: VolumeZone[];
+  /**
+   * 매물대 구간 하나의 가격 폭(원). 구간은 균일 분할이라 단일 값.
+   *
+   * "어떤 가격이 이 매물대 안에 들어왔는가" 를 판정할 때 허용 오차의 기준이 된다 — 고정 %(±3% 등)를
+   * 쓰면 저변동주에선 헐겁고 고변동주에선 빡빡해지는데, 구간폭은 종목의 1년 가격 범위에서 나오므로
+   * 변동성에 자동으로 스케일한다. 매물대가 없으면 null.
+   */
+  binWidth: number | null;
   /** 현재가 바로 아래의 가장 가까운 두꺼운 매물대(= 다음 지지 후보). 없으면 null. */
   nearestSupport: VolumeZone | null;
   /** 현재가 바로 위의 가장 가까운 두꺼운 매물대(= 반등 시 저항·돌파 트리거). 없으면 null. */
@@ -121,15 +129,21 @@ function fibOf(candles: StockDailyCandle[], current: number) {
   };
 }
 
-/** 매물대 — 최근 1년 일봉의 거래량 가격 분포에서 비중 있는 구간만. */
-function zonesOf(candles: StockDailyCandle[], current: number): VolumeZone[] {
+/** 매물대 — 최근 1년 일봉의 거래량 가격 분포에서 비중 있는 구간만. 구간폭도 함께 돌려준다. */
+function zonesOf(
+  candles: StockDailyCandle[],
+  current: number,
+): { zones: VolumeZone[]; binWidth: number | null } {
   const window = candles.slice(-VP_LOOKBACK);
-  if (window.length < 40) return [];
+  if (window.length < 40) return { zones: [], binWidth: null };
   const vp = computeVolumeProfile(window, VP_BINS);
   const total = vp.bins.reduce((s, b) => s + b.volume, 0);
-  if (total <= 0) return [];
+  if (total <= 0) return { zones: [], binWidth: null };
 
-  return vp.bins
+  const first = vp.bins[0];
+  const binWidth = first ? first.high - first.low : null;
+
+  const zones = vp.bins
     .map((b) => {
       // "현재가 대비 구간이 얼마나 위(+)/아래(-)인지" — **분모는 현재가**.
       // 구간가를 분모로 쓰면 먼 구간에서 -100% 를 넘는 불가능한 값이 나온다(가격은 -100% 아래로 못 감).
@@ -145,6 +159,8 @@ function zonesOf(candles: StockDailyCandle[], current: number): VolumeZone[] {
     })
     .filter((z) => z.weightPct >= MIN_ZONE_WEIGHT_PCT)
     .sort((a, b) => b.weightPct - a.weightPct);
+
+  return { zones, binWidth: binWidth && binWidth > 0 ? binWidth : null };
 }
 
 /** 일봉 → 가격 레벨 컨텍스트. 봉이 부족하면 가능한 항목만 채운다. */
@@ -156,7 +172,7 @@ export function computePriceLevels(
   const closes = sorted.map((c) => c.close);
   const cur = currentPrice > 0 ? currentPrice : (closes[closes.length - 1] ?? 0);
 
-  const zones = cur > 0 ? zonesOf(sorted, cur) : [];
+  const { zones, binWidth } = cur > 0 ? zonesOf(sorted, cur) : { zones: [], binWidth: null };
   // 지지/저항 후보 — 현재가 아래/위 중 **가장 가까운** 것(두께는 이미 필터됨).
   const below = zones.filter((z) => z.side === "below").sort((a, b) => b.price - a.price);
   const above = zones.filter((z) => z.side === "above").sort((a, b) => a.price - b.price);
@@ -171,6 +187,7 @@ export function computePriceLevels(
     bollinger: bollingerOf(closes),
     fib: cur > 0 ? fibOf(sorted, cur) : null,
     zones,
+    binWidth,
     nearestSupport: below[0] ?? null,
     nearestResistance: above[0] ?? null,
   };
