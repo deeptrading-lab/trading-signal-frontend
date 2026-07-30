@@ -205,6 +205,15 @@ export interface FinalDecision {
   /** 목표 수익률 또는 재진입 구간 % (현재가 대비). BUY/OVERWEIGHT/HOLD=양수 목표, UNDERWEIGHT/REDUCE=음수 재진입 구간, SELL=null */
   target_pct: number | null;
   /**
+   * 서버가 약세 재진입가를 **무효화한 사유**(있으면 `target_pct` 는 null 로 강제된 것).
+   *
+   * PM 이 낸 재진입가가 매물대 공백에 찍히면 `checkReentryAnchor` 가 무효화한다 — 그 자리는 지지가
+   * 아니라 낙폭이 확대되는 구간이라 "다시 볼 자리"가 될 수 없기 때문. 이 필드는 **프롬프트 준수율
+   * 계측기**이기도 하다(발동률이 높으면 프롬프트 문구를 손봐야 한다는 신호).
+   * 정상 통과·강세·legacy 행은 undefined.
+   */
+  target_pct_voided_reason?: string | null;
+  /**
    * 테제(논거) 무효화 라인 % (현재가 대비). 방향은 verdict 로 갈림:
    * 강세(BUY/OVERWEIGHT/HOLD)=하방 손절(음수, 예 -5), 약세(UNDERWEIGHT/REDUCE/SELL)=상방 무효화(양수, 예 +6).
    * ⚠️ 이 시맨틱 도입(2026-07) 이전 legacy 약세 행은 stop 이 음수(하방)일 수 있음 — 소비처는 부호로 방향 판단.
