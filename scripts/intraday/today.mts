@@ -134,6 +134,58 @@ for (const [owner, a] of byOwner)
     `  ${owner}: 세션 ${a.n}개 중 매매 ${a.traded}개 · 손익 ${Math.round(a.pnl).toLocaleString()}원` +
       (a.cap ? ` (런 총자본 대비 ${((a.pnl / (a.cap * 3)) * 100).toFixed(3)}%)` : ""),
   );
+// ─── 비용 분해 — "손실이 판단 탓인가 비용 탓인가" ─────────────────────────────
+// 왕복 ~0.28%(수수료 0.015%/편도 + 매도 제세금 0.15% + 슬리피지 0.05%/편도)가 net 부호를 가르므로
+// 실현손익을 [순수 가격손익] + [거래비용]으로 쪼개 본다. 비용 비중이 크면 개선 레버는
+// 판단 품질이 아니라 "거래당 기대 이동폭 vs 비용"(회전율·목표폭) 쪽이다.
+const BUY_RATE = 0.0007; // 수수료 0.015% + 슬리피지 0.05%
+const SELL_RATE = 0.0021; // 위 + 제세금 0.15%
+type Agg = { name: string; owner: string; buys: number; sells: number; turnover: number; pnl: number; cost: number };
+const bySess = new Map<string, Agg>();
+const metaOf = new Map<string, any>();
+for (const x of mine) metaOf.set(x.id, x.payload);
+for (const x of ticks) {
+  const p = metaOf.get(x.session_id);
+  if (!p) continue;
+  for (const o of x.payload?.orders ?? []) {
+    if (!bySess.has(x.session_id))
+      bySess.set(x.session_id, { name: p.stocks?.[0]?.name ?? p.tickers?.[0], owner: p.owner, buys: 0, sells: 0, turnover: 0, pnl: 0, cost: 0 });
+    const a = bySess.get(x.session_id)!;
+    const amt = (o.price ?? 0) * (o.quantity ?? 0);
+    a.turnover += amt;
+    if (o.side === "BUY") { a.buys += 1; a.cost += amt * BUY_RATE; } else { a.sells += 1; a.cost += amt * SELL_RATE; }
+  }
+}
+if (bySess.size) {
+  for (const [id, a] of bySess) {
+    const p = metaOf.get(id);
+    a.pnl = (p.portfolioValue ?? p.initialCash ?? 0) - (p.initialCash ?? 0);
+  }
+  console.log("\n[비용 분해] 종목        소유자 매수/매도  회전금액     실현손익   거래비용   비용제외");
+  let tp = 0, tc = 0;
+  for (const [, a] of [...bySess].sort((x, y) => x[1].pnl - y[1].pnl)) {
+    tp += a.pnl; tc += a.cost;
+    console.log(
+      `  ${String(a.name).padEnd(12)} ${String(a.owner).padEnd(5)} ${String(a.buys)}/${String(a.sells).padEnd(4)} ${Math.round(a.turnover).toLocaleString().padStart(11)} ${Math.round(a.pnl).toLocaleString().padStart(10)}원 ${Math.round(a.cost).toLocaleString().padStart(8)}원 ${Math.round(a.pnl + a.cost).toLocaleString().padStart(9)}원`,
+    );
+  }
+  console.log(`  합계: 실현 ${Math.round(tp).toLocaleString()}원 = 가격손익 ${Math.round(tp + tc).toLocaleString()}원 + 비용 ${Math.round(-tc).toLocaleString()}원`);
+  if (tp < 0) console.log(`  → ★손실 중 거래비용 비중 ${((tc / Math.abs(tp)) * 100).toFixed(0)}%`);
+}
+
+// ─── 청산 사유 ────────────────────────────────────────────────────────────────
+const exitKinds: Record<string, number> = {};
+for (const x of ticks) {
+  if (!metaOf.has(x.session_id)) continue;
+  if (!(x.payload?.orders ?? []).some((o: any) => o.side === "SELL")) continue;
+  const r = String(x.payload.decision?.rationale ?? "");
+  const kind = r.includes("손절선") ? "손절선 이탈" : r.includes("익절") ? "익절 목표 도달"
+    : r.includes("강제 청산") ? "장막판 강제청산" : "판단(judge)";
+  exitKinds[kind] = (exitKinds[kind] ?? 0) + 1;
+}
+if (Object.keys(exitKinds).length)
+  console.log(`\n[청산 사유] ${Object.entries(exitKinds).map(([k, v]) => `${k} ${v}`).join(" / ")}`);
+
 const stuck = sessions.filter((x: any) => x.status === "running" && (x.payload?.startedAt ?? "") < `${day}T23:59`);
 if (stuck.length)
   console.log(`\n⚠️ running 잔존 세션 ${stuck.length}건: ${stuck.map((x: any) => `${x.payload?.stocks?.[0]?.name ?? "?"}(${x.payload?.owner})`).join(", ")}`);
