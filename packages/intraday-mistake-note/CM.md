@@ -1,5 +1,6 @@
 # AI 단타 Compact Memory (자동 생성)
-updated:2026-07-28T06:38:23.717Z | objective:비용후 순기대값↑·낙폭↓ | goal-zone:일 +1~2%(관찰값·보장아님)
+updated:2026-08-04T00:00:43.244Z | objective:비용후 순기대값↑·낙폭↓ | goal-zone:일 +1~2%(관찰값·보장아님)
+source-through:2026-07-21
 SHADOW=참고만/하드게이트금지 | ACTIVE도 손실킬·15:00진입금지·15:20청산·하드스톱 완화금지
 <!-- AI_CONTEXT_START -->
 - S:SHADOW | R:AI-49DC5B9A | T:CALIBRATION | IF:높은 매수 확신 구간 | DO:고확신=강화 금지, 실제체결·OOS로 방향성 재검증 | AVOID:반복틱 승률을 독립표본으로 해석 | E:d=1,n=3,tr=7,W/L=2/5,net=-47524 | UNTIL:2026-08-04 | kw:conviction,OOS,독립표본,반사실

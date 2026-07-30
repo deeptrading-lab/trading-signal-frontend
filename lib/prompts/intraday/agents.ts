@@ -212,6 +212,7 @@ A+ 매수 셋업(하나라도 명확히 성립 + 거부권 없음):
   "stopPrice": <원> | null,
   "invalidationPrice": <원> | null,
   "expectedHoldingMinutes": <분> | null,
+  "appliedMistakeNoteRuleId": "<입력의 AI-XXXXXXXX 규칙 ID>" | null,
   "rationale": "<한국어 1~2문장>",
   "riskNotes": ["<0~2개>"]
 }`;
@@ -222,13 +223,26 @@ export function buildJudgeUser(
   mistakeNotes = "",
 ): string {
   const note = analystNote.trim() ? analystNote.trim() : "(분석가 진단 없음 — 정량 데이터로 직접 판단)";
-  return [
+  const base = [
     formatIntradayContext(ctx),
     "",
     "[흐름·세력 분석가 진단]",
     note,
-    ...(mistakeNotes ? ["", mistakeNotes] : []),
     "",
     "위 데이터로 지금 이 종목의 단기 방향 확신 점수(convictionScore)를 JSON 으로 출력하세요.",
   ].join("\n");
+  if (!mistakeNotes) return base;
+  const withMemory = [
+    formatIntradayContext(ctx),
+    "",
+    "[흐름·세력 분석가 진단]",
+    note,
+    "",
+    mistakeNotes,
+    "",
+    "위 데이터로 지금 이 종목의 단기 방향 확신 점수(convictionScore)를 JSON 으로 출력하세요.",
+  ].join("\n");
+  const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
+  const baselineBytes = bytes(JUDGE_SYSTEM) + bytes(base);
+  return bytes(JUDGE_SYSTEM) + bytes(withMemory) <= baselineBytes * 1.05 ? withMemory : base;
 }

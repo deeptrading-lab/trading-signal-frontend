@@ -1,5 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { buildRuntimeMemorySnapshot } from "../../../packages/intraday-mistake-note/src/memory";
+import type { RuntimeMemorySnapshot } from "../../../packages/intraday-mistake-note/src/types";
 
 const MEMORY_PATH = path.join(
   process.cwd(),
@@ -8,8 +10,8 @@ const MEMORY_PATH = path.join(
   "CM.md",
 );
 const CACHE_MS = 60_000;
-const MAX_RULES = 6;
-const MAX_CHARS = 900;
+const MAX_RULES = 1;
+const MAX_CHARS = 160;
 
 let cache: { loadedAt: number; markdown: string } | null = null;
 
@@ -19,50 +21,31 @@ export function buildMistakeNoteContext(
   maxRules = MAX_RULES,
   maxChars = MAX_CHARS,
 ): string {
-  const start = markdown.indexOf("<!-- AI_CONTEXT_START -->");
-  const end = markdown.indexOf("<!-- AI_CONTEXT_END -->");
-  if (start < 0 || end <= start) return "";
-  const scopeSet = new Set(scopes);
-  const todayKst = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const lines = markdown
-    .slice(start, end)
-    .split("\n")
-    .filter((line) => line.startsWith("- S:ACTIVE") || line.startsWith("- S:SHADOW"))
-    .filter((line) => {
-      const until = line.match(/\| UNTIL:(\d{4}-\d{2}-\d{2}) \|/)?.[1];
-      return !until || until >= todayKst;
-    })
-    .filter(
-      (line) =>
-        scopeSet.size === 0 || [...scopeSet].some((scope) => line.includes(`| T:${scope} |`)),
-    )
-    .slice(0, maxRules);
-  if (lines.length === 0) return "";
-  const prefix = "[검증형 오답노트] SHADOW는 참고만, 안전핀 완화 금지\n";
-  const selected: string[] = [];
-  for (const line of lines) {
-    const next = prefix + [...selected, line].join("\n");
-    if (next.length > maxChars) break;
-    selected.push(line);
-  }
-  return selected.length ? prefix + selected.join("\n") : "";
+  return buildRuntimeMemorySnapshot(markdown, scopes, maxRules, maxChars).context;
 }
 
-export async function loadMistakeNoteContext(scopes: string[] = []): Promise<string> {
+export async function loadMistakeNoteSnapshot(
+  scopes: string[] = [],
+): Promise<RuntimeMemorySnapshot> {
   try {
     const now = Date.now();
     if (!cache || now - cache.loadedAt >= CACHE_MS) {
       cache = { loadedAt: now, markdown: await fs.readFile(MEMORY_PATH, "utf8") };
     }
-    return buildMistakeNoteContext(cache.markdown, scopes);
+    return buildRuntimeMemorySnapshot(cache.markdown, scopes, MAX_RULES, MAX_CHARS);
   } catch {
-    return "";
+    return {
+      status: "IO_ERROR",
+      context: "",
+      hash: null,
+      ruleIds: [],
+      sourceThrough: null,
+    };
   }
+}
+
+export async function loadMistakeNoteContext(scopes: string[] = []): Promise<string> {
+  return (await loadMistakeNoteSnapshot(scopes)).context;
 }
 
 export function resetMistakeNoteContextCacheForTest(): void {

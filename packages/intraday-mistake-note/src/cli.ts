@@ -6,25 +6,12 @@ import { collectDay, hashCollectedDay } from "./collect";
 import { deriveDailySource } from "./derive";
 import { buildMemory } from "./memory";
 import { renderReview, renderStandaloneHtml } from "./render";
+import { defaultReviewDate, shouldSkipRemoteReview } from "./schedule";
 import type { DailyMistakeSource } from "./types";
 import { validateArtifacts } from "./validate";
+import { resolveServerOperator } from "../../../lib/server/paperTrading/operator";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../", import.meta.url));
-
-function kstDate(date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function previousKstDay(): string {
-  const value = new Date();
-  value.setUTCDate(value.getUTCDate() - 1);
-  return kstDate(value);
-}
 
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -108,15 +95,68 @@ async function renderLatest(): Promise<void> {
   await atomicWrite(path.join(PACKAGE_ROOT, "reports", "latest.html"), html);
 }
 
+async function ensureLocalArtifacts(
+  day: string,
+  key: string,
+  expectedInputHash: string,
+): Promise<"VALID" | "REPAIRED" | "MISSING"> {
+  const sourcePath = path.join(PACKAGE_ROOT, "sources", "ai-daily", key, `${day}.json`);
+  const reviewPath = path.join(PACKAGE_ROOT, "reviews", key, `${day}.md`);
+  const memoryPath = path.join(PACKAGE_ROOT, "CM.md");
+  const source = await fs
+    .readFile(sourcePath, "utf8")
+    .then((value) => JSON.parse(value) as DailyMistakeSource)
+    .catch(() => null);
+  if (!source || source.inputHash !== expectedInputHash || source.status !== "READY") {
+    return "MISSING";
+  }
+  const [sources, review, memory] = await Promise.all([
+    loadSources(),
+    fs.readFile(reviewPath, "utf8").catch(() => ""),
+    fs.readFile(memoryPath, "utf8").catch(() => ""),
+  ]);
+  const valid =
+    review.length > 0 &&
+    validateArtifacts(sources, memory).ok &&
+    memory.includes(`source-through:${sources.filter((item) => item.status === "READY").map((item) => item.date).sort().at(-1)}`);
+  if (valid) return "VALID";
+
+  const rebuilt = buildMemory(sources);
+  const validation = validateArtifacts(sources, rebuilt.markdown);
+  if (!validation.ok) return "MISSING";
+  await atomicWrite(memoryPath, rebuilt.markdown);
+  await atomicWrite(reviewPath, renderReview(source, rebuilt.rules));
+  await persistRetired(rebuilt);
+  await renderLatest();
+  return "REPAIRED";
+}
+
 async function runReview(dryRun: boolean): Promise<void> {
-  const day = option("--date") ?? previousKstDay();
-  const collected = await collectDay(day);
-  const inputHash = hashCollectedDay(collected);
-  const key = operatorKey(collected.operator);
+  const day = option("--date") ?? defaultReviewDate();
+  const operator = resolveServerOperator();
+  const key = operatorKey(operator);
   const manifestPath = path.join(PACKAGE_ROOT, "state", "manifests", `${key}.json`);
   const manifest = JSON.parse(
     await fs.readFile(manifestPath, "utf8").catch(() => "{}"),
   ) as { lastSuccessfulDate?: string; lastInputHash?: string };
+  if (shouldSkipRemoteReview({
+    day,
+    dryRun,
+    forceRefresh: process.argv.includes("--force-refresh"),
+    lastSuccessfulDate: manifest.lastSuccessfulDate,
+    lastInputHash: manifest.lastInputHash,
+  })) {
+    const local = await ensureLocalArtifacts(day, key, manifest.lastInputHash ?? "");
+    if (local !== "MISSING") {
+      console.log(
+        `${local === "VALID" ? "UNCHANGED_LOCAL" : "REPAIRED_LOCAL"} ${day} ${manifest.lastInputHash?.slice(0, 12) ?? ""}`,
+      );
+      return;
+    }
+  }
+
+  const collected = await collectDay(day, operator);
+  const inputHash = hashCollectedDay(collected);
   if (!dryRun && manifest.lastSuccessfulDate === day && manifest.lastInputHash === inputHash) {
     console.log(`UNCHANGED ${day} ${inputHash.slice(0, 12)}`);
     return;

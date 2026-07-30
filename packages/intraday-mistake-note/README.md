@@ -14,7 +14,7 @@
 ## 명령
 
 ```bash
-# 기본값: 전일 KST. 장 마감 후 특정일을 재현할 때 --date 사용
+# 기본값: 16:30 KST 이후 당일, 그 전에는 전일. 특정일 재현은 --date 사용
 npm run intraday:notes:review -- --date 2026-07-21
 
 # 파일을 바꾸지 않고 원장/규칙 후보 확인
@@ -28,6 +28,9 @@ npm run intraday:notes:render
 
 `review`는 `date + inputHash`가 같으면 `UNCHANGED`로 끝난다. 휴장·데이터 없음·미완료 세션·owner 오염·라벨 품질 실패 시 `SKIPPED` 기록만 만들고 `CM.md`는 바꾸지 않는다. 파일은 임시 파일을 거친 원자적 rename으로 갱신한다.
 
+같은 날짜의 성공 manifest가 있으면 원격 원장을 다시 받기 전에 `UNCHANGED_LOCAL`로 끝내 egress를
+늘리지 않는다. 장 마감 자료가 뒤늦게 보정된 날만 `--force-refresh`로 명시 재수집한다.
+
 ## 장 마감 후 수동 운영
 
 1. 15:40 세션·오토파일럿 완료 확인
@@ -38,6 +41,7 @@ npm run intraday:notes:render
 6. 전일 규칙을 당일 데이터로 OOS 검증
 7. 후보 생성 → `SHADOW` → `ACTIVE` 또는 퇴역
 8. 일일 리뷰·정형 source·CM·HTML 재생성 및 검증
+9. 다음 AI 호출부터 최종 판단가 prompt에 관련 규칙 1개(최대 160자)를 필수 참고 문맥으로 포함
 
 오답노트는 상주 프로세스가 아니라 명령 1회로 끝나는 로컬 배치다. 장 마감 뒤 자동 분석·호출이
 계속되지 않도록 저장소에서는 `launchd`/cron을 설치하지 않으며, 필요한 날 16:30 KST 이후 운영자가
@@ -55,7 +59,9 @@ cd /Users/a454155/Documents/Projects/trading-signal/trading-signal-frontend && n
 - 실전/자동 하드게이트 검토: 최소 100왕복·20거래일·20 ticker-days, 비용 스트레스, PF≥1.3, OOS 순기대값 95% CI 하단 >0, MDD 비악화.
 - `RETIRED`: 10거래일/50표본에서 개선효과 없음, 반대증거 2회, 만료, 안전 위반 중 하나. CM 삭제 + tombstone.
 
-CM은 최대 12줄/1,800자, 실제 에이전트 주입은 관련 범위 최대 6줄/900자다.
+CM은 최대 12줄/1,800자다. 실제 런타임은 분석가에 중복 주입하지 않고 최종 판단가에만 관련 범위
+1규칙/160자를 넣는다. 적용 상태·CM 해시·규칙 ID·원천 일자는 판단 payload에 남기며 긴 원문은
+저장하지 않는다.
 
 ## 다른 개발자와 병합
 

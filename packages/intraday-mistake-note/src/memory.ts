@@ -4,6 +4,7 @@ import type {
   MemoryBuildResult,
   MemoryRule,
   RuleCandidate,
+  RuntimeMemorySnapshot,
 } from "./types";
 
 const MAX_RULES = 12;
@@ -111,6 +112,7 @@ export function buildMemory(
   const header = [
     "# AI 단타 Compact Memory (자동 생성)",
     `updated:${generatedAt} | objective:비용후 순기대값↑·낙폭↓ | goal-zone:일 +1~2%(관찰값·보장아님)`,
+    `source-through:${ready.map((source) => source.date).sort().at(-1) ?? "none"}`,
     "SHADOW=참고만/하드게이트금지 | ACTIVE도 손실킬·15:00진입금지·15:20청산·하드스톱 완화금지",
     "<!-- AI_CONTEXT_START -->",
   ];
@@ -128,29 +130,86 @@ export function buildMemory(
 export function buildRuntimeContext(
   markdown: string,
   scopes: string[] = [],
-  maxRules = 6,
-  maxChars = 900,
+  maxRules = 1,
+  maxChars = 160,
 ): string {
+  return buildRuntimeMemorySnapshot(markdown, scopes, maxRules, maxChars).context;
+}
+
+const RUNTIME_RULE =
+  /^- S:(ACTIVE|SHADOW) \| R:(AI-[A-F0-9]{8}) \| T:(ENTRY|REENTRY|EXIT|CALIBRATION|RISK) \| IF:([^|\r\n]+) \| DO:([^|\r\n]+) \| AVOID:([^|\r\n]+) \| E:([^|\r\n]+) \| UNTIL:(\d{4}-\d{2}-\d{2}) \| kw:([^|\r\n]+)$/;
+
+function todayKst(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export function buildRuntimeMemorySnapshot(
+  markdown: string,
+  scopes: string[] = [],
+  maxRules = 1,
+  maxChars = 160,
+): RuntimeMemorySnapshot {
+  const hash = createHash("sha256").update(markdown).digest("hex");
+  const starts = markdown.match(/<!-- AI_CONTEXT_START -->/g)?.length ?? 0;
+  const ends = markdown.match(/<!-- AI_CONTEXT_END -->/g)?.length ?? 0;
   const start = markdown.indexOf("<!-- AI_CONTEXT_START -->");
   const end = markdown.indexOf("<!-- AI_CONTEXT_END -->");
-  if (start < 0 || end <= start) return "";
+  const sourceThroughValue =
+    markdown.match(/^source-through:(\d{4}-\d{2}-\d{2}|none)$/m)?.[1] ?? null;
+  const sourceThrough = sourceThroughValue === "none" ? null : sourceThroughValue;
+  if (starts !== 1 || ends !== 1 || start < 0 || end <= start || !sourceThroughValue) {
+    return { status: "INVALID", context: "", hash, ruleIds: [], sourceThrough };
+  }
+  if (sourceThroughValue === "none") {
+    return { status: "EMPTY", context: "", hash, ruleIds: [], sourceThrough: null };
+  }
   const allowed = new Set(scopes);
-  const lines = markdown
+  const parsed = markdown
     .slice(start, end)
     .split("\n")
     .filter((line) => line.startsWith("- S:"))
-    .filter((line) => {
-      const until = line.match(/\| UNTIL:(\d{4}-\d{2}-\d{2}) \|/)?.[1];
-      return !until || until >= new Date().toISOString().slice(0, 10);
-    })
-    .filter((line) => allowed.size === 0 || [...allowed].some((scope) => line.includes(`| T:${scope} |`)))
-    .slice(0, maxRules);
-  if (lines.length === 0) return "";
-  const prefix = "[검증형 오답노트] SHADOW는 참고만, 안전핀 완화 금지\n";
-  const selected: string[] = [];
-  for (const line of lines) {
-    if ((prefix + [...selected, line].join("\n")).length > maxChars) break;
-    selected.push(line);
+    .map((line) => line.match(RUNTIME_RULE))
+    .filter((match): match is RegExpMatchArray => match !== null);
+  const rawRuleCount = markdown
+    .slice(start, end)
+    .split("\n")
+    .filter((line) => line.startsWith("- S:")).length;
+  if (parsed.length !== rawRuleCount) {
+    return { status: "INVALID", context: "", hash, ruleIds: [], sourceThrough };
   }
-  return selected.length ? prefix + selected.join("\n") : "";
+  const applicable = parsed
+    .filter((match) => match[8] >= todayKst())
+    .filter((match) => allowed.size === 0 || allowed.has(match[3]))
+    .sort((a, b) => {
+      const scopeOrder = (scope: string) => {
+        const index = scopes.indexOf(scope);
+        return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+      };
+      const byScope = scopeOrder(a[3]) - scopeOrder(b[3]);
+      if (byScope !== 0) return byScope;
+      if (a[1] !== b[1]) return a[1] === "ACTIVE" ? -1 : 1;
+      return a[2].localeCompare(b[2]);
+    })
+    .slice(0, maxRules);
+  const selected: string[] = [];
+  const ruleIds: string[] = [];
+  for (const match of applicable) {
+    const compact = `[필수참고 ${match[1]} ${match[2]}] IF:${match[4].trim()} → DO:${match[5].trim()} (안전핀 유지)`;
+    const next = [...selected, compact].join("\n");
+    if (next.length > maxChars) break;
+    selected.push(compact);
+    ruleIds.push(match[2]);
+  }
+  return {
+    status: selected.length ? "PRESENTED" : "EMPTY",
+    context: selected.join("\n"),
+    hash,
+    ruleIds,
+    sourceThrough,
+  };
 }

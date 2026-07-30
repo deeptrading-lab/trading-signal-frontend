@@ -10,6 +10,12 @@ function esc(value: unknown): string {
 
 export function renderReview(source: DailyMistakeSource, rules: MemoryRule[]): string {
   const pct = (value: number | null) => (value === null ? "—" : `${(value * 100).toFixed(1)}%`);
+  const goalStatus =
+    source.actual.portfolioReturnPct === null
+      ? "판정 보류"
+      : source.actual.portfolioReturnPct >= 1
+        ? "1% 이상"
+        : "1% 미만";
   return `# AI 단타 오답노트 — ${source.date}
 
 > 상태: **${source.status}** · 실제 체결/반사실 라벨/스크리너는 분리 해석 · 일 1~2%는 관찰 구간(보장 아님)
@@ -17,6 +23,7 @@ export function renderReview(source: DailyMistakeSource, rules: MemoryRule[]): s
 ## 키워드 요약
 
 - 실제: \`round-trip ${source.actual.closedTrades}\` · \`W/L ${source.actual.wins}/${source.actual.losses}\` · \`net ${source.actual.netPnlKrw.toLocaleString("ko-KR")}원\` · \`run ${source.actual.portfolioReturnPct ?? "—"}%\`
+- 목표 관찰: \`${goalStatus}\` · 일 +1%는 보장/만회매매 기준이 아니라 rolling 분포 개선 지표
 - 비용/리스크: \`cost ${source.actual.costsKrw.toLocaleString("ko-KR")}원\` · \`MDD(session) ${source.actual.maxSessionDrawdownPct ?? "—"}%\` · \`forced-exit ${source.actual.forcedExitTrades}/${source.actual.closedTrades}\`
 - 반사실 BUY: \`W/L/N/U ${source.counterfactualBuy.wins}/${source.counterfactualBuy.losses}/${source.counterfactualBuy.neutral}/${source.counterfactualBuy.unresolved}\` · \`WR ${pct(source.counterfactualBuy.winRate)}\` · gross only
 - 품질: \`sessions ${source.quality.completedSessions}/${source.quality.totalSessions}\` · \`ticks ${source.quality.ticks}\` · \`labels ${(source.quality.labelCoverageRate * 100).toFixed(1)}%\` · \`unresolved ${(source.quality.unresolvedLabelRate * 100).toFixed(1)}%\` · \`fallback ${(source.quality.fallbackRate * 100).toFixed(1)}%\`
