@@ -82,7 +82,7 @@ import type { AnalysisJobSource } from "@/lib/types/stock/analysisQueue";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 import { isVercelEnv } from "@/lib/server/env";
 import { createLogger } from "@/lib/server/logTag";
-import { AGENT_PROMPTS, runDebateLoop } from "@/lib/prompts/stock/aiAnalysis";
+import { AGENT_PROMPTS, runDebateLoop, TIMEOUT_TOTAL_MS } from "@/lib/prompts/stock/aiAnalysis";
 import type { AnalysisState } from "@/lib/prompts/stock/aiAnalysis";
 import { resolveAnalysisConfig, type AnalysisConfigOverride } from "@/lib/server/ai/analysisConfig";
 import { recordAbRunConfig } from "@/lib/server/ai/abRunConfigStore";
@@ -117,10 +117,7 @@ const CHART_DAYS = 365;
  * 이 마진(7)이 흡수한다 — 설·추석 연휴(공휴일 ~3평일)에도 임계 미만이라 오탐 없음.
  */
 const STALE_MAX_BUSINESS_DAYS = 7;
-// 12-에이전트 파이프라인 최대 허용 시간 (50분)
-// Phase A(6m) + Phase B(20m) + research_manager(5m) + trader/effort:high(6m)
-//   + risk×3 병렬(5m) + PM/effort:high(5m) ≈ 47m + 안전마진
-const TIMEOUT_TOTAL_MS = 3_000_000;
+// 전체 상한은 단계별 상한과 한곳에서 관리한다(둘의 대소가 불변식 — aiAnalysis.ts 참조).
 
 /**
  * 봇 SSE 통로 대기 파라미터. 봇 요청이 꽉 찬 슬롯을 만나면 연결을 끊지 않고(429 대신) 큐에 적재한 뒤
