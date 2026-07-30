@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { checkReentryAnchor } from "@/lib/signal/levels/validateReentry";
+import { checkReentryAnchor, checkStopNoiseBand } from "@/lib/signal/levels/validateReentry";
 import type { PriceLevels, VolumeZone } from "@/lib/signal/levels/priceLevels";
 
 function zone(price: number, side: VolumeZone["side"], weightPct = 8): VolumeZone {
@@ -24,6 +24,7 @@ function levels(overrides: Partial<PriceLevels> = {}): PriceLevels {
     binWidth: 4_000,
     nearestSupport: zone(90_000, "below"),
     nearestResistance: zone(115_000, "above"),
+    typicalMove: { d5: 4, d10: 6, d21: 10 },
     ...overrides,
   };
 }
@@ -104,5 +105,55 @@ describe("checkReentryAnchor — 허용 오차가 변동성에 스케일한다",
     // 75,000원은 90,000 과 15,000 차이 → 좁은 구간폭에선 실패했지만 넓으면 통과.
     expect(checkReentryAnchor("REDUCE", -25, 100_000, wide).anchored).toBe(true);
     expect(checkReentryAnchor("REDUCE", -25, 100_000, levels()).anchored).toBe(false);
+  });
+});
+
+describe("checkStopNoiseBand — 무효화 라인이 노이즈 안인지(관측 전용)", () => {
+  // 통상 변동폭: 단기(1주) 4% / 중기(2주) 6% / 장기(1개월) 10%.
+  it("통상 변동폭보다 좁으면 경고", () => {
+    expect(checkStopNoiseBand(5, "중기", levels())).toContain("노이즈로 발동할 수 있음");
+    expect(checkStopNoiseBand(-5, "중기", levels())).toContain("노이즈"); // 부호 무관(폭만 본다)
+  });
+
+  it("통상 변동폭 이상이면 경고 없음", () => {
+    expect(checkStopNoiseBand(6, "중기", levels())).toBeNull();
+    expect(checkStopNoiseBand(12, "중기", levels())).toBeNull();
+  });
+
+  it("판단 기간에 맞는 변동폭을 고른다", () => {
+    // 5% 는 단기(4%) 기준으론 넉넉하지만 장기(10%) 기준으론 노이즈.
+    expect(checkStopNoiseBand(5, "단기", levels())).toBeNull();
+    expect(checkStopNoiseBand(5, "장기", levels())).toContain("노이즈");
+  });
+
+  it("근거가 없으면 판정하지 않는다", () => {
+    expect(checkStopNoiseBand(5, "중기", null)).toBeNull();
+    const noMove = levels({ typicalMove: { d5: null, d10: null, d21: null } });
+    expect(checkStopNoiseBand(5, "중기", noMove)).toBeNull();
+  });
+});
+
+describe("typicalMove — 기간별 통상 변동폭", () => {
+  it("변동이 큰 종목일수록 값이 크다", async () => {
+    const { computePriceLevels } = await import("@/lib/signal/levels/priceLevels");
+    const dateAt = (i: number) =>
+      new Date(Date.UTC(2025, 0, 1) + i * 86_400_000).toISOString().slice(0, 10);
+    const mk = (amp: number) =>
+      Array.from({ length: 300 }, (_, i) => {
+        const c = 100 * (1 + amp * Math.sin(i / 3));
+        return { date: dateAt(i), open: c, high: c * 1.01, low: c * 0.99, close: c, volume: 1000 };
+      });
+    const calm = computePriceLevels(mk(0.01), 100).typicalMove.d10!;
+    const wild = computePriceLevels(mk(0.15), 100).typicalMove.d10!;
+    expect(wild).toBeGreaterThan(calm);
+  });
+
+  it("봉이 부족하면 null(추정 금지)", async () => {
+    const { computePriceLevels } = await import("@/lib/signal/levels/priceLevels");
+    const few = Array.from({ length: 20 }, (_, i) => ({
+      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+      open: 100, high: 101, low: 99, close: 100, volume: 1000,
+    }));
+    expect(computePriceLevels(few, 100).typicalMove.d21).toBeNull();
   });
 });

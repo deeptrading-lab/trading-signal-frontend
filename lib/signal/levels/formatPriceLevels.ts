@@ -45,6 +45,20 @@ export function formatPriceLevelsForPrompt(levels: PriceLevels, current: number)
     );
   }
 
+  // ── 통상 변동폭 — 목표·무효화 라인이 노이즈 안에 들어가는 걸 막는 기준 ──────────
+  const tm = levels.typicalMove;
+  if (tm.d5 !== null || tm.d10 !== null || tm.d21 !== null) {
+    const parts = [
+      tm.d5 !== null ? `1주 ±${tm.d5.toFixed(1)}%` : null,
+      tm.d10 !== null ? `2주 ±${tm.d10.toFixed(1)}%` : null,
+      tm.d21 !== null ? `1개월 ±${tm.d21.toFixed(1)}%` : null,
+    ].filter(Boolean);
+    lines.push(
+      `통상 변동폭(이 종목이 실제로 움직이는 폭, 과거 1년 중앙값): ${parts.join(" | ")}` +
+        ` — 목표·무효화 라인이 이 안에 있으면 논거가 깨져서가 아니라 **노이즈로 발동**한다.`,
+    );
+  }
+
   // ── 피보나치 되돌림 ──────────────────────────────────────────────────────────
   if (levels.fib) {
     const f = levels.fib;
