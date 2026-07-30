@@ -66,7 +66,7 @@ import { recordAgentUsage } from "@/lib/server/ai/agentUsageStore";
 import { computePriceLevels } from "@/lib/signal/levels/priceLevels";
 import type { PriceLevels } from "@/lib/signal/levels/priceLevels";
 import { formatPriceLevelsForPrompt } from "@/lib/signal/levels/formatPriceLevels";
-import { checkReentryAnchor } from "@/lib/signal/levels/validateReentry";
+import { checkReentryAnchor, checkStopNoiseBand } from "@/lib/signal/levels/validateReentry";
 import {
   normalizeConfidence,
   normalizeTimeHorizon,
@@ -954,6 +954,12 @@ export async function POST(req: NextRequest): Promise<Response> {
                   );
                 }
                 const enforcedTarget = anchorCheck.anchored ? rawTarget : null;
+
+                // 무효화 라인이 통상 변동폭 안이면 노이즈로 발동한다 — **기록만** 하고 값은 안 바꾼다
+                // (매물대·직전 저점 같은 구조적 경계면 좁아도 정당할 수 있어 강제하지 않는다).
+                const horizonForNoise = normalizeTimeHorizon(d.time_horizon, () => {});
+                const stopNoiseReason = checkStopNoiseBand(normalizedStop, horizonForNoise, priceLevels);
+                if (stopNoiseReason) aiLog.warn(`무효화 라인 노이즈 경고 — ${stopNoiseReason}`);
                 const finalDecision: FinalDecision = {
                   verdict: d.verdict as FinalDecision["verdict"],
                   reasoning: typeof d.reasoning === "string" ? d.reasoning : "",
@@ -978,6 +984,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                   ...(anchorCheck.checked && !anchorCheck.anchored
                     ? { target_pct_voided_reason: anchorCheck.reason }
                     : {}),
+                  // 무효화 라인 노이즈 경고(관측 전용 — 값은 그대로 둔다).
+                  ...(stopNoiseReason ? { stop_noise_warning: stopNoiseReason } : {}),
                   risk_reward_ratio: typeof d.risk_reward_ratio === "number" ? d.risk_reward_ratio : null,
                   // % 기준가 = LLM 에 넘긴 "현재가"(priceData?.price ?? 마지막 봉 종가). 절대가격 표기·재현용.
                   base_price: priceData?.price ?? sorted[sorted.length - 1]?.close ?? null,

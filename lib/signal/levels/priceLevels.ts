@@ -65,6 +65,17 @@ export interface PriceLevels {
   nearestSupport: VolumeZone | null;
   /** 현재가 바로 위의 가장 가까운 두꺼운 매물대(= 반등 시 저항·돌파 트리거). 없으면 null. */
   nearestResistance: VolumeZone | null;
+  /**
+   * 이 종목이 해당 기간에 **실제로 얼마나 움직이는가**(% , 절대값 중앙값).
+   *
+   * 목표·무효화 라인이 통상 변동폭 안에 있으면 논거가 깨져서가 아니라 **노이즈로 발동**한다.
+   * 그런데 통상 변동폭은 종목마다 2.4%~13.3% 로 5배 넘게 갈리는데(실측 80건) 프롬프트는 모든
+   * 종목에 고정 ±5~8% 를 쓰고 있었다 — 조용한 종목엔 과도하게 넓고 변동성 큰 종목엔 노이즈 안.
+   *
+   * ★ATR×√N 스케일링은 쓰지 않는다. 변동성 급등 직후 ATR 이 과거를 보느라 부풀어 이후 실현
+   * 변동을 3.4배 과대추정했다(실측/기대 0.29배). **기간을 맞춰 직접 재는** 쪽이 보정이 맞다(1.30배).
+   */
+  typicalMove: { d5: number | null; d10: number | null; d21: number | null };
 }
 
 /** 매물대로 인정할 최소 비중 %(노이즈 컷). */
@@ -129,6 +140,23 @@ function fibOf(candles: StockDailyCandle[], current: number) {
   };
 }
 
+/**
+ * 지정 영업일 수 동안의 **통상 변동폭**(|수익률| 중앙값 %) — 과거 1년의 겹치는 창에서 직접 측정.
+ * 스케일링 가정(√N) 없이 기간을 맞춰 재므로 변동성 급등 국면에서도 과대추정하지 않는다.
+ */
+function typicalMoveOf(closes: number[], horizon: number, lookback = 250): number | null {
+  const w = closes.slice(-(lookback + horizon));
+  if (w.length < horizon + 30) return null;
+  const moves: number[] = [];
+  for (let i = horizon; i < w.length; i++) {
+    const prev = w[i - horizon];
+    if (prev > 0) moves.push(Math.abs((w[i] - prev) / prev) * 100);
+  }
+  if (moves.length === 0) return null;
+  moves.sort((a, b) => a - b);
+  return moves[Math.floor(moves.length / 2)];
+}
+
 /** 매물대 — 최근 1년 일봉의 거래량 가격 분포에서 비중 있는 구간만. 구간폭도 함께 돌려준다. */
 function zonesOf(
   candles: StockDailyCandle[],
@@ -190,5 +218,10 @@ export function computePriceLevels(
     binWidth,
     nearestSupport: below[0] ?? null,
     nearestResistance: above[0] ?? null,
+    typicalMove: {
+      d5: typicalMoveOf(closes, 5),
+      d10: typicalMoveOf(closes, 10),
+      d21: typicalMoveOf(closes, 21),
+    },
   };
 }

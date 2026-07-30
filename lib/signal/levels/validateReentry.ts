@@ -1,4 +1,6 @@
 /**
+ * PM 이 낸 **가격 레벨의 타당성 검증** — 재진입가 앵커(강제) + 무효화 라인 노이즈 판정(관측).
+ *
  * 약세 판정의 재진입가(`target_pct`)가 **실제 지지에 앵커됐는지** 검증한다.
  *
  * ## 왜 서버가 강제하는가
@@ -108,4 +110,27 @@ export function checkReentryAnchor(
       `재진입가 ${reentryPrice.toLocaleString("ko-KR")}원이 매물대 공백에 위치` +
       ` (가장 가까운 지지 ${nearest.price.toLocaleString("ko-KR")}원, 허용 오차 ±${Math.round(tolerance).toLocaleString("ko-KR")}원)`,
   };
+}
+
+/**
+ * 무효화 라인이 **통상 변동폭 안**에 있는지 — 관측 전용(값을 바꾸지 않는다).
+ *
+ * 안에 있으면 논거가 깨져서가 아니라 노이즈로 발동한다. 다만 매물대·직전 저점처럼 구조적 경계라면
+ * 좁아도 정당할 수 있어 **강제하지 않고 기록만** 한다(프롬프트 준수율 계측 → 필요하면 나중에 승격).
+ *
+ * @param timeHorizon 판단 기간 — 대응하는 통상 변동폭을 고른다.
+ * @returns 노이즈 안이면 사유 문자열, 아니면 null(판정 불가 포함).
+ */
+export function checkStopNoiseBand(
+  stopPct: number,
+  timeHorizon: FinalDecision["time_horizon"],
+  levels: PriceLevels | null,
+): string | null {
+  if (!levels) return null;
+  const { d5, d10, d21 } = levels.typicalMove;
+  const typical = timeHorizon === "단기" ? d5 : timeHorizon === "장기" ? d21 : d10;
+  if (typical == null || typical <= 0) return null;
+  const width = Math.abs(stopPct);
+  if (width >= typical) return null;
+  return `무효화 라인 ±${width.toFixed(1)}% 가 ${timeHorizon} 통상 변동폭 ±${typical.toFixed(1)}% 안 — 노이즈로 발동할 수 있음`;
 }

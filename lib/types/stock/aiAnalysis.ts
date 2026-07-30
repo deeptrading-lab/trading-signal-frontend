@@ -214,6 +214,13 @@ export interface FinalDecision {
    */
   target_pct_voided_reason?: string | null;
   /**
+   * 무효화 라인이 이 종목의 **통상 변동폭 안**에 있을 때의 경고(관측 전용 — 값은 바꾸지 않는다).
+   *
+   * 안에 있으면 논거가 깨져서가 아니라 노이즈로 발동한다. 다만 매물대·직전 저점 같은 구조적
+   * 경계면 좁아도 정당할 수 있어 강제하지 않고 기록만 한다. 없거나 legacy 행은 undefined.
+   */
+  stop_noise_warning?: string | null;
+  /**
    * 테제(논거) 무효화 라인 % (현재가 대비). 방향은 verdict 로 갈림:
    * 강세(BUY/OVERWEIGHT/HOLD)=하방 손절(음수, 예 -5), 약세(UNDERWEIGHT/REDUCE/SELL)=상방 무효화(양수, 예 +6).
    * ⚠️ 이 시맨틱 도입(2026-07) 이전 legacy 약세 행은 stop 이 음수(하방)일 수 있음 — 소비처는 부호로 방향 판단.
