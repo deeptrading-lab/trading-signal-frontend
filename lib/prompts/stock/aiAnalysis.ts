@@ -15,6 +15,7 @@ import type {
   AIAnalysisProvider,
   SentimentReport,
 } from "@/lib/types/stock/aiAnalysis";
+import { DEBATE_ROUNDS } from "@/lib/types/stock/aiAnalysis";
 import { COPY } from "@/lib/copy/stock/aiAnalysis";
 import {
   DEFAULT_ANALYSIS_CONFIG,
@@ -177,10 +178,13 @@ const T = {
 /**
  * 파이프라인이 순차로 지날 수 있는 **단계 상한의 합**(ms) — 최악 경로.
  * 분석가 4개와 리스크 3개는 각각 병렬이라 그 중 최대치 하나만 센다.
+ * 토론은 라운드당 bull+bear 2발화이고 1라운드만 NO_TOOL, 2라운드부터 DEBATE_R2 를 쓴다
+ * (`runDebateLoop` 참조) — 라운드 수를 상수에서 끌어와야 DEBATE_ROUNDS 변경 시 같이 따라간다.
  */
 export const WORST_CASE_STAGE_MS =
   T.WEB_TOOL + // 분석가 4개 병렬 → 최대 하나
-  T.NO_TOOL * 2 + T.DEBATE_R2 * 2 + // 토론 2라운드 × (bull, bear)
+  T.NO_TOOL * 2 + // 토론 1라운드 (bull, bear)
+  T.DEBATE_R2 * 2 * Math.max(0, DEBATE_ROUNDS - 1) + // 2라운드부터
   T.NO_TOOL + // research_manager
   T.TRADER +
   T.NO_TOOL + // 리스크 3개 병렬 → 최대 하나
