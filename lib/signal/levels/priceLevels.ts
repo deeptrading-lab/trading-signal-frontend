@@ -53,10 +53,29 @@ export interface PriceLevels {
   } | null;
   /** 매물대 — 비중 큰 순. 현재가 위/아래가 섞여 있다. */
   zones: VolumeZone[];
+  /**
+   * 매물대 구간 하나의 가격 폭(원). 구간은 균일 분할이라 단일 값.
+   *
+   * "어떤 가격이 이 매물대 안에 들어왔는가" 를 판정할 때 허용 오차의 기준이 된다 — 고정 %(±3% 등)를
+   * 쓰면 저변동주에선 헐겁고 고변동주에선 빡빡해지는데, 구간폭은 종목의 1년 가격 범위에서 나오므로
+   * 변동성에 자동으로 스케일한다. 매물대가 없으면 null.
+   */
+  binWidth: number | null;
   /** 현재가 바로 아래의 가장 가까운 두꺼운 매물대(= 다음 지지 후보). 없으면 null. */
   nearestSupport: VolumeZone | null;
   /** 현재가 바로 위의 가장 가까운 두꺼운 매물대(= 반등 시 저항·돌파 트리거). 없으면 null. */
   nearestResistance: VolumeZone | null;
+  /**
+   * 이 종목이 해당 기간에 **실제로 얼마나 움직이는가**(% , 절대값 중앙값).
+   *
+   * 목표·무효화 라인이 통상 변동폭 안에 있으면 논거가 깨져서가 아니라 **노이즈로 발동**한다.
+   * 그런데 통상 변동폭은 종목마다 2.4%~13.3% 로 5배 넘게 갈리는데(실측 80건) 프롬프트는 모든
+   * 종목에 고정 ±5~8% 를 쓰고 있었다 — 조용한 종목엔 과도하게 넓고 변동성 큰 종목엔 노이즈 안.
+   *
+   * ★ATR×√N 스케일링은 쓰지 않는다. 변동성 급등 직후 ATR 이 과거를 보느라 부풀어 이후 실현
+   * 변동을 3.4배 과대추정했다(실측/기대 0.29배). **기간을 맞춰 직접 재는** 쪽이 보정이 맞다(1.30배).
+   */
+  typicalMove: { d5: number | null; d10: number | null; d21: number | null };
 }
 
 /** 매물대로 인정할 최소 비중 %(노이즈 컷). */
@@ -121,15 +140,38 @@ function fibOf(candles: StockDailyCandle[], current: number) {
   };
 }
 
-/** 매물대 — 최근 1년 일봉의 거래량 가격 분포에서 비중 있는 구간만. */
-function zonesOf(candles: StockDailyCandle[], current: number): VolumeZone[] {
+/**
+ * 지정 영업일 수 동안의 **통상 변동폭**(|수익률| 중앙값 %) — 과거 1년의 겹치는 창에서 직접 측정.
+ * 스케일링 가정(√N) 없이 기간을 맞춰 재므로 변동성 급등 국면에서도 과대추정하지 않는다.
+ */
+function typicalMoveOf(closes: number[], horizon: number, lookback = 250): number | null {
+  const w = closes.slice(-(lookback + horizon));
+  if (w.length < horizon + 30) return null;
+  const moves: number[] = [];
+  for (let i = horizon; i < w.length; i++) {
+    const prev = w[i - horizon];
+    if (prev > 0) moves.push(Math.abs((w[i] - prev) / prev) * 100);
+  }
+  if (moves.length === 0) return null;
+  moves.sort((a, b) => a - b);
+  return moves[Math.floor(moves.length / 2)];
+}
+
+/** 매물대 — 최근 1년 일봉의 거래량 가격 분포에서 비중 있는 구간만. 구간폭도 함께 돌려준다. */
+function zonesOf(
+  candles: StockDailyCandle[],
+  current: number,
+): { zones: VolumeZone[]; binWidth: number | null } {
   const window = candles.slice(-VP_LOOKBACK);
-  if (window.length < 40) return [];
+  if (window.length < 40) return { zones: [], binWidth: null };
   const vp = computeVolumeProfile(window, VP_BINS);
   const total = vp.bins.reduce((s, b) => s + b.volume, 0);
-  if (total <= 0) return [];
+  if (total <= 0) return { zones: [], binWidth: null };
 
-  return vp.bins
+  const first = vp.bins[0];
+  const binWidth = first ? first.high - first.low : null;
+
+  const zones = vp.bins
     .map((b) => {
       // "현재가 대비 구간이 얼마나 위(+)/아래(-)인지" — **분모는 현재가**.
       // 구간가를 분모로 쓰면 먼 구간에서 -100% 를 넘는 불가능한 값이 나온다(가격은 -100% 아래로 못 감).
@@ -145,6 +187,8 @@ function zonesOf(candles: StockDailyCandle[], current: number): VolumeZone[] {
     })
     .filter((z) => z.weightPct >= MIN_ZONE_WEIGHT_PCT)
     .sort((a, b) => b.weightPct - a.weightPct);
+
+  return { zones, binWidth: binWidth && binWidth > 0 ? binWidth : null };
 }
 
 /** 일봉 → 가격 레벨 컨텍스트. 봉이 부족하면 가능한 항목만 채운다. */
@@ -156,7 +200,7 @@ export function computePriceLevels(
   const closes = sorted.map((c) => c.close);
   const cur = currentPrice > 0 ? currentPrice : (closes[closes.length - 1] ?? 0);
 
-  const zones = cur > 0 ? zonesOf(sorted, cur) : [];
+  const { zones, binWidth } = cur > 0 ? zonesOf(sorted, cur) : { zones: [], binWidth: null };
   // 지지/저항 후보 — 현재가 아래/위 중 **가장 가까운** 것(두께는 이미 필터됨).
   const below = zones.filter((z) => z.side === "below").sort((a, b) => b.price - a.price);
   const above = zones.filter((z) => z.side === "above").sort((a, b) => a.price - b.price);
@@ -171,7 +215,13 @@ export function computePriceLevels(
     bollinger: bollingerOf(closes),
     fib: cur > 0 ? fibOf(sorted, cur) : null,
     zones,
+    binWidth,
     nearestSupport: below[0] ?? null,
     nearestResistance: above[0] ?? null,
+    typicalMove: {
+      d5: typicalMoveOf(closes, 5),
+      d10: typicalMoveOf(closes, 10),
+      d21: typicalMoveOf(closes, 21),
+    },
   };
 }

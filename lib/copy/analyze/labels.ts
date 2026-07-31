@@ -34,12 +34,12 @@ export const resultsCount = (n: number): string => `종목 ${n}개`;
 export const INFLIGHT_PROCESSING = "분석 중";
 export const INFLIGHT_PENDING = "대기 중";
 
-// ─── 테제 무효화 배지 ────────────────────────────────────────────────────────
+// ─── 판단 근거 붕괴 배지 ─────────────────────────────────────────────────────
 /**
- * 현재가가 판정의 무효화/손절 라인을 넘었을 때 카드에 다는 배지.
- * 약세 판정의 상방 돌파 = 판단 근거가 깨진 것 / 강세 판정의 하방 이탈 = 손절 라인 이탈.
+ * 현재가가 판정의 재검토/손절 라인을 넘었을 때 카드에 다는 배지.
+ * 약세 판정의 상방 돌파 = 약세로 본 근거가 깨진 것 / 강세 판정의 하방 이탈 = 손절 라인 이탈.
  */
-export const THESIS_INVALIDATED = "무효화";
+export const THESIS_INVALIDATED = "재검토 필요";
 export const THESIS_STOP_HIT = "손절 이탈";
 /** 배지 title(마우스오버) — 어느 가격을 얼마나 넘었는지. */
 export const thesisBreachTitle = (
@@ -48,8 +48,8 @@ export const thesisBreachTitle = (
   overshootPct: number,
 ): string =>
   kind === "invalidation"
-    ? `무효화 라인 ${linePrice}원 돌파 (+${overshootPct.toFixed(1)}%) — 약세 판단 근거가 깨졌어요. 재분석을 권해요.`
-    : `손절 라인 ${linePrice}원 이탈 (-${overshootPct.toFixed(1)}%) — 강세 판단 근거가 깨졌어요. 재분석을 권해요.`;
+    ? `재검토 가격 ${linePrice}원 돌파 (+${overshootPct.toFixed(1)}%) — 약세로 본 근거가 깨졌어요. 다시 분석해 보세요.`
+    : `손절 라인 ${linePrice}원 이탈 (-${overshootPct.toFixed(1)}%) — 강세로 본 근거가 깨졌어요. 다시 분석해 보세요.`;
 // ─── 채점 결과 ("이 판단이 맞았나") ─────────────────────────────────────────
 /** 채점 시점 라벨 — signal_scorecard 의 d1/w1/w2/m1. */
 export const OUTCOME_HORIZON_LABEL: Record<"d1" | "w1" | "w2" | "m1", string> = {
