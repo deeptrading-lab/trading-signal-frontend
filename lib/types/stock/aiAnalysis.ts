@@ -205,14 +205,16 @@ export interface FinalDecision {
   /** 목표 수익률 또는 재진입 구간 % (현재가 대비). BUY/OVERWEIGHT/HOLD=양수 목표, UNDERWEIGHT/REDUCE=음수 재진입 구간, SELL=null */
   target_pct: number | null;
   /**
-   * 서버가 약세 재진입가를 **무효화한 사유**(있으면 `target_pct` 는 null 로 강제된 것).
+   * 서버가 약세 재진입가를 **기각한 사유**(있으면 `target_pct` 는 null 로 강제된 것).
    *
-   * PM 이 낸 재진입가가 매물대 공백에 찍히면 `checkReentryAnchor` 가 무효화한다 — 그 자리는 지지가
+   * PM 이 낸 재진입가가 매물대 공백에 찍히면 `checkReentryAnchor` 가 기각한다 — 그 자리는 지지가
    * 아니라 낙폭이 확대되는 구간이라 "다시 볼 자리"가 될 수 없기 때문. 이 필드는 **프롬프트 준수율
    * 계측기**이기도 하다(발동률이 높으면 프롬프트 문구를 손봐야 한다는 신호).
-   * 정상 통과·강세·legacy 행은 undefined.
+   *
+   * ⚠️ 이름 주의 — 화면의 "재검토 가격"(`stop_loss_pct`, 논거가 깨지는 지점)과는 **다른 개념**이다.
+   * 이쪽은 AI 가 낸 재진입가를 서버가 버린 기록일 뿐이다. 정상 통과·강세·legacy 행은 undefined.
    */
-  target_pct_voided_reason?: string | null;
+  reentry_rejected_reason?: string | null;
   /**
    * 무효화 라인이 이 종목의 **통상 변동폭 안**에 있을 때의 경고(관측 전용 — 값은 바꾸지 않는다).
    *

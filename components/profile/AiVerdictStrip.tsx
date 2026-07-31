@@ -18,18 +18,13 @@ import {
 } from "@/components/stock/ai-analysis/verdictLabels";
 import type { AiVerdictLevels, AiLevelRole } from "@/lib/utils/aiVerdictLevels";
 import type { FinalDecision } from "@/lib/types/stock/aiAnalysis";
+import { AI_LEVEL_ROLE_LABEL } from "@/lib/copy/stock/aiAnalysis";
 
-const ROLE_LABEL: Record<AiLevelRole, string> = {
-  target: "목표",
-  reentry: "재진입",
-  stop: "손절",
-  invalidation: "무효화",
-};
 const ROLE_DOT: Record<AiLevelRole, string> = {
   target: "bg-signal-up",
   reentry: "bg-chart-signal", // 앰버 — 회색(안 보임)에서 변경, 차트 레벨 색과 일치
   stop: "bg-signal-down",
-  invalidation: "bg-chart-rsi", // 보라 — 상방 무효화(약세), 차트 무효화 선·존 색과 일치
+  invalidation: "bg-chart-rsi", // 보라 — 약세 판정의 상방 재검토 라인, 차트 선·존 색과 일치
 };
 const CONFIDENCE_LABEL: Record<FinalDecision["confidence"], string> = {
   HIGH: "높음",
@@ -116,7 +111,7 @@ export function AiVerdictStrip({ levels, decision, show, onToggle }: AiVerdictSt
           {rows.map((row) => (
             <span key={row.role} className="inline-flex items-center gap-xs">
               <span className={cn("h-2.5 w-2.5 rounded-pill", ROLE_DOT[row.role])} aria-hidden="true" />
-              <span className="text-text-muted">{ROLE_LABEL[row.role]}</span>
+              <span className="text-text-muted">{AI_LEVEL_ROLE_LABEL[row.role]}</span>
               <span className="font-bold text-text-strong">{formatMoney(row.price)}</span>
               <span className="text-text-muted">({fmtPct(row.pct)})</span>
             </span>

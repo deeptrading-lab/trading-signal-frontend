@@ -16,6 +16,7 @@ import { useYAxisScale, usePlotArea } from "recharts";
 import { useChartThemeContext } from "./ChartThemeContext";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
+import { AI_LEVEL_ROLE_LABEL } from "@/lib/copy/stock/aiAnalysis";
 
 interface PlacedLabel {
   text: string;
@@ -44,11 +45,11 @@ function levelLabelTexts(levels: AiVerdictLevels): string[] {
   const texts: string[] = [];
   if (levels.target) {
     texts.push(
-      `${levels.target.role === "target" ? "목표" : "재진입"} ${formatNumber(levels.target.price, { digits: 0 })}`,
+      `${AI_LEVEL_ROLE_LABEL[levels.target.role]} ${formatNumber(levels.target.price, { digits: 0 })}`,
     );
   }
   texts.push(
-    `${levels.stop.role === "invalidation" ? "무효화" : "손절"} ${formatNumber(levels.stop.price, { digits: 0 })}`,
+    `${AI_LEVEL_ROLE_LABEL[levels.stop.role]} ${formatNumber(levels.stop.price, { digits: 0 })}`,
   );
   return texts;
 }
@@ -95,10 +96,10 @@ export function AiLevelAxisLabels({
   }
   const stopY0 = yScale(levels.stop.price);
   if (stopY0 != null) {
-    // 손절(하방, 파랑) / 무효화(상방, 보라). 부호로 갈린 role 로 라벨·색 분기.
+    // 손절(하방, 파랑) / 재검토(상방, 보라). 부호로 갈린 role 로 라벨·색 분기.
     const isInvalidation = levels.stop.role === "invalidation";
     labels.push({
-      text: `${isInvalidation ? "무효화" : "손절"} ${formatNumber(levels.stop.price, { digits: 0 })}`,
+      text: `${AI_LEVEL_ROLE_LABEL[levels.stop.role]} ${formatNumber(levels.stop.price, { digits: 0 })}`,
       fill: isInvalidation ? C.rsiLine : C.down,
       textColor: "#fff",
       y0: stopY0,
