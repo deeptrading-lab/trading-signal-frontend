@@ -46,7 +46,7 @@ export const INTRADAY_READ_COPY = {
     box: "박스권",
     target: "목표가",
     stop: "손절가",
-    invalidation: "무효화가",
+    invalidation: "재검토가",
     rrr: "손익비",
     entryZone: "진입 구간",
     holding: "예상 보유",

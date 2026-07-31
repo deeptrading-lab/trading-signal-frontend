@@ -1,10 +1,26 @@
 import type { AgentFailReason, SentimentBand, SentimentConfidence } from "@/lib/types/stock/aiAnalysis";
 import type { StaleReason } from "@/lib/stock/decisionStaleness";
+import type { AiLevelRole } from "@/lib/utils/aiVerdictLevels";
+
+/**
+ * AI 판정 레벨의 역할 → 화면 라벨. **차트 축 알약·판정 스트립·패널이 모두 이걸 쓴다**
+ * (전에는 세 곳에 같은 매핑이 하드코딩돼 있어 문구가 갈라질 수 있었다).
+ *
+ * `invalidation` = 약세 판정에서 현재가 **위**에 그리는 선. 여기까지 오르면 약세로 본 근거가
+ * 깨진 것이므로 판단을 다시 봐야 한다는 뜻이라 **"재검토"** 로 표기한다.
+ * (내부 role 명은 도메인 개념어 `invalidation` 을 유지하고, 사람이 읽는 말만 여기서 정한다.)
+ */
+export const AI_LEVEL_ROLE_LABEL = {
+  target: "목표",
+  reentry: "재진입",
+  stop: "손절",
+  invalidation: "재검토",
+} as const satisfies Record<AiLevelRole, string>;
 
 /** 저장 분석 재분석 권유 사유 → 한글 문구(앰버 배너). decisionStaleness 의 StaleReason 과 1:1. */
 const SAVED_STALE_REASON: Record<StaleReason, string> = {
   "stop-near": "손절가 부근이에요",
-  "invalidation-near": "무효화 라인 부근이에요",
+  "invalidation-near": "재검토 가격 부근이에요",
   "target-near": "목표가에 근접했어요",
   "big-move": "분석 시점보다 가격이 크게 움직였어요",
   aged: "분석한 지 시간이 지났어요",
@@ -326,8 +342,8 @@ export const COPY = {
     targetLabel: "목표가",
     reentryLabel: "재진입 구간",
     stopLossLabel: "손절가",
-    /** 약세 판정의 상방 무효화 라인 라벨 — 현재가가 이 위로 오르면 약세 논거 취소(stop_loss_pct 양수). */
-    invalidationLabel: "무효화",
+    /** 약세 판정의 상방 라인 라벨 — 여기까지 오르면 약세로 본 근거가 깨져 판단을 다시 봐야 한다(stop_loss_pct 양수). */
+    invalidationLabel: "재검토 가격",
     rrLabel: "손익비",
     targetHint: "현재가 대비",
     shortTermLabel: "단기 전망 (1~2주)",

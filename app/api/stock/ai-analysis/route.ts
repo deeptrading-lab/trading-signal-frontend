@@ -950,7 +950,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                 );
                 if (anchorCheck.checked && !anchorCheck.anchored) {
                   aiLog.warn(
-                    `재진입가 앵커 실패 — target_pct=${rawTarget}% 무효화(null). ${anchorCheck.reason}`,
+                    `재진입가 앵커 실패 — target_pct=${rawTarget}% 기각(null). ${anchorCheck.reason}`,
                   );
                 }
                 const enforcedTarget = anchorCheck.anchored ? rawTarget : null;
@@ -978,11 +978,11 @@ export async function POST(req: NextRequest): Promise<Response> {
                   holder_strategy: typeof d.holder_strategy === "string" ? d.holder_strategy : "",
                   target_pct: enforcedTarget,
                   stop_loss_pct: normalizedStop,
-                  // 서버가 재진입가를 무효화했으면 사유를 남긴다(JSONB — 마이그레이션 불필요).
+                  // 서버가 재진입가를 기각했으면 사유를 남긴다(JSONB — 마이그레이션 불필요).
                   // 프롬프트 준수율 계측기 역할: 발동률이 낮으면 규칙이 잘 듣는 것이고,
                   // 높으면 프롬프트 문구 자체를 손봐야 한다는 신호.
                   ...(anchorCheck.checked && !anchorCheck.anchored
-                    ? { target_pct_voided_reason: anchorCheck.reason }
+                    ? { reentry_rejected_reason: anchorCheck.reason }
                     : {}),
                   // 무효화 라인 노이즈 경고(관측 전용 — 값은 그대로 둔다).
                   ...(stopNoiseReason ? { stop_noise_warning: stopNoiseReason } : {}),
