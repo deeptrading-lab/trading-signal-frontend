@@ -239,6 +239,17 @@ export type LoadSessionSummariesOptions = {
   offset?: number;
   /** `decision_provider` 컬럼 필터. 미지정이면 전체(기존 동작). */
   decisionProvider?: PaperTradingDecisionProvider;
+  /**
+   * `payload->>startedAt` 이 이 ISO 시각 **미만**인 세션만(과거 내역 = 오늘 이전 경계).
+   *
+   * 이 필터를 서버가 걸지 않으면, 정렬 기준이 `updated_at` 이라 오늘 세션이 1페이지를 거의 다
+   * 차지하고 과거는 몇 건만 남는다(실측: 20칸 중 14칸이 오늘). 클라가 오늘을 걸러내는 방식으로는
+   * 페이지 예산이 낭비되고 `hasMore` 도 의미가 흐려진다.
+   *
+   * ISO(UTC)는 고정 폭 `Z` 접미사라 텍스트 사전순 비교 = 시간순 비교다(저장 시 항상
+   * `toISOString()`). 인덱스는 없지만 원장 규모(수백~수천 행)에서 문제되지 않는다.
+   */
+  startedBefore?: string;
 };
 
 export async function loadPersistedPaperTradingSessionSummaries(
@@ -253,7 +264,10 @@ export async function loadPersistedPaperTradingSessionSummaries(
   const query =
     `select=payload,positions&order=updated_at.desc,id.desc&limit=${limit}` +
     (offset > 0 ? `&offset=${offset}` : "") +
-    (options.decisionProvider ? `&decision_provider=eq.${options.decisionProvider}` : "");
+    (options.decisionProvider ? `&decision_provider=eq.${options.decisionProvider}` : "") +
+    (options.startedBefore
+      ? `&${encodeURIComponent("payload->>startedAt")}=lt.${encodeURIComponent(options.startedBefore)}`
+      : "");
   try {
     const res = await fetch(
       `${config.url}/rest/v1/${SESSIONS_TABLE}?${query}`,

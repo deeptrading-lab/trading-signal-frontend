@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "../route";
 import { loadPersistedPaperTradingSessionSummaries } from "@/lib/server/paperTrading/persistence";
+import { kstDateStartIso, todayKstDate } from "@/lib/api/toss/kst";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 
 vi.mock("@/lib/server/paperTrading/persistence", () => ({
@@ -42,24 +43,26 @@ beforeEach(() => {
 });
 
 describe("GET /api/paper-trading/sessions/history", () => {
-  it("기본 페이지는 limit+1 을 cli-agent 로 조회하고 21건이면 20건 + hasMore 로 응답한다", async () => {
-    mockLoad.mockResolvedValue({ status: "ok", sessions: summaries(21) });
+  it("기본 페이지는 limit+1 을 cli-agent 로 조회하고 41건이면 40건 + hasMore 로 응답한다", async () => {
+    mockLoad.mockResolvedValue({ status: "ok", sessions: summaries(41) });
 
     const res = await GET(request());
     const body = await res.json();
 
     expect(mockLoad).toHaveBeenCalledWith({
-      limit: 21,
+      limit: 41,
       offset: 0,
       decisionProvider: "cli-agent",
+      // 오늘(KST) 00:00 경계 — 오늘 세션이 페이지 예산을 먹지 않게 서버가 잘라준다.
+      startedBefore: kstDateStartIso(todayKstDate()),
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
-    expect(body.sessions).toHaveLength(20);
+    expect(body.sessions).toHaveLength(40);
     expect(body.hasMore).toBe(true);
-    expect(body.nextOffset).toBe(20);
+    expect(body.nextOffset).toBe(40);
     expect(body.configured).toBe(true);
-    expect(Object.keys(body.positionsBySessionId)).toHaveLength(20);
+    expect(Object.keys(body.positionsBySessionId)).toHaveLength(40);
   });
 
   it("마지막 페이지는 hasMore:false 이고 nextOffset 이 실제 건수만큼만 전진한다", async () => {
@@ -77,14 +80,14 @@ describe("GET /api/paper-trading/sessions/history", () => {
 
     await GET(request("?limit=999&offset=99999"));
     expect(mockLoad).toHaveBeenLastCalledWith(
-      expect.objectContaining({ limit: 51, offset: 5_000 }),
+      expect.objectContaining({ limit: 101, offset: 5_000 }),
     );
 
     await GET(request("?limit=-1&offset=-5"));
     expect(mockLoad).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 2, offset: 0 }));
 
     await GET(request("?limit=abc&offset=abc"));
-    expect(mockLoad).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 21, offset: 0 }));
+    expect(mockLoad).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 41, offset: 0 }));
   });
 
   it("Supabase 미설정이면 장애가 아니라 configured:false 빈 페이지로 응답한다", async () => {

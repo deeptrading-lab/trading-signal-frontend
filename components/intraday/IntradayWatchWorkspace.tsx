@@ -235,7 +235,9 @@ export function IntradayWatchWorkspace() {
     return [...map.values()];
   }, [watch, todaySessionStocks]);
 
-  // 오늘/과거 분리는 계속 클라(KST) 규칙 — 히스토리 응답에는 오늘 세션도 섞여 온다.
+  // 오늘 제외는 서버가 이미 했다(startedBefore = 오늘 00:00 KST). 여기서 한 번 더 거르는 건
+  // 자정 롤오버 방어용 — todayKey 는 마운트 시점 고정이라 자정을 넘겨 열어둔 화면에서 서버가
+  // 새 "오늘"을 넘겨줄 수 있다. 이미 걸러진 목록이라 보통은 아무것도 제거하지 않는다.
   const pastSessions = useMemo(
     () => filterPastSessions(pastHistory.sessions, todayKey),
     [pastHistory.sessions, todayKey],

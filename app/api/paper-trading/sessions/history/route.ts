@@ -1,6 +1,9 @@
 /**
  * 과거 모의투자 내역 페이지 — Supabase 원장을 limit/offset 으로 직접 읽는다(intraday-history-pagination).
  *
+ * "과거" 경계(오늘 00:00 KST 이전 시작)는 **서버가** 건다. 클라가 걸러내면 정렬 기준(updated_at)상
+ * 오늘 세션이 1페이지를 거의 다 차지해 과거가 몇 건만 남는다.
+ *
  * ⚠️ 이 라우트는 `sessionStore` 를 import 하지 않는다. 인메모리 스토어(`getStore().sessions`)는
  *    `tickScheduler.selectSchedulableSessions` 의 유일한 입력이라, 과거 세션이 거기 들어가는 순간
  *    자동 틱·마감 스윕·크로스데이 복구 대상이 된다. 히스토리는 읽기 전용 별도 경로로만 흐른다.
@@ -11,6 +14,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
+import { kstDateStartIso, todayKstDate } from "@/lib/api/toss/kst";
 import {
   PAPER_TRADING_HISTORY_MAX_OFFSET,
   PAPER_TRADING_HISTORY_MAX_PAGE_SIZE,
@@ -46,11 +50,16 @@ export async function GET(request: NextRequest): Promise<Response> {
   );
   const offset = clampInt(params.get("offset"), 0, PAPER_TRADING_HISTORY_MAX_OFFSET, 0);
 
+  // 오늘(KST) 세션은 서버가 빼고 준다 — 정렬이 updated_at 이라 오늘 세션이 1페이지를 거의 다
+  // 차지하면 과거가 몇 건만 남는다(실측: 20칸 중 14칸). 클라가 걸러내면 페이지 예산이 낭비된다.
+  const startedBefore = kstDateStartIso(todayKstDate());
+
   const loaded = await loadPersistedPaperTradingSessionSummaries({
     // hasMore 판정용 1건 오버페치 — 별도 count 쿼리(전체 스캔) 없이 다음 페이지 유무만 알아낸다.
     limit: limit + 1,
     offset,
     decisionProvider: "cli-agent",
+    startedBefore,
   });
 
   if (loaded.status === "error") {

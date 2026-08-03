@@ -63,6 +63,7 @@ describe("paperTrading persistence egress guard", () => {
       limit: 21,
       offset: 20,
       decisionProvider: "cli-agent",
+      startedBefore: "2026-08-02T15:00:00.000Z",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -70,6 +71,8 @@ describe("paperTrading persistence egress guard", () => {
     expect(url).toContain("limit=21");
     expect(url).toContain("offset=20");
     expect(url).toContain("decision_provider=eq.cli-agent");
+    // JSON 키 경로 필터 — `>` 는 퍼센트 인코딩해서 싣는다(PostgREST 가 디코드 후 파싱).
+    expect(url).toContain("payload-%3E%3EstartedAt=lt.2026-08-02T15%3A00%3A00.000Z");
     expect(url).not.toContain("paper_trading_ticks");
   });
 
