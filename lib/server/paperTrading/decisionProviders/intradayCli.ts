@@ -11,6 +11,7 @@
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import { parseLooseJson } from "@/lib/server/ai/parseLooseJson";
 import { fetchActiveWarnings } from "@/lib/api/toss/warnings";
+import { buildOrderFlowText } from "@/lib/server/paperTrading/orderFlowContext";
 import { isEntryBlockingWarning } from "@/lib/copy/stock/warnings";
 import { evaluateIntradaySignal, resolveIntradayProfile } from "@/lib/signal/intradayProfile";
 import {
@@ -81,6 +82,8 @@ export interface IntradayCliInput {
   tickIntervalMinutes: number;
   /** 일봉 레짐(-1/0/1) — 분봉 평가 regimeOverride. */
   dailyRegime: RuleDirection;
+  /** 일봉 흐름 요약 텍스트(I1) — MACD/RSI/이평/위치. 프롬프트 주입용, 미주입 시 빈 문자열. */
+  dailyContextText?: string;
   /** 현재가(원). */
   price: number;
   /** 장중 시각 "HH:mm"(KST). */
@@ -244,6 +247,7 @@ function buildContext(
     previousDecision: input.previousDecision,
     nowHhmm: input.nowHhmm,
     featuresText,
+    dailyContextText: input.dailyContextText,
     structureEvent,
   };
 }
@@ -282,6 +286,14 @@ export function evaluatePreGate(
   //    우회된다(정리매매 종목 자동 진입). BUY 신호에서 스킵하려면 먼저 warnings 를 채워야 한다.
   if (flat && ctx.signal.action === "HOLD" && (ctx.previousDecision?.action ?? "HOLD") === "HOLD") {
     if (ctx.structureEvent && !noNewEntry) {
+      return { callLlm: true, noNewEntry };
+    }
+    // 약세 레짐 관측 창(2026-07-29) — regime -1 이면 4축이 *구조적으로* BUY 를 못 내므로
+    // "변화 없음" 스킵이 상시화돼 판단 기록이 통째로 사라진다(7/29 실측: 오전 스킵률 100%,
+    // 하루 67%). 스킵의 전제("언젠가 신호가 바뀌면 다시 묻는다")가 약세장에선 성립하지 않는다.
+    // → **호출만** 연다. 진입은 사후 게이트의 레짐 veto(applyPostGate ③)가 그대로 BUY→HOLD 로
+    //   강등시키므로 하락 국면 역행 매수 위험은 커지지 않는다(관측만 확보).
+    if (ctx.signal.regime === -1 && !noNewEntry) {
       return { callLlm: true, noNewEntry };
     }
     return { callLlm: false, noNewEntry, reason: "상황 변화 없음 — AI 호출 생략(포지션·신호 그대로)" };
@@ -721,7 +733,14 @@ export async function decideIntradayWithCli(
   // 이미 중단된 틱이면 조회 자체를 생략(리뷰 F-1 — abort 경로 불필요 대기 제거). 조회 중 중단은
   // fetchActiveWarnings 가 바운드(≤5s)·never-throw 라 판단을 깨지 않는다.
   if (!input.abortSignal.aborted) {
-    ctx.warnings = await fetchActiveWarnings(input.ticker);
+    // 매수 유의(경보·VI) + 수급 선행(체결강도·호가, I3)을 병렬 fail-soft 조회. 둘 다 never-throw·
+    // 바운드라 판단을 깨지 않고, 토스 미설정이면 빈 값(프롬프트 무변경).
+    const [warnings, orderFlowText] = await Promise.all([
+      fetchActiveWarnings(input.ticker),
+      buildOrderFlowText(input.ticker),
+    ]);
+    ctx.warnings = warnings;
+    ctx.orderFlowText = orderFlowText;
   }
 
   // 장마감 검증을 통과한 Compact Memory만 범위·문자 상한을 적용해 주입한다.

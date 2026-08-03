@@ -46,14 +46,14 @@
     {
       "key": "entry-confirmation-before-cut",
       "scope": "ENTRY",
-      "condition": "저항근접+돌파확인전/거래량부족+확신컷경계",
-      "action": "돌파안착·거래량동반 재확인, 그전 점수는 BUY컷 아래",
+      "condition": "저항근접+돌파확인전/거래량부족+확신 애매",
+      "action": "돌파안착·거래량동반 재확인, 그전에는 매수 확신을 낮게 유지",
       "avoid": "확인필요를 적고 즉시진입",
       "keywords": [
         "저항",
         "거래량",
         "돌파확인",
-        "컷경계"
+        "확신애매"
       ],
       "supports": true,
       "independentSamples": 3,
@@ -68,7 +68,7 @@
       "scope": "REENTRY",
       "condition": "동일종목 손절후 재진입",
       "action": "새 구조이벤트+거래량 확인 전 재진입 보류",
-      "avoid": "컷만 재충족한 반복진입",
+      "avoid": "확신 점수만 재충족한 반복진입",
       "keywords": [
         "재진입",
         "손절후",
@@ -106,7 +106,7 @@
     {
       "key": "conviction-buy-calibration",
       "scope": "CALIBRATION",
-      "condition": "conviction≥BUY컷",
+      "condition": "높은 매수 확신 구간",
       "action": "고확신=강화 금지, 실제체결·OOS로 방향성 재검증",
       "avoid": "반복틱 승률을 독립표본으로 해석",
       "keywords": [

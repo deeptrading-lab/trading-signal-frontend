@@ -174,18 +174,18 @@ describe("확신 컷 플로우 — v2 점수가 실제 BUY 를 만든다 (AC-10�
     expect(intraday.judgeSchema).toBe("v2");
     expect(intraday.confidence).toBe("HIGH"); // 표시 enum 파생 — 카피·Slack·ReadCard 호환
     expect(decision.action).toBe("BUY");
-    expect(decision.targetAllocationPct).toBe(50); // 20+(80−65)×2=50, maxPositionPct 50 캡 내
+    expect(decision.targetAllocationPct).toBe(50); // 20+(80−58)×2=64 → maxPositionPct 50 캡
     expect(decision.convictionScore).toBe(80); // payload 영속(다음 틱 에코 원장)
   });
 
-  it("60점(컷 미달) → HOLD — 주문 없음", async () => {
-    stubJudgeV2(60);
+  it("52점(컷 58 미달) → HOLD — 주문 없음", async () => {
+    stubJudgeV2(52);
 
     const { decision, intraday } = await decideIntradayWithCli(input());
 
     expect(intraday.action).toBe("HOLD");
     expect(decision.targetAllocations).toHaveLength(0);
-    expect(decision.convictionScore).toBe(60); // HOLD 여도 점수는 영속(58점 노이즈 방지)
+    expect(decision.convictionScore).toBe(52); // HOLD 여도 점수는 영속(모달 노이즈 방지)
   });
 
   it("80점 BUY 인데 LLM 이 TP/SL 을 비우면 구조/ATR 레벨로 백필(무방비 포지션 차단, 리뷰 F-1)", async () => {

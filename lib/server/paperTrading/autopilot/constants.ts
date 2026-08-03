@@ -52,9 +52,12 @@ export const AUTOPILOT_FIRST_FILL_HHMM = envHhmm("AUTOPILOT_FIRST_FILL_HHMM", "0
 
 /**
  * 신규 fill 마감 시각(KST) — 이후엔 빈 슬롯을 채우지도, 교체 회수하지도 않는다.
- * 기존 사후 게이트의 15:00 신규진입 금지보다 보수적(진입 후 관리 시간 확보).
+ * 15:20 강제청산(CLOSE_FLATTEN)까지 최소 ~20분 관리 시간을 남긴다.
+ * ★2026-07-28 14:00→15:00: 오후 늦게 시작한 날(예: 13시 이후)에도 슬롯을 채워 여러 종목을
+ *   관찰(로테이션)할 수 있게 완화. 개장(09:05) 시작 시엔 오전에 슬롯이 다 차므로 사실상 무영향 —
+ *   주로 늦은 시작의 유연성용. 관찰 목적상 마감 직전 편입(runway 짧음)도 판단 표본으로 유효.
  */
-export const AUTOPILOT_NO_NEW_FILL_HHMM = envHhmm("AUTOPILOT_NO_NEW_FILL_HHMM", "14:00");
+export const AUTOPILOT_NO_NEW_FILL_HHMM = envHhmm("AUTOPILOT_NO_NEW_FILL_HHMM", "15:00");
 
 /** 스윕당 최대 fill 수 — 세션 생성=동기 첫 틱(CLI 2콜)이라 한 스윕에 몰지 않는다. */
 export const AUTOPILOT_MAX_FILLS_PER_SWEEP = envInt("AUTOPILOT_MAX_FILLS_PER_SWEEP", 2, 1, 5);

@@ -16,10 +16,10 @@ import type {
   PaperTradingTick,
 } from "@/lib/types/paperTrading/paperTrading";
 
-/** KST 10:00 월요일(2026-07-13) — fill 창(09:05~14:00) 안. */
+/** KST 10:00 월요일(2026-07-13) — fill 창(09:05~15:00) 안. */
 const IN_WINDOW = new Date("2026-07-13T01:00:00Z");
-/** KST 14:30 — fill 창 밖(신규 진입 마감 후). */
-const AFTER_WINDOW = new Date("2026-07-13T05:30:00Z");
+/** KST 15:10 — fill 창 밖(신규 진입 마감 15:00 후). */
+const AFTER_WINDOW = new Date("2026-07-13T06:10:00Z");
 /** KST 09:04 — 첫 fill 허용(09:05) 직전. */
 const BEFORE_WINDOW = new Date("2026-07-13T00:04:00Z");
 
@@ -154,7 +154,7 @@ describe("planRotation — 교체 판정", () => {
     expect(plan.fills).toEqual([]);
   });
 
-  it("fill 창 밖(14:00 이후)에는 교체 회수도 하지 않는다 — 회수해도 못 채운다", () => {
+  it("fill 창 밖(15:00 이후)에는 교체 회수도 하지 않는다 — 회수해도 못 채운다", () => {
     const run = makeRun({ slots: [filledSlot(0, "s1", "100015")] });
     const plan = planRotation({
       run,
