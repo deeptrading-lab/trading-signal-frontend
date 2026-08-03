@@ -11,6 +11,16 @@
  */
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { AutopilotRun, AutopilotRotationEvent } from "@/lib/types/paperTrading/autopilot";
+import type {
+  PaperTradingSession,
+  PaperTradingTick,
+} from "@/lib/types/paperTrading/paperTrading";
+
+/** Supabase REST 행 — 도메인 객체는 payload(jsonb)에 통째로 들어있다. */
+type RunRow = { id: string; status: string; owner: string; payload: AutopilotRun; updated_at: string };
+type TickRow = { session_id: string; created_at: string; payload: PaperTradingTick };
+type SessionRow = { id: string; status: string; payload: PaperTradingSession };
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
@@ -24,11 +34,12 @@ const h = { apikey: key, Authorization: `Bearer ${key}` };
 const day =
   process.argv[2] ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
 
-const get = (path: string) => fetch(`${url}/rest/v1/${path}`, { headers: h }).then((r) => r.json());
+const get = <T>(path: string): Promise<T[]> =>
+  fetch(`${url}/rest/v1/${path}`, { headers: h }).then((r) => r.json() as Promise<T[]>);
 const kst = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour12: false });
 
 // ─── 오토파일럿 런 ────────────────────────────────────────────────────────────
-const runs: any = await get(
+const runs = await get<RunRow>(
   `paper_trading_autopilot_runs?select=id,status,owner,payload,updated_at&order=updated_at.desc&limit=10`,
 );
 console.log(`===== ${day} 단타 실황 =====\n[오토파일럿 런]`);
@@ -36,10 +47,10 @@ for (const r of runs) {
   const p = r.payload ?? {};
   if (!(p.startedAt ?? "").startsWith(day)) continue;
   const log = p.rotationLog ?? [];
-  const fills = log.filter((e: any) => e.kind === "fill").length;
-  const reps = log.filter((e: any) => e.kind === "replace").length;
+  const fills = log.filter((e: AutopilotRotationEvent) => e.kind === "fill").length;
+  const reps = log.filter((e: AutopilotRotationEvent) => e.kind === "replace").length;
   console.log(
-    `  ${r.id.slice(0, 8)} ${r.status.padEnd(9)} owner=${r.owner} 슬롯=[${(p.slots ?? []).map((s: any) => s.ticker || "빈").join(" ")}] fill ${fills}·replace ${reps}`,
+    `  ${r.id.slice(0, 8)} ${r.status.padEnd(9)} owner=${r.owner} 슬롯=[${(p.slots ?? []).map((s: { ticker: string | null }) => s.ticker || "빈").join(" ")}] fill ${fills}·replace ${reps}`,
   );
   const skips: Record<string, number> = {};
   for (const e of log) if (e.kind === "skip") skips[e.note ?? "?"] = (skips[e.note ?? "?"] ?? 0) + 1;
@@ -48,22 +59,22 @@ for (const r of runs) {
 }
 
 // ─── 틱 ───────────────────────────────────────────────────────────────────────
-const ticks: any = await get(
+const ticks = await get<TickRow>(
   `paper_trading_ticks?created_at=gte.${day}T00:00:00&created_at=lt.${day}T23:59:59&select=session_id,created_at,payload&order=created_at.asc&limit=3000`,
 );
-const llm = ticks.filter((x: any) => x.payload?.decision?.judgeSchema === "v2");
-const skipped = ticks.filter((x: any) =>
+const llm = ticks.filter((x: TickRow) => x.payload?.decision?.judgeSchema === "v2");
+const skipped = ticks.filter((x: TickRow) =>
   (x.payload?.decision?.gateAdjustments ?? []).some((g: string) => g.includes("상황 변화 없음")),
 );
-const risk = ticks.filter((x: any) => x.payload?.triggeredBy === "risk");
+const risk = ticks.filter((x: TickRow) => x.payload?.triggeredBy === "risk");
 const errs = ticks.filter(
-  (x: any) =>
+  (x: TickRow) =>
     x.payload?.errorMessage ||
     x.payload?.decision?.agentDiagnostics?.judge?.failKind ||
     x.payload?.decision?.agentDiagnostics?.analyst?.failKind,
 );
-const orders = ticks.flatMap((x: any) =>
-  (x.payload?.orders ?? []).map((o: any) => ({ at: x.created_at, ...o })),
+const orders = ticks.flatMap((x: TickRow) =>
+  (x.payload?.orders ?? []).map((o: { side: string; price: number | null; quantity: number | null }) => ({ at: x.created_at, ...o })),
 );
 console.log(`\n[틱] 총 ${ticks.length} · AI호출(v2) ${llm.length} · 변화없음 스킵 ${skipped.length} · risk ${risk.length} · 주문 ${orders.length}건`);
 console.log(`[에러] ${errs.length}건${errs.length ? " ⚠️" : " ✅"}`);
@@ -72,8 +83,8 @@ for (const e of errs.slice(0, 3))
 
 // ─── conviction 분포 (2026-07-28 밴드 재배치 이후 관찰 지표) ──────────────────
 const convs = llm
-  .map((x: any) => x.payload.decision.convictionScore)
-  .filter((c: any) => typeof c === "number");
+  .map((x: TickRow) => x.payload.decision.convictionScore)
+  .filter((c): c is number => typeof c === "number");
 if (convs.length) {
   const mean = convs.reduce((a: number, b: number) => a + b, 0) / convs.length;
   console.log(`\n[conviction] n=${convs.length} 평균 ${mean.toFixed(1)} · 최대 ${Math.max(...convs)} · 최소 ${Math.min(...convs)}`);
@@ -100,7 +111,7 @@ if (convs.length) {
 }
 
 // ─── BUY 판단 근거 ────────────────────────────────────────────────────────────
-const buys = ticks.filter((x: any) => x.payload?.decision?.action === "BUY");
+const buys = ticks.filter((x: TickRow) => x.payload?.decision?.action === "BUY");
 if (buys.length) {
   console.log(`\n[BUY 판단 ${buys.length}건]`);
   for (const x of buys) {
@@ -111,10 +122,10 @@ if (buys.length) {
 }
 
 // ─── 실현 손익 ────────────────────────────────────────────────────────────────
-const sessions: any = await get(
+const sessions = await get<SessionRow>(
   `paper_trading_sessions?select=id,status,payload&order=updated_at.desc&limit=200`,
 );
-const mine = sessions.filter((x: any) => (x.payload?.startedAt ?? "").startsWith(day));
+const mine = sessions.filter((x: TickRow) => (x.payload?.startedAt ?? "").startsWith(day));
 const byOwner = new Map<string, { n: number; traded: number; pnl: number; cap: number }>();
 for (const x of mine) {
   const p = x.payload;
@@ -142,7 +153,7 @@ const BUY_RATE = 0.0007; // 수수료 0.015% + 슬리피지 0.05%
 const SELL_RATE = 0.0021; // 위 + 제세금 0.15%
 type Agg = { name: string; owner: string; buys: number; sells: number; turnover: number; pnl: number; cost: number };
 const bySess = new Map<string, Agg>();
-const metaOf = new Map<string, any>();
+const metaOf = new Map<string, PaperTradingSession>();
 for (const x of mine) metaOf.set(x.id, x.payload);
 for (const x of ticks) {
   const p = metaOf.get(x.session_id);
@@ -177,7 +188,7 @@ if (bySess.size) {
 const exitKinds: Record<string, number> = {};
 for (const x of ticks) {
   if (!metaOf.has(x.session_id)) continue;
-  if (!(x.payload?.orders ?? []).some((o: any) => o.side === "SELL")) continue;
+  if (!(x.payload?.orders ?? []).some((o: { side: string; price: number | null; quantity: number | null }) => o.side === "SELL")) continue;
   const r = String(x.payload.decision?.rationale ?? "");
   const kind = r.includes("손절선") ? "손절선 이탈" : r.includes("익절") ? "익절 목표 도달"
     : r.includes("강제 청산") ? "장막판 강제청산" : "판단(judge)";
@@ -186,6 +197,6 @@ for (const x of ticks) {
 if (Object.keys(exitKinds).length)
   console.log(`\n[청산 사유] ${Object.entries(exitKinds).map(([k, v]) => `${k} ${v}`).join(" / ")}`);
 
-const stuck = sessions.filter((x: any) => x.status === "running" && (x.payload?.startedAt ?? "") < `${day}T23:59`);
+const stuck = sessions.filter((x: TickRow) => x.status === "running" && (x.payload?.startedAt ?? "") < `${day}T23:59`);
 if (stuck.length)
-  console.log(`\n⚠️ running 잔존 세션 ${stuck.length}건: ${stuck.map((x: any) => `${x.payload?.stocks?.[0]?.name ?? "?"}(${x.payload?.owner})`).join(", ")}`);
+  console.log(`\n⚠️ running 잔존 세션 ${stuck.length}건: ${stuck.map((x: TickRow) => `${x.payload?.stocks?.[0]?.name ?? "?"}(${x.payload?.owner})`).join(", ")}`);

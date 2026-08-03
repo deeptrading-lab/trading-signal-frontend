@@ -4,6 +4,8 @@
  *   npx tsx scripts/intraday/pool.mts
  * 분봉은 저장 안 돼 재페치(최근 며칠만 가능) — 만료된 날은 UNRESOLVED 로 빠짐.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- 저장된 스냅샷 JSON(스키마 무보증)을
+   광범위하게 훑는 일회성 풀링 분석. 상시 도구인 daily.mts·today.mts 는 타입 완비. */
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));

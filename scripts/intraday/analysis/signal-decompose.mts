@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- 스키마 무보증 스냅샷 JSON 을 훑는
+   일회성 반사실 검증 스크립트(결론은 IMPROVEMENT-week1.md 에 기록, 재현용으로 보존).
+   상시 도구인 daily.mts·today.mts 는 타입 완비. */
 import fs from "node:fs";
 for(const l of fs.readFileSync("/Applications/하영/code_source/trading-signal-frontend/.env.local","utf8").split("\n")){const m=l.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].trim().replace(/^["']|["']$/g,"");}
 const { labelTick, kstMinuteStamp } = await import("@/lib/server/intraday/tickLabels");
