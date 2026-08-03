@@ -16,6 +16,7 @@
 import { createLogger } from "@/lib/server/logTag";
 import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
 import type {
+  PaperTradingDecisionProvider,
   PaperTradingPosition,
   PaperTradingSession,
   PaperTradingTick,
@@ -63,6 +64,12 @@ export type LoadPersistedTicksResult =
   | { status: "disabled" }
   | { status: "error" }
   | { status: "ok"; ticks: PaperTradingTick[] };
+
+/** 단건 조회 — `session: null` 은 "정상 조회했으나 그런 세션 없음"(error 와 구분). */
+export type LoadPersistedSessionByIdResult =
+  | { status: "disabled" }
+  | { status: "error" }
+  | { status: "ok"; session: PersistedSessionSummary | null };
 
 function supabaseConfig(): { url: string; key: string } | null {
   return getSupabaseServiceConfig();
@@ -214,19 +221,42 @@ export async function loadPersistedPaperTrading(): Promise<LoadPersistedResult> 
 }
 
 /**
- * 목록 동기화용 경량 로드 — 최근 세션/포지션만 읽고 대용량 틱 payload 는 받지 않는다.
+ * 목록 동기화용 경량 로드 — 세션/포지션만 읽고 대용량 틱 payload 는 받지 않는다.
  *
  * `sessionStore.refreshForeignSessions` 는 장중 화면 폴링 중 반복 호출된다. 기존에는 이 경로도
  * `loadPersistedPaperTrading` 을 사용해 최근 50개 세션의 틱을 매번 전량 다운로드했고, Supabase
  * PostgREST egress 가 데이터 크기에 비례해 폭증했다. 목록에서 필요한 것은 세션 상태와 포지션뿐이므로
  * 틱은 상세 조회의 증분 로드로 분리한다.
+ *
+ * 과거 내역 페이지네이션(intraday-history-pagination)이 같은 쿼리를 limit/offset 만 바꿔 재사용한다 —
+ * 인메모리 창(`HYDRATE_SESSION_LIMIT`)과 무관하게 원장 전체를 페이지 단위로 읽는 유일한 경로다.
+ * 무인자 호출은 기존 동작(최신 20건, provider 필터 없음)을 그대로 유지한다.
  */
-export async function loadPersistedPaperTradingSessionSummaries(): Promise<LoadPersistedSessionSummariesResult> {
+export type LoadSessionSummariesOptions = {
+  /** 1페이지 행 수. 미지정 = `HYDRATE_SESSION_LIMIT`. */
+  limit?: number;
+  /** 건너뛸 행 수. 0/미지정이면 URL 에 넣지 않는다(기존 호출부 URL 불변). */
+  offset?: number;
+  /** `decision_provider` 컬럼 필터. 미지정이면 전체(기존 동작). */
+  decisionProvider?: PaperTradingDecisionProvider;
+};
+
+export async function loadPersistedPaperTradingSessionSummaries(
+  options: LoadSessionSummariesOptions = {},
+): Promise<LoadPersistedSessionSummariesResult> {
   const config = supabaseConfig();
   if (!config) return { status: "disabled" };
+  const limit = Math.max(1, Math.trunc(options.limit ?? HYDRATE_SESSION_LIMIT));
+  const offset = Math.max(0, Math.trunc(options.offset ?? 0));
+  // 정렬은 `updated_at.desc` + PK tiebreak — offset 페이지네이션은 전순서가 없으면 동일 timestamp
+  // 경계에서 행이 건너뛰이거나 중복된다.
+  const query =
+    `select=payload,positions&order=updated_at.desc,id.desc&limit=${limit}` +
+    (offset > 0 ? `&offset=${offset}` : "") +
+    (options.decisionProvider ? `&decision_provider=eq.${options.decisionProvider}` : "");
   try {
     const res = await fetch(
-      `${config.url}/rest/v1/${SESSIONS_TABLE}?select=payload,positions&order=updated_at.desc&limit=${HYDRATE_SESSION_LIMIT}`,
+      `${config.url}/rest/v1/${SESSIONS_TABLE}?${query}`,
       {
         headers: headers(config.key),
         cache: "no-store",
@@ -250,6 +280,47 @@ export async function loadPersistedPaperTradingSessionSummaries(): Promise<LoadP
     };
   } catch (error) {
     warnOnce("모의투자 세션 요약 로드 실패(네트워크/타임아웃)", error);
+    return { status: "error" };
+  }
+}
+
+/**
+ * 세션 단건 로드(틱 제외) — 인메모리 창(`HYDRATE_SESSION_LIMIT`) 밖 과거 세션 상세 복원용.
+ *
+ * 목록 요약 로더와 달리 id 로 콕 집어 1행만 읽는다. 호출측(`getArchivedPaperTradingSessionDetail`)이
+ * 틱을 별도로 붙인다.
+ */
+export async function loadPersistedPaperTradingSessionById(
+  sessionId: string,
+): Promise<LoadPersistedSessionByIdResult> {
+  const config = supabaseConfig();
+  if (!config) return { status: "disabled" };
+  try {
+    const url = new URL(`${config.url}/rest/v1/${SESSIONS_TABLE}`);
+    url.searchParams.set("select", "payload,positions");
+    url.searchParams.set("id", `eq.${sessionId}`);
+    url.searchParams.set("limit", "1");
+
+    const res = await fetch(url, {
+      headers: headers(config.key),
+      cache: "no-store",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      warnOnce(`세션 단건 로드 실패 HTTP ${res.status}`);
+      return { status: "error" };
+    }
+    const rows = (await res.json()) as Array<{
+      payload: PaperTradingSession;
+      positions: PaperTradingPosition[] | null;
+    }>;
+    const row = rows[0];
+    return {
+      status: "ok",
+      session: row ? { session: row.payload, positions: row.positions ?? [] } : null,
+    };
+  } catch (error) {
+    warnOnce("모의투자 세션 단건 로드 실패(네트워크/타임아웃)", error);
     return { status: "error" };
   }
 }

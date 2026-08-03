@@ -287,6 +287,26 @@ export type PaperTradingSessionsResponse = {
   generatedAt: string;
 };
 
+/**
+ * 과거 모의투자 내역 1페이지(intraday-history-pagination).
+ *
+ * 세션 목록(`PaperTradingSessionsResponse`)은 인메모리 원장(최근 20건)을 그대로 내려주지만, 이 응답은
+ * Supabase 원장을 limit/offset 으로 직접 읽는다 — 인메모리 창과 무관하게 과거 전체를 페이지 단위로 볼 수
+ * 있는 유일한 경로이며, 틱 payload 는 포함하지 않는다(상세 조회에서 세션별로 따로 읽는다).
+ */
+export type PaperTradingSessionHistoryResponse = {
+  sessions: PaperTradingSession[];
+  /** 세션 id → 저장 시점 포지션 스냅샷. 목록 쿼리에 이미 딸려오는 값이라 추가 비용 없음. */
+  positionsBySessionId: Record<string, PaperTradingPosition[]>;
+  /** 다음 페이지 존재 — 서버가 limit+1 건을 읽어 판정한다(별도 count 쿼리 없음). */
+  hasMore: boolean;
+  /** 다음 요청에 쓸 offset(= 요청 offset + sessions.length). 짧은 페이지에도 커서가 과주행하지 않는다. */
+  nextOffset: number;
+  /** Supabase 저장본에서 읽었는지. false = 미설정/차단 → 빈 목록이 장애가 아님을 클라가 구분. */
+  configured: boolean;
+  generatedAt: string;
+};
+
 export type PaperTradingSessionResponse = PaperTradingSessionDetail;
 
 export type CreatePaperTradingSessionResponse = PaperTradingSessionDetail;

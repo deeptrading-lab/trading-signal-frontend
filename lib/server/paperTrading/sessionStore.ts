@@ -13,6 +13,7 @@ import { addTickWindow, floorToTickWindow, riskSweepTickWindow } from "@/lib/ser
 import { kstHhmm, type IntradayTickResult } from "@/lib/server/paperTrading/intradayTickDecision";
 import {
   loadPersistedPaperTrading,
+  loadPersistedPaperTradingSessionById,
   loadPersistedPaperTradingSessionSummaries,
   loadPersistedPaperTradingTicks,
   persistPaperSession,
@@ -203,6 +204,66 @@ export async function getPaperTradingSessionDetail(
   }
   if (!entry) return null;
   return toDetail(entry);
+}
+
+// ─── 아카이브(메모리 창 밖) 세션 상세 — 읽기 전용 ─────────────────────────────
+
+/** 아카이브 상세 캐시 TTL — 같은 과거 세션을 반복해 펼쳐도 틱을 다시 내려받지 않게. */
+const ARCHIVED_DETAIL_TTL_MS = 5 * 60_000;
+/** 캐시 상한(FIFO) — 히스토리를 계속 넘겨봐도 메모리가 무한정 늘지 않게. */
+const ARCHIVED_DETAIL_MAX = 50;
+/**
+ * ⚠️ `store.sessions` 와 **완전히 분리된** 맵이다. 여기 담긴 세션은
+ * `listPaperTradingSessions` 에 절대 노출되지 않으므로 스케줄러 후보가 되지 않는다.
+ */
+const archivedDetails = new Map<string, { detail: PaperTradingSessionDetail; at: number }>();
+
+/** 세션 id 형태 가드 — 로컬은 게이트가 열려 있어 임의 문자열마다 REST 2회를 태우지 않게. */
+const SESSION_ID_RE = /^[0-9a-f-]{16,64}$/i;
+
+/**
+ * 인메모리 창(`HYDRATE_SESSION_LIMIT`) 밖 과거 세션 상세 — Supabase 직독 **읽기 전용** 조회.
+ *
+ * 부팅 hydrate 는 최근 20건만 올리므로 그보다 오래된 세션은 `getPaperTradingSessionDetail` 이
+ * null 을 돌려주고 상세가 404 났다(과거 내역에서 행을 펼쳐도 체결·판단이 안 보이던 원인).
+ * 히스토리 페이지네이션으로 과거를 더 멀리 볼 수 있게 되면서 이 경로가 필요해졌다.
+ *
+ * ⚠️ **절대 `store.sessions` 에 넣지 않는다.** 그 맵은 `tickScheduler.selectSchedulableSessions`
+ *    의 유일한 입력이라, 며칠 전 세션이 들어가는 순간 자동 틱·마감 스윕·크로스데이 복구 대상이
+ *    된다. 조회 전용이므로 상태 변경(PATCH·틱)은 계속 404 로 남는다 — 완료 세션이 running 으로
+ *    부활해 스케줄러에 재진입하는 것을 구조적으로 막는다.
+ */
+export async function getArchivedPaperTradingSessionDetail(
+  sessionId: string,
+  now = Date.now(),
+): Promise<PaperTradingSessionDetail | null> {
+  if (!SESSION_ID_RE.test(sessionId)) return null;
+
+  const cached = archivedDetails.get(sessionId);
+  if (cached && now - cached.at < ARCHIVED_DETAIL_TTL_MS) return cached.detail;
+
+  const loaded = await loadPersistedPaperTradingSessionById(sessionId);
+  if (loaded.status !== "ok" || !loaded.session) return null;
+
+  // 틱 로드 실패는 상세 전체를 버리지 않는다 — 세션 헤더·포지션만이라도 보여준다.
+  const ticks = await loadPersistedPaperTradingTicks(sessionId);
+  const detail = toDetail({
+    session: loaded.session.session,
+    positions: loaded.session.positions,
+    ticks: ticks.status === "ok" ? ticks.ticks : [],
+  });
+
+  archivedDetails.set(sessionId, { detail, at: now });
+  if (archivedDetails.size > ARCHIVED_DETAIL_MAX) {
+    const oldest = archivedDetails.keys().next().value;
+    if (oldest !== undefined) archivedDetails.delete(oldest);
+  }
+  return detail;
+}
+
+/** 테스트 전용 — 아카이브 상세 캐시 비우기. */
+export function resetArchivedPaperTradingDetailCacheForTest(): void {
+  archivedDetails.clear();
 }
 
 export async function createPaperTradingSession(
