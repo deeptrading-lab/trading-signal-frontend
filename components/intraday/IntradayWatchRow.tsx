@@ -749,7 +749,9 @@ function WatchRow({
         >
           {current ? formatMoney(current.portfolioValue) : T.none}
         </td>
-        <td className="py-sm pr-md text-right tabular-nums text-text-muted">
+        {/* 포지션·주기·손절 같은 짧은 라벨은 컬럼이 좁아져도 줄바꿈되지 않게 nowrap — 좁으면 표가
+            가로 스크롤(표 셸 정책)로 흡수한다. */}
+        <td className="py-sm pr-md text-right tabular-nums whitespace-nowrap text-text-muted">
           {current ? (position ? `${position.quantity}주` : P.positionNone) : T.none}
         </td>
         <td className="py-sm pr-md text-text-muted">
@@ -774,7 +776,7 @@ function WatchRow({
 
         {/* 판단 주기 — 미시작=드랍다운(시작값) / 진행·일시정지=드랍다운(세션 중 변경, 다음 틱부터 반영)
             / 완료=정적 텍스트. 변경 중(isPatching)엔 비활성. */}
-        <td className="py-sm pr-md text-center">
+        <td className="py-sm pr-md text-center whitespace-nowrap">
           {current ? (
             current.status === "completed" ? (
               <span className="tabular-nums text-text-muted">{current.tickIntervalMinutes}분</span>
@@ -791,7 +793,7 @@ function WatchRow({
         </td>
 
         {/* 손절 상한(포지션 하드스톱) — 미시작=셀렉트(끄기 시 경고), 진행/완료=설정값 정적 표시 */}
-        <td className="py-sm pr-md text-center">
+        <td className="py-sm pr-md text-center whitespace-nowrap">
           {current ? (
             <span
               className={cn(
@@ -948,132 +950,138 @@ function WatchRow({
         <tr className="border-t border-border-line">
           <td colSpan={13} className="relative bg-surface-muted px-lg py-md">
             <StatusStripe color={stripe} />
-            <div className="flex flex-col gap-sm">
-              {startError ? (
-                <p className="text-caption text-signal-down" role="alert">
-                  {startError}
-                </p>
-              ) : null}
-              {!provider ? <p className="text-caption text-text-muted">{C.localOnly}</p> : null}
-              {read.isPending ? (
-                <p className="text-caption text-text-muted">
-                  {C.loading} {C.loadingHint}
-                </p>
-              ) : null}
-              {read.isError ? (
-                <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
-              ) : null}
-              {read.data ? <IntradayReadCard data={read.data} /> : null}
+            {/* ⚠️ 전폭 colSpan 셀은 auto 레이아웃 표의 컬럼 폭 계산에 끼어든다(펼침 순간 판단 근거 같은
+                긴 텍스트가 13컬럼에 분배돼 다른 행까지 "무포지션"·"5분" 이 줄바꿈되며 표가 흔들림).
+                `w-0` 로 셀의 고유 폭 기여를 0 으로 만들고 `min-w-full` 로 실제 렌더 폭만 되돌린다 —
+                펼쳐도 컬럼 폭은 접힘 상태 그대로. */}
+            <div className="w-0 min-w-full">
+              <div className="flex flex-col gap-sm">
+                {startError ? (
+                  <p className="text-caption text-signal-down" role="alert">
+                    {startError}
+                  </p>
+                ) : null}
+                {!provider ? <p className="text-caption text-text-muted">{C.localOnly}</p> : null}
+                {read.isPending ? (
+                  <p className="text-caption text-text-muted">
+                    {C.loading} {C.loadingHint}
+                  </p>
+                ) : null}
+                {read.isError ? (
+                  <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
+                ) : null}
+                {read.data ? <IntradayReadCard data={read.data} /> : null}
 
-              {/* 왜 이런 판단 — 최근 판단 근거 메모(탭 공통 상단) */}
-              {current && lastTick ? (
-                <p className="text-caption text-text-muted">
-                  {P.lastDecision}: {lastTick.rationale}
-                </p>
-              ) : null}
+                {/* 왜 이런 판단 — 최근 판단 근거 메모(탭 공통 상단) */}
+                {current && lastTick ? (
+                  <p className="text-caption text-text-muted">
+                    {P.lastDecision}: {lastTick.rationale}
+                  </p>
+                ) : null}
 
-              {/* 펼침 탭 — 체결 내역 | 차트 (체결 내역 기본, 사용자 지정 순서) */}
-              <div className="flex items-center gap-md border-b border-border-line" role="tablist">
-                {(["orders", "chart"] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === key}
-                    className={cn(
-                      "-mb-px cursor-pointer border-b-2 pb-xs text-body-sm transition-colors",
-                      tab === key
-                        ? "border-accent-vivid font-medium text-text-strong"
-                        : "border-transparent text-text-muted hover:text-text-strong",
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTab(key);
-                    }}
-                  >
-                    {key === "chart" ? T.tabChart : T.tabOrders}
-                  </button>
-                ))}
-              </div>
+                {/* 펼침 탭 — 체결 내역 | 차트 (체결 내역 기본, 사용자 지정 순서) */}
+                <div className="flex items-center gap-md border-b border-border-line" role="tablist">
+                  {(["orders", "chart"] as const).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === key}
+                      className={cn(
+                        "-mb-px cursor-pointer border-b-2 pb-xs text-body-sm transition-colors",
+                        tab === key
+                          ? "border-accent-vivid font-medium text-text-strong"
+                          : "border-transparent text-text-muted hover:text-text-strong",
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTab(key);
+                      }}
+                    >
+                      {key === "chart" ? T.tabChart : T.tabOrders}
+                    </button>
+                  ))}
+                </div>
 
-              {tab === "chart" ? (
-                <div className="flex flex-col gap-md">
-                  <IntradayMiniChart
-                    ticker={item.ticker}
-                    timeframe={chartTimeframe}
-                    orders={allOrders.map((order) => ({
-                      at: order.at,
-                      price: order.price,
-                      side: order.side,
-                    }))}
-                  />
-                  {/* 차트 밑 — 호가창(좌) + 체결강도(우). 종목 펼침 시에만 렌더돼 폴링도 그때만(사용자 배치).
-                      아코디언(동시 펼침 1행)이라 이 3초 폴링 쌍은 전체 표에서 최대 1쌍. */}
-                  <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
-                    <OrderbookPanel ticker={item.ticker} variant="compact" />
-                    <TradeStrengthPanel ticker={item.ticker} variant="compact" />
+                {tab === "chart" ? (
+                  <div className="flex flex-col gap-md">
+                    <IntradayMiniChart
+                      ticker={item.ticker}
+                      timeframe={chartTimeframe}
+                      orders={allOrders.map((order) => ({
+                        at: order.at,
+                        price: order.price,
+                        side: order.side,
+                      }))}
+                    />
+                    {/* 차트 밑 — 호가창(좌) + 체결강도(우). 종목 펼침 시에만 렌더돼 폴링도 그때만(사용자 배치).
+                        아코디언(동시 펼침 1행)이라 이 3초 폴링 쌍은 전체 표에서 최대 1쌍. */}
+                    <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
+                      <OrderbookPanel ticker={item.ticker} variant="compact" />
+                      <TradeStrengthPanel ticker={item.ticker} variant="compact" />
+                    </div>
                   </div>
-                </div>
-              ) : !current ? (
-                <p className="text-caption text-text-muted">{T.ordersNoSession}</p>
-              ) : (
-                <div className="flex flex-col gap-xs">
-                  {/* 미니 체결 로그 — 최근 5건(전체·손익 합계는 행의 체결 내역 아이콘) */}
-                  {recentOrders.length === 0 ? (
-                    <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
-                  ) : (
-                    // 보이지 않는 그리드 정렬 — ul 이 5트랙(시각·구분·수량×가격·손익·메모)을 소유하고
-                    // 각 li 가 subgrid 로 트랙을 공유해, 행마다 팩트 폭이 달라도 컬럼이 딱 맞는다.
-                    // 손익 셀은 null 이어도 자리를 차지(빈 span)해 메모 트랙이 밀리지 않는다.
-                    <ul className="grid grid-cols-[auto_auto_auto_auto_1fr] gap-x-md gap-y-xs text-body-sm tabular-nums">
-                      {recentOrders.map((order, index) => (
-                        <li
-                          key={`${order.at}-${index}`}
-                          className="col-span-full grid grid-cols-subgrid items-baseline"
-                        >
-                          <span className="whitespace-nowrap text-text-muted">
-                            {kstHhmm(order.at)}
-                          </span>
-                          <span
-                            className={cn(
-                              "whitespace-nowrap font-medium",
-                              order.side === "BUY" ? "text-signal-up" : "text-signal-down",
-                            )}
+                ) : !current ? (
+                  <p className="text-caption text-text-muted">{T.ordersNoSession}</p>
+                ) : (
+                  <div className="flex flex-col gap-xs">
+                    {/* 미니 체결 로그 — 최근 5건(전체·손익 합계는 행의 체결 내역 아이콘) */}
+                    {recentOrders.length === 0 ? (
+                      <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
+                    ) : (
+                      // 보이지 않는 그리드 정렬 — ul 이 5트랙(시각·구분·수량×가격·손익·메모)을 소유하고
+                      // 각 li 가 subgrid 로 트랙을 공유해, 행마다 팩트 폭이 달라도 컬럼이 딱 맞는다.
+                      // 손익 셀은 null 이어도 자리를 차지(빈 span)해 메모 트랙이 밀리지 않는다.
+                      <ul className="grid grid-cols-[auto_auto_auto_auto_1fr] gap-x-md gap-y-xs text-body-sm tabular-nums">
+                        {recentOrders.map((order, index) => (
+                          <li
+                            key={`${order.at}-${index}`}
+                            className="col-span-full grid grid-cols-subgrid items-baseline"
                           >
-                            {order.side === "BUY" ? P.sheet.sideBuy : P.sheet.sideSell}
-                          </span>
-                          <span className="whitespace-nowrap text-text-strong">
-                            {order.quantity}주 × {formatMoney(order.price)}
-                          </span>
-                          <span
-                            className={cn(
-                              "whitespace-nowrap",
-                              order.realizedPnl != null &&
-                                (order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"),
-                            )}
-                          >
-                            {order.realizedPnl != null ? (
-                              <>
-                                {order.realizedPnl >= 0 ? "+" : ""}
-                                {formatMoney(order.realizedPnl)}
-                              </>
-                            ) : null}
-                          </span>
-                          {/* 판단 메모 — 최대 2줄 말줄임(hover 전문). 모바일은 팩트 아래 전폭 랩. */}
-                          {order.rationale ? (
-                            <span
-                              className="col-span-full min-w-0 text-caption leading-snug text-text-muted line-clamp-2 sm:col-span-1 sm:col-start-5"
-                              title={order.rationale}
-                            >
-                              {order.rationale}
+                            <span className="whitespace-nowrap text-text-muted">
+                              {kstHhmm(order.at)}
                             </span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+                            <span
+                              className={cn(
+                                "whitespace-nowrap font-medium",
+                                order.side === "BUY" ? "text-signal-up" : "text-signal-down",
+                              )}
+                            >
+                              {order.side === "BUY" ? P.sheet.sideBuy : P.sheet.sideSell}
+                            </span>
+                            <span className="whitespace-nowrap text-text-strong">
+                              {order.quantity}주 × {formatMoney(order.price)}
+                            </span>
+                            <span
+                              className={cn(
+                                "whitespace-nowrap",
+                                order.realizedPnl != null &&
+                                  (order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"),
+                              )}
+                            >
+                              {order.realizedPnl != null ? (
+                                <>
+                                  {order.realizedPnl >= 0 ? "+" : ""}
+                                  {formatMoney(order.realizedPnl)}
+                                </>
+                              ) : null}
+                            </span>
+                            {/* 판단 메모 — 최대 2줄 말줄임(hover 전문). 모바일은 팩트 아래 전폭 랩. */}
+                            {order.rationale ? (
+                              <span
+                                className="col-span-full min-w-0 text-caption leading-snug text-text-muted line-clamp-2 sm:col-span-1 sm:col-start-5"
+                                title={order.rationale}
+                              >
+                                {order.rationale}
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </td>
         </tr>
