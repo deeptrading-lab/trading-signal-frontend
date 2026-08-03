@@ -5,6 +5,10 @@
  * "모의 단타 시작"(세션 생성)·오늘 세션 종목(`todaySessionStocks` — 표 자동 보존용)·화면 갱신
  * 폴링 대상(오늘 running 세션 id)을 제공한다. 과거 세션은 오늘 구성 목록에 섞지 않는다.
  * 틱 발화는 서버 스케줄러(tickScheduler) 전담.
+ *
+ * 과거 내역 목록은 이 훅이 아니라 `useIntradayPastSessions`(Supabase 원장 페이지네이션)가 소유한다 —
+ * 여기 있던 `pastSessions` 는 인메모리 창(최근 20건)에 갇혀 있었다. `filterPastSessions` 는 오늘/과거
+ * 분리 규칙(KST)이라 그대로 export 해 히스토리 경로가 재사용한다.
  */
 
 "use client";
@@ -115,14 +119,6 @@ export function useIntradayPaperWatch() {
     [cliSessions, todayKey],
   );
 
-  const pastSessions = useMemo(
-    () =>
-      filterPastSessions(cliSessions, todayKey).sort((a, b) =>
-        b.startedAt.localeCompare(a.startedAt),
-      ),
-    [cliSessions, todayKey],
-  );
-
   // 새로고침 뒤에도 서버 세션 원장에서 실행 중 자동 포트폴리오를 복원한다. 상세 조회는 해당 묶음의
   // 종목별 포지션·체결 표시만 담당하며, 기존 단일 종목 세션/틱 실행 경로에는 영향을 주지 않는다.
   const autoPortfolioSessions = useMemo(
@@ -200,7 +196,6 @@ export function useIntradayPaperWatch() {
     isCompletingAutoPortfolio: completeAutoPortfolioMutation.isPending,
     sessionByTicker,
     todaySessionStocks,
-    pastSessions,
     runningSessionIds,
     /** 이 서버 운영자 — 표 소유자 배지·"내 세션만" 필터 판정용(구 응답이면 undefined). */
     currentOperator,

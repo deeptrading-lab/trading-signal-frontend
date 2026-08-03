@@ -7,7 +7,7 @@
  *     memo 가 유효하려면 부모가 인라인 클로저 props 를 만들지 않아야 한다 — `onRemove` 는
  *     `(ticker) => void` 시그니처로 부모 콜백을 그대로 받는다.
  *   - **펼침 아코디언(상위 소유)**: 행 내부 useState 였던 `expanded` 를 표 레벨
- *     `expandedTicker` 로 승격 — 동시 펼침을 1행으로 상한해 펼침 패널(호가·체결강도 각
+ *     `expandedRowKey` 로 승격 — 동시 펼침을 1행으로 상한해 펼침 패널(호가·체결강도 각
  *     3초 폴링)의 N행 중첩 폴링을 구조적으로 차단한다(모바일 부하 완화, env 손잡이 없음).
  *
  * 전속 부품(다른 소비처 0): OwnerBadge · useFixedMenu/MenuPanel · IntervalSelect ·
@@ -56,7 +56,7 @@ import {
 import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
-import type { WatchItem } from "@/components/intraday/IntradayWatchTable";
+import { watchRowKey, type WatchItem } from "@/components/intraday/IntradayWatchTable";
 
 /**
  * 분봉 미니차트 — recharts(~100KB gz)를 끌어오는 유일한 표 내 컴포넌트라 지연 로드
@@ -570,12 +570,20 @@ export interface IntradayWatchRowProps {
   currentOperator?: string;
   selected?: boolean;
   /**
-   * 펼침(아코디언) — 표가 `expandedTicker` 단일 상태로 소유. 동시 펼침 1행 상한이라 펼침
+   * 펼침(아코디언) — 표가 `expandedRowKey` 단일 상태로 소유. 동시 펼침 1행 상한이라 펼침
    * 패널의 3초 폴링(호가+체결강도)이 최대 2본을 넘지 않는다(intraday-table-refactor).
    */
   expanded: boolean;
-  /** 펼침 변경 요청 — (ticker, 원하는 상태). 표의 안정 콜백(useCallback)이라 memo 를 깨지 않는다. */
-  onExpandChange: (ticker: string, expanded: boolean) => void;
+  /**
+   * 과거(히스토리) 행 — **접혀 있으면 세션 상세를 조회하지 않는다**.
+   *
+   * 인메모리 창 밖 과거 세션 상세는 Supabase 직독(그 세션 틱 전량)이라, 날짜 그룹 하나가 N행이면
+   * 접힌 채로 N배 판아웃된다. 대신 접힌 과거 행의 「최근 판단」은 "—" 로 남는다 — 창 밖 과거 행은
+   * 지금도 상세가 없어 같은 화면이므로 퇴행은 아니다. 수익률·평가금액·투자금은 세션 payload 에서 온다.
+   */
+  historyMode?: boolean;
+  /** 펼침 변경 요청 — (행 식별자, 원하는 상태). 표의 안정 콜백(useCallback)이라 memo 를 깨지 않는다. */
+  onExpandChange: (rowKey: string, expanded: boolean) => void;
   onSelect?: (ticker: string) => void;
   onStart: (
     stock: PaperTradingSelectedStock,
@@ -596,11 +604,15 @@ function WatchRow({
   currentOperator,
   selected,
   expanded,
+  historyMode = false,
   onExpandChange,
   onSelect,
   onStart,
   onRemove,
 }: IntradayWatchRowProps) {
+  // 행 식별자 — 오늘 표는 ticker, 과거 표는 세션 id. 펼침 아코디언 키로만 쓴다
+  // (시세·경보·선택·차트/호가 패널은 계속 item.ticker).
+  const rowKey = watchRowKey(item);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
@@ -615,7 +627,11 @@ function WatchRow({
   const [tab, setTab] = useState<"chart" | "orders">("orders");
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
-  const { detail, isPatching, setStatus, setInterval } = usePaperTradingSession(session?.id ?? "");
+  // 과거 행은 펼쳤을 때만 조회한다(historyMode) — 창 밖 과거 세션 상세는 Supabase 직독 + 틱 전량이라
+  // 접힌 행까지 부르면 날짜 그룹 크기만큼 판아웃된다.
+  const { detail, isPatching, setStatus, setInterval } = usePaperTradingSession(
+    historyMode && !expanded ? "" : session?.id ?? "",
+  );
   const { data: providers } = useQueryAIProviders();
   const read = useMutationIntradayRead();
   const provider = providers?.available[0];
@@ -647,14 +663,14 @@ function WatchRow({
   const runRead = () => {
     if (!provider || read.isPending) return;
     read.mutate({ ticker: item.ticker, provider });
-    onExpandChange(item.ticker, true);
+    onExpandChange(rowKey, true);
   };
 
   async function handleStart() {
     const amount = Number(cash.replace(/[^0-9]/g, ""));
     if (!Number.isFinite(amount) || amount <= 0) {
       setStartError(P.cashInvalid);
-      onExpandChange(item.ticker, true);
+      onExpandChange(rowKey, true);
       return;
     }
     setStartError(null);
@@ -663,7 +679,7 @@ function WatchRow({
       await onStart({ ticker: item.ticker, name: item.name }, amount, intervalMin, hardStopPct);
     } catch (err) {
       setStartError(isApiError(err) ? err.message : P.error);
-      onExpandChange(item.ticker, true);
+      onExpandChange(rowKey, true);
     } finally {
       setStarting(false);
     }
@@ -675,7 +691,7 @@ function WatchRow({
         {...ROW_ENTER}
         onClick={() => {
           onSelect?.(item.ticker);
-          onExpandChange(item.ticker, !expanded);
+          onExpandChange(rowKey, !expanded);
         }}
         className={cn(
           "cursor-pointer border-t border-border-line transition-colors hover:bg-surface-muted",
@@ -932,7 +948,7 @@ function WatchRow({
               aria-expanded={expanded}
               onClick={(e) => {
                 e.stopPropagation();
-                onExpandChange(item.ticker, !expanded);
+                onExpandChange(rowKey, !expanded);
               }}
               onKeyDown={(e) => e.stopPropagation()}
             >

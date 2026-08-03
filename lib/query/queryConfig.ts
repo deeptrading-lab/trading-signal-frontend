@@ -286,6 +286,14 @@ export const queryConfig = {
       staleTime: 30 * SECOND,
       gcTime: 5 * MINUTE,
     },
+    /**
+     * 과거 내역 페이지 — 이미 끝난 세션 원장이라 장중 재검증이 무의미하다. 페이지를 누적하는
+     * 무한 쿼리라 재요청 억제(staleTime)·캐시 보존(gcTime) 둘 다 길게 잡는다.
+     */
+    sessionHistory: {
+      staleTime: 5 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
     /** 오토파일럿 런 — 스윕이 10분 주기라 30s 신선도면 슬롯·로그가 늦지 않게 보인다. */
     autopilot: {
       staleTime: 30 * SECOND,

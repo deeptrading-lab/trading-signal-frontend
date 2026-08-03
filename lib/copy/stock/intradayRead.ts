@@ -122,6 +122,21 @@ export const INTRADAY_PAPER_COPY = {
   error: "모의 단타 세션 처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
   disclaimer: "가상 체결 기록이에요. 실제 주문은 발생하지 않으며, 실제 매매 판단·집행은 직접 하세요.",
 
+  /* 과거 내역 섹션 — Supabase 원장을 페이지 단위로 읽는다(intraday-history-pagination). */
+  past: {
+    title: "과거 모의투자 내역",
+    hint: "오늘 목록에는 영향을 주지 않아요",
+    loading: "과거 내역을 불러오는 중…",
+    empty: "아직 과거 모의투자 내역이 없어요.",
+    error: "과거 내역을 불러오지 못했어요.",
+    retry: "다시 시도",
+    more: "더 보기",
+    loadingMore: "불러오는 중…",
+    end: "마지막 기록까지 다 봤어요.",
+    /** Supabase 미설정(로컬 무DB·egress 차단) — 장애가 아니라 저장소가 꺼진 상태. */
+    disabled: "과거 내역 저장소가 꺼져 있어 이전 기록을 불러올 수 없어요.",
+  },
+
   /* 워치 표 (토스 랭킹 표 스타일) — 컬럼 헤더·행 액션(input·버튼 컬럼 포함). */
   table: {
     colStock: "종목",
