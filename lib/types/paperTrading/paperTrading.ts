@@ -80,6 +80,16 @@ export type PaperTradingDecision = {
   convictionScore?: number | null;
   /** judge 응답 스키마("v2"=점수화/"v1"=레거시 action 직접 출력) — 근사 합성 구분 마커. */
   judgeSchema?: "v1" | "v2";
+  /**
+   * 최종 판단가 prompt에 제시한 로컬 Compact Memory 감사 정보.
+   * 긴 원문은 저장하지 않고 상태·해시·규칙 ID·원천 일자만 payload(jsonb)에 남긴다.
+   */
+  mistakeNote?: {
+    status: import("../../../packages/intraday-mistake-note/src/types").RuntimeMemoryStatus;
+    hash: string | null;
+    ruleIds: string[];
+    sourceThrough: string | null;
+  };
   expectedHoldingMinutes?: number;
   invalidationPrice?: number | null;
   /**
