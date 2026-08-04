@@ -8525,3 +8525,45 @@
   - [ ] 그때까지 컷 58·밴드 구성·손절 폭 **동결**(하루치 눈짐작 튜닝 금지). 손절 확대는 반사실 재시뮬에서 이미 기각(승률 24→38%인데 net −0.86%→−1.44% 악화).
   - [ ] 계속 0 근처면 컷 튜닝이 아니라 **4축 신호·판단 토대 재설계**로 피벗(2모델 교차검증 결론과 합류).
   - [ ] 오답노트 필수화 작업과의 결합 후 conviction 분포 재확인(규칙이 하방으로만 작동하므로 재압축 여부 감시).
+
+### 2026-08-04 — feat(intraday): 오답노트 다음 장 활용 고도화 (#381)
+
+- **slug**: `intraday-mistake-note-v2` · **author**: @devbob0701
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/381
+- **요약**: feat(intraday): 오답노트 다음 장 활용 고도화
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 무엇을
+  > 
+  > - 16:30 KST 이후 오답노트 review가 당일 원장을 선택하고, 동일 날짜 성공 manifest는 원격 수집 전에 종료합니다.
+  > - Compact Memory를 분석가에 중복 주입하지 않고 최종 judge에 포지션 상태별 규칙 1개(최대 160자)만 필수 참고로 제공합니다.
+  > - CM hash·규칙 ID·원천 일자와 PRESENTED/APPLIED 상태를 판단 payload에 기록합니다.
+  > - PR #380의 컷 숫자 제거·conviction 밴드·약세 레짐 관측 창 설계를 유지한 채 통합했습니다.
+  > 
+  > ## 검증
+  > 
+  > - npm test: 1,441 passed / 3 skipped
+  > - npm run typecheck: 통과
+  > - npm run lint: 오류 0 (기존 경고 2)
+  > - npm run intraday:notes:merge: 4 rules / conflicts 0
+  > - npm run intraday:notes:validate: VALID / 1,103 chars
+  > - npm run build: 성공
+  > - 집중 회귀: 34 tests passed
+  > 
+  > ## 영향
+  > 
+  > - UI·BFF route·Supabase schema 변경 없음
+  > - 런타임 외부 fetch 및 LLM 호출 수 증가 없음
+  > - 긴 CM 원문은 payload에 저장하지 않음
+  > - 손실킬·15:00 신규 진입 금지·15:20 청산·하드스톱·사후 레짐 veto 유지
+  > 
+  > ## 다음 작업
+  > 
+  > - [ ] 20거래일 rolling provider usage와 conviction 분포를 관찰해 prompt 비용 ≤5% 및 재압축 여부 확인
+  > - [ ] 최소 100 closed trades·20 ticker-days에서 D+1 OOS expectancy/PF/MDD 검증
+  > - [ ] 기준 충족 전 BUY 컷·포지션 비중·손절 한도 자동 상향 금지
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - [ ] 20거래일 rolling provider usage와 conviction 분포를 관찰해 prompt 비용 ≤5% 및 재압축 여부 확인
+  - [ ] 최소 100 closed trades·20 ticker-days에서 D+1 OOS expectancy/PF/MDD 검증
+  - [ ] 기준 충족 전 BUY 컷·포지션 비중·손절 한도 자동 상향 금지
