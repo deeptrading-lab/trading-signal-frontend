@@ -62,6 +62,12 @@ function envInt(name: string, fallback: number, min: number, max: number): numbe
   return Math.min(max, Math.max(min, raw));
 }
 
+function envNumber(name: string, fallback: number, min: number, max: number): number {
+  const raw = Number.parseFloat(process.env[name] ?? "");
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, raw));
+}
+
 /**
  * 단타 틱/판단 주기(분) — `INTRADAY_TICK_INTERVAL_MINUTES` 로 조절(기본 5, 1~30).
  * 2분 등 단축 시 LLM 콜 빈도가 비례 증가(로컬 CLI 구독이라 토큰 과금은 없음).
@@ -82,8 +88,27 @@ export function deriveIntradayTimeframe(intervalMinutes: number): number {
   if ([1, 3, 5, 15].includes(override)) return override;
   return INTRADAY_TIMEFRAME_BY_INTERVAL[intervalMinutes] ?? 5;
 }
-/** 단타 익절 목표 캡(%) — 과욕 차단(사후 게이트). */
-export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = 5;
+/** 오토파일럿 모멘텀 목표형의 실제 평단 기준 전량 익절(%, 기본 +2). */
+export const PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT = envNumber(
+  "INTRADAY_TAKE_PROFIT_PCT",
+  2,
+  0.5,
+  5,
+);
+/** 고정 목표와 손익비 2:1을 이루는 실제 평단 기준 손절(%, 기본 −1). */
+export const PAPER_TRADING_INTRADAY_STOP_LOSS_PCT = envNumber(
+  "INTRADAY_STOP_LOSS_PCT",
+  -1,
+  -3,
+  -0.3,
+);
+/** 목표 전 AI 조기청산을 허용할 강한 테제 훼손 확신 상한(0~40). */
+export const PAPER_TRADING_INTRADAY_THESIS_EXIT_CONVICTION_MAX = envInt(
+  "INTRADAY_THESIS_EXIT_CONVICTION_MAX",
+  25,
+  0,
+  40,
+);
 /**
  * judge 확신 점수(convictionScore 0~100) 결정론 컷 — LLM 은 점수만 내고, BUY/SELL 판정은
  * 코드가 한다(PRD intraday-decision-overhaul PR-3a: judge 942회 실질 100% HOLD 의 해체).

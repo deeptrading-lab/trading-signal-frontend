@@ -22,6 +22,10 @@ import { runPaperTradingTick } from "@/lib/server/paperTrading/runTick";
 import { resolveServerOperator } from "@/lib/server/paperTrading/operator";
 import { scheduleSessionTickLabeling } from "@/lib/server/intraday/tickLabels";
 import { isoToKstDate } from "@/lib/api/toss/kst";
+import {
+  intradayMomentumStopPrice,
+  intradayMomentumTargetPrice,
+} from "@/lib/server/paperTrading/intradayMomentumTarget";
 import type { PaperTradingPriceSnapshotProvider } from "@/lib/server/paperTrading/marketData";
 import type {
   CreatePaperTradingSessionRequest,
@@ -609,6 +613,7 @@ async function runRiskCheckOnce(
   const tickWindowStart = riskSweepTickWindow(now);
   const lastTick = entry.ticks.at(-1);
   const flattenAll = kstHhmm(tickWindowStart) >= PAPER_TRADING_CLOSE_FLATTEN_HHMM;
+  const momentumTargetMode = Boolean(session.autopilotRunId);
 
   // 리스크 stub — LLM 없이 HOLD(리밸런싱 없음) + 최근 틱의 동적 손절선/익절가/장막판만 싣는다.
   // 하드스톱·세션 수익률은 runTick 이 세션 설정에서 주입(LLM 5분 틱과 동일 경로).
@@ -623,8 +628,12 @@ async function runRiskCheckOnce(
       source: "cli-agent",
     },
     forcedExit: {
-      targetPrice: lastTick?.decision.targetPrice ?? null,
-      stopPrice: lastTick?.decision.invalidationPrice ?? null,
+      targetPrice: momentumTargetMode
+        ? intradayMomentumTargetPrice(held.avgEntryPrice)
+        : (lastTick?.decision.targetPrice ?? null),
+      stopPrice: momentumTargetMode
+        ? intradayMomentumStopPrice(held.avgEntryPrice)
+        : (lastTick?.decision.invalidationPrice ?? null),
       flattenAll,
     },
   });

@@ -128,6 +128,28 @@ export const AUTOPILOT_HARD_EXCLUDE_WARNINGS: readonly string[] = [
 /** 1차 점수 상위 몇 종목의 분봉을 걷어 2차 점수를 낼지 — KIS 순차 호출 비용과의 균형. */
 export const AUTOPILOT_SHORTLIST_SIZE = envInt("AUTOPILOT_SHORTLIST_SIZE", 8, 3, 15);
 
+/** 고정 +2% 목표형의 추격 상한 — 당일 이미 +15% 넘은 종목은 남은 여력보다 급반전 위험을 우선한다. */
+export const AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT = envNumber(
+  "AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT",
+  15,
+  5,
+  25,
+);
+/** 거래량 랭킹 단독 후보가 수급 후보를 대신하려면 필요한 최근 마감봉 최소 z-score. */
+export const AUTOPILOT_MOMENTUM_MIN_VOLUME_Z = envNumber(
+  "AUTOPILOT_MOMENTUM_MIN_VOLUME_Z",
+  0.5,
+  -1,
+  3,
+);
+/** VWAP 위라도 이격이 너무 크면 이미 뻗은 뒤 추격일 가능성이 커 편입하지 않는다. */
+export const AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT = envNumber(
+  "AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT",
+  3,
+  1,
+  8,
+);
+
 /**
  * 2차 ATR% 포화 프로파일 — 저점(죽은 변동성)/만점 플래토/극단(체결 불가·상한가·정지 근처) %.
  *

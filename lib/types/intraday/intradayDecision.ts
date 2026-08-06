@@ -10,6 +10,7 @@ import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
 export type IntradayAction = "BUY" | "HOLD" | "SELL";
 export type IntradayConfidence = "HIGH" | "MEDIUM" | "LOW";
+export type IntradayStrategyMode = "adaptive" | "momentum-target";
 
 /** 결정론 코어가 산출해 에이전트에 주입하는 정량 레벨(LLM 이 재계산하지 않음). */
 export interface IntradayLevels {
@@ -71,6 +72,10 @@ export interface IntradayContext {
    * 주기에 맞추도록 컨텍스트에 노출한다(5분 이상 = 다음 주기까지 견딜 셋업만).
    */
   intervalMinutes: number;
+  /** adaptive=기존 구조 TP/SL, momentum-target=오토파일럿 평단 +2%/-1% 고정 정책. */
+  strategyMode: IntradayStrategyMode;
+  /** 모멘텀 목표형 진입 시 사용할 세션 최대 비중. */
+  maxPositionPct: number;
   /** 분봉 결정론 시그널 압축본(4축/score/action/regime). */
   signal: DecisionSignal;
   levels: IntradayLevels;

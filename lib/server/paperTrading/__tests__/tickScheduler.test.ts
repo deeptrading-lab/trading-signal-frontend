@@ -326,6 +326,19 @@ describe("runIntradayRiskSweep (A — 60초 리스크-only 체크)", () => {
     expect(detail?.positions).toHaveLength(1);
     expect(detail?.ticks).toHaveLength(1);
   });
+
+  it("오토파일럿은 최근 AI 목표가가 아니라 실제 평단 +2%에서 60초 전량 익절", async () => {
+    resetPaperTradingStoreForTest();
+    seedPaperTradingSessionForTest(
+      session({ id: "pos", cash: 700_000, autopilotRunId: "auto-run" }),
+      { positions: [heldPosition], ticks: [lastTickWithStop()] },
+    );
+    // 최근 AI 목표는 10,400원이지만 모멘텀 목표형은 평단 10,000원의 +2%=10,200원.
+    expect(await runIntradayRiskSweep(marketNow, { priceSnapshotProvider: priceAll(10_200) })).toBe(1);
+    const detail = await getPaperTradingSessionDetail("pos");
+    expect(detail?.positions).toHaveLength(0);
+    expect(detail?.ticks.at(-1)?.decision.rationale).toContain("10,200원");
+  });
 });
 
 describe("closeOutStaleCrossdaySessions (밀린 이전-거래일 세션 정리)", () => {

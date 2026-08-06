@@ -5,6 +5,7 @@
  *   1차 — KIS 랭킹 4콜(거래대금·등락률·외국인/기관 수급) union → 하드필터(경보·가격·유동성·등락률)
  *          → 랭킹 필드만으로 점수(모멘텀·유동성·수급, percentile 정규화).
  *   2차 — 1차 상위 shortlist 만 당일 5분봉을 걷어 변동성 품질 점수(ATR%·거래량 z·VWAP 위치·구조).
+ *          편입은 거래량/수급 확인 + VWAP 위 상승 구조를 만족하는 후보로 한정한다.
  *
  * 종목 선정은 **전부 결정론**(PR-4 conviction 역상관 교훈 — LLM 은 기존 judge 역할만).
  * LLM 재랭킹은 `AutopilotScreenerDeps.rerank` 훅만 남겨둔다(이번 스코프 미구현).
@@ -30,6 +31,9 @@ import {
   AUTOPILOT_ATR_PCT_PLATEAU,
   AUTOPILOT_HARD_EXCLUDE_WARNINGS,
   AUTOPILOT_MAX_CHANGE_PCT,
+  AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT,
+  AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT,
+  AUTOPILOT_MOMENTUM_MIN_VOLUME_Z,
   AUTOPILOT_MAX_PRICE_KRW,
   AUTOPILOT_MIN_CHANGE_PCT,
   AUTOPILOT_MIN_PRICE_KRW,
@@ -259,6 +263,40 @@ export function scoreStage2(features: AutopilotStage2Features): number {
   return clip(0.3 * atr + 0.25 * volz + 0.25 * vwapScore + 0.2 * structure, 0, 1);
 }
 
+/**
+ * 고정 +2% 목표를 노릴 수 있는 모멘텀 편입 조건. 랭킹 자체만 좇지 않고 다음을 함께 요구한다.
+ * - 거래량 상위 또는 외국인/기관 순매수 상위 출처
+ * - 수급 양수 또는 최근 거래량 확장(z≥기본 0.5)
+ * - VWAP 위 + 상승 구조/오프닝 돌파/VWAP 재탈환 중 하나
+ * - 당일 +15% 이하, VWAP +3% 이내(뒤늦은 추격 제한)
+ */
+export function momentumTargetRejectionReason(
+  candidate: AutopilotCandidate,
+  features: AutopilotStage2Features,
+): string | null {
+  const fromVolume = candidate.sources.includes("volume");
+  const fromFlow =
+    candidate.sources.includes("flow-frgn") || candidate.sources.includes("flow-orgn");
+  if (!fromVolume && !fromFlow) return "거래량·수급 랭킹 밖";
+
+  const flowConfirmed = fromFlow && (candidate.netBuyAmount ?? 0) > 0;
+  const volumeConfirmed =
+    fromVolume &&
+    features.volumeZ != null &&
+    features.volumeZ >= AUTOPILOT_MOMENTUM_MIN_VOLUME_Z;
+  if (!flowConfirmed && !volumeConfirmed) return "수급 양수·거래량 확장 미확인";
+  if (!features.aboveVwap) return "VWAP 아래";
+  if (!(features.swingUptrend || features.orBreakout || features.vwapReclaim))
+    return "상승 구조 미확인";
+  if (candidate.changePercent > AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT) return "당일 과도한 상승 추격";
+  if (
+    features.vwapGapPct == null ||
+    features.vwapGapPct > AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT
+  )
+    return "VWAP 과다 이격";
+  return null;
+}
+
 // ─── 유니버스 조립 ────────────────────────────────────────────────────────────
 
 type UniverseRow = {
@@ -407,6 +445,15 @@ export async function runAutopilotScreener(
         features.todayTradingValueKrw < AUTOPILOT_MIN_TRADING_VALUE_KRW
       ) {
         rejected.push({ ...candidate, rejectedBy: "거래대금 하한(2차 재검증)" });
+        continue;
+      }
+      const momentumRejectedBy = momentumTargetRejectionReason(candidate, features);
+      if (momentumRejectedBy) {
+        rejected.push({
+          ...candidate,
+          stage2: features,
+          rejectedBy: `모멘텀 목표형(${momentumRejectedBy})`,
+        });
         continue;
       }
       const score2 = scoreStage2(features);

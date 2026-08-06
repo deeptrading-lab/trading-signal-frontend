@@ -4,6 +4,7 @@ import {
   buildUniverse,
   computeAtrPct,
   extractStage2Features,
+  momentumTargetRejectionReason,
   runAutopilotScreener,
   saturatingScore,
   scoreStage1,
@@ -47,6 +48,24 @@ function makeCandles(opts: { bars?: number; price?: number; volume?: number } = 
       low: Math.min(price, close) * 0.998,
       close,
       volume,
+    };
+  });
+}
+
+/** 오프닝 레인지 위로 완만하게 이어지는 합성 상승 추세. */
+function makeTrendCandles(bars = 40): StockMinuteCandle[] {
+  return Array.from({ length: bars }, (_, i) => {
+    const hh = String(9 + Math.floor((i * 5) / 60)).padStart(2, "0");
+    const mm = String((i * 5) % 60).padStart(2, "0");
+    const open = 10_000 + i * 12;
+    const close = open + 8;
+    return {
+      date: `2026-07-13T${hh}:${mm}`,
+      open,
+      high: close + 8,
+      low: open - 5,
+      close,
+      volume: 1_000_000 + i * 30_000,
     };
   });
 }
@@ -193,10 +212,34 @@ describe("2차 피처·점수", () => {
     expect(above).toBeGreaterThan(below);
     expect(above).toBeGreaterThan(chasing);
   });
+
+  it("모멘텀 목표형 — 거래/수급 확인 + VWAP 위 상승 구조만 편입", () => {
+    const base = {
+      atrPct: 0.8,
+      volumeZ: 1,
+      vwapGapPct: 0.8,
+      aboveVwap: true,
+      orBreakout: true,
+      vwapReclaim: false,
+      volumeZSurge: false,
+      swingUptrend: false,
+      todayTradingValueKrw: 100_000_000_000,
+    };
+    expect(momentumTargetRejectionReason(candidate("1"), base)).toBeNull();
+    expect(
+      momentumTargetRejectionReason(candidate("2", { sources: ["fluctuation"] }), base),
+    ).toContain("랭킹 밖");
+    expect(momentumTargetRejectionReason(candidate("3"), { ...base, aboveVwap: false })).toBe(
+      "VWAP 아래",
+    );
+    expect(
+      momentumTargetRejectionReason(candidate("4", { changePercent: 18 }), base),
+    ).toBe("당일 과도한 상승 추격");
+  });
 });
 
 describe("runAutopilotScreener (deps 주입 e2e)", () => {
-  const bigCandles = makeCandles(); // 거래대금 충분(≈4,000억).
+  const bigCandles = makeTrendCandles(); // 거래대금 충분 + VWAP 위 상승 지속.
 
   function deps(over: Record<string, unknown> = {}) {
     return {
@@ -221,7 +264,24 @@ describe("runAutopilotScreener (deps 주입 e2e)", () => {
   });
 
   it("union→하드필터→1차·2차 점수 — 정상 경로", async () => {
-    const result = await runAutopilotScreener({ deps: deps() });
+    const result = await runAutopilotScreener({
+      deps: deps({
+        fetchForeignInstitutionTotal: async (subject: string) =>
+          subject === "frgn"
+            ? [
+                {
+                  ticker: "100001",
+                  name: "가",
+                  price: 10_000,
+                  changePercent: 4,
+                  direction: "up" as const,
+                  netBuyAmount: 500,
+                  netBuyQty: 10_000,
+                },
+              ]
+            : [],
+      }),
+    });
     expect(result.status).toBe("ok");
     if (result.status !== "ok") return;
     expect(result.universeSize).toBe(3);
@@ -246,7 +306,11 @@ describe("runAutopilotScreener (deps 주입 e2e)", () => {
     expect(result.status).toBe("ok");
     if (result.status !== "ok") return;
     expect(result.stage1Ranking.map((c) => c.ticker)).toEqual(["100003"]);
-    expect(result.rejected.map((c) => c.ticker)).toEqual(["100001"]);
+    expect(
+      result.rejected.some(
+        (c) => c.ticker === "100001" && c.rejectedBy?.includes("시장경보"),
+      ),
+    ).toBe(true);
   });
 
   it("shortlist 분봉 실패 종목은 fillRanking 에서만 빠진다(stage1 유지)", async () => {

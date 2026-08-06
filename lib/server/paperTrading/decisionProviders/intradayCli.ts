@@ -27,6 +27,7 @@ import {
   PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS,
 } from "@/lib/server/paperTrading/constants";
 import { loadMistakeNoteSnapshot } from "@/lib/server/paperTrading/mistakeNoteContext";
+import { applyMomentumTargetPolicy } from "@/lib/server/paperTrading/intradayMomentumTarget";
 import {
   FLOW_ANALYST_SYSTEM,
   JUDGE_SYSTEM,
@@ -52,6 +53,7 @@ import type {
   IntradayLevels,
   IntradayPositionView,
   IntradaySnapshot,
+  IntradayStrategyMode,
 } from "@/lib/types/intraday/intradayDecision";
 
 const AGENT_TIMEOUT_MS = 25_000;
@@ -101,6 +103,8 @@ export interface IntradayCliInput {
   ticksSinceLastExit?: number | null;
   riskMode: PaperTradingRiskMode;
   maxPositionPct: number;
+  /** 오토파일럿은 고정 목표형, 수동 단타는 기존 적응형. */
+  strategyMode?: IntradayStrategyMode;
   provider?: AIAnalysisProvider;
   abortSignal: AbortSignal;
   /**
@@ -240,6 +244,8 @@ function buildContext(
     price: input.price,
     timeframe: input.timeframe,
     intervalMinutes: input.tickIntervalMinutes,
+    strategyMode: input.strategyMode ?? "adaptive",
+    maxPositionPct: input.maxPositionPct,
     signal,
     levels,
     recentBars: buildRecentBars(input.minuteCandles),
@@ -702,14 +708,22 @@ export async function decideIntradayWithCli(
     analystNote: string | undefined,
     gateAdjustments: string[],
   ): IntradayProviderResult => {
+    const policy = applyMomentumTargetPolicy({
+      decision: llm,
+      signal: decisionSignal,
+      strategyMode: ctx.strategyMode,
+      referencePrice: lastClose,
+      position: input.position,
+      maxPositionPct: input.maxPositionPct,
+    });
     const intraday: IntradayDecision = {
-      ...llm,
+      ...policy.decision,
       basePrice: lastClose,
       rrr: levels.rrr,
       signal: decisionSignal,
       source,
       analystNote,
-      gateAdjustments,
+      gateAdjustments: [...gateAdjustments, ...policy.adjustments],
     };
     // 판단 근거 정량 스냅샷 — LLM·폴백 공통 choke point 라 모든 틱이 기록된다.
     const snapshot: IntradaySnapshot = {

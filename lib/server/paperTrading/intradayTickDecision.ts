@@ -250,6 +250,7 @@ export async function resolveIntradayTickDecision(
     ticksSinceLastExit: ticksSinceLastExit(args.existingTicks, stock.ticker),
     riskMode: session.riskMode,
     maxPositionPct: session.maxPositionPct,
+    strategyMode: session.autopilotRunId ? "momentum-target" : "adaptive",
     provider: resolveSessionAiProvider(session),
     abortSignal: args.abortSignal ?? new AbortController().signal,
   });

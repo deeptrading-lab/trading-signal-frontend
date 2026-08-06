@@ -67,6 +67,8 @@ function ctx(over: Partial<IntradayContext> = {}): IntradayContext {
     price: 10_000,
     timeframe: 5,
     intervalMinutes: 5,
+    strategyMode: "adaptive",
+    maxPositionPct: 50,
     signal: signal(),
     levels: levels(),
     recentBars: [],

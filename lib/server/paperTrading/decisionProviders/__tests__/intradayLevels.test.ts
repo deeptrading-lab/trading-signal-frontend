@@ -116,6 +116,8 @@ describe("buildIntradayLevels — ATR 폴백 (PR-1a)", () => {
       price: 10_000,
       timeframe: 5,
       intervalMinutes: 5,
+      strategyMode: "adaptive",
+      maxPositionPct: 50,
       signal: sig,
       levels: lv,
       recentBars: [],

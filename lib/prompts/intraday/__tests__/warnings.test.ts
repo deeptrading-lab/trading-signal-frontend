@@ -42,6 +42,8 @@ function baseContext(overrides: Partial<IntradayContext> = {}): IntradayContext 
     previousDecision: null,
     nowHhmm: "10:30",
     ...overrides,
+    strategyMode: overrides.strategyMode ?? "adaptive",
+    maxPositionPct: overrides.maxPositionPct ?? 50,
   };
 }
 
@@ -54,6 +56,14 @@ describe("formatIntradayContext — 매수 유의", () => {
   it("빈 배열도 무주입", () => {
     const text = formatIntradayContext(baseContext({ warnings: [] }));
     expect(text).not.toContain("[매수 유의]");
+  });
+
+  it("모멘텀 목표형에만 고정 +2%/-1% 전략을 명시", () => {
+    expect(formatIntradayContext(baseContext())).not.toContain("[운용 전략]");
+    const text = formatIntradayContext(baseContext({ strategyMode: "momentum-target" }));
+    expect(text).toContain("[운용 전략]");
+    expect(text).toContain("평단 +2%");
+    expect(text).toContain("−1% 손절");
   });
 
   it("활성 경보가 있으면 한글 라벨로 줄을 주입한다 (AC-3)", () => {

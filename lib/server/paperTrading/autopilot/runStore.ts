@@ -531,7 +531,8 @@ async function sweepOneRun(
           tickers: [candidate.ticker],
           stocks: [{ ticker: candidate.ticker, name: candidate.name }],
           initialCash: run.perSlotCash,
-          targetReturnPct: 5,
+          // 슬롯 최대 비중 50% × 종목 +2% 목표 ≈ 세션 총자본 +1% gross 목표(보장값 아님).
+          targetReturnPct: 1,
           riskMode: run.riskMode,
           decisionProvider: "cli-agent",
           aiProvider: cliGate.provider,
