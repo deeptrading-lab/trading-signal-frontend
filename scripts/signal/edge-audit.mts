@@ -26,7 +26,12 @@ for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
 }
 
-const OUT = fileURLToPath(new URL("./__fixtures__/", import.meta.url));
+const MODE = process.argv[2] === "oos" ? "oos" : "is";
+const OUT = fileURLToPath(new URL(MODE === "oos" ? "./__fixtures__oos__/" : "./__fixtures__/", import.meta.url));
+/** OOS 는 사전 등록된 하드필터가 고른 (종목,일)만 대상. */
+const oosSet = MODE === "oos" && fs.existsSync(`${OUT}universe.json`)
+  ? new Set((JSON.parse(fs.readFileSync(`${OUT}universe.json`, "utf8")) as Array<{ ticker: string; day: string }>).map((p) => `${p.ticker}|${p.day}`))
+  : null;
 const { resampleMinuteCandles } = await import("@/lib/api/kis/minuteChartChunked");
 const { evaluateIntradaySignal, resolveIntradayProfile } = await import("@/lib/signal/intradayProfile");
 
@@ -81,6 +86,7 @@ let pairs = 0, skippedWarmup = 0;
 for (const [ticker, days] of byTicker) {
   for (let di = 0; di < days.length; di++) {
     const target = days[di];
+    if (oosSet && !oosSet.has(`${ticker}|${target}`)) continue;
     // warmup = 이전 3거래일(픽스처에 있는 것만)
     const warm = days.slice(Math.max(0, di - 3), di);
     const prior1m = warm.flatMap((d) => load(ticker, d));
@@ -126,7 +132,7 @@ for (const o of obs) {
 const FEATURES = [...new Set(obs.flatMap((o) => Object.keys(o.feat)))];
 const days = [...new Set(obs.map((o) => o.day))].sort();
 console.log("═".repeat(78));
-console.log(`Phase 1a — 입력 피처 예측력 감사`);
+console.log(`Phase 1a — 입력 피처 예측력 감사 [${MODE === "oos" ? "★아웃오브샘플 2026-06" : "인샘플 2026-07~08"}]`);
 console.log(`관측 ${obs.length.toLocaleString()}건 · 종목·일 ${pairs}쌍 · 거래일 ${days.length}일 · ${TF}분봉 · warmup 미달 스킵 ${skippedWarmup.toLocaleString()}`);
 console.log(`피처 ${FEATURES.length}개: ${FEATURES.join(", ")}`);
 console.log("═".repeat(78));
