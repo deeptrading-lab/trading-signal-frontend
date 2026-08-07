@@ -23,7 +23,6 @@ import {
   filterPastSessions,
   useIntradayPaperWatch,
 } from "@/hooks/intraday/useIntradayPaperWatch";
-import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { useIntradayPastSessions } from "@/hooks/intraday/useIntradayPastSessions";
 import {
   IntradayWatchTable,
@@ -38,6 +37,7 @@ import { IntradayResearchAutopilotCard } from "@/components/intraday/IntradayRes
 import { BookOpenCheck, ChevronDown, Loader2, SlidersHorizontal } from "lucide-react";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { todayKstDate } from "@/lib/api/toss/kst";
+import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 import {
   INTRADAY_PAPER_COPY as P,
   INTRADAY_WATCH_COPY as W,
@@ -219,9 +219,10 @@ export function IntradayWatchWorkspace() {
   // 과거 내역은 인메모리 원장(최근 20건)이 아니라 Supabase 원장을 페이지 단위로 읽는다 —
   // "더 보기"로 과거 전체를 볼 수 있다(intraday-history-pagination).
   const pastHistory = useIntradayPastSessions();
-  // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
-  useIntradayPaperRefresh(runningSessionIds);
-  const autoActive = runningSessionIds.length > 0;
+  // 화면 갱신은 각 쿼리 훅의 refetchInterval 이 담당한다(intraday-live-refresh) — 세션 목록은
+  // 실행 중 세션 유무와 무관하게 항상 폴링해야 새 세션(오토파일럿 스윕·타 서버)을 발견할 수 있다.
+  // 15:40 이후엔 자동 완료 스윕 전까지 배지가 켜져 있던 것을 시각 게이트로 정리.
+  const autoActive = runningSessionIds.length > 0 && isKstMarketHoursWithCloseGrace();
 
   // 표 행 = 오늘 로컬 워치 ∪ 오늘 cli-agent 세션. 이전 날짜 세션은 히스토리이지 오늘 구성 목록이
   // 아니므로 자동 편입하지 않는다. 다른 브라우저에서 오늘 시작한 세션만 이름순으로 뒤에 보존한다.
@@ -369,7 +370,10 @@ export function IntradayWatchWorkspace() {
       {/* 오늘 가이드 상품 — 시작·현재 행동·수행 원장이 첫 번째 시각 위계. */}
       <IntradayAutopilotCard />
 
-      <details className="group rounded-xl border border-border-line bg-surface-base">
+      {/* 기본 펼침(사용자 지정) — 세션 표가 이 안에 있어 접혀 있으면 매번 열어야 했다.
+          비제어 <details> 라 사용자가 접으면 접힌 채로 남는다: React 는 `open` prop 값이 바뀔 때만
+          DOM 을 다시 쓰므로 폴링 재렌더가 접은 패널을 다시 열지 않는다. */}
+      <details open className="group rounded-xl border border-border-line bg-surface-base">
         <summary className="flex cursor-pointer list-none items-center gap-sm p-lg text-body-md font-bold text-text-strong marker:hidden">
           <SlidersHorizontal className="size-5 text-text-muted" aria-hidden />
           직접 분석 도구

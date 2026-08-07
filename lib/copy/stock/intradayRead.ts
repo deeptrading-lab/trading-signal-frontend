@@ -153,6 +153,13 @@ export const INTRADAY_PAPER_COPY = {
     colPaper: "모의 매매",
     colManage: "관리",
     none: "—",
+    /* 다음 자동 판단 예정 — 판단이 5분 주기라 그 사이 화면이 멈춘 것처럼 보이는 문제(사용자 지적).
+       '±1분' 은 정직한 표기: 서버 스케줄러 폴이 60초라 14:05 창은 14:05:00~14:05:59 사이에 시도된다. */
+    nextTick: (hhmm: string) => `${hhmm} 예정`,
+    nextTickDue: "곧 판단",
+    nextTickPaused: "일시정지",
+    nextTickClosed: "장 마감",
+    nextTickTitle: "서버가 다음 자동 판단을 시도할 시각이에요(±1분).",
     /* 손절 상한(포지션 하드스톱) 선택 — 급락 시 자동 전량 청산 백스톱(intraday-stop-slippage C). */
     hardStopTitle: "포지션이 이 손실률에 닿으면 자동 전량 청산해요(하드스톱 백스톱).",
     hardStopOff: "끄기",

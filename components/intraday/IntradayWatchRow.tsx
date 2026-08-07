@@ -33,6 +33,7 @@ import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { isPaperSessionStalled } from "@/lib/utils/paperTradingStale";
+import { paperNextTickState } from "@/lib/utils/paperTradingTick";
 import {
   INTRADAY_AUTOPILOT_COPY as A,
   INTRADAY_PAPER_COPY as P,
@@ -550,6 +551,26 @@ function stripeColor(
   return null;
 }
 
+/**
+ * 「최근 판단」 셀 둘째 줄 문구 — 다음 자동 판단 예정.
+ * `none`(세션 없음·완료)과 `stalled`(StatusPill 이 이미 "판단 끊김" 을 말함)은 비운다.
+ */
+function nextTickCellLabel(session: PaperTradingSession | null | undefined): string | null {
+  const state = paperNextTickState(session);
+  switch (state.kind) {
+    case "scheduled":
+      return T.nextTick(state.hhmm);
+    case "due":
+      return T.nextTickDue;
+    case "paused":
+      return T.nextTickPaused;
+    case "closed":
+      return T.nextTickClosed;
+    default:
+      return null;
+  }
+}
+
 /** 좌측 상태 스트라이프 — 첫 셀(relative) 안 absolute 세로 바. 펼침 행에도 같은 색으로 이어 붙인다. */
 function StatusStripe({ color }: { color: string | null }) {
   if (!color) return null;
@@ -646,6 +667,9 @@ function WatchRow({
   // 지금 돌고 있는 세션. 완료 세션은 당일 성과 비교 대상이라 디밍하지 않는다.
   const stripe = stripeColor(current?.status, stalled);
   const dimmed = current?.status === "paused";
+  // 다음 자동 판단 예정 — 5분 주기 사이의 "멈춰 보임" 해소. stalled 는 StatusPill 이 이미 알리므로
+  // 여기선 비운다(중복 문구 방지). 상대 표기 대신 절대 시각인 이유는 helper 주석 참고.
+  const nextTickLabel = nextTickCellLabel(current);
   // 체결 전체(시간순) — 차트 탭 마커용. 미니 로그는 최근 5건(최신 위), 전체·손익 합계는 시트.
   // rationale 은 틱 레벨 판단 메모 — 체결별 "왜 샀/팔았나"를 미니 로그 우측에 보여준다.
   const allOrders = (detail?.ticks ?? []).flatMap((tick) =>
@@ -779,6 +803,17 @@ function WatchRow({
           ) : (
             T.none
           )}
+          {/* 다음 판단 예정 — 판단이 5분 주기라 그 사이엔 표가 멈춘 것처럼 보인다(사용자 지적).
+              별도 컬럼 대신 같은 셀 둘째 줄: "최근 판단 / 다음 판단" 은 한 덩어리이고, 컬럼을
+              늘리면 헤더 + colSpan={13} 2곳을 함께 고쳐야 한다. */}
+          {nextTickLabel ? (
+            <span
+              className="block whitespace-nowrap text-caption tabular-nums text-text-muted"
+              title={T.nextTickTitle}
+            >
+              {nextTickLabel}
+            </span>
+          ) : null}
         </td>
 
         {/* 모의 투자금 — 미시작이면 input, 시작 후엔 시작 투자금 표시 */}

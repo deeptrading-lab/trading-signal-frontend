@@ -130,9 +130,10 @@ export const queryKeys = {
     /**
      * 과거 모의투자 내역(무한 페이지). 인자 없는 단일 키.
      *
-     * ⚠️ 2번째 세그먼트를 "sessions" 로 두면 안 된다 — `useIntradayPaperRefresh` 가 30초마다
-     * `paperTrading.sessions` 를 invalidate 하는데 TanStack 은 prefix 매칭이라 **적재된 모든
-     * 페이지**가 30초마다 재요청된다. 별도 네임스페이스로 분리해 둔다.
+     * ⚠️ 2번째 세그먼트를 "sessions" 로 두면 안 된다 — 세션 생성·상태 변경·오토파일럿 중지
+     * mutation 이 `paperTrading.sessions` 를 invalidate 하는데 TanStack 은 prefix 매칭이라
+     * **적재된 모든 페이지**가 그때마다 재요청된다. 별도 네임스페이스로 분리해 둔다.
+     * (목록 폴링 자체는 refetchInterval 이라 prefix 무효화를 쓰지 않는다.)
      */
     sessionHistory: ["paper-trading", "session-history"] as const,
     /** 단타 오토파일럿 런(자동 포트폴리오) — 이 서버 운영자의 오늘 런. 인자 없는 단일 키. */

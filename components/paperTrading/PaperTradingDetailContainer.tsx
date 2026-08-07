@@ -22,7 +22,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { usePaperTradingSession } from "@/hooks/paperTrading/usePaperTradingSession";
-import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
 import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
@@ -104,13 +103,8 @@ export function PaperTradingDetailContainer({ sessionId }: PaperTradingDetailCon
     refetch,
   } = usePaperTradingSession(sessionId);
 
-  // 장중 자동 갱신 — 서버 스케줄러가 주기마다 틱을 만드니 running 단타 세션이면 이 화면도
-  // 30초 폴링으로 따라온다(새로고침 불필요). mock·정지 세션은 폴링 없음.
-  useIntradayPaperRefresh(
-    detail && detail.session.decisionProvider === "cli-agent" && detail.session.status === "running"
-      ? [detail.session.id]
-      : [],
-  );
+  // 장중 자동 갱신은 세션 상세 쿼리(useQueryPaperTradingSession)의 refetchInterval 이 담당한다 —
+  // 종료 세션·장외는 스스로 멈춘다. 화면별 폴링 타이머를 따로 두지 않는다(intraday-live-refresh).
 
   if (isLoading) {
     // 카드 박스 스켈레톤 제거 — 흰 바탕 위 플랫 스켈레톤(제목 라인 + 차트 블록).
