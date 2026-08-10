@@ -59,9 +59,10 @@ describe("IntradayWatchWorkspace helpers", () => {
     expect(removed.map((item) => item.ticker)).toEqual(["000660"]);
   });
 
-  it("과거 세션을 기존 표 컴포넌트에 넘길 rows와 session map으로 복구한다", () => {
+  it("과거 세션 1건 = 1행 — 같은 종목의 다른 날짜 세션이 삼켜지지 않는다", () => {
     const first = session({ id: "old-1" });
-    const duplicateOlder = session({
+    // 같은 종목(005930)의 하루 전 세션 — 예전에는 ticker 중복으로 통째 사라졌다.
+    const sameTickerOlderDay = session({
       id: "old-0",
       startedAt: "2026-07-06T01:00:00.000Z",
     });
@@ -71,11 +72,24 @@ describe("IntradayWatchWorkspace helpers", () => {
       stocks: [{ ticker: "000660", name: "SK하이닉스", market: "KOSPI" }],
     });
 
-    const view = buildPastSessionRows([first, duplicateOlder, second]);
+    const view = buildPastSessionRows([first, sameTickerOlderDay, second]);
 
-    expect(view.rows.map((item) => item.ticker)).toEqual(["005930", "000660"]);
-    expect(view.sessionByTicker.get("005930")?.id).toBe("old-1");
-    expect(view.sessionByTicker.get("000660")?.id).toBe("old-2");
+    expect(view.rows.map((item) => item.ticker)).toEqual(["005930", "005930", "000660"]);
+    // 행 식별자는 세션 id — 같은 종목 두 행이 서로 다른 세션을 가리킨다.
+    expect(view.rows.map((item) => item.rowKey)).toEqual(["old-1", "old-0", "old-2"]);
+    expect(view.sessionByRowKey.get("old-1")?.id).toBe("old-1");
+    expect(view.sessionByRowKey.get("old-0")?.id).toBe("old-0");
+    expect(view.sessionByRowKey.get("old-2")?.id).toBe("old-2");
+  });
+
+  it("같은 날 같은 종목 세션이 둘이어도 둘 다 남긴다(합산 손익 누락 방지)", () => {
+    const morning = session({ id: "same-day-1" });
+    const afternoon = session({ id: "same-day-2" });
+
+    const view = buildPastSessionRows([morning, afternoon]);
+
+    expect(view.rows).toHaveLength(2);
+    expect(view.sessionByRowKey.size).toBe(2);
   });
 });
 

@@ -73,6 +73,14 @@ export function todayKstDate(): string {
   return KST_DATE_FMT.format(Date.now());
 }
 
+/**
+ * KST "YYYY-MM-DD" → 그 날 00:00 KST 의 ISO(UTC) 문자열.
+ * 예: "2026-08-03" → "2026-08-02T15:00:00.000Z". 과거/오늘 경계를 서버 쿼리에 실을 때 쓴다.
+ */
+export function kstDateStartIso(dateKey: string): string {
+  return new Date(`${dateKey}T00:00:00+09:00`).toISOString();
+}
+
 /** "YYYYMMDD" → "YYYY-MM-DD". 이미 dash 형식이거나 비정형이면 그대로 통과(디펜시브). */
 export function ymdToDash(ymd: string): string {
   if (/^\d{8}$/.test(ymd)) {

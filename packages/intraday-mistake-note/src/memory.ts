@@ -132,8 +132,9 @@ export function buildRuntimeContext(
   scopes: string[] = [],
   maxRules = 1,
   maxChars = 160,
+  today = todayKst(),
 ): string {
-  return buildRuntimeMemorySnapshot(markdown, scopes, maxRules, maxChars).context;
+  return buildRuntimeMemorySnapshot(markdown, scopes, maxRules, maxChars, today).context;
 }
 
 const RUNTIME_RULE =
@@ -148,11 +149,17 @@ function todayKst(): string {
   }).format(new Date());
 }
 
+/**
+ * @param today 만료(UNTIL) 비교 기준일 "YYYY-MM-DD"(KST). 기본값은 실제 오늘 —
+ *   **테스트에서만** 고정 날짜를 주입한다. 주입 수단이 없으면 UNTIL 이 지나는 순간 픽스처가
+ *   조용히 빈 결과가 돼 테스트가 시간이 지나 썩는다(실제로 발생).
+ */
 export function buildRuntimeMemorySnapshot(
   markdown: string,
   scopes: string[] = [],
   maxRules = 1,
   maxChars = 160,
+  today = todayKst(),
 ): RuntimeMemorySnapshot {
   const hash = createHash("sha256").update(markdown).digest("hex");
   const starts = markdown.match(/<!-- AI_CONTEXT_START -->/g)?.length ?? 0;
@@ -183,7 +190,7 @@ export function buildRuntimeMemorySnapshot(
     return { status: "INVALID", context: "", hash, ruleIds: [], sourceThrough };
   }
   const applicable = parsed
-    .filter((match) => match[8] >= todayKst())
+    .filter((match) => match[8] >= today)
     .filter((match) => allowed.size === 0 || allowed.has(match[3]))
     .sort((a, b) => {
       const scopeOrder = (scope: string) => {

@@ -13,6 +13,22 @@ export const PAPER_TRADING_POSITION_HARD_STOP_PCT = -5;
 export const PAPER_TRADING_SESSION_HARD_STOP_PCT = -7;
 export const PAPER_TRADING_MAX_TURNOVER_PER_TICK_PCT = 50;
 
+// ─── 과거 내역 페이지네이션(intraday-history-pagination) ──────────────────────
+// 인메모리 창(HYDRATE_SESSION_LIMIT=20)과 무관한 별개 축 — 원장을 페이지 단위로 읽는다.
+// env 손잡이 없이 코드 상수로만 조정한다.
+
+/**
+ * "더 보기" 1페이지 기본 행 수.
+ *
+ * 하루에 20~45 세션이 쌓이므로 20이면 한 페이지가 사실상 하루치라 날짜 그룹이 하나만 보였다.
+ * 40이면 첫 화면에 보통 2일치가 뜬다. 행 1건 ≈ 810B(실측)라 페이지를 키워도 전송량은 32KB 수준.
+ */
+export const PAPER_TRADING_HISTORY_PAGE_SIZE = 40;
+/** 요청 limit 상한 — 한 번에 과하게 긁어가지 못하게. */
+export const PAPER_TRADING_HISTORY_MAX_PAGE_SIZE = 100;
+/** 요청 offset 상한 — 무한 페이징 폭주 방지(원장 규모 대비 충분히 큼). */
+export const PAPER_TRADING_HISTORY_MAX_OFFSET = 5_000;
+
 // ─── 하드스톱(포지션/세션 손실 한도) 배선 ─────────────────────────────────────
 // intraday-stop-slippage B/C. cli-agent 단타의 백스톱 — mock 경로는 무영향(forcedExit 미지정).
 
