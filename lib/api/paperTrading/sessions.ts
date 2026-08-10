@@ -28,7 +28,7 @@ export async function fetchPaperTradingSessions(): Promise<PaperTradingSessionsR
 
 /**
  * 과거 모의투자 내역 1페이지 — 인메모리 원장(최근 20건)이 아니라 Supabase 저장본을 직접 읽는다.
- * 서버가 limit 을 상한(50)으로 clamp 한다.
+ * 서버가 limit(상한 100)·offset(상한 5,000)을 clamp 하고, offset 상한에 닿으면 hasMore 를 내린다.
  */
 export async function fetchPaperTradingSessionHistory(params: {
   limit?: number;

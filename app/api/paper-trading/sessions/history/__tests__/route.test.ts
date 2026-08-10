@@ -90,6 +90,17 @@ describe("GET /api/paper-trading/sessions/history", () => {
     expect(mockLoad).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 41, offset: 0 }));
   });
 
+  it("offset 상한에 닿으면 hasMore 를 내려 '더 보기' 무한 루프를 막는다", async () => {
+    // 상한 너머를 요청하면 서버가 5,000 으로 clamp 하므로, hasMore 를 그대로 두면 클라가
+    // 같은 페이지를 영원히 다시 부른다(새 행은 0인데 버튼은 계속 노출).
+    mockLoad.mockResolvedValue({ status: "ok", sessions: summaries(41) });
+
+    const body = await (await GET(request("?offset=99999"))).json();
+
+    expect(body.nextOffset).toBe(5_040);
+    expect(body.hasMore).toBe(false);
+  });
+
   it("Supabase 미설정이면 장애가 아니라 configured:false 빈 페이지로 응답한다", async () => {
     mockLoad.mockResolvedValue({ status: "disabled" });
 

@@ -82,8 +82,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     return NextResponse.json(payload, { headers: NO_STORE });
   }
 
-  const hasMore = loaded.sessions.length > limit;
-  const page = hasMore ? loaded.sessions.slice(0, limit) : loaded.sessions;
+  const morePages = loaded.sessions.length > limit;
+  const page = morePages ? loaded.sessions.slice(0, limit) : loaded.sessions;
+  // offset 상한에 닿으면 hasMore 를 내려 "더 보기"를 닫는다. 안 그러면 클라가 상한 너머 offset 을
+  // 요청 → 서버가 다시 상한으로 clamp → **같은 페이지 반복**(중복 제거로 새 행 0)인데 버튼은
+  // 계속 살아 있는 무한 루프가 된다(QA·리뷰 지적).
+  const hasMore = morePages && offset + page.length < PAPER_TRADING_HISTORY_MAX_OFFSET;
   const positionsBySessionId: Record<string, PaperTradingPosition[]> = {};
   for (const entry of page) {
     positionsBySessionId[entry.session.id] = entry.positions;
