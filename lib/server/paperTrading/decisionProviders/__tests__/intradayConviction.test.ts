@@ -114,6 +114,7 @@ function stubJudgeV2(convictionScore: number) {
         stopPrice: 9_850,
         invalidationPrice: 9_850,
         expectedHoldingMinutes: 30,
+        appliedMistakeNoteRuleId: "AI-4EC46D87",
         rationale: "점수 플로우 테스트.",
         riskNotes: [],
       }),
@@ -159,6 +160,7 @@ describe("AC-11 — judge 실패 폴백은 신규 진입 금지", () => {
 
     expect(intraday.action).toBe("SELL");
     expect(decision.action).toBe("EXIT"); // 전량 정리
+    expect(mockInvoke.mock.calls[1][1].userPrompt).toContain("AI-FA2B6DEA");
   });
 });
 
@@ -176,6 +178,20 @@ describe("확신 컷 플로우 — v2 점수가 실제 BUY 를 만든다 (AC-10�
     expect(decision.action).toBe("BUY");
     expect(decision.targetAllocationPct).toBe(50); // 20+(80−58)×2=64 → maxPositionPct 50 캡
     expect(decision.convictionScore).toBe(80); // payload 영속(다음 틱 에코 원장)
+    const analystPrompt = mockInvoke.mock.calls[0][1].userPrompt;
+    const judgePrompt = mockInvoke.mock.calls[1][1].userPrompt;
+    expect(analystPrompt).not.toContain("필수참고");
+    expect(judgePrompt.match(/필수참고/g)).toHaveLength(1);
+    expect(decision.mistakeNote?.status).toBe("APPLIED");
+    expect(decision.mistakeNote?.ruleIds).toHaveLength(1);
+    expect(decision.mistakeNote?.hash).toMatch(/^[a-f0-9]{16}$/);
+    const memoryLine = judgePrompt.split("\n").find((line) => line.includes("필수참고")) ?? "";
+    const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
+    const totalPromptBytes = mockInvoke.mock.calls
+      .slice(0, 2)
+      .reduce((sum, call) => sum + bytes(call[1].systemPrompt) + bytes(call[1].userPrompt), 0);
+    const memoryBytes = bytes(`\n${memoryLine}`);
+    expect(memoryBytes / (totalPromptBytes - memoryBytes)).toBeLessThanOrEqual(0.05);
   });
 
   it("52점(컷 58 미달) → HOLD — 주문 없음", async () => {
@@ -212,6 +228,7 @@ describe("확신 컷 플로우 — v2 점수가 실제 BUY 를 만든다 (AC-10�
     expect(intraday.stopPrice).toBe(9_850);
     expect(decision.invalidationPrice).toBe(9_850);
     expect(decision.targetPrice).toBe(10_300);
+    expect(decision.mistakeNote?.status).toBe("PRESENTED_NOT_ACKNOWLEDGED");
   });
 });
 
@@ -223,6 +240,7 @@ describe("재진입 쿨다운 플로우 (PRD §9 q2)", () => {
 
     expect(intraday.action).toBe("HOLD");
     expect(decision.gateAdjustments?.join()).toContain("재진입 쿨다운");
+    expect(mockInvoke.mock.calls[1][1].userPrompt).toContain("AI-7563C592");
   });
 
   it("청산 2틱 경과(쿨다운 충족) → BUY 허용", async () => {

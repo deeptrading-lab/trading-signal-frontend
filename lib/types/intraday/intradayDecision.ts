@@ -145,6 +145,8 @@ export interface IntradayDecisionLlm {
    * 캘리브레이션 집계에서 근사 합성(v1)을 구분하기 위한 마커.
    */
   judgeSchema?: "v1" | "v2";
+  /** prompt로 제시된 오답노트 규칙을 실제 판단에 반영했다고 judge가 확인한 규칙 ID. */
+  appliedMistakeNoteRuleId?: string | null;
 }
 
 /**

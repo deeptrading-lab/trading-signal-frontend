@@ -102,8 +102,9 @@ describe("buildMemory", () => {
 
   it("런타임은 scope와 문자 예산을 적용한다", () => {
     const result = buildMemory([source("2026-07-21")]);
-    expect(buildRuntimeContext(result.markdown, ["ENTRY"])).toContain("T:ENTRY");
+    expect(buildRuntimeContext(result.markdown, ["ENTRY"])).toContain(result.rules[0].id);
+    expect(buildRuntimeContext(result.markdown, ["ENTRY"])).toContain("필수참고");
     expect(buildRuntimeContext(result.markdown, ["EXIT"])).toBe("");
-    expect(buildRuntimeContext(result.markdown, [], 6, 60)).toBe("");
+    expect(buildRuntimeContext(result.markdown, [], 6, 40)).toBe("");
   });
 });

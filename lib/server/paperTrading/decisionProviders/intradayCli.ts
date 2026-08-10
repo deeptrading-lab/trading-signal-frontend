@@ -26,7 +26,7 @@ import {
   PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX,
   PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS,
 } from "@/lib/server/paperTrading/constants";
-import { loadMistakeNoteContext } from "@/lib/server/paperTrading/mistakeNoteContext";
+import { loadMistakeNoteSnapshot } from "@/lib/server/paperTrading/mistakeNoteContext";
 import {
   FLOW_ANALYST_SYSTEM,
   JUDGE_SYSTEM,
@@ -472,6 +472,10 @@ function normalizeRiskNotes(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 3) : [];
 }
 
+function normalizeMistakeNoteRuleId(value: unknown): string | null {
+  return typeof value === "string" && /^AI-[A-F0-9]{8}$/.test(value) ? value : null;
+}
+
 /**
  * v2(convictionScore) 응답 → 판단 필드 파생 — action/confidence/진입 구간/사이징을 전부
  * 결정론(컷·사이징·|Δ50| 매핑)으로 채운다. LLM 산은 점수·가격 레벨·서사뿐.
@@ -503,6 +507,7 @@ function fromConvictionSchema(
     riskNotes: normalizeRiskNotes(d.riskNotes),
     convictionScore: conviction,
     judgeSchema: "v2",
+    appliedMistakeNoteRuleId: normalizeMistakeNoteRuleId(d.appliedMistakeNoteRuleId),
   };
 }
 
@@ -545,6 +550,7 @@ export function normalizeLlm(parsed: unknown, ctx: IntradayContext): IntradayDec
     riskNotes: normalizeRiskNotes(d.riskNotes),
     convictionScore: action === "BUY" ? 70 : action === "SELL" ? 30 : 50,
     judgeSchema: "v1",
+    appliedMistakeNoteRuleId: normalizeMistakeNoteRuleId(d.appliedMistakeNoteRuleId),
   };
 }
 
@@ -743,12 +749,15 @@ export async function decideIntradayWithCli(
     ctx.orderFlowText = orderFlowText;
   }
 
-  // 장마감 검증을 통과한 Compact Memory만 범위·문자 상한을 적용해 주입한다.
-  // 파일 부재/읽기 실패는 빈 문자열 fail-soft라 기존 판단 경로와 비트 동일하다.
-  const [entryMistakeNotes, judgeMistakeNotes] = await Promise.all([
-    loadMistakeNoteContext(["ENTRY", "REENTRY", "CALIBRATION"]),
-    loadMistakeNoteContext(["ENTRY", "REENTRY", "EXIT", "CALIBRATION", "RISK"]),
-  ]);
+  // 장마감 검증을 통과한 Compact Memory는 최종 판단가에만 1개 압축 규칙으로 주입한다.
+  // 분석가 중복 주입을 없애 토큰·egress를 줄이고, 포지션 상태에 맞는 scope만 선택한다.
+  const mistakeNoteScopes = input.position
+    ? ["EXIT", "RISK", "CALIBRATION"]
+    : input.ticksSinceLastExit != null
+      ? ["REENTRY", "ENTRY", "RISK", "CALIBRATION"]
+      : ["ENTRY", "RISK", "CALIBRATION"];
+  const mistakeNote = await loadMistakeNoteSnapshot(mistakeNoteScopes);
+  const judgeMistakeNotes = mistakeNote.context;
 
   const provider: AIAnalysisProvider = input.provider ?? "claude";
   // 에이전트별 모델 분리 — 분석가(요약, 싸고 빠르게)와 판단가(필요 시 더 무겁게)를 따로 둔다.
@@ -776,6 +785,25 @@ export async function decideIntradayWithCli(
     }
     return result;
   };
+  const withMistakeNote = (
+    result: IntradayProviderResult,
+    appliedRuleId: string | null,
+  ): IntradayProviderResult => {
+    const expectedRuleId = mistakeNote.ruleIds[0] ?? null;
+    const status =
+      mistakeNote.status === "PRESENTED"
+        ? expectedRuleId !== null && appliedRuleId === expectedRuleId
+          ? "APPLIED"
+          : "PRESENTED_NOT_ACKNOWLEDGED"
+        : mistakeNote.status;
+    result.decision.mistakeNote = {
+      status,
+      hash: mistakeNote.hash?.slice(0, 16) ?? null,
+      ruleIds: mistakeNote.ruleIds,
+      sourceThrough: mistakeNote.sourceThrough,
+    };
+    return result;
+  };
 
   // ① 흐름·세력 분석가 — 실패해도 진단 없이 ②로 진행(분석가는 보조). 실패는 agentDiagnostics 기록.
   let analystNote = "";
@@ -785,7 +813,7 @@ export async function decideIntradayWithCli(
       provider,
       {
         systemPrompt: FLOW_ANALYST_SYSTEM,
-        userPrompt: buildFlowAnalystUser(ctx, entryMistakeNotes),
+        userPrompt: buildFlowAnalystUser(ctx),
         tools: [],
         timeoutMs: AGENT_TIMEOUT_MS,
         effort: intradayEffort(analystModel),
@@ -867,21 +895,21 @@ export async function decideIntradayWithCli(
     // judge 실패 = 폴백 신규 진입 금지(AC-11 — "judge 실패 ≠ 의도 밖 체결"). noNewEntry 를 강제해
     // 폴백이 새 포지션을 열지 못하게 한다 — 보유 관리(보호 SELL·직전 목표/손절 유지·forced-exit)만.
     // 감사에서 실체결 8건 전부가 이 폴백 경로에서 발생했던 사고 구조를 차단한다.
-    return withDiagnostics(
+    return withMistakeNote(withDiagnostics(
       withModels(
         finalize(deriveFromSignal(ctx, true), "intraday-fallback", analystNote, [
           "AI 판단 응답 실패 — 신규 진입 금지(보유 관리만)",
         ]),
         { analyst: analystNote !== "", judge: false },
       ),
-    );
+    ), null);
   }
 
   const gated = applyPostGate(llm, ctx, pre.noNewEntry, reentryCooldown);
-  return withDiagnostics(
+  return withMistakeNote(withDiagnostics(
     withModels(
       finalize(gated.decision, "intraday-cli", analystNote, gated.adjustments),
       { analyst: analystNote !== "", judge: true },
     ),
-  );
+  ), llm.appliedMistakeNoteRuleId ?? null);
 }

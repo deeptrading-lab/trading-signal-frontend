@@ -6,8 +6,8 @@
   "memory": {
     "maxRules": 12,
     "maxChars": 1800,
-    "runtimeMaxRules": 6,
-    "runtimeMaxChars": 900
+    "runtimeMaxRules": 1,
+    "runtimeMaxChars": 160
   },
   "quality": {
     "maxUnresolvedLabelRate": 0.2,

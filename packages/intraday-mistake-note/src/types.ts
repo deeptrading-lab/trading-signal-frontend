@@ -118,3 +118,19 @@ export type MemoryBuildResult = {
   conflicts: string[];
   retired: Array<{ key: string; retiredAt: string; reason: string }>;
 };
+
+export type RuntimeMemoryStatus =
+  | "PRESENTED"
+  | "APPLIED"
+  | "PRESENTED_NOT_ACKNOWLEDGED"
+  | "EMPTY"
+  | "INVALID"
+  | "IO_ERROR";
+
+export type RuntimeMemorySnapshot = {
+  status: RuntimeMemoryStatus;
+  context: string;
+  hash: string | null;
+  ruleIds: string[];
+  sourceThrough: string | null;
+};
