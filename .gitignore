@@ -49,6 +49,8 @@ htmlcov/
 # KIS 로컬 토큰 캐시 (백테스트 러너)
 lib/signal/backtest/__live__/.kis-token.json
 lib/signal/backtest/__live__/__fixtures__/
+# 신호 감사 스크립트의 로컬 분봉 캐시 — 수십 MB 실행 부산물이라 커밋하지 않는다.
+scripts/signal/__fixtures__*/
 
 # Next.js auto-generated (path flips between dev/build)
 next-env.d.ts

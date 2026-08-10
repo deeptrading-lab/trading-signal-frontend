@@ -73,20 +73,19 @@ describe("buildMemory", () => {
   });
 
   it("3일·독립/폐쇄 20표본을 넘은 손실패턴만 ACTIVE로 승격한다", () => {
-    const result = buildMemory([
-      source("2026-07-21"),
-      source("2026-07-22"),
-      source("2026-07-23"),
-    ]);
+    const result = buildMemory(
+      [source("2026-07-21"), source("2026-07-22"), source("2026-07-23")],
+      "2026-07-24T00:00:00.000Z",
+    );
     expect(result.rules[0].status).toBe("ACTIVE");
     expect(result.rules[0].evidence).toContain("d=3");
   });
 
   it("동일 key의 의미가 충돌하면 CM에서 제외한다", () => {
-    const result = buildMemory([
-      source("2026-07-21"),
-      source("2026-07-22", [candidate({ action: "즉시진입" })]),
-    ]);
+    const result = buildMemory(
+      [source("2026-07-21"), source("2026-07-22", [candidate({ action: "즉시진입" })])],
+      "2026-07-23T00:00:00.000Z",
+    );
     expect(result.conflicts).toEqual(["entry-confirmation-before-cut"]);
     expect(result.rules).toHaveLength(0);
   });
@@ -101,10 +100,21 @@ describe("buildMemory", () => {
   });
 
   it("런타임은 scope와 문자 예산을 적용한다", () => {
-    const result = buildMemory([source("2026-07-21")]);
-    expect(buildRuntimeContext(result.markdown, ["ENTRY"])).toContain(result.rules[0].id);
-    expect(buildRuntimeContext(result.markdown, ["ENTRY"])).toContain("필수참고");
-    expect(buildRuntimeContext(result.markdown, ["EXIT"])).toBe("");
-    expect(buildRuntimeContext(result.markdown, [], 6, 40)).toBe("");
+    const result = buildMemory([source("2026-07-21")], "2026-07-22T00:00:00.000Z");
+    // ⚠️ 기준일을 고정한다. 규칙 UNTIL = 소스일 +14일(SHADOW) 이라, 실제 오늘로 비교하면
+    //    2026-08-04 이후 이 테스트가 조용히 빈 결과를 받아 썩는다(실제로 발생했음).
+    const today = "2026-07-22";
+    expect(buildRuntimeContext(result.markdown, ["ENTRY"], 1, 160, today)).toContain(
+      result.rules[0].id,
+    );
+    expect(buildRuntimeContext(result.markdown, ["ENTRY"], 1, 160, today)).toContain("필수참고");
+    expect(buildRuntimeContext(result.markdown, ["EXIT"], 1, 160, today)).toBe("");
+    expect(buildRuntimeContext(result.markdown, [], 6, 40, today)).toBe("");
+  });
+
+  it("UNTIL 이 지난 규칙은 런타임 주입에서 제외된다", () => {
+    const result = buildMemory([source("2026-07-21")], "2026-07-22T00:00:00.000Z");
+    // 만료 경계(소스일 +14 = 2026-08-04)의 다음 날.
+    expect(buildRuntimeContext(result.markdown, ["ENTRY"], 1, 160, "2026-08-05")).toBe("");
   });
 });
