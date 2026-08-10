@@ -41,7 +41,6 @@ const COST_PCT = 0.28; // 왕복 비용선
 const PROFILE = resolveIntradayProfile(TF);
 
 // ── 픽스처 인덱스 ────────────────────────────────────────────────────────────
-type Key = { ticker: string; day: string };
 const files = fs.readdirSync(OUT).filter((f) => f.endsWith("_1m.json"));
 const byTicker = new Map<string, string[]>(); // ticker → 정렬된 yyyymmdd
 for (const f of files) {
