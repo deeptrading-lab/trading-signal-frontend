@@ -23,6 +23,15 @@ export type AutopilotRunPurpose = "guide" | "research";
 /** 사용자가 AI 가이드 한 건에 남긴 최종 응답. 추천 원본(tick.orders)은 수정하지 않는다. */
 export type AutopilotGuideResponseKind = "performed" | "passed";
 
+/** 고객 화면과 서버 만료 판정이 공유하는 오늘 가이드 정책 스냅샷. */
+export type AutopilotGuidePolicy = {
+  strategy: "momentum-target";
+  takeProfitPct: number;
+  stopLossPct: number;
+  maxPositionPct: number;
+  validityMinutes: number;
+};
+
 /**
  * 가이드 응답 원장 — 서버가 source tick/order를 다시 조회해 스냅샷을 채운다.
  * 클라이언트가 보낸 가격·수량을 신뢰하지 않아 가상 주문과 사용자 수행 기록이 뒤섞이지 않는다.
@@ -168,6 +177,10 @@ export type AutopilotRun = {
   status: AutopilotRunStatus;
   /** 실행 진입점의 목적. 미기록 레거시 런은 research다. */
   purpose?: AutopilotRunPurpose;
+  /** guide 시작 전 원금손실·직접주문 책임을 확인한 시각. 레거시/research 런은 미기록. */
+  riskAcknowledgedAt?: string;
+  /** 시작 당시 정책 스냅샷. 환경변수 변경 뒤에도 당일 안내와 서버 판정을 동일하게 유지한다. */
+  guidePolicy?: AutopilotGuidePolicy;
   /**
    * 이 런을 만든 서버 운영자 — 공유 Supabase 다중 서버 격리 키. 세션 게이트(own-or-unowned)와
    * 달리 런은 신규 개념이라 레거시 미지정 호환이 없다: **엄격히 owner === operator 만** 스윕/마감.
@@ -203,6 +216,7 @@ export type AutopilotRun = {
 /** 런 시작 요청 — 전부 optional(서버 기본값 채움). */
 export type StartAutopilotRunRequest = {
   purpose?: AutopilotRunPurpose;
+  riskAcknowledgedAt?: string;
   totalCapital?: number;
   slotCount?: number;
   riskMode?: PaperTradingRiskMode;
@@ -212,6 +226,8 @@ export type StartAutopilotRunRequest = {
 /** GET/POST /api/paper-trading/autopilot 응답. */
 export type AutopilotRunResponse = {
   run: AutopilotRun | null;
+  /** 아직 런이 없어도 시작 카드가 서버의 현재 정책을 표시할 수 있게 제공한다. */
+  guidePolicy: AutopilotGuidePolicy;
   /** 이 서버의 운영자 — 클라 "내 런" 판정용(세션 응답 currentOperator 관례). */
   currentOperator: string;
   /** 스크리너 가용 여부(KIS prod 설정) — false 면 UI 가 "종목 선정 불가" 경고. 시작 자체는 허용. */

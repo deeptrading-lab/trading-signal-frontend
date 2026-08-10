@@ -4,6 +4,7 @@ import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import { getPaperTradingAiCliGate } from "@/lib/server/paperTrading/aiCliGate";
 import { AUTOPILOT_MAX_SLOT_COUNT } from "@/lib/server/paperTrading/autopilot/constants";
 import {
+  getAutopilotGuidePolicy,
   getActiveAutopilotRun,
   startAutopilotRun,
 } from "@/lib/server/paperTrading/autopilot/runStore";
@@ -14,6 +15,7 @@ import type {
   StartAutopilotRunRequest,
 } from "@/lib/types/paperTrading/autopilot";
 import { isKstAfterMarketClose } from "@/lib/utils/kstMarketHours";
+import { isFreshGuideRiskAcknowledgement } from "@/lib/intraday/guideProduct";
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
@@ -28,6 +30,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const payload: AutopilotRunResponse = {
     run: await getActiveAutopilotRun(),
+    guidePolicy: getAutopilotGuidePolicy(),
     currentOperator: resolveServerOperator(),
     kisReady: kisReady(),
     generatedAt: new Date().toISOString(),
@@ -102,6 +105,14 @@ export async function POST(request: NextRequest): Promise<Response> {
         { status: 422, headers: NO_STORE },
       );
     }
+    if (body.purpose === "guide") {
+      if (!isFreshGuideRiskAcknowledgement(body.riskAcknowledgedAt)) {
+        return NextResponse.json(
+          { error: "원금손실 가능성과 직접 주문 책임을 확인해 주세요." },
+          { status: 422, headers: NO_STORE },
+        );
+      }
+    }
 
     // 자식 세션이 로컬 AI CLI 를 쓰므로 시작 시점에 게이트 확인(스윕 때 조용히 실패하지 않게).
     const cliGate = getPaperTradingAiCliGate();
@@ -115,6 +126,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     // KIS 미설정이어도 시작은 허용(출근 전 프리마켓 시작 시나리오) — kisReady 로 UI 경고만.
     const run = await startAutopilotRun({
       purpose: body.purpose,
+      riskAcknowledgedAt: body.riskAcknowledgedAt,
       totalCapital: body.totalCapital,
       slotCount: body.slotCount,
       riskMode: body.riskMode,
@@ -122,6 +134,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     const payload: AutopilotRunResponse = {
       run,
+      guidePolicy: getAutopilotGuidePolicy(),
       currentOperator: resolveServerOperator(),
       kisReady: kisReady(),
       generatedAt: new Date().toISOString(),

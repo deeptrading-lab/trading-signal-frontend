@@ -1,8 +1,14 @@
 import type {
+  AutopilotGuidePolicy,
   AutopilotGuideResponse,
   AutopilotRun,
 } from "@/lib/types/paperTrading/autopilot";
 import type { PaperTradingSessionDetail } from "@/lib/types/paperTrading/paperTrading";
+import {
+  DEFAULT_AUTOPILOT_GUIDE_POLICY,
+  intradayGuideValidUntil,
+  isIntradayGuideExpired,
+} from "@/lib/intraday/guideProduct";
 
 export type IntradayGuideItem = {
   id: string;
@@ -19,8 +25,11 @@ export type IntradayGuideItem = {
   rationale: string;
   invalidationPrice: number | null;
   targetPrice: number | null;
-  status: "pending" | "performed" | "passed";
+  status: "pending" | "performed" | "passed" | "expired";
   response: AutopilotGuideResponse | null;
+  validUntil: string;
+  convictionScore: number | null;
+  riskNotes: string[];
 };
 
 export type IntradayGuideHolding = {
@@ -73,6 +82,8 @@ export function buildGuideHoldings(
 export function buildIntradayGuideItems(
   run: AutopilotRun | null,
   details: PaperTradingSessionDetail[],
+  now: Date = new Date(),
+  policy: AutopilotGuidePolicy = run?.guidePolicy ?? DEFAULT_AUTOPILOT_GUIDE_POLICY,
 ): IntradayGuideItem[] {
   if (!run) return [];
   const responses = run.guideResponses ?? {};
@@ -92,6 +103,10 @@ export function buildIntradayGuideItems(
           latestOriginalByTicker.set(order.ticker, { id, at: tick.createdAt });
         }
         const response = responses[id] ?? null;
+        const validUntil = intradayGuideValidUntil(tick.createdAt, policy.validityMinutes);
+        const status = response?.response ?? (
+          isIntradayGuideExpired(validUntil, now) ? "expired" : "pending"
+        );
         const holding = holdingByTicker.get(order.ticker);
         // 가상 엔진의 SELL은 사용자 수행 BUY가 없으면 행동 알림이 아니다. 이미 응답된 레거시 항목은
         // 감사 내역을 위해 유지하고, 미응답 SELL만 사용자 원장 보유량으로 게이트한다.
@@ -115,8 +130,11 @@ export function buildIntradayGuideItems(
           rationale: order.reason || tick.rationale,
           invalidationPrice: tick.decision.invalidationPrice ?? null,
           targetPrice: tick.decision.targetPrice ?? null,
-          status: response?.response ?? "pending",
+          status,
           response,
+          validUntil,
+          convictionScore: tick.decision.convictionScore ?? null,
+          riskNotes: tick.decision.riskNotes.slice(0, 2),
         });
       });
     }
@@ -125,7 +143,7 @@ export function buildIntradayGuideItems(
   return items
     .filter(
       (item) =>
-        item.status !== "pending" || latestOriginalByTicker.get(item.ticker)?.id === item.id,
+        item.response !== null || latestOriginalByTicker.get(item.ticker)?.id === item.id,
     )
     .sort((a, b) => b.at.localeCompare(a.at));
 }

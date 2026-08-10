@@ -16,6 +16,7 @@ import { usePaperTradingSessions } from "@/hooks/paperTrading/usePaperTradingSes
 import { useQueryPaperTradingSessionDetails } from "@/hooks/query/useQueryPaperTradingSessionDetails";
 import { useMutationRespondAutopilotGuide } from "@/hooks/query/useMutationRespondAutopilotGuide";
 import { buildGuideHoldings, buildIntradayGuideItems } from "@/lib/intraday/guideFeed";
+import { DEFAULT_AUTOPILOT_GUIDE_POLICY } from "@/lib/intraday/guideProduct";
 import type {
   AutopilotRun,
   StartAutopilotRunRequest,
@@ -51,6 +52,8 @@ export function useIntradayAutopilot() {
   const respondMutation = useMutationRespondAutopilotGuide();
 
   const run = runQuery.data?.run ?? null;
+  const guidePolicy =
+    run?.guidePolicy ?? runQuery.data?.guidePolicy ?? DEFAULT_AUTOPILOT_GUIDE_POLICY;
 
   const childSessionById = useMemo(() => {
     const map = new Map<string, PaperTradingSession>();
@@ -68,11 +71,15 @@ export function useIntradayAutopilot() {
   );
   const detailQueries = useQueryPaperTradingSessionDetails(childSessionIds);
   const details = detailQueries.flatMap((query) => (query.data ? [query.data] : []));
-  const guideItems = useMemo(() => buildIntradayGuideItems(run, details), [run, details]);
+  const guideItems = useMemo(
+    () => buildIntradayGuideItems(run, details, new Date(), guidePolicy),
+    [run, details, guidePolicy],
+  );
   const guideHoldings = useMemo(() => buildGuideHoldings(run?.guideResponses), [run?.guideResponses]);
 
   return {
     run,
+    guidePolicy,
     /** 스크리너 가용 여부(KIS prod) — false 면 "종목 선정 불가" 경고 배지. */
     kisReady: runQuery.data?.kisReady ?? true,
     childSessionById,

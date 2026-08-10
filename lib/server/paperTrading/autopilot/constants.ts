@@ -34,6 +34,14 @@ export const AUTOPILOT_DEFAULT_TOTAL_CAPITAL = PAPER_TRADING_DEFAULT_INITIAL_CAS
 export const AUTOPILOT_DEFAULT_SLOT_COUNT = envInt("AUTOPILOT_SLOT_COUNT", 3, 1, 5);
 export const AUTOPILOT_MAX_SLOT_COUNT = 5;
 
+/** 고객 행동 가이드 유효시간 — 두 번의 5분 판단 창을 넘긴 가격은 다시 확인한다. */
+export const AUTOPILOT_GUIDE_VALIDITY_MINUTES = envInt(
+  "AUTOPILOT_GUIDE_VALIDITY_MINUTES",
+  10,
+  5,
+  30,
+);
+
 // ─── 스윕 주기·창 ─────────────────────────────────────────────────────────────
 
 /**

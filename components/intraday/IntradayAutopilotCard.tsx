@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Clock3,
+  Gauge,
   ShieldCheck,
   Sparkles,
   Square,
@@ -18,6 +19,11 @@ import { useIntradayAutopilot } from "@/hooks/intraday/useIntradayAutopilot";
 import { isApiError } from "@/lib/api/errors";
 import { INTRADAY_GUIDE_COPY as C } from "@/lib/copy/intraday/guideProduct";
 import type { IntradayGuideItem } from "@/lib/intraday/guideFeed";
+import type { AutopilotRun } from "@/lib/types/paperTrading/autopilot";
+import {
+  buildIntradayGuideScenario,
+  resolveIntradayGuideWaitReason,
+} from "@/lib/intraday/guideProduct";
 import { cn } from "@/lib/utils/cn";
 import { formatKrwInput, formatMoney } from "@/lib/utils/formatMoney";
 
@@ -46,7 +52,8 @@ function directionLabel(item: IntradayGuideItem): string {
 export function IntradayAutopilotCard() {
   const {
     run,
-    childSessionById,
+    guidePolicy,
+    kisReady,
     isStarting,
     isStopping,
     isResponding,
@@ -60,6 +67,7 @@ export function IntradayAutopilotCard() {
   } = useIntradayAutopilot();
   const [capitalInput, setCapitalInput] = useState(formatKrwInput(String(DEFAULT_CAPITAL)));
   const [confirmingGuideId, setConfirmingGuideId] = useState<string | null>(null);
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const pending = useMemo(
@@ -74,6 +82,9 @@ export function IntradayAutopilotCard() {
   const researchRunActive = run?.status === "active" && (run.purpose ?? "research") === "research";
   const capital = Number(capitalInput.replace(/[^0-9]/g, ""));
   const capitalValid = Number.isFinite(capital) && capital >= 1_000_000;
+  const scenario = buildIntradayGuideScenario(capital, guidePolicy);
+  const activeSlotCount = run?.slots.filter((slot) => slot.sessionId).length ?? 0;
+  const emptySlotCount = Math.max(0, (run?.slotCount ?? 0) - activeSlotCount);
 
   const onStart = async () => {
     if (!capitalValid) {
@@ -82,7 +93,13 @@ export function IntradayAutopilotCard() {
     }
     setError(null);
     try {
-      await start({ purpose: "guide", totalCapital: capital, slotCount: 3, tickIntervalMinutes: 5 });
+      await start({
+        purpose: "guide",
+        riskAcknowledgedAt: new Date().toISOString(),
+        totalCapital: capital,
+        slotCount: 3,
+        tickIntervalMinutes: 5,
+      });
     } catch (cause) {
       setError(isApiError(cause) ? cause.message : C.startError);
     }
@@ -146,7 +163,22 @@ export function IntradayAutopilotCard() {
             ))}
           </ul>
 
-          <div className="grid gap-sm sm:grid-cols-[minmax(0,1fr)_auto]">
+          <section className="rounded-lg bg-surface-muted p-md" aria-labelledby="guide-strategy-title">
+            <div className="flex items-center gap-xs">
+              <Gauge className="size-4 text-accent-vivid" aria-hidden />
+              <h3 id="guide-strategy-title" className="text-body-sm font-bold text-text-strong">
+                {C.strategyTitle}
+              </h3>
+            </div>
+            <dl className="mt-md grid grid-cols-2 gap-md sm:grid-cols-4">
+              <Metric label={C.strategyItems.target} value={`+${guidePolicy.takeProfitPct}%`} />
+              <Metric label={C.strategyItems.stop} value={`${guidePolicy.stopLossPct}%`} />
+              <Metric label={C.strategyItems.allocation} value={`${guidePolicy.maxPositionPct}%`} />
+              <Metric label={C.strategyItems.stocks} value="3종목" />
+            </dl>
+          </section>
+
+          <div className="grid gap-sm">
             <label className="flex min-w-0 items-center rounded-lg border border-border-line bg-surface-base px-md focus-within:border-accent-vivid">
               <span className="shrink-0 text-body-sm font-medium text-text-muted">{C.capitalLabel}</span>
               <input
@@ -158,16 +190,40 @@ export function IntradayAutopilotCard() {
               />
               <span className="ml-xs text-body-sm text-text-muted">원</span>
             </label>
-            <Button
-              loading={isStarting}
-              disabled={researchRunActive}
-              onClick={onStart}
-              className="h-12 whitespace-nowrap px-xl"
-            >
-              {isStarting ? C.starting : researchRunActive ? C.researchRunning : C.start}
-            </Button>
           </div>
           <p id="guide-capital-hint" className="text-caption text-text-muted">{C.capitalHint}</p>
+
+          <section className="rounded-lg border border-border-line p-md" aria-labelledby="guide-scenario-title">
+            <h3 id="guide-scenario-title" className="text-body-sm font-bold text-text-strong">
+              {C.scenarioTitle}
+            </h3>
+            <dl className="mt-sm grid grid-cols-2 gap-md">
+              <Metric label={C.scenarioTarget} value={`+${formatMoney(scenario.targetProfit)}원`} />
+              <Metric label={C.scenarioLoss} value={`-${formatMoney(scenario.plannedLoss)}원`} />
+            </dl>
+            <p className="mt-sm text-caption text-text-muted">{C.scenarioNotice}</p>
+          </section>
+
+          <label className="flex cursor-pointer items-start gap-sm rounded-lg border border-border-line p-md">
+            <input
+              type="checkbox"
+              checked={riskAcknowledged}
+              onChange={(event) => setRiskAcknowledged(event.target.checked)}
+              className="mt-2xs size-4 accent-accent-vivid"
+            />
+            <span>
+              <span className="block text-body-sm font-medium text-text-strong">{C.riskAcknowledgement}</span>
+              <span className="mt-2xs block text-caption text-text-muted">{C.riskAcknowledgementHint}</span>
+            </span>
+          </label>
+          <Button
+            loading={isStarting}
+            disabled={researchRunActive || !riskAcknowledged}
+            onClick={onStart}
+            className="h-12 w-full whitespace-nowrap px-xl"
+          >
+            {isStarting ? C.starting : researchRunActive ? C.researchRunning : C.start}
+          </Button>
           {researchRunActive ? (
             <p className="text-caption text-accent-vivid">{C.researchRunningHint}</p>
           ) : null}
@@ -208,11 +264,13 @@ export function IntradayAutopilotCard() {
             ) : null}
           </div>
 
-          <div className="grid grid-cols-3 gap-sm rounded-lg bg-surface-muted p-md">
+          <div className="grid grid-cols-2 gap-sm rounded-lg bg-surface-muted p-md sm:grid-cols-4">
             <Metric label={C.nextAnalysis} value={active ? nextAnalysisTime(run.lastSweepWindowStart) : "—"} />
-            <Metric label={C.watchedStocks} value={`${childSessionById.size}개`} />
-            <Metric label={C.holdings} value={`${guideHoldings.length}개`} />
+            <Metric label={C.watchedStocks} value={`${activeSlotCount}개`} />
+            <Metric label={C.emptySlots} value={`${emptySlotCount}개`} />
+            <Metric label={C.recentCandidates} value={`${run.lastScreenerSummary?.passed ?? 0}개`} />
           </div>
+          <p className="text-caption text-text-muted">{C.selectiveEntry}</p>
           <p className="flex items-center gap-xs text-caption text-text-muted">
             <ShieldCheck className="size-4" aria-hidden />
             {C.originalNotice}
@@ -232,15 +290,7 @@ export function IntradayAutopilotCard() {
             onRespond={(response) => onRespond(currentGuide, response)}
           />
         ) : (
-          <div className="rounded-xl border border-border-line bg-surface-base p-xl text-center">
-            <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent-vivid">
-              <BellRing className="size-5" aria-hidden />
-            </span>
-            <h3 className="mt-md text-body-lg font-bold text-text-strong">{C.waitingTitle}</h3>
-            <p className="mt-xs text-body-sm text-text-muted">
-              {guideLoading ? C.waitingTitle : C.waitingBody}
-            </p>
-          </div>
+          <GuideWaitingCard run={run} kisReady={kisReady} loading={guideLoading} />
         )
       ) : (
         <div className="rounded-lg bg-surface-muted p-md text-body-sm text-text-muted">{C.completedBody}</div>
@@ -287,8 +337,11 @@ export function IntradayAutopilotCard() {
                   <span className={cn("size-2 rounded-full", item.side === "BUY" ? "bg-signal-up" : "bg-signal-down")} />
                   <span className="font-bold text-text-strong">{item.name}</span>
                   <span className="text-text-muted">{directionLabel(item)}</span>
-                  <Badge variant={item.status === "performed" ? "accent" : "info"} className="ml-auto">
-                    {item.status === "performed" ? C.performed : C.passed}
+                  <Badge
+                    variant={item.status === "performed" ? "accent" : item.status === "expired" ? "warn" : "info"}
+                    className="ml-auto"
+                  >
+                    {item.status === "performed" ? C.performed : item.status === "expired" ? C.expired : C.passed}
                   </Badge>
                   <time className="text-caption tabular-nums text-text-muted">{kstTime(item.at)}</time>
                 </li>
@@ -328,6 +381,13 @@ function GuideActionCard({
   onCancelConfirm: () => void;
   onRespond: (response: "performed" | "passed") => void;
 }) {
+  const targetProfit = item.targetPrice
+    ? Math.max(0, (item.targetPrice - item.price) * item.quantity)
+    : null;
+  const plannedLoss = item.invalidationPrice
+    ? Math.max(0, (item.price - item.invalidationPrice) * item.quantity)
+    : null;
+
   return (
     <article
       className={cn(
@@ -342,7 +402,9 @@ function GuideActionCard({
           <Badge variant={item.side === "BUY" ? "signal-up" : "signal-down"}>{directionLabel(item)}</Badge>
           <span className="text-caption font-bold text-accent-vivid">{C.guideEyebrow}</span>
           {pendingCount > 1 ? <Badge variant="info" className="ml-auto">{C.waitingCount(pendingCount)}</Badge> : null}
-          <time className="text-caption tabular-nums text-text-muted">{kstTime(item.at)}</time>
+          <Badge variant="info" className={pendingCount > 1 ? undefined : "ml-auto"}>
+            {C.validUntil(kstTime(item.validUntil))}
+          </Badge>
         </div>
 
         <div>
@@ -355,19 +417,45 @@ function GuideActionCard({
           <GuideValue label={C.quantityLabel} value={`${item.quantity}주`} />
           <GuideValue label={C.amountLabel} value={`${formatMoney(item.notional)}원`} />
           <GuideValue
-            label={item.side === "BUY" ? C.stopLossLabel : C.targetLabel}
-            value={
-              item.side === "BUY"
-                ? item.invalidationPrice
-                  ? `${formatMoney(item.invalidationPrice)}원`
-                  : "상황별 안내"
-                : item.targetPrice
-                  ? `${formatMoney(item.targetPrice)}원`
-                  : "전량 정리"
-            }
+            label={C.convictionLabel}
+            value={item.convictionScore == null ? "—" : `${item.convictionScore}점`}
           />
         </dl>
+
+        {item.side === "BUY" ? (
+          <section className="grid gap-sm rounded-lg border border-border-line p-md sm:grid-cols-2" aria-label="목표와 손절 계획">
+            <div>
+              <GuideValue
+                label={C.targetLabel}
+                value={item.targetPrice ? `${formatMoney(item.targetPrice)}원` : "상황별 안내"}
+              />
+              <p className="mt-xs text-caption tabular-nums text-signal-up">
+                {C.expectedProfit} {targetProfit == null ? "—" : `+${formatMoney(targetProfit)}원`}
+              </p>
+            </div>
+            <div>
+              <GuideValue
+                label={C.stopLossLabel}
+                value={item.invalidationPrice ? `${formatMoney(item.invalidationPrice)}원` : "상황별 안내"}
+              />
+              <p className="mt-xs text-caption tabular-nums text-signal-down">
+                {C.plannedLoss} {plannedLoss == null ? "—" : `-${formatMoney(plannedLoss)}원`}
+              </p>
+            </div>
+          </section>
+        ) : null}
         <p className="rounded-lg bg-surface-muted px-md py-sm text-body-sm text-text-muted">{item.rationale}</p>
+        {item.riskNotes.length > 0 ? (
+          <section aria-labelledby={`guide-risk-${item.id}`}>
+            <h4 id={`guide-risk-${item.id}`} className="text-caption font-bold text-text-strong">
+              {C.riskTitle}
+            </h4>
+            <ul className="mt-xs space-y-xs text-caption text-text-muted">
+              {item.riskNotes.map((note, index) => <li key={`${index}-${note}`}>• {note}</li>)}
+            </ul>
+          </section>
+        ) : null}
+        <p className="text-caption text-text-muted">{C.validityNotice}</p>
 
         {confirming ? (
           <div className="rounded-lg border border-accent-vivid bg-accent-soft p-md" role="group" aria-label={C.confirmTitle(item.side)}>
@@ -414,6 +502,46 @@ function GuideActionCard({
         )}
       </div>
     </article>
+  );
+}
+
+function GuideWaitingCard({
+  run,
+  kisReady,
+  loading,
+}: {
+  run: AutopilotRun;
+  kisReady: boolean;
+  loading: boolean;
+}) {
+  const reason = resolveIntradayGuideWaitReason(run, kisReady);
+  const body = reason === "market-data"
+    ? C.waitReasons.marketData
+    : reason === "cooldown"
+      ? C.waitReasons.cooldown
+      : reason === "no-candidate"
+        ? C.waitReasons.noCandidate
+        : reason === "quality-gate"
+          ? C.waitReasons.qualityGate
+          : C.waitReasons.screening;
+  const summary = run.lastScreenerSummary;
+
+  return (
+    <div className="rounded-xl border border-border-line bg-surface-base p-xl text-center" role="status">
+      <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent-vivid">
+        <BellRing className="size-5" aria-hidden />
+      </span>
+      <h3 className="mt-md text-body-lg font-bold text-text-strong">{C.waitingTitle}</h3>
+      <p className="mx-auto mt-xs max-w-2xl text-body-sm text-text-muted">
+        {loading ? C.waitingBody : body}
+      </p>
+      {summary ? (
+        <p className="mt-sm text-caption tabular-nums text-text-muted">
+          {C.waitSummary(summary.universeSize, summary.passed)} · {kstTime(summary.at)} 기준
+        </p>
+      ) : null}
+      <p className="mt-md text-caption font-medium text-accent-vivid">{C.selectiveEntry}</p>
+    </div>
   );
 }
 

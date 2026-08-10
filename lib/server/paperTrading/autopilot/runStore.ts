@@ -20,10 +20,17 @@ import { getPaperTradingAiCliGate } from "@/lib/server/paperTrading/aiCliGate";
 import {
   AUTOPILOT_DEFAULT_SLOT_COUNT,
   AUTOPILOT_DEFAULT_TOTAL_CAPITAL,
+  AUTOPILOT_GUIDE_VALIDITY_MINUTES,
   AUTOPILOT_MAX_SLOT_COUNT,
   AUTOPILOT_ROTATION_LOG_MAX,
   AUTOPILOT_SWEEP_INTERVAL_MINUTES,
 } from "@/lib/server/paperTrading/autopilot/constants";
+import {
+  PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
+  PAPER_TRADING_INTRADAY_STOP_LOSS_PCT,
+  PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT,
+} from "@/lib/server/paperTrading/constants";
+import { intradayGuideValidUntil } from "@/lib/intraday/guideProduct";
 import {
   loadPersistedAutopilotRuns,
   persistAutopilotRun,
@@ -49,6 +56,7 @@ import { floorToTickWindow } from "@/lib/server/paperTrading/time";
 import { isKstAfterMarketClose, isKstMarketHours } from "@/lib/utils/kstMarketHours";
 import type {
   AutopilotGuideResponseKind,
+  AutopilotGuidePolicy,
   AutopilotRun,
   AutopilotScreenerSnapshot,
   AutopilotScreenerSummary,
@@ -56,6 +64,16 @@ import type {
 } from "@/lib/types/paperTrading/autopilot";
 
 const log = createLogger("autopilot");
+
+export function getAutopilotGuidePolicy(): AutopilotGuidePolicy {
+  return {
+    strategy: "momentum-target",
+    takeProfitPct: PAPER_TRADING_INTRADAY_TAKE_PROFIT_PCT,
+    stopLossPct: PAPER_TRADING_INTRADAY_STOP_LOSS_PCT,
+    maxPositionPct: PAPER_TRADING_DEFAULT_MAX_POSITION_PCT,
+    validityMinutes: AUTOPILOT_GUIDE_VALIDITY_MINUTES,
+  };
+}
 
 // ─── 스토어(globalThis — dev HMR 무손실) ──────────────────────────────────────
 
@@ -167,6 +185,9 @@ export async function startAutopilotRun(request: StartAutopilotRunRequest): Prom
     id: randomUUID(),
     status: "active",
     purpose: request.purpose ?? "research",
+    riskAcknowledgedAt:
+      request.purpose === "guide" ? request.riskAcknowledgedAt : undefined,
+    guidePolicy: getAutopilotGuidePolicy(),
     owner: operator,
     totalCapital,
     slotCount,
@@ -230,7 +251,16 @@ export async function stopAutopilotRun(
 
 export type RespondToAutopilotGuideResult =
   | { ok: true; run: AutopilotRun }
-  | { ok: false; reason: "not_found" | "conflict" | "no_position" | "invalid_guide" };
+  | {
+      ok: false;
+      reason:
+        | "not_found"
+        | "conflict"
+        | "no_position"
+        | "invalid_guide"
+        | "expired"
+        | "inactive";
+    };
 
 function parseGuideId(
   guideId: string,
@@ -260,6 +290,7 @@ export async function respondToAutopilotGuide(
   guideId: string,
   response: AutopilotGuideResponseKind,
   getDetail: typeof getPaperTradingSessionDetail = getPaperTradingSessionDetail,
+  now: Date = new Date(),
 ): Promise<RespondToAutopilotGuideResult> {
   await ensureHydrated();
   const run = getStore().runs.get(runId);
@@ -273,6 +304,7 @@ export async function respondToAutopilotGuide(
       ? { ok: true, run }
       : { ok: false, reason: "conflict" };
   }
+  if (run.status !== "active") return { ok: false, reason: "inactive" };
 
   const detail = await getDetail(parsed.sessionId);
   if (!detail || detail.session.autopilotRunId !== run.id) {
@@ -281,6 +313,13 @@ export async function respondToAutopilotGuide(
   const tick = detail.ticks.find((item) => item.id === parsed.tickId);
   const order = tick?.orders[parsed.orderIndex];
   if (!tick || !order) return { ok: false, reason: "invalid_guide" };
+  const validUntil = intradayGuideValidUntil(
+    tick.createdAt,
+    run.guidePolicy?.validityMinutes ?? AUTOPILOT_GUIDE_VALIDITY_MINUTES,
+  );
+  if (now.getTime() >= new Date(validUntil).getTime()) {
+    return { ok: false, reason: "expired" };
+  }
 
   // 원본 조회 중 다른 요청이 먼저 확정됐을 수 있으므로 await 이후 멱등 상태를 다시 확인한다.
   const raced = run.guideResponses?.[guideId];
@@ -313,7 +352,7 @@ export async function respondToAutopilotGuide(
     recommendedAt: tick.createdAt,
     executedQuantity,
     response,
-    respondedAt: new Date().toISOString(),
+    respondedAt: now.toISOString(),
   } as const;
   run.guideResponses = { ...(run.guideResponses ?? {}), [guideId]: item };
   touchAndPersist(run);

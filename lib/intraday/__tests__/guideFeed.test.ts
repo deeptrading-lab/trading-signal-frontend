@@ -95,6 +95,36 @@ describe("AI 단타 가이드 피드", () => {
     expect(buildIntradayGuideItems(run(), [detail("SELL")])).toEqual([]);
   });
 
+  it("가이드는 생성 후 10분 동안만 pending이고 이후 expired가 된다", () => {
+    const beforeExpiry = buildIntradayGuideItems(
+      run(),
+      [detail("BUY")],
+      new Date("2026-07-13T01:09:59.000Z"),
+    )[0];
+    const expired = buildIntradayGuideItems(
+      run(),
+      [detail("BUY")],
+      new Date("2026-07-13T01:10:00.000Z"),
+    )[0];
+
+    expect(beforeExpiry).toMatchObject({
+      status: "pending",
+      validUntil: "2026-07-13T01:10:00.000Z",
+    });
+    expect(expired.status).toBe("expired");
+  });
+
+  it("고객 카드용 판단 점수와 위험 메모는 원본에서 최대 2개만 가져온다", () => {
+    const source = detail("BUY");
+    source.ticks[0].decision.convictionScore = 67;
+    source.ticks[0].decision.riskNotes = ["저항 근접", "거래량 둔화", "세 번째 메모"];
+
+    expect(buildIntradayGuideItems(run(), [source], new Date(now))[0]).toMatchObject({
+      convictionScore: 67,
+      riskNotes: ["저항 근접", "거래량 둔화"],
+    });
+  });
+
   it("같은 종목의 최신 원본이 SELL이면 그보다 오래된 미응답 BUY도 만료한다", () => {
     const buy = detail("BUY");
     buy.ticks[0].createdAt = "2026-07-13T00:50:00.000Z";
@@ -140,7 +170,11 @@ describe("AI 단타 가이드 피드", () => {
     expect(buildGuideHoldings(responses)).toEqual([
       { ticker: "005930", name: "삼성전자", quantity: 10, averagePrice: 70_000 },
     ]);
-    expect(buildIntradayGuideItems(run({ guideResponses: responses }), [detail("SELL")])[0]).toMatchObject({
+    expect(buildIntradayGuideItems(
+      run({ guideResponses: responses }),
+      [detail("SELL")],
+      new Date(now),
+    )[0]).toMatchObject({
       side: "SELL",
       quantity: 10,
       status: "pending",

@@ -28,6 +28,7 @@ const MARKET_OPEN = new Date("2026-07-13T01:00:00Z");
 const AFTER_CLOSE = new Date("2026-07-13T07:00:00Z");
 /** KST 07:00 화요일 — 평일 프리마켓(장외). */
 const PREMARKET = new Date("2026-07-13T22:00:00Z");
+const GUIDE_NOW = new Date("2026-07-13T01:05:00.000Z");
 
 const OPERATOR = resolveServerOperator();
 
@@ -214,8 +215,19 @@ describe("startAutopilotRun / stopAutopilotRun", () => {
     expect(research.purpose).toBe("research");
 
     resetAutopilotStoreForTest();
-    const guide = await startAutopilotRun({ purpose: "guide" });
+    const guide = await startAutopilotRun({
+      purpose: "guide",
+      riskAcknowledgedAt: "2026-07-13T01:00:00.000Z",
+    });
     expect(guide.purpose).toBe("guide");
+    expect(guide.riskAcknowledgedAt).toBe("2026-07-13T01:00:00.000Z");
+    expect(guide.guidePolicy).toMatchObject({
+      strategy: "momentum-target",
+      takeProfitPct: 2,
+      stopLossPct: -1,
+      maxPositionPct: 50,
+      validityMinutes: 10,
+    });
   });
 
   it("중지 — active→stopped, 남의 런은 null", async () => {
@@ -254,8 +266,8 @@ describe("respondToAutopilotGuide", () => {
     const guideId = `${detail.session.id}:${detail.ticks[0].id}:0`;
     const getDetail = async () => detail;
 
-    const first = await respondToAutopilotGuide(run.id, guideId, "performed", getDetail);
-    const second = await respondToAutopilotGuide(run.id, guideId, "performed", getDetail);
+    const first = await respondToAutopilotGuide(run.id, guideId, "performed", getDetail, GUIDE_NOW);
+    const second = await respondToAutopilotGuide(run.id, guideId, "performed", getDetail, GUIDE_NOW);
 
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
@@ -275,18 +287,44 @@ describe("respondToAutopilotGuide", () => {
     seedAutopilotRunForTest(run);
     const buy = guideDetail(run.id, "BUY");
     const buyId = `${buy.session.id}:${buy.ticks[0].id}:0`;
-    await respondToAutopilotGuide(run.id, buyId, "passed", async () => buy);
-    expect(await respondToAutopilotGuide(run.id, buyId, "performed", async () => buy)).toEqual({
+    await respondToAutopilotGuide(run.id, buyId, "passed", async () => buy, GUIDE_NOW);
+    expect(await respondToAutopilotGuide(run.id, buyId, "performed", async () => buy, GUIDE_NOW)).toEqual({
       ok: false,
       reason: "conflict",
     });
 
     const sell = guideDetail(run.id, "SELL");
     const sellId = `${sell.session.id}:${sell.ticks[0].id}:0`;
-    expect(await respondToAutopilotGuide(run.id, sellId, "performed", async () => sell)).toEqual({
+    expect(await respondToAutopilotGuide(run.id, sellId, "performed", async () => sell, GUIDE_NOW)).toEqual({
       ok: false,
       reason: "no_position",
     });
+  });
+
+  it("10분이 지난 가이드와 종료된 런의 응답을 원장에 기록하지 않는다", async () => {
+    const activeRun = makeRun({ purpose: "guide" });
+    seedAutopilotRunForTest(activeRun);
+    const source = guideDetail(activeRun.id, "BUY");
+    const guideId = `${source.session.id}:${source.ticks[0].id}:0`;
+
+    expect(await respondToAutopilotGuide(
+      activeRun.id,
+      guideId,
+      "performed",
+      async () => source,
+      new Date("2026-07-13T01:10:00.000Z"),
+    )).toEqual({ ok: false, reason: "expired" });
+    expect(activeRun.guideResponses).toBeUndefined();
+
+    const stoppedRun = makeRun({ id: "stopped-guide", purpose: "guide", status: "stopped" });
+    seedAutopilotRunForTest(stoppedRun);
+    expect(await respondToAutopilotGuide(
+      stoppedRun.id,
+      guideId,
+      "passed",
+      async () => guideDetail(stoppedRun.id, "BUY"),
+      GUIDE_NOW,
+    )).toEqual({ ok: false, reason: "inactive" });
   });
 });
 

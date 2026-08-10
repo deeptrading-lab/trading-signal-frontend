@@ -38,10 +38,21 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
         body.guideResponse.response,
       );
       if (!result.ok) {
-        const status = result.reason === "conflict" ? 409 : result.reason === "not_found" ? 404 : 422;
+        const status =
+          result.reason === "conflict" ||
+          result.reason === "expired" ||
+          result.reason === "inactive"
+            ? 409
+            : result.reason === "not_found"
+              ? 404
+              : 422;
         const error =
           result.reason === "conflict"
             ? "이미 다른 응답으로 확정된 가이드예요."
+            : result.reason === "expired"
+              ? "가이드 유효시간이 지났어요. 새 분석을 기다려 주세요."
+              : result.reason === "inactive"
+                ? "종료된 오늘 가이드에는 응답할 수 없어요."
             : result.reason === "no_position"
               ? "수행한 매수 기록이 없어 매도로 기록할 수 없어요."
               : result.reason === "not_found"
