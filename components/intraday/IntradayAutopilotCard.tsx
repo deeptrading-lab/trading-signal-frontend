@@ -532,7 +532,7 @@ function GuideWaitingCard({
         <BellRing className="size-5" aria-hidden />
       </span>
       <h3 className="mt-md text-body-lg font-bold text-text-strong">{C.waitingTitle}</h3>
-      <p className="mx-auto mt-xs max-w-2xl text-body-sm text-text-muted">
+      <p className="mx-auto mt-xs w-full max-w-[44rem] break-keep text-body-sm leading-relaxed text-text-muted">
         {loading ? C.waitingBody : body}
       </p>
       {summary ? (
