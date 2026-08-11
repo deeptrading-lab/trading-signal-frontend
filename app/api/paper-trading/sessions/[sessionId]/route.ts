@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireProdAdminApi } from "@/lib/server/auth/apiGuard";
 import {
+  getArchivedPaperTradingSessionDetail,
   getPaperTradingSessionDetail,
   patchPaperTradingSession,
 } from "@/lib/server/paperTrading/sessionStore";
@@ -19,7 +20,12 @@ export async function GET(request: NextRequest, context: RouteContext): Promise<
   if (denied) return denied;
 
   const { sessionId } = await context.params;
-  const payload = await getPaperTradingSessionDetail(sessionId);
+  // 인메모리 창(최근 20건) 밖 과거 세션은 Supabase 저장본에서 읽기 전용으로 복원한다 —
+  // 폴백을 `getPaperTradingSessionDetail` 안이 아니라 여기 두는 이유: 그 함수는 틱 실행·라벨링·
+  // 오토파일럿 경로도 호출하므로, 거기에 miss 마다 Supabase 왕복을 얹지 않는다.
+  const payload =
+    (await getPaperTradingSessionDetail(sessionId)) ??
+    (await getArchivedPaperTradingSessionDetail(sessionId));
   if (!payload) {
     return NextResponse.json({ error: "모의투자 세션을 찾지 못했어요." }, { status: 404 });
   }

@@ -17,6 +17,42 @@ vi.mock("@/lib/server/ai/agentCli", () => ({
 vi.mock("@/lib/api/toss/warnings", () => ({
   fetchActiveWarnings: vi.fn(async () => []),
 }));
+/**
+ * 오답노트 메모리는 **고정 픽스처**로 주입한다.
+ *
+ * 예전엔 실제 `packages/intraday-mistake-note/CM.md` 를 읽었는데, 규칙에는 `UNTIL`(SHADOW=소스일
+ * +14일)이 있어 그 날짜가 지나는 순간 규칙이 전부 걸러져 이 테스트들이 **시간이 지나 조용히
+ * 깨졌다**(실제로 2026-08-05 부터 4건 실패). 선택·해시·문자예산 로직은 실물을 그대로 태우고
+ * 파일·벽시계 의존만 끊는다.
+ */
+const memoryFixture = vi.hoisted(() => ({
+  markdown: [
+    "# fixture",
+    "updated:2026-07-22T00:00:00.000Z | objective:test",
+    "source-through:2026-07-21",
+    "<!-- AI_CONTEXT_START -->",
+    "- S:SHADOW | R:AI-4EC46D87 | T:ENTRY | IF:저항근접+돌파확인전 | DO:재확인 대기 | AVOID:즉시진입 | E:d=1,n=3,tr=7,W/L=1/6,net=-47524 | UNTIL:2026-08-04 | kw:저항,거래량",
+    "- S:SHADOW | R:AI-7563C592 | T:REENTRY | IF:손절후 재진입 | DO:구조이벤트 확인 전 보류 | AVOID:점수만 재충족한 반복진입 | E:d=1,n=2,tr=7,W/L=1/6,net=-47524 | UNTIL:2026-08-04 | kw:재진입,손절후",
+    "- S:SHADOW | R:AI-FA2B6DEA | T:EXIT | IF:보유중 흐름둔화 | DO:선제청산 재평가 | AVOID:스톱 의존 | E:d=1,n=3,tr=7,W/L=1/6,net=-47524 | UNTIL:2026-08-04 | kw:선제청산,스톱의존",
+    "<!-- AI_CONTEXT_END -->",
+  ].join("\n"),
+  /** UNTIL 경계 이내 고정일 — 실제 오늘과 무관하게 규칙이 항상 살아 있다. */
+  today: "2026-07-22",
+}));
+vi.mock("@/lib/server/paperTrading/mistakeNoteContext", async () => {
+  const { buildRuntimeMemorySnapshot } = await import(
+    "@/packages/intraday-mistake-note/src/memory"
+  );
+  const snapshot = (scopes: string[] = []) =>
+    buildRuntimeMemorySnapshot(memoryFixture.markdown, scopes, 1, 160, memoryFixture.today);
+  return {
+    loadMistakeNoteSnapshot: vi.fn(async (scopes: string[] = []) => snapshot(scopes)),
+    loadMistakeNoteContext: vi.fn(async (scopes: string[] = []) => snapshot(scopes).context),
+    buildMistakeNoteContext: (markdown: string, scopes: string[] = []) =>
+      buildRuntimeMemorySnapshot(markdown, scopes, 1, 160, memoryFixture.today).context,
+    resetMistakeNoteContextCacheForTest: vi.fn(),
+  };
+});
 // 시그널만 스텁(레벨·컨텍스트·프로파일은 실물) — "신호 BUY 인데 judge 실패" 시나리오 구성용.
 vi.mock("@/lib/signal/intradayProfile", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/signal/intradayProfile")>();

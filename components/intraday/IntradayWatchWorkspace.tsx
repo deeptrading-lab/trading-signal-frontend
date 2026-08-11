@@ -19,19 +19,25 @@ import { useQueryVolumeRank } from "@/hooks/market/useQueryVolumeRank";
 import { useQueryWatchlist } from "@/hooks/watchlist/useQueryWatchlist";
 import { useQueryStockWarningsBatch } from "@/hooks/stock/useQueryStockWarningsBatch";
 import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
-import { useIntradayPaperWatch } from "@/hooks/intraday/useIntradayPaperWatch";
-import { useIntradayPaperRefresh } from "@/hooks/intraday/useIntradayPaperRefresh";
+import {
+  filterPastSessions,
+  useIntradayPaperWatch,
+} from "@/hooks/intraday/useIntradayPaperWatch";
+import { useIntradayPastSessions } from "@/hooks/intraday/useIntradayPastSessions";
 import {
   IntradayWatchTable,
   groupWatchItemsByDate,
+  watchRowKey,
   type WatchDateGroup,
+  type WatchItem,
 } from "@/components/intraday/IntradayWatchTable";
 import { IntradayAutopilotCard } from "@/components/intraday/IntradayAutopilotCard";
 import { IntradayCalibrationPanel } from "@/components/intraday/IntradayCalibrationPanel";
 import { IntradayResearchAutopilotCard } from "@/components/intraday/IntradayResearchAutopilotCard";
-import { BookOpenCheck, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { BookOpenCheck, ChevronDown, Loader2, SlidersHorizontal } from "lucide-react";
 import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { todayKstDate } from "@/lib/api/toss/kst";
+import { isKstMarketHoursWithCloseGrace } from "@/lib/utils/kstMarketHours";
 import {
   INTRADAY_PAPER_COPY as P,
   INTRADAY_WATCH_COPY as W,
@@ -40,7 +46,14 @@ import type { InvestorFlowRow } from "@/lib/types/flow/top10";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
-export type Watch = { ticker: string; name: string };
+/** 과거 내역 섹션 카피 — 인라인 문구 금지(lib/copy SSOT). */
+const PAST = P.past;
+
+/**
+ * 표 행 — 오늘 워치(rowKey 없음 = ticker 기준)와 과거 세션 행(rowKey = 세션 id)을 겸한다.
+ * localStorage 에는 오늘 워치만 저장되고 rowKey 는 optional 이라 라운드트립에 영향 없음.
+ */
+export type Watch = WatchItem;
 
 /** 티커별 활성 경보 맵(빈 맵이면 전부 미표시) — 배치 훅 결과 fail-soft 기본. */
 type WarningsByTicker = Record<string, StockWarningItem[]>;
@@ -98,19 +111,26 @@ function sessionWatch(session: PaperTradingSession): Watch {
   };
 }
 
+/**
+ * 과거 세션 → 표 행. **세션 1건 = 1행**(행 식별자 = 세션 id).
+ *
+ * 예전에는 ticker 를 행 정체성으로 써서 같은 종목의 옛 날짜 세션이 통째로 삼켜졌다(종목당 최신 1건만
+ * 남아 과거 날짜 그룹이 사라지던 원인). 날짜+티커 대신 세션 id 를 쓰는 이유는, 같은 날 같은 종목
+ * 세션이 둘이면 날짜 그룹 합산 손익에서 한 건이 조용히 빠지기 때문이다.
+ */
 export function buildPastSessionRows(sessions: PaperTradingSession[]): {
   rows: Watch[];
-  sessionByTicker: Map<string, PaperTradingSession>;
+  sessionByRowKey: Map<string, PaperTradingSession>;
 } {
   const rows: Watch[] = [];
-  const sessionByTicker = new Map<string, PaperTradingSession>();
+  const sessionByRowKey = new Map<string, PaperTradingSession>();
   for (const session of sessions) {
     const stock = sessionWatch(session);
-    if (!stock.ticker || sessionByTicker.has(stock.ticker)) continue;
-    rows.push(stock);
-    sessionByTicker.set(stock.ticker, session);
+    if (!stock.ticker || sessionByRowKey.has(session.id)) continue;
+    rows.push({ ...stock, rowKey: session.id });
+    sessionByRowKey.set(session.id, session);
   }
-  return { rows, sessionByTicker };
+  return { rows, sessionByRowKey };
 }
 
 /**
@@ -192,14 +212,17 @@ export function IntradayWatchWorkspace() {
   const {
     sessionByTicker,
     todaySessionStocks,
-    pastSessions,
     runningSessionIds,
     currentOperator,
     start,
   } = useIntradayPaperWatch();
-  // 틱은 서버 스케줄러가 전담 — 여기선 화면 데이터만 30초 주기로 따라온다.
-  useIntradayPaperRefresh(runningSessionIds);
-  const autoActive = runningSessionIds.length > 0;
+  // 과거 내역은 인메모리 원장(최근 20건)이 아니라 Supabase 원장을 페이지 단위로 읽는다 —
+  // "더 보기"로 과거 전체를 볼 수 있다(intraday-history-pagination).
+  const pastHistory = useIntradayPastSessions();
+  // 화면 갱신은 각 쿼리 훅의 refetchInterval 이 담당한다(intraday-live-refresh) — 세션 목록은
+  // 실행 중 세션 유무와 무관하게 항상 폴링해야 새 세션(오토파일럿 스윕·타 서버)을 발견할 수 있다.
+  // 15:40 이후엔 자동 완료 스윕 전까지 배지가 켜져 있던 것을 시각 게이트로 정리.
+  const autoActive = runningSessionIds.length > 0 && isKstMarketHoursWithCloseGrace();
 
   // 표 행 = 오늘 로컬 워치 ∪ 오늘 cli-agent 세션. 이전 날짜 세션은 히스토리이지 오늘 구성 목록이
   // 아니므로 자동 편입하지 않는다. 다른 브라우저에서 오늘 시작한 세션만 이름순으로 뒤에 보존한다.
@@ -213,6 +236,13 @@ export function IntradayWatchWorkspace() {
     return [...map.values()];
   }, [watch, todaySessionStocks]);
 
+  // 오늘 제외는 서버가 이미 했다(startedBefore = 오늘 00:00 KST). 여기서 한 번 더 거르는 건
+  // 자정 롤오버 방어용 — todayKey 는 마운트 시점 고정이라 자정을 넘겨 열어둔 화면에서 서버가
+  // 새 "오늘"을 넘겨줄 수 있다. 이미 걸러진 목록이라 보통은 아무것도 제거하지 않는다.
+  const pastSessions = useMemo(
+    () => filterPastSessions(pastHistory.sessions, todayKey),
+    [pastHistory.sessions, todayKey],
+  );
   const pastView = useMemo(() => buildPastSessionRows(pastSessions), [pastSessions]);
 
   // "내 세션만" 대상이 있는지 — 다른 운영자 소유 세션이 하나라도 있을 때만 토글을 노출(단독 운영 시 무노출).
@@ -220,7 +250,7 @@ export function IntradayWatchWorkspace() {
     () =>
       rows.some((r) => isForeignOwnedSession(sessionByTicker.get(r.ticker), currentOperator)) ||
       pastView.rows.some((r) =>
-        isForeignOwnedSession(pastView.sessionByTicker.get(r.ticker), currentOperator),
+        isForeignOwnedSession(pastView.sessionByRowKey.get(watchRowKey(r)), currentOperator),
       ),
     [rows, sessionByTicker, pastView, currentOperator],
   );
@@ -240,9 +270,9 @@ export function IntradayWatchWorkspace() {
     if (!mineOnly) return pastView;
     return {
       rows: pastView.rows.filter(
-        (r) => !isForeignOwnedSession(pastView.sessionByTicker.get(r.ticker), currentOperator),
+        (r) => !isForeignOwnedSession(pastView.sessionByRowKey.get(watchRowKey(r)), currentOperator),
       ),
-      sessionByTicker: pastView.sessionByTicker,
+      sessionByRowKey: pastView.sessionByRowKey,
     };
   }, [pastView, mineOnly, currentOperator]);
 
@@ -257,7 +287,7 @@ export function IntradayWatchWorkspace() {
   // 과거 표 — 세션 시작일(KST) 기준 날짜 그룹. 기본은 가장 최근 과거 날짜 하나만 펼침(표와 동일 규칙).
   // 펼침 상태를 여기서 소유해야 "펼친 그룹만 시세 조회" 를 계산할 수 있어 표를 controlled 로 쓴다.
   const pastGroups = useMemo(
-    () => groupWatchItemsByDate(visiblePastView.rows, visiblePastView.sessionByTicker, todayKey),
+    () => groupWatchItemsByDate(visiblePastView.rows, visiblePastView.sessionByRowKey, todayKey),
     [visiblePastView, todayKey],
   );
   const pastMostRecentKey = pastGroups[0]?.dateKey;
@@ -340,7 +370,10 @@ export function IntradayWatchWorkspace() {
       {/* 오늘 가이드 상품 — 시작·현재 행동·수행 원장이 첫 번째 시각 위계. */}
       <IntradayAutopilotCard />
 
-      <details className="group rounded-xl border border-border-line bg-surface-base">
+      {/* 기본 펼침(사용자 지정) — 세션 표가 이 안에 있어 접혀 있으면 매번 열어야 했다.
+          비제어 <details> 라 사용자가 접으면 접힌 채로 남는다: React 는 `open` prop 값이 바뀔 때만
+          DOM 을 다시 쓰므로 폴링 재렌더가 접은 패널을 다시 열지 않는다. */}
+      <details open className="group rounded-xl border border-border-line bg-surface-base">
         <summary className="flex cursor-pointer list-none items-center gap-sm p-lg text-body-md font-bold text-text-strong marker:hidden">
           <SlidersHorizontal className="size-5 text-text-muted" aria-hidden />
           직접 분석 도구
@@ -418,7 +451,7 @@ export function IntradayWatchWorkspace() {
             items={visibleRows}
             quotes={todayQuotes}
             quotesLoading={todayQuotesLoading}
-            sessionByTicker={sessionByTicker}
+            sessionByRowKey={sessionByTicker}
             warningsByTicker={warningsByTicker}
             currentOperator={currentOperator}
             selectedTicker={selectedTicker}
@@ -429,19 +462,47 @@ export function IntradayWatchWorkspace() {
         </>
       )}
 
-      {visiblePastView.rows.length > 0 ? (
-        <section className="flex flex-col gap-sm" aria-label="과거 모의투자 내역">
-          <div className="flex items-baseline justify-between gap-md">
-            <h2 className="text-body-md font-bold text-text-strong">과거 모의투자 내역</h2>
-            <span className="text-caption text-text-muted">
-              오늘 목록에는 영향을 주지 않아요
-            </span>
+      {/* 과거 모의투자 내역 — Supabase 원장 페이지네이션. 첫 페이지가 비어도 "저장소 꺼짐"·에러는
+          구분해 알린다(빈 내역으로 위장하지 않음). 더 보기로 들어온 날짜 그룹은 접힌 채 도착하므로
+          시세·경보·상세 요청이 페이징만으로는 늘지 않는다. */}
+      <section className="flex flex-col gap-sm" aria-label={PAST.title}>
+        <div className="flex items-baseline justify-between gap-md">
+          <h2 className="text-body-md font-bold text-text-strong">{PAST.title}</h2>
+          <span className="text-caption text-text-muted">{PAST.hint}</span>
+        </div>
+
+        {pastHistory.isLoading ? (
+          <p className="text-caption text-text-muted">{PAST.loading}</p>
+        ) : null}
+
+        {pastHistory.isError ? (
+          <div className="flex items-center gap-sm">
+            <p className="text-caption text-signal-down" role="alert">
+              {PAST.error}
+            </p>
+            <button
+              type="button"
+              onClick={pastHistory.retry}
+              className="text-caption text-accent-vivid transition-colors hover:text-text-strong cursor-pointer"
+            >
+              {PAST.retry}
+            </button>
           </div>
+        ) : null}
+
+        {!pastHistory.isLoading && !pastHistory.isError && visiblePastView.rows.length === 0 ? (
+          <p className="text-caption text-text-muted">
+            {pastHistory.configured ? PAST.empty : PAST.disabled}
+          </p>
+        ) : null}
+
+        {visiblePastView.rows.length > 0 ? (
           <IntradayWatchTable
             items={visiblePastView.rows}
             quotes={pastQuotes}
             quotesLoading={pastQuotesLoading}
-            sessionByTicker={visiblePastView.sessionByTicker}
+            sessionByRowKey={visiblePastView.sessionByRowKey}
+            historyMode
             warningsByTicker={warningsByTicker}
             currentOperator={currentOperator}
             expandedDateKeys={expandedPastDateKeys}
@@ -450,8 +511,32 @@ export function IntradayWatchWorkspace() {
             onStart={start}
             onRemove={() => undefined}
           />
-        </section>
-      ) : null}
+        ) : null}
+
+        {/* 더 보기 — 렌더된 행 수와 무관하게 hasMore 면 노출한다("내 세션만" 이 한 페이지를 통째로
+            걸러내도 다음 페이지로 넘어갈 수 있어야 한다). */}
+        {pastHistory.hasMore && !pastHistory.isError ? (
+          <button
+            type="button"
+            onClick={pastHistory.loadMore}
+            disabled={pastHistory.isLoadingMore}
+            className="button-secondary self-center inline-flex items-center gap-xs"
+          >
+            {pastHistory.isLoadingMore ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                {PAST.loadingMore}
+              </>
+            ) : (
+              PAST.more
+            )}
+          </button>
+        ) : null}
+
+        {!pastHistory.hasMore && !pastHistory.isError && visiblePastView.rows.length > 0 ? (
+          <p className="self-center text-caption text-text-muted">{PAST.end}</p>
+        ) : null}
+      </section>
 
       {/* 판단 캘리브레이션(관리자) — 틱 자가채점 라벨 요약·백필 실행. 노출 규칙은 페이지와 동일. */}
       <IntradayCalibrationPanel />

@@ -8567,3 +8567,50 @@
   - [ ] 20거래일 rolling provider usage와 conviction 분포를 관찰해 prompt 비용 ≤5% 및 재압축 여부 확인
   - [ ] 최소 100 closed trades·20 ticker-days에서 D+1 OOS expectancy/PF/MDD 검증
   - [ ] 기준 충족 전 BUY 컷·포지션 비중·손절 한도 자동 상향 금지
+
+### 2026-08-10 — fix(intraday): 과거 내역 페이지네이션 + 실시간 갱신 교착 해소 + 표 버그 3종 (#382)
+
+- **slug**: `hylee/intraday-history-pagination` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/382
+- **요약**: fix(intraday): 과거 내역 페이지네이션 + 실시간 갱신 교착 해소 + 표 버그 3종
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > `/intraday` 에서 사용자가 실제로 겪은 3가지 + 그 과정에서 드러난 main red 를 함께 해소한다.
+  > 
+  > | | 증상 | 원인 |
+  > |---|---|---|
+  > | **BUG-1** | 종목 펼치면 표 컬럼이 흔들려 "무포지 션"·"5 분" 줄바꿈 | 전폭 `colSpan={13}` 셀이 auto 레이아웃 컬럼 폭 계산에 참여 |
+  > | **BUG-2** | 과거 내역이 하루치·종목당 1건만 보임 | 인메모리 창(20건)이 실질 상한 + 행 정체성이 ticker |
+  > | **BUG-3** | 오래된 세션 펼치면 상세 404 | 메모리 창 밖이면 `getPaperTradingSessionDetail` 이 null |
+  > | **BUG-4** | 단타 시작해도 새로고침 전엔 화면이 안 바뀜 | 폴링 **교착**(아래) |
+  > | **BUG-5** | main 테스트 5건 red | 오답노트 규칙 `UNTIL` 판정이 실제 벽시계 |
+  > 
+  > ### BUG-4 = 교착이었다
+  > 
+  > ```
+  > useIntradayPaperRefresh(runningSessionIds)   ← 페이지의 유일한 갱신 장치
+  >   if (ids.length === 0) return;              ← 실행 중 세션을 "이미 알아야" 타이머가 돈다
+  >         ↑                                                    │
+  >         └──────── 그 목록을 갱신하는 게 이 타이머다 ◄─────────┘
+  > ```
+  > 
+  > 폴러의 입력이 폴러의 산출물이라, 캐시된 목록이 비어 있으면 새 세션을 영영 발견하지 못한다.
+  > 오토파일럿이 특히 크게 물렸다 — POST 는 런만 만들고 **자식 세션은 60초 서버 스윕이 나중에** 만들어서,
+  > mutation 시점 무효화로는 발견이 구조적으로 불가능하고 지속 폴링만이 유일한 경로였다.
+  > 
+  > ## 변경
+  > 
+  > **과거 내역 페이지네이션 (서버)**
+  > - `GET /api/paper-trading/sessions/history` 신설 — limit/offset, `limit+1` 오버페치로 `hasMore` 판정(count 쿼리 0회), 오늘(KST) 제외를 서버가 `payload->>startedAt` 으로 처리. 미설정은 200 `configured:false`, 로드 실패는 502.
+  > - `getArchivedPaperTradingSessionDetail` — 메모리 창 밖 과거 세션 상세를 저장본에서 복원(5분 TTL 캐시).
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **⚠️ 오답노트 CM.md 재생성 필요(코드 아님)** — 규칙이 전부 `UNTIL:2026-08-04` 로 만료돼 **8/5부터 프로덕션 judge 에 오답노트가 빈 값으로 주입되고 있다**. `npm run intraday:notes:*` 로 재생성해야 기능이 되살아난다. 만료가 조용한 EMPTY 로 흡수되는 구조라 아무도 몰랐다 — 만료 전용 상태(EXPIRED)나 경고 로그를 붙이는 것도 후속 후보.
+  - 브라우저 육안 확인 2건: 네트워크 탭에서 `sessions` 가 실행 세션 0개일 때도 30초/2분 주기로 도는지, 오토파일럿 시작 후 새로고침 없이 자식 세션 행이 뜨는지.
+  - 자정 롤오버 — `todayKey` 가 마운트 시점 고정이라 탭을 자정 넘겨 열어두면 어제 세션이 "오늘" 그룹에 남는다. 교착과 무관해 이번 범위에서 뺐고, 고치면 날짜별 localStorage 워치 목록이 자정에 초기화되는 동작 변화가 따라붙는다.
+  - Vercel 상세 폴링 — `resolveServerOperator()` 가 램다 호스트명이라 모든 세션이 "남의 세션" 판정 → 상세마다 Supabase **증분** 왕복(`refreshForeignSessionTicks` 가 `afterTickIndex` 이후만 읽어 대부분 0행 응답). admin 게이트 1인 사용이라 수용했고, 문제 시 해법은 클라 분기가 아니라 그 함수에 TTL 추가.
+  - `positionsBySessionId` — 라우트가 만들고 훅이 노출하는데 컴포넌트 소비처가 0건이다. **쓸 거면** `mergeHistoryPages` 의 병합 비대칭(세션은 첫 페이지 유지, 포지션은 `Object.assign` 이라 마지막 페이지 승리)을 함께 맞추고, **안 쓸 거면 필드를 지우는 쪽**이 두 항목을 한 번에 없앤다.
+  - `payload->>startedAt` 이 NULL 인 행 확인 — PostgREST `lt` 필터는 NULL 을 제외하므로 그런 레거시 행이 있으면 과거 내역에서 영원히 안 보인다. 타입상 `startedAt: string` 이라 0건일 가능성이 높으니 **한 줄 조회로 확인만** 하면 항목이 소멸한다.
+  - 「다음 판단 예정」 둘째 줄 `aria-label` — 스크린리더에 컬럼 헤더(「최근 판단」) 다음으로 이어져 예정 시각을 과거 판단 시각으로 오독할 수 있다. `title` 은 SR·키보드에 전달되지 않는다. 폴리시 묶음에 태우면 충분.
+  - 아카이브 상세 캐시 FIFO — TTL 만료 후 재삽입 시 `Map` 이 기존 삽입 순서를 유지해 자주 보는 세션이 먼저 축출된다. 상한 50이라 실질 영향 없음(관찰 항목).

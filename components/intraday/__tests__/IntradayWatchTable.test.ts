@@ -3,7 +3,7 @@
  * 계산이 같은 그룹핑을 공유하므로(순수 함수), 날짜 그룹 경계·정렬·세션 없는 행 폴백을 고정한다.
  */
 import { describe, expect, it } from "vitest";
-import { groupWatchItemsByDate } from "@/components/intraday/IntradayWatchTable";
+import { groupWatchItemsByDate, watchRowKey } from "@/components/intraday/IntradayWatchTable";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 
 function session(id: string, startedAt: string): PaperTradingSession {
@@ -81,5 +81,33 @@ describe("groupWatchItemsByDate", () => {
       todayKey,
     );
     expect(groups.map((g) => g.dateKey)).toEqual(["2026-07-09", "2026-07-08"]);
+  });
+
+  it("rowKey 를 쓰면 같은 종목이 날짜별로 각각의 그룹에 남는다(과거 표)", () => {
+    // 과거 표는 세션 1건 = 1행 — 행 식별자가 세션 id 라 같은 종목이 두 날짜에 모두 나타난다.
+    const sessionByRowKey = new Map<string, PaperTradingSession>([
+      ["s-08", session("s-08", "2026-07-08T00:30:00.000Z")],
+      ["s-07", session("s-07", "2026-07-07T00:30:00.000Z")],
+    ]);
+    const items = [
+      { ticker: "005930", name: "삼성전자", rowKey: "s-08" },
+      { ticker: "005930", name: "삼성전자", rowKey: "s-07" },
+    ];
+
+    const groups = groupWatchItemsByDate(items, sessionByRowKey, todayKey);
+
+    expect(groups.map((g) => g.dateKey)).toEqual(["2026-07-08", "2026-07-07"]);
+    expect(groups[0].items.map(watchRowKey)).toEqual(["s-08"]);
+    expect(groups[1].items.map(watchRowKey)).toEqual(["s-07"]);
+  });
+});
+
+describe("watchRowKey", () => {
+  it("rowKey 가 없으면 ticker 로 폴백한다(오늘 표 기존 동작)", () => {
+    expect(watchRowKey({ ticker: "005930", name: "삼성전자" })).toBe("005930");
+  });
+
+  it("rowKey 가 있으면 그것을 쓴다(과거 표 = 세션 id)", () => {
+    expect(watchRowKey({ ticker: "005930", name: "삼성전자", rowKey: "s-1" })).toBe("s-1");
   });
 });

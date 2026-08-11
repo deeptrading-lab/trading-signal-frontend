@@ -41,7 +41,23 @@ function kstDateKey(iso: string | null | undefined): string | null {
   return new Date(ms).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 }
 
-export type WatchItem = { ticker: string; name: string };
+export type WatchItem = {
+  ticker: string;
+  name: string;
+  /**
+   * 행 식별자 — 미지정이면 ticker(오늘 표: 종목당 1행이라 기존 동작 그대로).
+   *
+   * 과거 표는 같은 종목이 날짜별로 여러 행이므로 세션 id 를 넣는다. 예전엔 행 정체성이 ticker 라
+   * 같은 종목의 옛 날짜 세션이 통째로 삼켜졌다(과거 내역에서 종목당 최신 1건만 보이던 원인).
+   * React key · 펼침 아코디언 · 세션 맵 키가 이 값을 쓰고, **시세·경보·선택은 계속 ticker 기준**이다.
+   */
+  rowKey?: string;
+};
+
+/** 행 식별자 해석 — 미지정이면 ticker 폴백(오늘 표 무회귀). */
+export function watchRowKey(item: WatchItem): string {
+  return item.rowKey ?? item.ticker;
+}
 
 /** 날짜 그룹 1개 — 세션 시작일(KST) 키 + 그 날 워치 행들. */
 export type WatchDateGroup = { dateKey: string; items: WatchItem[] };
@@ -52,12 +68,12 @@ export type WatchDateGroup = { dateKey: string; items: WatchItem[] };
  */
 export function groupWatchItemsByDate(
   items: WatchItem[],
-  sessionByTicker: Map<string, PaperTradingSession>,
+  sessionByRowKey: Map<string, PaperTradingSession>,
   todayKey: string,
 ): WatchDateGroup[] {
   const map = new Map<string, WatchItem[]>();
   for (const item of items) {
-    const session = sessionByTicker.get(item.ticker);
+    const session = sessionByRowKey.get(watchRowKey(item));
     const key = (session && kstDateKey(session.startedAt ?? session.createdAt)) || todayKey;
     const list = map.get(key) ?? [];
     list.push(item);
@@ -89,11 +105,11 @@ type DaySummary = {
 };
 function daySummary(
   items: WatchItem[],
-  sessionByTicker: Map<string, PaperTradingSession>,
+  sessionByRowKey: Map<string, PaperTradingSession>,
 ): DaySummary {
   let sessions = 0, wins = 0, losses = 0, running = 0, totalInit = 0, totalPnl = 0;
   for (const item of items) {
-    const s = sessionByTicker.get(item.ticker);
+    const s = sessionByRowKey.get(watchRowKey(item));
     if (!s) continue;
     sessions++;
     if (s.status === "running") running++;
@@ -152,7 +168,13 @@ export interface IntradayWatchTableProps {
    * 스켈레톤을 보여주기 위한 신호. 미제공이면 없는 시세는 곧장 "—".
    */
   quotesLoading?: boolean;
-  sessionByTicker: Map<string, PaperTradingSession>;
+  /** 행 식별자(`watchRowKey`) → 세션. 오늘 표는 ticker 키, 과거 표는 세션 id 키. */
+  sessionByRowKey: Map<string, PaperTradingSession>;
+  /**
+   * 과거(히스토리) 표인지 — 행이 접혀 있으면 세션 상세를 조회하지 않는다.
+   * 창 밖 과거 세션 상세는 Supabase 직독(틱 전량)이라, 그룹 하나가 N행이면 그만큼 판아웃된다.
+   */
+  historyMode?: boolean;
   /** 티커별 활성 매수 유의(경보·VI) — 빈 맵/미제공이면 칩 미표시(fail-soft). */
   warningsByTicker?: Record<string, StockWarningItem[]>;
   /**
@@ -184,7 +206,8 @@ export function IntradayWatchTable({
   items,
   quotes,
   quotesLoading = false,
-  sessionByTicker,
+  sessionByRowKey,
+  historyMode = false,
   warningsByTicker,
   currentOperator,
   selectedTicker,
@@ -204,8 +227,8 @@ export function IntradayWatchTable({
 
   // 세션 시작일 기준 날짜 그룹(최신 날짜 먼저). 세션 없는 워치 행(검색 추가)은 오늘 그룹으로.
   const groups = useMemo(
-    () => groupWatchItemsByDate(items, sessionByTicker, todayKey),
-    [items, sessionByTicker, todayKey],
+    () => groupWatchItemsByDate(items, sessionByRowKey, todayKey),
+    [items, sessionByRowKey, todayKey],
   );
 
   // 그룹 펼침 — controlled(상위 소유) 이면 넘어온 셋/콜백을, 아니면 표 내부 상태를 쓴다.
@@ -234,10 +257,12 @@ export function IntradayWatchTable({
 
   // 행 펼침 아코디언 — 표가 단일 소유(동시 1행). 행 내부 useState 였던 것을 승격해 펼침 패널의
   // 3초 폴링 중첩(N행×2본)을 구조적으로 1행×2본으로 상한(intraday-table-refactor).
+  // 키는 ticker 가 아니라 행 식별자(`watchRowKey`) — 과거 표에서 같은 종목의 다른 날짜 행이
+  // 함께 펼쳐지지 않게 한다.
   // 안정 콜백(useCallback + 함수형 업데이트) — memo 행의 props 동일성 유지.
-  const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
-  const handleExpandChange = useCallback((ticker: string, expanded: boolean) => {
-    setExpandedTicker((cur) => (expanded ? ticker : cur === ticker ? null : cur));
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const handleExpandChange = useCallback((rowKey: string, expanded: boolean) => {
+    setExpandedRowKey((cur) => (expanded ? rowKey : cur === rowKey ? null : cur));
   }, []);
 
   return (
@@ -270,7 +295,7 @@ export function IntradayWatchTable({
           {groups.map((g) => {
             const expanded = isExpanded(g.dateKey);
             const label = groupLabel(g.dateKey, todayKey, yesterdayKey);
-            const sum = daySummary(g.items, sessionByTicker);
+            const sum = daySummary(g.items, sessionByRowKey);
             return (
               <Fragment key={g.dateKey}>
                 {/* 날짜 그룹 헤더 — colSpan 전폭. 좌=접기토글+라벨+건수 / 우=당일 요약(합산 수익률·승/패·진행). */}
@@ -329,15 +354,16 @@ export function IntradayWatchTable({
                 {expanded &&
                   g.items.map((item) => (
                     <IntradayWatchRow
-                      key={item.ticker}
+                      key={watchRowKey(item)}
                       item={item}
                       quote={quotes.find((q) => q.ticker === item.ticker) ?? null}
                       quotesLoading={quotesLoading}
-                      session={sessionByTicker.get(item.ticker) ?? null}
+                      session={sessionByRowKey.get(watchRowKey(item)) ?? null}
                       warnings={warningsByTicker?.[item.ticker]}
                       currentOperator={currentOperator}
                       selected={selectedTicker === item.ticker}
-                      expanded={expandedTicker === item.ticker}
+                      expanded={expandedRowKey === watchRowKey(item)}
+                      historyMode={historyMode}
                       onExpandChange={handleExpandChange}
                       onSelect={onSelect}
                       onStart={onStart}

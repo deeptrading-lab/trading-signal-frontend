@@ -3,6 +3,7 @@ import type {
   CreatePaperTradingSessionRequest,
   CreatePaperTradingSessionResponse,
   CompletePaperTradingPortfolioResponse,
+  PaperTradingSessionHistoryResponse,
   PaperTradingSessionResponse,
   PaperTradingSessionsResponse,
   PatchPaperTradingSessionRequest,
@@ -21,6 +22,21 @@ export async function completePaperTradingPortfolio(
 export async function fetchPaperTradingSessions(): Promise<PaperTradingSessionsResponse> {
   const response = await httpClient.get<PaperTradingSessionsResponse>(
     "/paper-trading/sessions",
+  );
+  return response.data;
+}
+
+/**
+ * 과거 모의투자 내역 1페이지 — 인메모리 원장(최근 20건)이 아니라 Supabase 저장본을 직접 읽는다.
+ * 서버가 limit(상한 100)·offset(상한 5,000)을 clamp 하고, offset 상한에 닿으면 hasMore 를 내린다.
+ */
+export async function fetchPaperTradingSessionHistory(params: {
+  limit?: number;
+  offset: number;
+}): Promise<PaperTradingSessionHistoryResponse> {
+  const response = await httpClient.get<PaperTradingSessionHistoryResponse>(
+    "/paper-trading/sessions/history",
+    { params },
   );
   return response.data;
 }

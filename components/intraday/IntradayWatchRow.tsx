@@ -7,7 +7,7 @@
  *     memo 가 유효하려면 부모가 인라인 클로저 props 를 만들지 않아야 한다 — `onRemove` 는
  *     `(ticker) => void` 시그니처로 부모 콜백을 그대로 받는다.
  *   - **펼침 아코디언(상위 소유)**: 행 내부 useState 였던 `expanded` 를 표 레벨
- *     `expandedTicker` 로 승격 — 동시 펼침을 1행으로 상한해 펼침 패널(호가·체결강도 각
+ *     `expandedRowKey` 로 승격 — 동시 펼침을 1행으로 상한해 펼침 패널(호가·체결강도 각
  *     3초 폴링)의 N행 중첩 폴링을 구조적으로 차단한다(모바일 부하 완화, env 손잡이 없음).
  *
  * 전속 부품(다른 소비처 0): OwnerBadge · useFixedMenu/MenuPanel · IntervalSelect ·
@@ -33,6 +33,7 @@ import { StockWarningBadges } from "@/components/stock/StockWarningBadges";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { isPaperSessionStalled } from "@/lib/utils/paperTradingStale";
+import { paperNextTickState } from "@/lib/utils/paperTradingTick";
 import {
   INTRADAY_AUTOPILOT_COPY as A,
   INTRADAY_PAPER_COPY as P,
@@ -56,7 +57,7 @@ import {
 import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
-import type { WatchItem } from "@/components/intraday/IntradayWatchTable";
+import { watchRowKey, type WatchItem } from "@/components/intraday/IntradayWatchTable";
 
 /**
  * 분봉 미니차트 — recharts(~100KB gz)를 끌어오는 유일한 표 내 컴포넌트라 지연 로드
@@ -550,6 +551,26 @@ function stripeColor(
   return null;
 }
 
+/**
+ * 「최근 판단」 셀 둘째 줄 문구 — 다음 자동 판단 예정.
+ * `none`(세션 없음·완료)과 `stalled`(StatusPill 이 이미 "판단 끊김" 을 말함)은 비운다.
+ */
+function nextTickCellLabel(session: PaperTradingSession | null | undefined): string | null {
+  const state = paperNextTickState(session);
+  switch (state.kind) {
+    case "scheduled":
+      return T.nextTick(state.hhmm);
+    case "due":
+      return T.nextTickDue;
+    case "paused":
+      return T.nextTickPaused;
+    case "closed":
+      return T.nextTickClosed;
+    default:
+      return null;
+  }
+}
+
 /** 좌측 상태 스트라이프 — 첫 셀(relative) 안 absolute 세로 바. 펼침 행에도 같은 색으로 이어 붙인다. */
 function StatusStripe({ color }: { color: string | null }) {
   if (!color) return null;
@@ -570,12 +591,20 @@ export interface IntradayWatchRowProps {
   currentOperator?: string;
   selected?: boolean;
   /**
-   * 펼침(아코디언) — 표가 `expandedTicker` 단일 상태로 소유. 동시 펼침 1행 상한이라 펼침
+   * 펼침(아코디언) — 표가 `expandedRowKey` 단일 상태로 소유. 동시 펼침 1행 상한이라 펼침
    * 패널의 3초 폴링(호가+체결강도)이 최대 2본을 넘지 않는다(intraday-table-refactor).
    */
   expanded: boolean;
-  /** 펼침 변경 요청 — (ticker, 원하는 상태). 표의 안정 콜백(useCallback)이라 memo 를 깨지 않는다. */
-  onExpandChange: (ticker: string, expanded: boolean) => void;
+  /**
+   * 과거(히스토리) 행 — **접혀 있으면 세션 상세를 조회하지 않는다**.
+   *
+   * 인메모리 창 밖 과거 세션 상세는 Supabase 직독(그 세션 틱 전량)이라, 날짜 그룹 하나가 N행이면
+   * 접힌 채로 N배 판아웃된다. 대신 접힌 과거 행의 「최근 판단」은 "—" 로 남는다 — 창 밖 과거 행은
+   * 지금도 상세가 없어 같은 화면이므로 퇴행은 아니다. 수익률·평가금액·투자금은 세션 payload 에서 온다.
+   */
+  historyMode?: boolean;
+  /** 펼침 변경 요청 — (행 식별자, 원하는 상태). 표의 안정 콜백(useCallback)이라 memo 를 깨지 않는다. */
+  onExpandChange: (rowKey: string, expanded: boolean) => void;
   onSelect?: (ticker: string) => void;
   onStart: (
     stock: PaperTradingSelectedStock,
@@ -596,11 +625,15 @@ function WatchRow({
   currentOperator,
   selected,
   expanded,
+  historyMode = false,
   onExpandChange,
   onSelect,
   onStart,
   onRemove,
 }: IntradayWatchRowProps) {
+  // 행 식별자 — 오늘 표는 ticker, 과거 표는 세션 id. 펼침 아코디언 키로만 쓴다
+  // (시세·경보·선택·차트/호가 패널은 계속 item.ticker).
+  const rowKey = watchRowKey(item);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cash, setCash] = useState(formatKrwInput("10000000"));
   const [intervalMin, setIntervalMin] = useState(DEFAULT_INTERVAL_MIN);
@@ -615,7 +648,11 @@ function WatchRow({
   const [tab, setTab] = useState<"chart" | "orders">("orders");
 
   // sessionId "" 이면 쿼리 자동 비활성(useQueryPaperTradingSession enabled 가드) — 조건부 훅 회피.
-  const { detail, isPatching, setStatus, setInterval } = usePaperTradingSession(session?.id ?? "");
+  // 과거 행은 펼쳤을 때만 조회한다(historyMode) — 창 밖 과거 세션 상세는 Supabase 직독 + 틱 전량이라
+  // 접힌 행까지 부르면 날짜 그룹 크기만큼 판아웃된다.
+  const { detail, isPatching, setStatus, setInterval } = usePaperTradingSession(
+    historyMode && !expanded ? "" : session?.id ?? "",
+  );
   const { data: providers } = useQueryAIProviders();
   const read = useMutationIntradayRead();
   const provider = providers?.available[0];
@@ -630,6 +667,9 @@ function WatchRow({
   // 지금 돌고 있는 세션. 완료 세션은 당일 성과 비교 대상이라 디밍하지 않는다.
   const stripe = stripeColor(current?.status, stalled);
   const dimmed = current?.status === "paused";
+  // 다음 자동 판단 예정 — 5분 주기 사이의 "멈춰 보임" 해소. stalled 는 StatusPill 이 이미 알리므로
+  // 여기선 비운다(중복 문구 방지). 상대 표기 대신 절대 시각인 이유는 helper 주석 참고.
+  const nextTickLabel = nextTickCellLabel(current);
   // 체결 전체(시간순) — 차트 탭 마커용. 미니 로그는 최근 5건(최신 위), 전체·손익 합계는 시트.
   // rationale 은 틱 레벨 판단 메모 — 체결별 "왜 샀/팔았나"를 미니 로그 우측에 보여준다.
   const allOrders = (detail?.ticks ?? []).flatMap((tick) =>
@@ -647,14 +687,14 @@ function WatchRow({
   const runRead = () => {
     if (!provider || read.isPending) return;
     read.mutate({ ticker: item.ticker, provider });
-    onExpandChange(item.ticker, true);
+    onExpandChange(rowKey, true);
   };
 
   async function handleStart() {
     const amount = Number(cash.replace(/[^0-9]/g, ""));
     if (!Number.isFinite(amount) || amount <= 0) {
       setStartError(P.cashInvalid);
-      onExpandChange(item.ticker, true);
+      onExpandChange(rowKey, true);
       return;
     }
     setStartError(null);
@@ -663,7 +703,7 @@ function WatchRow({
       await onStart({ ticker: item.ticker, name: item.name }, amount, intervalMin, hardStopPct);
     } catch (err) {
       setStartError(isApiError(err) ? err.message : P.error);
-      onExpandChange(item.ticker, true);
+      onExpandChange(rowKey, true);
     } finally {
       setStarting(false);
     }
@@ -675,7 +715,7 @@ function WatchRow({
         {...ROW_ENTER}
         onClick={() => {
           onSelect?.(item.ticker);
-          onExpandChange(item.ticker, !expanded);
+          onExpandChange(rowKey, !expanded);
         }}
         className={cn(
           "cursor-pointer border-t border-border-line transition-colors hover:bg-surface-muted",
@@ -749,7 +789,9 @@ function WatchRow({
         >
           {current ? formatMoney(current.portfolioValue) : T.none}
         </td>
-        <td className="py-sm pr-md text-right tabular-nums text-text-muted">
+        {/* 포지션·주기·손절 같은 짧은 라벨은 컬럼이 좁아져도 줄바꿈되지 않게 nowrap — 좁으면 표가
+            가로 스크롤(표 셸 정책)로 흡수한다. */}
+        <td className="py-sm pr-md text-right tabular-nums whitespace-nowrap text-text-muted">
           {current ? (position ? `${position.quantity}주` : P.positionNone) : T.none}
         </td>
         <td className="py-sm pr-md text-text-muted">
@@ -761,6 +803,17 @@ function WatchRow({
           ) : (
             T.none
           )}
+          {/* 다음 판단 예정 — 판단이 5분 주기라 그 사이엔 표가 멈춘 것처럼 보인다(사용자 지적).
+              별도 컬럼 대신 같은 셀 둘째 줄: "최근 판단 / 다음 판단" 은 한 덩어리이고, 컬럼을
+              늘리면 헤더 + colSpan={13} 2곳을 함께 고쳐야 한다. */}
+          {nextTickLabel ? (
+            <span
+              className="block whitespace-nowrap text-caption tabular-nums text-text-muted"
+              title={T.nextTickTitle}
+            >
+              {nextTickLabel}
+            </span>
+          ) : null}
         </td>
 
         {/* 모의 투자금 — 미시작이면 input, 시작 후엔 시작 투자금 표시 */}
@@ -774,7 +827,7 @@ function WatchRow({
 
         {/* 판단 주기 — 미시작=드랍다운(시작값) / 진행·일시정지=드랍다운(세션 중 변경, 다음 틱부터 반영)
             / 완료=정적 텍스트. 변경 중(isPatching)엔 비활성. */}
-        <td className="py-sm pr-md text-center">
+        <td className="py-sm pr-md text-center whitespace-nowrap">
           {current ? (
             current.status === "completed" ? (
               <span className="tabular-nums text-text-muted">{current.tickIntervalMinutes}분</span>
@@ -791,7 +844,7 @@ function WatchRow({
         </td>
 
         {/* 손절 상한(포지션 하드스톱) — 미시작=셀렉트(끄기 시 경고), 진행/완료=설정값 정적 표시 */}
-        <td className="py-sm pr-md text-center">
+        <td className="py-sm pr-md text-center whitespace-nowrap">
           {current ? (
             <span
               className={cn(
@@ -930,7 +983,7 @@ function WatchRow({
               aria-expanded={expanded}
               onClick={(e) => {
                 e.stopPropagation();
-                onExpandChange(item.ticker, !expanded);
+                onExpandChange(rowKey, !expanded);
               }}
               onKeyDown={(e) => e.stopPropagation()}
             >
@@ -948,132 +1001,138 @@ function WatchRow({
         <tr className="border-t border-border-line">
           <td colSpan={13} className="relative bg-surface-muted px-lg py-md">
             <StatusStripe color={stripe} />
-            <div className="flex flex-col gap-sm">
-              {startError ? (
-                <p className="text-caption text-signal-down" role="alert">
-                  {startError}
-                </p>
-              ) : null}
-              {!provider ? <p className="text-caption text-text-muted">{C.localOnly}</p> : null}
-              {read.isPending ? (
-                <p className="text-caption text-text-muted">
-                  {C.loading} {C.loadingHint}
-                </p>
-              ) : null}
-              {read.isError ? (
-                <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
-              ) : null}
-              {read.data ? <IntradayReadCard data={read.data} /> : null}
+            {/* ⚠️ 전폭 colSpan 셀은 auto 레이아웃 표의 컬럼 폭 계산에 끼어든다(펼침 순간 판단 근거 같은
+                긴 텍스트가 13컬럼에 분배돼 다른 행까지 "무포지션"·"5분" 이 줄바꿈되며 표가 흔들림).
+                `w-0` 로 셀의 고유 폭 기여를 0 으로 만들고 `min-w-full` 로 실제 렌더 폭만 되돌린다 —
+                펼쳐도 컬럼 폭은 접힘 상태 그대로. */}
+            <div className="w-0 min-w-full">
+              <div className="flex flex-col gap-sm">
+                {startError ? (
+                  <p className="text-caption text-signal-down" role="alert">
+                    {startError}
+                  </p>
+                ) : null}
+                {!provider ? <p className="text-caption text-text-muted">{C.localOnly}</p> : null}
+                {read.isPending ? (
+                  <p className="text-caption text-text-muted">
+                    {C.loading} {C.loadingHint}
+                  </p>
+                ) : null}
+                {read.isError ? (
+                  <p className="text-caption text-signal-down">{read.error?.message ?? C.error}</p>
+                ) : null}
+                {read.data ? <IntradayReadCard data={read.data} /> : null}
 
-              {/* 왜 이런 판단 — 최근 판단 근거 메모(탭 공통 상단) */}
-              {current && lastTick ? (
-                <p className="text-caption text-text-muted">
-                  {P.lastDecision}: {lastTick.rationale}
-                </p>
-              ) : null}
+                {/* 왜 이런 판단 — 최근 판단 근거 메모(탭 공통 상단) */}
+                {current && lastTick ? (
+                  <p className="text-caption text-text-muted">
+                    {P.lastDecision}: {lastTick.rationale}
+                  </p>
+                ) : null}
 
-              {/* 펼침 탭 — 체결 내역 | 차트 (체결 내역 기본, 사용자 지정 순서) */}
-              <div className="flex items-center gap-md border-b border-border-line" role="tablist">
-                {(["orders", "chart"] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === key}
-                    className={cn(
-                      "-mb-px cursor-pointer border-b-2 pb-xs text-body-sm transition-colors",
-                      tab === key
-                        ? "border-accent-vivid font-medium text-text-strong"
-                        : "border-transparent text-text-muted hover:text-text-strong",
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTab(key);
-                    }}
-                  >
-                    {key === "chart" ? T.tabChart : T.tabOrders}
-                  </button>
-                ))}
-              </div>
+                {/* 펼침 탭 — 체결 내역 | 차트 (체결 내역 기본, 사용자 지정 순서) */}
+                <div className="flex items-center gap-md border-b border-border-line" role="tablist">
+                  {(["orders", "chart"] as const).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === key}
+                      className={cn(
+                        "-mb-px cursor-pointer border-b-2 pb-xs text-body-sm transition-colors",
+                        tab === key
+                          ? "border-accent-vivid font-medium text-text-strong"
+                          : "border-transparent text-text-muted hover:text-text-strong",
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTab(key);
+                      }}
+                    >
+                      {key === "chart" ? T.tabChart : T.tabOrders}
+                    </button>
+                  ))}
+                </div>
 
-              {tab === "chart" ? (
-                <div className="flex flex-col gap-md">
-                  <IntradayMiniChart
-                    ticker={item.ticker}
-                    timeframe={chartTimeframe}
-                    orders={allOrders.map((order) => ({
-                      at: order.at,
-                      price: order.price,
-                      side: order.side,
-                    }))}
-                  />
-                  {/* 차트 밑 — 호가창(좌) + 체결강도(우). 종목 펼침 시에만 렌더돼 폴링도 그때만(사용자 배치).
-                      아코디언(동시 펼침 1행)이라 이 3초 폴링 쌍은 전체 표에서 최대 1쌍. */}
-                  <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
-                    <OrderbookPanel ticker={item.ticker} variant="compact" />
-                    <TradeStrengthPanel ticker={item.ticker} variant="compact" />
+                {tab === "chart" ? (
+                  <div className="flex flex-col gap-md">
+                    <IntradayMiniChart
+                      ticker={item.ticker}
+                      timeframe={chartTimeframe}
+                      orders={allOrders.map((order) => ({
+                        at: order.at,
+                        price: order.price,
+                        side: order.side,
+                      }))}
+                    />
+                    {/* 차트 밑 — 호가창(좌) + 체결강도(우). 종목 펼침 시에만 렌더돼 폴링도 그때만(사용자 배치).
+                        아코디언(동시 펼침 1행)이라 이 3초 폴링 쌍은 전체 표에서 최대 1쌍. */}
+                    <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
+                      <OrderbookPanel ticker={item.ticker} variant="compact" />
+                      <TradeStrengthPanel ticker={item.ticker} variant="compact" />
+                    </div>
                   </div>
-                </div>
-              ) : !current ? (
-                <p className="text-caption text-text-muted">{T.ordersNoSession}</p>
-              ) : (
-                <div className="flex flex-col gap-xs">
-                  {/* 미니 체결 로그 — 최근 5건(전체·손익 합계는 행의 체결 내역 아이콘) */}
-                  {recentOrders.length === 0 ? (
-                    <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
-                  ) : (
-                    // 보이지 않는 그리드 정렬 — ul 이 5트랙(시각·구분·수량×가격·손익·메모)을 소유하고
-                    // 각 li 가 subgrid 로 트랙을 공유해, 행마다 팩트 폭이 달라도 컬럼이 딱 맞는다.
-                    // 손익 셀은 null 이어도 자리를 차지(빈 span)해 메모 트랙이 밀리지 않는다.
-                    <ul className="grid grid-cols-[auto_auto_auto_auto_1fr] gap-x-md gap-y-xs text-body-sm tabular-nums">
-                      {recentOrders.map((order, index) => (
-                        <li
-                          key={`${order.at}-${index}`}
-                          className="col-span-full grid grid-cols-subgrid items-baseline"
-                        >
-                          <span className="whitespace-nowrap text-text-muted">
-                            {kstHhmm(order.at)}
-                          </span>
-                          <span
-                            className={cn(
-                              "whitespace-nowrap font-medium",
-                              order.side === "BUY" ? "text-signal-up" : "text-signal-down",
-                            )}
+                ) : !current ? (
+                  <p className="text-caption text-text-muted">{T.ordersNoSession}</p>
+                ) : (
+                  <div className="flex flex-col gap-xs">
+                    {/* 미니 체결 로그 — 최근 5건(전체·손익 합계는 행의 체결 내역 아이콘) */}
+                    {recentOrders.length === 0 ? (
+                      <p className="text-body-sm text-text-muted">{P.sheet.ordersEmpty}</p>
+                    ) : (
+                      // 보이지 않는 그리드 정렬 — ul 이 5트랙(시각·구분·수량×가격·손익·메모)을 소유하고
+                      // 각 li 가 subgrid 로 트랙을 공유해, 행마다 팩트 폭이 달라도 컬럼이 딱 맞는다.
+                      // 손익 셀은 null 이어도 자리를 차지(빈 span)해 메모 트랙이 밀리지 않는다.
+                      <ul className="grid grid-cols-[auto_auto_auto_auto_1fr] gap-x-md gap-y-xs text-body-sm tabular-nums">
+                        {recentOrders.map((order, index) => (
+                          <li
+                            key={`${order.at}-${index}`}
+                            className="col-span-full grid grid-cols-subgrid items-baseline"
                           >
-                            {order.side === "BUY" ? P.sheet.sideBuy : P.sheet.sideSell}
-                          </span>
-                          <span className="whitespace-nowrap text-text-strong">
-                            {order.quantity}주 × {formatMoney(order.price)}
-                          </span>
-                          <span
-                            className={cn(
-                              "whitespace-nowrap",
-                              order.realizedPnl != null &&
-                                (order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"),
-                            )}
-                          >
-                            {order.realizedPnl != null ? (
-                              <>
-                                {order.realizedPnl >= 0 ? "+" : ""}
-                                {formatMoney(order.realizedPnl)}
-                              </>
-                            ) : null}
-                          </span>
-                          {/* 판단 메모 — 최대 2줄 말줄임(hover 전문). 모바일은 팩트 아래 전폭 랩. */}
-                          {order.rationale ? (
-                            <span
-                              className="col-span-full min-w-0 text-caption leading-snug text-text-muted line-clamp-2 sm:col-span-1 sm:col-start-5"
-                              title={order.rationale}
-                            >
-                              {order.rationale}
+                            <span className="whitespace-nowrap text-text-muted">
+                              {kstHhmm(order.at)}
                             </span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+                            <span
+                              className={cn(
+                                "whitespace-nowrap font-medium",
+                                order.side === "BUY" ? "text-signal-up" : "text-signal-down",
+                              )}
+                            >
+                              {order.side === "BUY" ? P.sheet.sideBuy : P.sheet.sideSell}
+                            </span>
+                            <span className="whitespace-nowrap text-text-strong">
+                              {order.quantity}주 × {formatMoney(order.price)}
+                            </span>
+                            <span
+                              className={cn(
+                                "whitespace-nowrap",
+                                order.realizedPnl != null &&
+                                  (order.realizedPnl >= 0 ? "text-signal-up" : "text-signal-down"),
+                              )}
+                            >
+                              {order.realizedPnl != null ? (
+                                <>
+                                  {order.realizedPnl >= 0 ? "+" : ""}
+                                  {formatMoney(order.realizedPnl)}
+                                </>
+                              ) : null}
+                            </span>
+                            {/* 판단 메모 — 최대 2줄 말줄임(hover 전문). 모바일은 팩트 아래 전폭 랩. */}
+                            {order.rationale ? (
+                              <span
+                                className="col-span-full min-w-0 text-caption leading-snug text-text-muted line-clamp-2 sm:col-span-1 sm:col-start-5"
+                                title={order.rationale}
+                              >
+                                {order.rationale}
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </td>
         </tr>

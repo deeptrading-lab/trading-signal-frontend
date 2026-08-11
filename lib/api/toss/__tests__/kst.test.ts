@@ -14,6 +14,7 @@ import {
   addDaysToDash,
   isoToKstDate,
   isoToKstMinuteStamp,
+  kstDateStartIso,
   ymdToDash,
 } from "../kst";
 
@@ -58,5 +59,15 @@ describe("ymdToDash / addDaysToDash", () => {
   it("월말·연말 경계를 넘겨 더한다", () => {
     expect(addDaysToDash("2026-06-30", 1)).toBe("2026-07-01");
     expect(addDaysToDash("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("kstDateStartIso", () => {
+  it("KST 날짜의 00:00 을 UTC ISO 로 준다(전날 15:00Z)", () => {
+    expect(kstDateStartIso("2026-08-03")).toBe("2026-08-02T15:00:00.000Z");
+  });
+
+  it("월 경계에서도 어긋나지 않는다", () => {
+    expect(kstDateStartIso("2026-08-01")).toBe("2026-07-31T15:00:00.000Z");
   });
 });
