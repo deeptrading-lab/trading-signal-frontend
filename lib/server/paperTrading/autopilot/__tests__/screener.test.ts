@@ -10,6 +10,7 @@ import {
   scoreStage1,
   scoreStage2,
 } from "@/lib/server/paperTrading/autopilot/screener";
+import { AUTOPILOT_SHORTLIST_SIZE } from "@/lib/server/paperTrading/autopilot/constants";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type { AutopilotCandidate } from "@/lib/types/paperTrading/autopilot";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
@@ -30,6 +31,12 @@ function candidate(ticker: string, over: Partial<AutopilotCandidate> = {}): Auto
 function warning(warningType: string): StockWarningItem {
   return { warningType, exchange: "KRX", startDate: null, endDate: null };
 }
+
+describe("autopilot shortlist configuration", () => {
+  it("엄격한 모멘텀 확인 대상을 1차 상위 12종목까지 넓힌다", () => {
+    expect(AUTOPILOT_SHORTLIST_SIZE).toBe(12);
+  });
+});
 
 /** 당일 5분봉 합성 — 09:00부터. ATR 용 ±0.5% 지그재그, 거래대금 = price×volume 누적. */
 function makeCandles(opts: { bars?: number; price?: number; volume?: number } = {}): StockMinuteCandle[] {

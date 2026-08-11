@@ -133,8 +133,8 @@ export const AUTOPILOT_HARD_EXCLUDE_WARNINGS: readonly string[] = [
 
 // ─── 스크리너 shortlist·2차 점수 ──────────────────────────────────────────────
 
-/** 1차 점수 상위 몇 종목의 분봉을 걷어 2차 점수를 낼지 — KIS 순차 호출 비용과의 균형. */
-export const AUTOPILOT_SHORTLIST_SIZE = envInt("AUTOPILOT_SHORTLIST_SIZE", 8, 3, 15);
+/** 1차 점수 상위 12종목의 분봉을 걷어 2차 점수를 낸다 — 엄격한 모멘텀 확인 뒤 후보 고갈 완화. */
+export const AUTOPILOT_SHORTLIST_SIZE = envInt("AUTOPILOT_SHORTLIST_SIZE", 12, 3, 15);
 
 /** 고정 +2% 목표형의 추격 상한 — 당일 이미 +15% 넘은 종목은 남은 여력보다 급반전 위험을 우선한다. */
 export const AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT = envNumber(

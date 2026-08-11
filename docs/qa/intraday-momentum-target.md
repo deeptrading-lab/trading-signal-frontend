@@ -10,7 +10,7 @@
 | AC | 재현 | 기대 | 실측 | 판정 |
 |---|---|---|---|---|
 | AC-1 | `autopilotRunId` 유/무 세션 | 자동만 momentum-target | 유→고정 정책, 무→adaptive 입력 비트 유지 | PASS |
-| AC-2~5 | 스크리너 후보 출처·stage2 피처 조합 | 거래/수급+상승 확인, 추격 제외 | 탈락 사유까지 단위/E2E 검증 | PASS |
+| AC-2~5 | 상위 12종목 스크리너 후보 출처·stage2 피처 조합 | 거래/수급+상승 확인, 추격 제외 | 기본 shortlist 12 및 탈락 사유까지 단위/E2E 검증 | PASS |
 | AC-6 | conviction BUY, maxPositionPct=50 | 목표 비중 50% | 20% 입력을 50%로 덮어씀 | PASS |
 | AC-7~8 | 평단 10,000원 | 목표 10,200원, 손절 9,900원 | KRX 호가 단위 산출 일치 | PASS |
 | AC-9 | 보유 중 SELL 40/20, signal HOLD/SELL | 40은 HOLD, 20 또는 signal SELL은 EXIT 유지 | 세 경계 전부 일치 | PASS |
