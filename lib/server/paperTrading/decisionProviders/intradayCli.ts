@@ -23,6 +23,8 @@ import { structureBarrierAt } from "@/lib/signal/levels/structureBarrier";
 import { atrAt, ATR_FALLBACK_TP_MULT, ATR_FALLBACK_SL_MULT } from "@/lib/signal/levels/atr";
 import {
   PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN,
+  PAPER_TRADING_INTRADAY_MOMENTUM_BUY_CONVICTION_MIN,
+  PAPER_TRADING_INTRADAY_MOMENTUM_SELL_CONVICTION_MAX,
   PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX,
   PAPER_TRADING_INTRADAY_REENTRY_COOLDOWN_TICKS,
 } from "@/lib/server/paperTrading/constants";
@@ -435,9 +437,18 @@ export function deriveFromSignal(ctx: IntradayContext, noNewEntry: boolean): Int
 export function deriveActionFromConviction(
   conviction: number,
   hasPosition: boolean,
+  strategyMode: IntradayStrategyMode = "adaptive",
 ): IntradayAction {
-  if (conviction >= PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN) return "BUY";
-  if (hasPosition && conviction <= PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX) return "SELL";
+  const buyMin =
+    strategyMode === "momentum-target"
+      ? PAPER_TRADING_INTRADAY_MOMENTUM_BUY_CONVICTION_MIN
+      : PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN;
+  const sellMax =
+    strategyMode === "momentum-target"
+      ? PAPER_TRADING_INTRADAY_MOMENTUM_SELL_CONVICTION_MAX
+      : PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX;
+  if (conviction >= buyMin) return "BUY";
+  if (hasPosition && conviction <= sellMax) return "SELL";
   return "HOLD";
 }
 
@@ -492,7 +503,7 @@ function fromConvictionSchema(
 ): IntradayDecisionLlm {
   const conviction = Math.round(clampOrNull(num(d.convictionScore), 0, 100)!);
   const hasPosition = ctx.position != null && ctx.position.quantity > 0;
-  const action = deriveActionFromConviction(conviction, hasPosition);
+  const action = deriveActionFromConviction(conviction, hasPosition, ctx.strategyMode);
   return {
     action,
     confidence: convictionToConfidence(conviction),

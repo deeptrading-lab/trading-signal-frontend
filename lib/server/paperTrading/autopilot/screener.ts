@@ -268,7 +268,7 @@ export function scoreStage2(features: AutopilotStage2Features): number {
  * - 거래량 상위 또는 외국인/기관 순매수 상위 출처
  * - 수급 양수 또는 최근 거래량 확장(z≥기본 0.5)
  * - VWAP 위 + 상승 구조/오프닝 돌파/VWAP 재탈환 중 하나
- * - 당일 +15% 이하, VWAP +3% 이내(뒤늦은 추격 제한)
+ * - 당일 +18% 이하, VWAP +4% 이내(뒤늦은 추격 제한)
  */
 export function momentumTargetRejectionReason(
   candidate: AutopilotCandidate,

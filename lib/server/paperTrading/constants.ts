@@ -102,12 +102,12 @@ export const PAPER_TRADING_INTRADAY_STOP_LOSS_PCT = envNumber(
   -3,
   -0.3,
 );
-/** 목표 전 AI 조기청산을 허용할 강한 테제 훼손 확신 상한(0~40). */
+/** 목표 전 AI 조기청산을 허용할 명확한 테제 훼손 확신 상한(0~50). */
 export const PAPER_TRADING_INTRADAY_THESIS_EXIT_CONVICTION_MAX = envInt(
   "INTRADAY_THESIS_EXIT_CONVICTION_MAX",
-  25,
+  42,
   0,
-  40,
+  50,
 );
 /**
  * judge 확신 점수(convictionScore 0~100) 결정론 컷 — LLM 은 점수만 내고, BUY/SELL 판정은
@@ -128,6 +128,20 @@ export const PAPER_TRADING_INTRADAY_BUY_CONVICTION_MIN = envInt(
 export const PAPER_TRADING_INTRADAY_SELL_CONVICTION_MAX = envInt(
   "INTRADAY_SELL_CONVICTION_MAX",
   40,
+  10,
+  50,
+);
+/** 오토파일럿 모멘텀 목표형 신규/추가 매수 컷 — 최근 분포에서 58 대비 통과 판단 약 45% 확대. */
+export const PAPER_TRADING_INTRADAY_MOMENTUM_BUY_CONVICTION_MIN = envInt(
+  "INTRADAY_MOMENTUM_BUY_CONVICTION_MIN",
+  55,
+  50,
+  90,
+);
+/** 오토파일럿 모멘텀 목표형 청산 컷 — 55 매수 컷과 13점 히스테리시스 유지. */
+export const PAPER_TRADING_INTRADAY_MOMENTUM_SELL_CONVICTION_MAX = envInt(
+  "INTRADAY_MOMENTUM_SELL_CONVICTION_MAX",
+  42,
   10,
   50,
 );

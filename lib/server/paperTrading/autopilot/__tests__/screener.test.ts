@@ -10,7 +10,11 @@ import {
   scoreStage1,
   scoreStage2,
 } from "@/lib/server/paperTrading/autopilot/screener";
-import { AUTOPILOT_SHORTLIST_SIZE } from "@/lib/server/paperTrading/autopilot/constants";
+import {
+  AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT,
+  AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT,
+  AUTOPILOT_SHORTLIST_SIZE,
+} from "@/lib/server/paperTrading/autopilot/constants";
 import type { StockMinuteCandle } from "@/lib/api/kis/types";
 import type { AutopilotCandidate } from "@/lib/types/paperTrading/autopilot";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
@@ -33,8 +37,10 @@ function warning(warningType: string): StockWarningItem {
 }
 
 describe("autopilot shortlist configuration", () => {
-  it("엄격한 모멘텀 확인 대상을 1차 상위 12종목까지 넓힌다", () => {
+  it("상위 12종목·당일 +18%·VWAP +4% 범위에서 모멘텀 후보를 검토한다", () => {
     expect(AUTOPILOT_SHORTLIST_SIZE).toBe(12);
+    expect(AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT).toBe(18);
+    expect(AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT).toBe(4);
   });
 });
 
@@ -240,8 +246,11 @@ describe("2차 피처·점수", () => {
       "VWAP 아래",
     );
     expect(
-      momentumTargetRejectionReason(candidate("4", { changePercent: 18 }), base),
+      momentumTargetRejectionReason(candidate("4", { changePercent: 18.1 }), base),
     ).toBe("당일 과도한 상승 추격");
+    expect(
+      momentumTargetRejectionReason(candidate("5"), { ...base, vwapGapPct: 4.1 }),
+    ).toBe("VWAP 과다 이격");
   });
 });
 

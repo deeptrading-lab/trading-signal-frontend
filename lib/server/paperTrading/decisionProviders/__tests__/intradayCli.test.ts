@@ -262,6 +262,12 @@ describe("deriveActionFromConviction (결정론 컷)", () => {
     expect(deriveActionFromConviction(40, true)).toBe("SELL");
     expect(deriveActionFromConviction(41, true)).toBe("HOLD");
   });
+  it("오토파일럿 모멘텀 목표형 — 55부터 BUY, 보유 중 42 이하면 SELL", () => {
+    expect(deriveActionFromConviction(55, false, "momentum-target")).toBe("BUY");
+    expect(deriveActionFromConviction(54, false, "momentum-target")).toBe("HOLD");
+    expect(deriveActionFromConviction(42, true, "momentum-target")).toBe("SELL");
+    expect(deriveActionFromConviction(43, true, "momentum-target")).toBe("HOLD");
+  });
   it("무포지션 낮은 확신은 SELL 아님(공매도 없음) → HOLD", () => {
     expect(deriveActionFromConviction(10, false)).toBe("HOLD");
   });
@@ -339,6 +345,26 @@ describe("normalizeLlm — v2(convictionScore) / v1(레거시) 듀얼 스키마"
   it("v2 55점 → HOLD(진입 필드 null·LOW)", () => {
     const r = normalizeLlm(v2(55), ctx());
     expect(r).toMatchObject({ action: "HOLD", confidence: "LOW", entryZone: null, entryPositionPct: null });
+  });
+
+  it("v2 모멘텀 목표형 55점 → BUY, 보유 중 42점 → SELL", () => {
+    const entry = normalizeLlm(v2(55), ctx({ strategyMode: "momentum-target" }));
+    expect(entry).toMatchObject({ action: "BUY", entryPositionPct: 20 });
+
+    const exit = normalizeLlm(
+      v2(42),
+      ctx({
+        strategyMode: "momentum-target",
+        position: {
+          avgEntryPrice: 9_900,
+          quantity: 10,
+          unrealizedPnlPct: -0.2,
+          heldMinutes: 20,
+          allocationPct: 50,
+        },
+      }),
+    );
+    expect(exit).toMatchObject({ action: "SELL", sellRatioPct: 100 });
   });
 
   it("v2 범위 밖 점수는 0~100 clamp 후 파생(140→100→BUY·80% 캡)", () => {

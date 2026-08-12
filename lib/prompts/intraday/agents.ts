@@ -59,7 +59,7 @@ export function formatIntradayContext(ctx: IntradayContext): string {
   const warning = warningLine(ctx);
   const strategy =
     ctx.strategyMode === "momentum-target"
-      ? "[운용 전략] 오토파일럿 모멘텀 목표형 — 서버가 실제 평단 +2% 전량 익절·−1% 손절·최대 비중 진입을 고정. 목표 전에는 추세 SELL 또는 매우 강한 테제 훼손만 조기청산"
+      ? "[운용 전략] 오토파일럿 모멘텀 목표형 — 서버가 실제 평단 +2% 전량 익절·−1% 손절·최대 비중 진입을 고정. 목표 전에는 추세 SELL 또는 명확한 테제 훼손만 조기청산"
       : null;
 
   return [

@@ -136,10 +136,10 @@ export const AUTOPILOT_HARD_EXCLUDE_WARNINGS: readonly string[] = [
 /** 1차 점수 상위 12종목의 분봉을 걷어 2차 점수를 낸다 — 엄격한 모멘텀 확인 뒤 후보 고갈 완화. */
 export const AUTOPILOT_SHORTLIST_SIZE = envInt("AUTOPILOT_SHORTLIST_SIZE", 12, 3, 15);
 
-/** 고정 +2% 목표형의 추격 상한 — 당일 이미 +15% 넘은 종목은 남은 여력보다 급반전 위험을 우선한다. */
+/** 고정 +2% 목표형의 추격 상한 — 후보 고갈을 줄이되 +18% 초과 급등주는 계속 제외한다. */
 export const AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT = envNumber(
   "AUTOPILOT_MOMENTUM_MAX_CHANGE_PCT",
-  15,
+  18,
   5,
   25,
 );
@@ -150,10 +150,10 @@ export const AUTOPILOT_MOMENTUM_MIN_VOLUME_Z = envNumber(
   -1,
   3,
 );
-/** VWAP 위라도 이격이 너무 크면 이미 뻗은 뒤 추격일 가능성이 커 편입하지 않는다. */
+/** VWAP 위라도 +4% 넘게 이격되면 이미 뻗은 뒤 추격일 가능성이 커 편입하지 않는다. */
 export const AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT = envNumber(
   "AUTOPILOT_MOMENTUM_MAX_VWAP_GAP_PCT",
-  3,
+  4,
   1,
   8,
 );

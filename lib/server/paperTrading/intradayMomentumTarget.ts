@@ -39,8 +39,8 @@ export type MomentumTargetPolicyInput = {
 };
 
 /**
- * +2% 목표 전 조기청산은 결정론 시그널 SELL 또는 매우 강한 AI 훼손 점수만 통과시킨다.
- * 일반적인 SELL 컷(기본 40) 진동은 HOLD로 바꿔 +0.2% 같은 조기 익절을 줄인다. 손절은 아래에서
+ * +2% 목표 전 조기청산은 결정론 시그널 SELL 또는 모멘텀 SELL 컷 이하의 테제 훼손만 통과시킨다.
+ * 약한 점수 진동은 HOLD로 바꿔 +0.2% 같은 조기 익절을 줄인다. 손절은 아래에서
  * 실제 평단 −1%로 별도 고정되므로, 조기청산 억제가 손실 한도를 완화하지는 않는다.
  */
 export function applyMomentumTargetPolicy(

@@ -69,7 +69,7 @@ describe("오토파일럿 모멘텀 목표형", () => {
     expect(result.decision.stopPrice).toBeNull();
   });
 
-  it("일반 SELL 컷은 목표 전 HOLD, 강한 AI 훼손 또는 시그널 SELL은 청산 허용", () => {
+  it("모멘텀 SELL 컷 이하는 청산하고 컷 초과는 목표 전 HOLD", () => {
     const common = {
       strategyMode: "momentum-target" as const,
       referencePrice: 10_050,
@@ -78,22 +78,22 @@ describe("오토파일럿 모멘텀 목표형", () => {
     };
     const ordinary = applyMomentumTargetPolicy({
       ...common,
-      decision: decision({ action: "SELL", sellRatioPct: 100, convictionScore: 40 }),
+      decision: decision({ action: "SELL", sellRatioPct: 100, convictionScore: 43 }),
       signal: { action: "HOLD" },
     });
     expect(ordinary.decision.action).toBe("HOLD");
     expect(ordinary.adjustments.join(" ")).toContain("조기청산 보류");
 
-    const severe = applyMomentumTargetPolicy({
+    const thresholdExit = applyMomentumTargetPolicy({
       ...common,
-      decision: decision({ action: "SELL", sellRatioPct: 100, convictionScore: 20 }),
+      decision: decision({ action: "SELL", sellRatioPct: 100, convictionScore: 42 }),
       signal: { action: "HOLD" },
     });
-    expect(severe.decision.action).toBe("SELL");
+    expect(thresholdExit.decision.action).toBe("SELL");
 
     const deterministic = applyMomentumTargetPolicy({
       ...common,
-      decision: decision({ action: "SELL", sellRatioPct: 100, convictionScore: 40 }),
+      decision: decision({ action: "SELL", sellRatioPct: 100, convictionScore: 43 }),
       signal: { action: "SELL" },
     });
     expect(deterministic.decision.action).toBe("SELL");

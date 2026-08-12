@@ -370,4 +370,15 @@ describe("확신 컷 env 오버라이드", () => {
     expect(fresh.deriveActionFromConviction(50, false)).toBe("BUY"); // clamp 후 컷 50
     expect(fresh.deriveActionFromConviction(49, false)).toBe("HOLD");
   });
+
+  it("오토파일럿 전용 컷 env 는 수동 적응형 컷과 분리된다", async () => {
+    vi.stubEnv("INTRADAY_MOMENTUM_BUY_CONVICTION_MIN", "60");
+    vi.stubEnv("INTRADAY_MOMENTUM_SELL_CONVICTION_MAX", "45");
+    vi.resetModules();
+    const fresh = await import("../intradayCli");
+    expect(fresh.deriveActionFromConviction(58, false, "adaptive")).toBe("BUY");
+    expect(fresh.deriveActionFromConviction(58, false, "momentum-target")).toBe("HOLD");
+    expect(fresh.deriveActionFromConviction(60, false, "momentum-target")).toBe("BUY");
+    expect(fresh.deriveActionFromConviction(45, true, "momentum-target")).toBe("SELL");
+  });
 });
