@@ -49,6 +49,7 @@
 |---|---|---|
 | F1 | `/admin` 페이지가 `readServerIdentity()` 로 **세션 role 을 직접** 봐서, 강등된 관리자에게 페이지 셸이 그대로 렌더됐다(유저 목록은 API 가 403 이라 비어 있었지만 화면은 열림) | `hasServerRole` 로 전환 — 등급 드롭다운 노출 판정도 동일 기준 |
 | F2 | `/profile` 의 관리자 메뉴가 DB 조회 실패 시 **세션 role 로 폴백**해 fail-open 이었다 | 스토어 미설정(로컬 dev)일 때만 세션 폴백, 설정됐는데 조회 실패면 메뉴 닫음(fail-closed) |
+| F3 | `/admin` 이 `hasServerRole("admin")` + `hasServerRole("superadmin")` 를 각각 불러 **DB 를 2회** 조회했다(리뷰 지적) | `readServerPrivileges("admin","superadmin")` 추가 — 조회 1회로 여러 등급 판정. 게이트 동작은 재검증(강등=거부·정상=진입) |
 
 ## 회귀
 

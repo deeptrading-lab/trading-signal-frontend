@@ -13,16 +13,19 @@
  * `cookies()`(next/headers) 사용으로 요청별 동적 렌더 — 세션 신원을 서버에서 읽어 즉시 판정한다.
  */
 
-import { hasServerRole } from "@/lib/auth/serverGuard";
+import { readServerPrivileges } from "@/lib/auth/serverGuard";
 import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
 import { AdminUsersPanel } from "@/components/admin/AdminUsersPanel";
 
 export default async function AdminPage() {
+  // 두 등급을 한 번의 DB 조회로 판정한다(등급별로 따로 물으면 왕복 2회).
+  const can = await readServerPrivileges("admin", "superadmin");
+
   // 관리자 전용 — 권한 미달이면 "접근 권한 없음" 화면(과거 notFound 존재은닉 → 안내 화면 통일).
-  if (!(await hasServerRole("admin"))) {
+  if (!can.admin) {
     return <AccessDeniedView />;
   }
 
   // 등급 변경(드롭다운)은 superadmin 만 — admin 은 승인/취소·등급 읽기 전용.
-  return <AdminUsersPanel canChangeRole={await hasServerRole("superadmin")} />;
+  return <AdminUsersPanel canChangeRole={can.superadmin} />;
 }

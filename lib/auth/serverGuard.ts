@@ -33,8 +33,23 @@ export async function readServerIdentity(): Promise<SessionIdentity | null> {
 /**
  * 현재 사용자의 **DB 상 등급**이 `required` 이상인가(승인 상태도 함께 확인).
  * null·미상·승인취소·스토어 오류는 전부 false — 안전 실패.
+ *
+ * 한 페이지에서 두 등급을 각각 물으면 DB 를 두 번 친다 — 그럴 땐 `readServerPrivileges` 를 쓴다.
  */
 export async function hasServerRole(required: ProfileRole): Promise<boolean> {
   const live = await resolveLiveIdentity(await readServerIdentity());
   return hasLivePrivilege(live, required);
+}
+
+/**
+ * DB 조회 **1회**로 여러 등급을 한꺼번에 판정한다(`/admin` 처럼 admin 진입 + superadmin 기능
+ * 분기를 동시에 물어야 하는 화면용). 반환은 요청한 등급별 boolean 맵.
+ */
+export async function readServerPrivileges<T extends ProfileRole>(
+  ...required: T[]
+): Promise<Record<T, boolean>> {
+  const live = await resolveLiveIdentity(await readServerIdentity());
+  return Object.fromEntries(
+    required.map((role) => [role, hasLivePrivilege(live, role)]),
+  ) as Record<T, boolean>;
 }
