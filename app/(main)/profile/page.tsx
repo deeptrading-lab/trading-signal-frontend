@@ -1,21 +1,18 @@
 /**
- * `/profile` — 마이페이지 mock (PR9 finsight-redesign + home-market-redesign PR1 "내 자산" 이전).
+ * `/profile` — 마이페이지.
  *
- * 구조:
- *   1. 페이지 타이틀 "마이페이지".
- *   2. ProfileCard — hero (avatar + 이름/email + 멤버십·투자성향 칩 + "프로필 수정").
- *   3. "내 자산" 섹션 — 총자산 히어로 + 자산비중 도넛 + 보유종목 전체 테이블.
- *   4. 2-column 그리드 — ConnectedExchangesCard (좌) + 설정 (우, + admin 이상이면 관리자 메뉴).
+ * profile-real-data — mock 주입(김투자·총자산 1.4억·키움/업비트 연동)을 걷어내고 `profiles`
+ *   테이블 실데이터로 교체했다. 자산·보유종목·연동거래소 섹션은 원천이 없어 삭제.
  *
- * user-login-auth Phase 2 — 세션 role 을 서버에서 읽어 **역할별 메뉴 분리**(위계 `isAtLeast`):
- *   - 설정(모든 유저): 알림·보안·결제·테마·로그아웃.
- *   - **관리자 메뉴**(admin 이상만): 신호 성적표·AI 모의투자·유저 관리(→`/admin`). 운영 도구는
- *     일반 유저에게 노출하지 않는다. nav/설정은 client 라 role 노출 불가 → 서버 조건부 주입(플래시 0).
- *   role 위조는 readSession 의 HMAC 서명 검증이 차단(+ `/admin`·각 라우트 자체 게이트). `cookies()`
- *   사용으로 요청별 동적 렌더(게이트 뒤라 안전).
+ * 서버에서 세션 신원(`readSession`)으로 프로필을 읽는다:
+ *   - 세션은 sub/email/role 만 들고 있으므로 표시명·가입일·승인상태는 `getProfileBySub` 로 조회.
+ *   - 스토어 미설정/오류는 세션 값만으로 축약 프로필을 만들어 페이지를 살린다(fail-soft) —
+ *     마이페이지는 로그아웃 진입점이라 DB 가 죽어도 렌더돼야 한다.
+ *   - 세션 자체가 없으면(로컬 dev, OAuth 미설정) 게스트 표기.
  *
- * 클라이언트/서버 분리: 본 page.tsx + ProfilePage / 하위 모두 server. HoldingsTable 만 client(정렬).
- * BFF 무관 — mock 단계로 BE·axios 호출 0건(세션 쿠키 읽기는 BE 호출 아님).
+ * 역할별 메뉴 분리(위계 `isAtLeast`): 설정(전체) / 관리자 메뉴(admin 이상 — 성적표·유저관리).
+ *   nav·설정은 client 라 role 노출 불가 → 서버 조건부 주입(플래시 0). role 위조는 readSession
+ *   의 HMAC 서명 검증이 차단(+ `/admin`·각 라우트 자체 게이트).
  */
 
 import { cookies } from "next/headers";
@@ -23,48 +20,53 @@ import { ProfilePage } from "@/components/profile/ProfilePage";
 import { readSession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { isAtLeast } from "@/lib/auth/roles";
-import { USER_PROFILE_MOCK } from "@/lib/mock/profile/user";
-import { CONNECTED_EXCHANGES_MOCK } from "@/lib/mock/profile/exchanges";
+import { getProfileBySub } from "@/lib/server/auth/profileStore";
 import {
-  PROFILE_MENU_ITEMS_MOCK,
+  PROFILE_MENU_ITEMS,
+  PROFILE_SCORECARD_MENU_ITEM,
   PROFILE_ADMIN_MENU_ITEM,
-} from "@/lib/mock/profile/menuItems";
-import { PORTFOLIO_MOCK } from "@/lib/mock/profile/portfolio";
-import { HOLDINGS_MOCK } from "@/lib/mock/profile/holdings";
-import type {
-  ProfileMenuItem,
-  ProfileMenuKey,
-} from "@/lib/types/profile/menuItems";
+} from "@/lib/types/profile/menuItemsConfig";
+import type { ProfileMenuItem } from "@/lib/types/profile/menuItems";
+import type { Profile } from "@/lib/types/auth/profile";
 
-/** 관리자 메뉴로 분리할 항목(admin 이상만) — 신호 성적표는 운영 도구라 일반 유저 미노출.
- *  (AI 모의투자는 은퇴 — 단타 /intraday 로 일원화.) */
-const ADMIN_ONLY_KEYS = new Set<ProfileMenuKey>(["SCORECARD"]);
+/** 게스트(세션 없음) — 로컬 dev·OAuth 미설정에서도 지면이 깨지지 않게 하는 최소 프로필. */
+const GUEST_PROFILE: Profile = {
+  sub: "",
+  email: "게스트",
+  role: "user",
+  status: "approved",
+  displayName: null,
+  // 빈 문자열 = "가입일 없음" — ProfileCard 가 이 값일 때 가입일 표기를 건너뛴다.
+  createdAt: "",
+  updatedAt: "",
+};
 
 export default async function ProfileRoutePage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const identity = await readSession(token);
   const isAdminOrAbove = isAtLeast(identity?.role, "admin");
 
-  // 설정(모든 유저) — 운영 도구(성적표·모의투자) 제외.
-  const settingsItems = PROFILE_MENU_ITEMS_MOCK.filter(
-    (item) => !ADMIN_ONLY_KEYS.has(item.key),
-  );
-  // 관리자 메뉴(admin 이상) — 성적표·모의투자 + 유저 관리(→/admin).
+  let profile: Profile = GUEST_PROFILE;
+  if (identity?.sub) {
+    // DB 조회 실패는 페이지를 막지 않는다 — 세션 값만으로 축약 프로필(fail-soft).
+    const stored = await getProfileBySub(identity.sub).catch(() => null);
+    profile = stored ?? {
+      ...GUEST_PROFILE,
+      sub: identity.sub,
+      email: identity.email ?? GUEST_PROFILE.email,
+      role: identity.role ?? "user",
+    };
+  }
+
   const adminItems: ProfileMenuItem[] | undefined = isAdminOrAbove
-    ? [
-        ...PROFILE_MENU_ITEMS_MOCK.filter((item) => ADMIN_ONLY_KEYS.has(item.key)),
-        PROFILE_ADMIN_MENU_ITEM,
-      ]
+    ? [PROFILE_SCORECARD_MENU_ITEM, PROFILE_ADMIN_MENU_ITEM]
     : undefined;
 
   return (
     <ProfilePage
-      user={USER_PROFILE_MOCK}
-      exchanges={CONNECTED_EXCHANGES_MOCK}
-      menuItems={settingsItems}
+      profile={profile}
+      menuItems={PROFILE_MENU_ITEMS}
       adminItems={adminItems}
-      portfolio={PORTFOLIO_MOCK}
-      holdings={HOLDINGS_MOCK}
     />
   );
 }

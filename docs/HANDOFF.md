@@ -8783,3 +8783,45 @@
   - prod `GOOGLE_OAUTH_*` env 설정 — 미설정이면 `/api/auth/me` 가 전원 `authenticated:false` 라 prod 에서 아무도 분석 요청을 못 한다.
   - 데모 종목(`DEMO_TICKERS`) 노출 확인 — NAVER(035420) 분석 결과 적재 후 미로그인 화면 3종목 라이브 검증.
   - `ai_agent_usage` 는 소유자 컬럼이 없다. 토큰 대시보드(usage 탭)는 여전히 전역 집계 — 계정별 비용 분리가 필요해지면 별도 작업.
+
+### 2026-08-23 — refactor(profile): 마이페이지 mock 걷어내고 실데이터로 교체 (#387)
+
+- **slug**: `hylee/profile-real-data` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/387
+- **요약**: refactor(profile): 마이페이지 mock 걷어내고 실데이터로 교체
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 배경
+  > 
+  > 마이페이지가 거의 전부 mock 이었다 — 김투자 / investor.kim@example.com / PRO 멤버십 / 공격투자형, 총자산 1.425억, 키움·업비트 "연동됨". 가짜 숫자를 진짜처럼 보여주고 있었다.
+  > 
+  > ## 삭제 — 원천이 없는 섹션
+  > 
+  > 총자산 히어로 · 자산비중 도넛 · 보유종목 표 · 연동 거래소를 들어냈다. 실계좌 잔고는 조회·분석 전용 스코프라 붙일 계획이 없고, 거래소 연동은 미구현이다. **채울 수 없는 지면을 가짜로 채우느니 비운다.**
+  > 
+  > | 종류 | 삭제 |
+  > |---|---|
+  > | components | AssetSection · AssetHero · AssetDonut · HoldingsTable · ConnectedExchangesCard |
+  > | mock | portfolio · holdings · exchanges · user |
+  > | types | portfolio · holdings · exchanges · user |
+  > | 죽은 코드 | `hooks/profile/useQueryHoldings` · `lib/api/profile/holdings` (사용처 0건) + `queryKeys.profile` · `queryConfig.profile` |
+  > 
+  > ## 교체 — 실제로 계정에 있는 데이터
+  > 
+  > - **ProfileCard** — `profiles` 테이블(`getProfileBySub`)의 `displayName · email · role · createdAt · status`. 멤버십 티어·투자성향은 스키마에 개념 자체가 없어 제거. 아바타는 Google `picture` 를 세션에 안 실어(sub/email/role 만) 이니셜로 대체. 동작하지 않던 "프로필 수정" 버튼도 제거. DB 조회 실패는 세션 값만으로 축약 프로필(fail-soft) — 로그아웃 진입점이라 DB 가 죽어도 렌더돼야 한다.
+  > - **MyAnalysisSummary** — analyze-owner-cards 로 계정별 분리된 AI 판정 이력 상위 3건. `useQueryAIDecisions` 재사용이라 `/analyze` 와 캐시 공유(이동 시 재요청 0).
+  > - **MyStocksSummary** — 관심종목 · 최근 본 종목. ⚠️ 둘 다 **브라우저 로컬 저장**이라 계정이 아니라 기기에 묶인다. 오해 없게 "이 기기에만 저장돼요" 안내를 함께 둔다.
+  > 
+  > ## 설정 메뉴 정리
+  > 
+  > 알림 · 보안 · 결제는 `href` 도 핸들러도 없어 눌러도 아무 일이 없었다. 화면에 있는데 안 움직이는 행은 mock 과 같은 종류의 거짓말이라 제거. 남은 항목은 전부 동작한다 — 테마 토글 · 성적표 · 유저관리 · 로그아웃.
+  > 
+  > `lib/mock/profile/menuItems` 는 mock 이 아니라 고정 구성이라 `lib/types/profile/menuItemsConfig` 로 이관.
+  > 
+  > ## 검증
+  > 
+  > - `npx tsc --noEmit` 통과 / `npx eslint` 에러·경고 0
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `components/profile/` 폴더가 유저 프로필 컴포넌트와 **종목 상세 페이지 컴포넌트**(StockDailyChart · StockHeader · CompanyOverview · DisclosureList 등 15개)를 같이 담고 있다. "profile" 이 두 뜻으로 쓰여 혼란스러움 — `components/stock-detail/` 분리 검토.
+  - 관심종목·최근 본 종목 서버 영구화(계정 귀속). `useWatchlistTickers` 가 저장소 중립이라 시그니처 유지한 채 store 만 교체 가능.
+  - 알림·보안·결제 설정이 실제로 필요해지면 기능과 함께 메뉴 복원.

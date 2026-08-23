@@ -1,63 +1,42 @@
 /**
  * `/profile` 화면의 한글 라벨 카피.
  *
- * 시안 `Profile.tsx` 정합. enum 의 한글 매핑 (멤버십 / 투자성향 / 거래소 상태 / 메뉴 키) 포함.
+ * profile-real-data — 자산·보유종목·연동거래소(전부 mock, 원천 없음) 섹션이 제거되면서
+ * 관련 카피도 함께 삭제했다. 남은 카피는 실데이터 섹션과 실제 동작하는 설정 항목만 가리킨다.
  */
 
 export const PROFILE_PAGE_TITLE = "마이페이지";
 
-/* "내 자산" 섹션 (home-market-redesign PR1 — 계좌 위젯 `/dashboard` → `/profile` 이전). */
-export const ASSET_SECTION_TITLE = "내 자산";
+/* 아이덴티티 헤더 — profiles 테이블 실데이터. */
+export const PROFILE_NO_NAME = "이름 미상";
+/** 가입일 표기 접두 — 예: "2026.05.30 가입". */
+export const PROFILE_JOINED_SUFFIX = " 가입";
+/** 승인 대기 상태 배지(status=pending). approved 는 배지 없음(정상이 기본). */
+export const PROFILE_STATUS_PENDING = "승인 대기";
 
-/* 총자산 히어로 라벨 (`/dashboard` PortfolioHero 카피 이전). */
-export const ASSET_TOTAL_VALUE = "총 자산 평가 금액";
-export const ASSET_PRINCIPAL = "총 투자원금";
-export const ASSET_PROFIT = "총 평가손익";
+/* "내 분석" 요약 — 로그인 계정이 분석한 종목(analyze-owner-cards). */
+export const MY_ANALYSIS_TITLE = "내 분석";
+/**
+ * 목록 BFF 가 최근 20건만 내려주므로(CARD_LIST_LIMIT) 총계가 아니라 "최근 N개"로 표기한다.
+ * 총 분석 종목 수를 쓰려면 별도 count 조회가 필요 — 요약 지면에 그만한 값어치는 없다.
+ */
+export const MY_ANALYSIS_COUNT = (n: number) => `최근 ${n}개 종목`;
+export const MY_ANALYSIS_EMPTY = "아직 분석한 종목이 없어요.";
+export const MY_ANALYSIS_MORE = "전체 보기";
+export const MY_ANALYSIS_ERROR = "분석 이력을 불러오지 못했어요.";
 
-/* 자산비중 도넛 라벨. */
-export const ASSET_DONUT_CENTER = "자산";
-export const ASSET_RATIO_STOCK = "주식";
-export const ASSET_RATIO_CRYPTO = "코인";
-
-/* 보유종목 전체 테이블 (Top3 요약 아님 — PRD AC-2). */
-export const HOLDINGS_TABLE_TITLE = "보유종목";
-export const HOLDINGS_COL_NAME = "종목명";
-export const HOLDINGS_COL_AMOUNT = "평가액";
-export const HOLDINGS_COL_CHANGE = "수익률";
-export const HOLDINGS_COL_WEIGHT = "비중";
-export const HOLDINGS_SORT_HINT = "정렬";
-export const HOLDINGS_EMPTY = "보유 종목이 없어요.";
-export const ASSET_EMPTY = "보유 자산이 없어요.";
-
-/* 멤버십 enum 한글 매핑 (`lib/types/profile/user.ts` 의 `MembershipTier` 정합). */
-export const MEMBERSHIP_FREE = "FREE 멤버십";
-export const MEMBERSHIP_PRO = "PRO 멤버십";
-export const MEMBERSHIP_ENTERPRISE = "ENTERPRISE 멤버십";
-
-/* 투자성향 enum 한글 매핑 (`lib/types/profile/user.ts` 의 `InvestorType` 정합). */
-export const INVESTOR_TYPE_PREFIX = "투자성향: ";
-export const INVESTOR_TYPE_CONSERVATIVE = "안정형";
-export const INVESTOR_TYPE_MODERATE = "안정추구형";
-export const INVESTOR_TYPE_BALANCED = "위험중립형";
-export const INVESTOR_TYPE_GROWTH = "적극투자형";
-export const INVESTOR_TYPE_AGGRESSIVE = "공격투자형";
-
-/* 연동 거래소 섹션 */
-export const CONNECTED_SECTION_TITLE = "연동된 거래소 / 증권사";
-export const EXCHANGE_STATUS_CONNECTED = "연동됨";
-export const EXCHANGE_STATUS_DISCONNECTED = "연결 필요";
-
-/* 거래소 동기화 시점 (mock 의 SyncedAtKey 정합) */
-export const SYNC_REALTIME = "실시간 동기화";
-export const SYNC_1H_AGO = "1시간 전 동기화";
-export const SYNC_NONE = "-";
+/* "내 종목" 요약 — 관심종목·최근 본 종목(둘 다 이 기기에 저장). */
+export const MY_STOCKS_TITLE = "내 종목";
+export const MY_STOCKS_WATCHLIST = "관심종목";
+export const MY_STOCKS_RECENT = "최근 본 종목";
+export const MY_STOCKS_EMPTY = "아직 담은 종목이 없어요.";
+export const MY_STOCKS_RECENT_EMPTY = "최근 본 종목이 없어요.";
+export const MY_STOCKS_MORE = "전체 보기";
+/** 두 목록 모두 기기 로컬 저장이라 계정 간 공유되지 않는다는 안내. */
+export const MY_STOCKS_LOCAL_HINT = "이 기기에만 저장돼요.";
 
 /* 설정 메뉴 라벨 (`lib/types/profile/menuItems.ts` 의 `ProfileMenuKey` 정합). */
-/* profile-reskin — 카드리스 플랫 섹션 제목(설정 목록의 섹션 헤더). */
 export const SETTINGS_SECTION_TITLE = "설정";
-export const MENU_NOTIFICATIONS = "알림 설정";
-export const MENU_SECURITY = "보안 및 인증";
-export const MENU_BILLING = "구독 / 결제 관리";
 export const MENU_THEME = "화면 테마 설정 (다크모드)";
 /* scorecard-nav-link — `/dashboard/scorecard`(판정 적중률 자가점검) 도달성 보조 메뉴 라벨. */
 export const MENU_SCORECARD = "신호 성적표 (적중률 자가점검)";
