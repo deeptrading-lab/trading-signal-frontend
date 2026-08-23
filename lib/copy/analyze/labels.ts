@@ -91,9 +91,7 @@ export const INFLIGHT_PLACEHOLDER_HINT = "분석이 끝나면 결과가 여기�
 export const INFLIGHT_SOURCE_BOT = "봇 요청";
 
 /** 결과 카드 검색. */
-export const RESULTS_SEARCH_PLACEHOLDER = "종목명 또는 코드로 검색";
-export const RESULTS_SEARCH_EMPTY_TITLE = "검색 결과가 없어요";
-export const RESULTS_SEARCH_EMPTY_BODY = "다른 종목명이나 코드로 검색해 보세요.";
+export const RESULTS_SEARCH_PLACEHOLDER = "종목명 또는 코드로 검색해 바로 분석";
 
 /** 카드 토큰 줄. */
 export const CARD_TOKENS_LABEL = "총 토큰";

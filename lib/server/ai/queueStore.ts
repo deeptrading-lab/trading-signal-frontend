@@ -165,6 +165,8 @@ export async function enqueueAnalysis(input: {
   name?: string | null;
   /** 작업 출처(prod/local/bot). 미지정 시 컬럼 default 'prod'. */
   source?: AnalysisJobSource;
+  /** 요청 계정 이메일(analyze-owner-filter). 미로그인/미상이면 생략(컬럼 default null). */
+  requestedBy?: string | null;
 }): Promise<EnqueueResult> {
   const config = supabaseConfig();
   if (!config) return { status: "not_configured" };
@@ -182,6 +184,8 @@ export async function enqueueAnalysis(input: {
   if (input.name) insertBody.name = input.name;
   // 출처 지정 시 태깅(봇 등). 미지정이면 컬럼 default 'prod'.
   if (input.source) insertBody.source = input.source;
+  // 소유자 — 확보 시에만. 인플라이트 카드도 계정별로 걸러진다.
+  if (input.requestedBy) insertBody.requested_by = input.requestedBy;
 
   const res = await fetch(`${config.url}/rest/v1/${TABLE}`, {
     method: "POST",
@@ -216,6 +220,7 @@ async function insertProcessingRow(input: {
   ticker: string;
   source: AnalysisJobSource;
   workerId?: string;
+  requestedBy?: string | null;
 }): Promise<number | null> {
   const config = supabaseConfig();
   if (!config) return null;
@@ -228,6 +233,7 @@ async function insertProcessingRow(input: {
       status: "processing",
       source: input.source,
       worker_id: input.workerId ?? null,
+      requested_by: input.requestedBy ?? null,
       claimed_at: new Date().toISOString(),
     }),
   }).catch((error: unknown) => ({
@@ -262,9 +268,18 @@ export async function startProcessing(input: {
   /** prod 워커가 claim 한 행 id. 있으면 핸들러는 종결 안 함(owned=false). */
   jobId?: number | null;
   workerId?: string;
-}): Promise<{ jobId: number | null; owned: boolean }> {
+  /** 요청 계정 이메일(analyze-owner-filter). 세션에서 확보되면 전달. */
+  requestedBy?: string | null;
+}): Promise<{ jobId: number | null; owned: boolean; requestedBy: string | null }> {
   // prod 워커 경로 — 이미 claim 된 행 재사용, 종결은 워커가(중복 행·이중 종결 방지, G4).
-  if (input.jobId != null) return { jobId: input.jobId, owned: false };
+  // ⚠️ 워커 요청에는 쿠키가 없다 → 소유자는 **queue 행에서 서버가 조회**한다(요청 body 신뢰 X).
+  if (input.jobId != null) {
+    return {
+      jobId: input.jobId,
+      owned: false,
+      requestedBy: input.requestedBy ?? (await getJobRequestedBy(input.jobId)),
+    };
+  }
 
   // 직접 실행(로컬/봇) — 같은 ticker active 행 재사용 or 신규 insert. 종결은 핸들러가(owned=true).
   const active = await findActiveByTicker(input.ticker);
@@ -275,27 +290,62 @@ export async function startProcessing(input: {
         claimed_at: new Date().toISOString(),
       });
     }
-    return { jobId: active.id, owned: true };
+    return {
+      jobId: active.id,
+      owned: true,
+      requestedBy: input.requestedBy ?? active.requestedBy,
+    };
   }
   const id = await insertProcessingRow({
     ticker: input.ticker,
     source: input.source,
     workerId: input.workerId,
+    requestedBy: input.requestedBy,
   });
-  return { jobId: id, owned: id != null };
+  return { jobId: id, owned: id != null, requestedBy: input.requestedBy ?? null };
+}
+
+/** queue 행의 소유자만 조회(prod 워커 경로 — 요청에 쿠키가 없어 세션으로 못 구할 때). 실패 시 null. */
+async function getJobRequestedBy(id: number): Promise<string | null> {
+  const config = supabaseConfig();
+  if (!config) return null;
+
+  const url = new URL(`${config.url}/rest/v1/${TABLE}`);
+  url.searchParams.set("id", `eq.${id}`);
+  url.searchParams.set("select", "requested_by");
+  url.searchParams.set("limit", "1");
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch(() => null);
+  if (!res?.ok) return null;
+
+  const rows = (await res.json().catch(() => [])) as Array<{ requested_by: string | null }>;
+  return Array.isArray(rows) && rows[0] ? rows[0].requested_by : null;
 }
 
 /**
  * 활성(pending/processing) 작업 전체를 최신순(created_at desc)으로 반환한다(/analyze 인플라이트 합성용).
  * 미설정/오류/컬럼 미적용 시 빈 배열(fail-soft) — 완료 결과 카드는 그대로 뜨고 인플라이트만 미표시.
  */
-export async function getActiveJobs(limit = 200): Promise<AnalysisQueueRow[]> {
+export async function getActiveJobs(
+  limit = 200,
+  requestedBy: string | null = null,
+): Promise<AnalysisQueueRow[]> {
   const config = supabaseConfig();
   if (!config) return [];
 
   const url = new URL(`${config.url}/rest/v1/${TABLE}`);
   url.searchParams.set("select", SELECT_COLS);
   url.searchParams.set("status", "in.(pending,processing)");
+  // 뷰어 스코프 — 로그인은 내 작업만, 미로그인은 세션 없이 넣은 작업만(소유자 컬럼 null).
+  // 결정 테이블은 PK 라 ''를 쓰지만 큐는 nullable 이라 null 그대로 둔다(전이 중 행이라 legacy 무관).
+  url.searchParams.set(
+    "requested_by",
+    requestedBy ? `eq.${requestedBy}` : "is.null",
+  );
   url.searchParams.set("order", "created_at.desc");
   url.searchParams.set("limit", String(limit));
 

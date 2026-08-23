@@ -2,18 +2,20 @@
  * AIDecisionListContainer — 분석 결과 카드 목록의 client 데이터 경계.
  *
  * useQueryAIDecisions 로 저장된 결론 목록(최신순)을 가져와 로딩/에러/미설정/빈 분기를 처리한다.
- * 종목명은 useQueryStockNames 로 한 번에 해석해(카드·시트와 캐시 공유) 검색·표시에 모두 쓴다.
- * 검색은 로드된 목록을 클라이언트에서 ticker·종목명으로 필터링한다(소량 목록, 네트워크 호출 없음).
+ * 목록은 BFF 가 **로그인 계정 기준**으로 이미 걸러 내려준다(analyze-owner-filter) — 클라 필터 없음.
+ * 종목명은 useQueryStockNames 로 한 번에 해석해(카드·시트와 캐시 공유) 표시에 쓴다.
+ * 상단 검색은 목록 내 필터가 아니라 **전 종목 검색 → 선택 즉시 분석**(StockSearchPicker + openFor).
+ *   진입점은 카드 클릭·재분석 버튼과 동일한 `openFor` 라 이후 흐름(공급자 선택→분석)은 패널이 담당한다.
  * 커스텀훅 의무화(frontend.md §1) — useQuery 직접 import 금지, 도메인 훅만 소비.
  */
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { SearchInput } from "@/components/ui/SearchInput";
+import { StockSearchPicker } from "@/components/ui/StockSearchPicker";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQueryAIDecisions } from "@/hooks/stock/useQueryAIDecisions";
 import { useQueryStockNames } from "@/hooks/stock/useQueryStockNames";
@@ -27,8 +29,6 @@ import {
   RESULTS_LOADING,
   RESULTS_NOT_CONFIGURED_BODY,
   RESULTS_NOT_CONFIGURED_TITLE,
-  RESULTS_SEARCH_EMPTY_BODY,
-  RESULTS_SEARCH_EMPTY_TITLE,
   RESULTS_SEARCH_PLACEHOLDER,
   USAGE_REFRESH,
   USAGE_RETRY,
@@ -44,7 +44,6 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
   // 카드 클릭 → 우측 AI 패널 저장모드(openFor). 중앙 상세 팝업은 폐지 — 저장 결론은 이제 패널이
   // verdict-forward 로 렌더하고, 케밥/재분석과 진입점이 하나로 통합된다(ai-analysis-redesign PR③).
   const { openFor } = useAIAnalysisContext();
-  const [query, setQuery] = useState("");
 
   // 종목명은 한 곳에서 해석 — 카드/시트 표시 + 검색 매칭에 공용. (hooks 순서 고정 위해 early return 위에서 호출)
   const items = useMemo(() => data?.items ?? [], [data]);
@@ -72,26 +71,13 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
   // 우선순위: DB 종목명 → KIS 폴백 → ticker.
   const nameOf = (ticker: string): string =>
     dbNames.get(ticker) ?? names[ticker] ?? ticker;
-  const matchesQuery = (ticker: string, q: string): boolean =>
-    ticker.toLowerCase().includes(q) || nameOf(ticker).toLowerCase().includes(q);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = q ? items.filter((it) => matchesQuery(it.ticker, q)) : items;
-    // 재분석 중(reanalysis)인 종목을 상단으로 — 진행 상태가 오래된(updated_at) 카드에 묻히지 않게.
-    // Array.sort 는 안정 정렬이라 나머지는 BFF 순서(updated_at desc, 최신순) 그대로 유지된다.
-    return [...base].sort(
-      (a, b) => (b.reanalysis ? 1 : 0) - (a.reanalysis ? 1 : 0),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, names, dbNames, query]);
-
-  const filteredInflight = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return inflight;
-    return inflight.filter((it) => matchesQuery(it.ticker, q));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inflight, names, dbNames, query]);
+  // 재분석 중(reanalysis)인 종목을 상단으로 — 진행 상태가 오래된(updated_at) 카드에 묻히지 않게.
+  // Array.sort 는 안정 정렬이라 나머지는 BFF 순서(updated_at desc, 최신순) 그대로 유지된다.
+  const sorted = useMemo(
+    () => [...items].sort((a, b) => (b.reanalysis ? 1 : 0) - (a.reanalysis ? 1 : 0)),
+    [items],
+  );
 
   if (isLoading) {
     return <ResultsSkeleton />;
@@ -115,10 +101,6 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
     );
   }
 
-  if (items.length === 0 && inflight.length === 0) {
-    return <StatusBlock title={RESULTS_EMPTY_TITLE} body={RESULTS_EMPTY_BODY} />;
-  }
-
   return (
     <div className="flex flex-col gap-md">
       {/* 새로고침 — 탭 줄 우측 슬롯으로 portal. (종목 개수 표기는 제거 — 불필요, 사용자 요청.) */}
@@ -140,36 +122,34 @@ export function AIDecisionListContainer({ toolbarSlot }: AIDecisionListContainer
           toolbarSlot,
         )}
 
-      {/* 검색 */}
-      <SearchInput
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
+      {/* 전 종목 검색 → 선택 즉시 AI 패널 오픈(분석 시작). 목록 필터가 아니다. */}
+      <StockSearchPicker
         placeholder={RESULTS_SEARCH_PLACEHOLDER}
-        aria-label={RESULTS_SEARCH_PLACEHOLDER}
+        onSelect={(stock) => openFor(stock.ticker, stock.name)}
       />
 
-      {filtered.length === 0 && filteredInflight.length === 0 ? (
-        <StatusBlock title={RESULTS_SEARCH_EMPTY_TITLE} body={RESULTS_SEARCH_EMPTY_BODY} />
+      {/* 빈 상태는 목록 자리에만 — 검색(첫 분석 진입점)은 위에 그대로 남는다. */}
+      {items.length === 0 && inflight.length === 0 ? (
+        <StatusBlock title={RESULTS_EMPTY_TITLE} body={RESULTS_EMPTY_BODY} />
       ) : (
-        // 카드 그리드 → 카드리스 플랫 목록(헤어라인 행). 진행중 행이 위, 완료 결과가 아래(최신순).
-        <div role="list">
-          {filteredInflight.map((item) => (
-            <InflightCard
-              key={`inflight-${item.ticker}`}
-              item={item}
-              name={nameOf(item.ticker)}
-            />
-          ))}
-          {filtered.map((item) => (
-            <AIDecisionCard
-              key={item.ticker}
-              item={item}
-              name={nameOf(item.ticker)}
-              onSelect={(it) => openFor(it.ticker, nameOf(it.ticker))}
-            />
-          ))}
-        </div>
+      /* 카드 그리드 → 카드리스 플랫 목록(헤어라인 행). 진행중 행이 위, 완료 결과가 아래(최신순). */
+      <div role="list">
+        {inflight.map((item) => (
+          <InflightCard
+            key={`inflight-${item.ticker}`}
+            item={item}
+            name={nameOf(item.ticker)}
+          />
+        ))}
+        {sorted.map((item) => (
+          <AIDecisionCard
+            key={item.ticker}
+            item={item}
+            name={nameOf(item.ticker)}
+            onSelect={(it) => openFor(it.ticker, nameOf(it.ticker))}
+          />
+        ))}
+      </div>
       )}
     </div>
   );

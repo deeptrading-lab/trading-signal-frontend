@@ -55,10 +55,37 @@ export async function requireProdAdminApi(
   return (await isAdminRequest(request)) ? null : forbidden();
 }
 
+/**
+ * **prod(Vercel)에서만** 로그인 요구(등급 무관), 로컬은 통과 — 분석 실행처럼 "미로그인은 못 하게"
+ * 막되 로컬 dev 무마찰은 유지해야 하는 쓰기 경로용. 로컬 워커/봇도 localhost 호출이라 통과한다.
+ * 401(403 아님) — 클라이언트 axios 인터셉터가 세션 만료와 같은 방식으로 `/login` 유도.
+ */
+export async function requireProdSessionApi(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  if (!isVercelEnv()) return null;
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (await readSession(token)) return null;
+  return NextResponse.json(
+    { error: "unauthorized" },
+    { status: 401, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 async function isSuperadminRequest(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const identity = await readSession(token);
   return isAtLeast(identity?.role, "superadmin");
+}
+
+/**
+ * 요청 쿠키의 세션 이메일(소문자 정규화). 미로그인·서명 불일치·미설정이면 null.
+ * analyze-owner-filter — "내가 분석한 종목만" 필터의 신원 출처. 가드가 아니라 **귀속용**이라
+ * null 이어도 요청을 막지 않는다(로컬 dev 무마찰 = 필터 없음).
+ */
+export async function sessionEmail(request: NextRequest): Promise<string | null> {
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  return (await readSession(token))?.email ?? null;
 }
 
 /** superadmin 미만이면 403(환경 무관) — **파괴적 작업**(저장 분석 결과 삭제 등) 전용 최상위 가드. */

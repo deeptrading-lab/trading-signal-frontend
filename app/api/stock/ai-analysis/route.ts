@@ -19,6 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { sessionEmail } from "@/lib/server/auth/apiGuard";
 import { isKisConfigured, fetchStockPrice, fetchInvestorTrend, getSymbolName } from "@/lib/api/kis";
 import { fetchDailyChunked } from "@/lib/api/kis/chartChunked";
 import { evaluateSignal } from "@/lib/signal/engine";
@@ -47,6 +48,7 @@ import { AGENT_ORDER } from "@/lib/types/stock/aiAnalysis";
 import { invokeAgentCliStream } from "@/lib/server/ai/agentCli";
 import {
   getLatestAIDecision,
+  ownerKey,
   upsertAIDecision,
 } from "@/lib/server/ai/decisionStore";
 import {
@@ -489,6 +491,11 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const ticker = body.ticker.trim().replace(/[^A-Za-z0-9_-]/g, "");
+
+  // 분석 요청 계정(analyze-owner-cards) — 결론 저장 시 소유자(PK 일부)로 기록하고, 이전 결론 조회도
+  // 이 계정 스코프로 본다. 워커 요청엔 쿠키가 없어 null → startProcessing 이 queue 행에서 대신 읽는다
+  // (요청 body 는 신뢰하지 않는다).
+  const requesterEmail = await sessionEmail(req);
   if (!ticker) {
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
   }
@@ -567,7 +574,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ error: "KIS API가 설정되지 않아 시그널을 계산할 수 없어요." }, { status: 400 });
   }
 
-  const previousDecision = await getLatestAIDecision(ticker);
+  // 이전 결론은 **요청 계정 것**을 본다(남의 판정을 내 재분석 컨텍스트로 끌어오지 않는다).
+  const previousDecision = await getLatestAIDecision(ticker, requesterEmail);
   const previousDecisionContext = formatPreviousDecisionContext(previousDecision);
 
   // 과거 판정 성적 주입(scorecard-feedback (나)) — **플래그 OFF(기본)면 완전 skip**.
@@ -633,9 +641,18 @@ export async function POST(req: NextRequest): Promise<Response> {
   const callerJobId =
     typeof body.jobId === "number" && Number.isFinite(body.jobId) ? body.jobId : null;
   // 비봇: 슬롯을 이미 점유했으니 지금 processing 기록. 봇: 슬롯 대기 후 스트림 본문에서 기록(아래 prelude).
-  let job: { jobId: number | null; owned: boolean } = { jobId: null, owned: false };
+  let job: { jobId: number | null; owned: boolean; requestedBy: string | null } = {
+    jobId: null,
+    owned: false,
+    requestedBy: requesterEmail,
+  };
   if (!isBotWait) {
-    job = await startProcessing({ ticker, source: jobSource, jobId: callerJobId });
+    job = await startProcessing({
+      ticker,
+      source: jobSource,
+      jobId: callerJobId,
+      requestedBy: requesterEmail,
+    });
   }
   // 봇 대기 경로가 적재한 pending 행 id — 대기 중 취소 시 정리(‘대기중’ 카드 제거)에 쓴다.
   let botWaitRowId: number | null = null;
@@ -670,7 +687,12 @@ export async function POST(req: NextRequest): Promise<Response> {
           acquired = true; // 빈 슬롯 즉시 확보 — 대기 없이 바로 분석(start-now).
         } else {
           // 꽉 참 → 큐 적재(카드=대기중) + 순번 안내. 슬롯이 날 때까지 이 연결을 유지한다.
-          const enq = await enqueueAnalysis({ ticker, name: reqName, source: "bot" });
+          const enq = await enqueueAnalysis({
+            ticker,
+            name: reqName,
+            source: "bot",
+            requestedBy: requesterEmail,
+          });
           // 내가 새로 적재한(queued) 행일 때만 소유·정리 대상으로 잡는다. already(같은 ticker 를 다른 소스가
           // 이미 분석 중)면 그 행은 남의 것 — abort 시 markFailed 로 남의 라이브 분석 행을 오종결하면 안 되므로 null.
           botWaitRowId = enq.status === "queued" ? enq.id ?? null : null;
@@ -700,7 +722,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           acquired = true;
         }
         // 슬롯 확보 — 봇 작업을 processing 으로 기록(적재해 둔 pending 행 재사용). owned=true → 아래 finally 가 종결.
-        job = await startProcessing({ ticker, source: "bot" });
+        job = await startProcessing({ ticker, source: "bot", requestedBy: requesterEmail });
       }
 
       const state: AnalysisState = {
@@ -1004,6 +1026,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                 const saveResult = await upsertAIDecision({
                   ticker,
                   name: resolvedName,
+                  requestedBy: ownerKey(job.requestedBy),
+                  runId,
                   provider,
                   decision: finalDecision,
                   sentiment: state.sentiment ?? null,
