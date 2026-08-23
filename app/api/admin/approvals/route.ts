@@ -5,14 +5,12 @@
  *
  * PRD user-login-auth §3.7 / Phase 2:
  *   게이트(`proxy.ts`)는 role 을 보지 않으므로 **이 라우트가 직접 role 을 방어**한다.
- *   세션 신원(`readSession`)이 **admin 이상**(admin·superadmin)이 아니면 403(위계 `isAtLeast`).
+ *   **DB 상 등급**이 admin 이상(admin·superadmin)이 아니면 403(live-role-check).
  *   위조 role 은 HMAC 검증에서 걸러진다. 스토어 오류는 500(fail-open 금지).
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readSession } from "@/lib/auth/session";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { isAtLeast } from "@/lib/auth/roles";
+import { requireAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   listPendingProfiles,
   setProfileStatus,
@@ -59,17 +57,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** role **admin 이상** 자체 검증(superadmin 포함) — 미달이면 403(통과면 null). */
+/**
+ * role **admin 이상** 검증(superadmin 포함) — 미달이면 403(통과면 null).
+ * live-role-check — 공용 가드가 DB 상 등급·승인상태를 대조한다(쿠키 role 불신).
+ */
 async function guardAdmin(request: NextRequest): Promise<NextResponse | null> {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const identity = await readSession(token);
-  if (!isAtLeast(identity?.role, "admin")) {
-    return NextResponse.json(
-      { error: "forbidden" },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-  return null;
+  return requireAdminApi(request);
 }
 
 /** body `{ sub, status? }` — status 미지정/불량이면 `approved`(하위호환). */

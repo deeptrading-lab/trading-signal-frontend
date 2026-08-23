@@ -6,9 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readSession } from "@/lib/auth/session";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { isAtLeast, isValidRole } from "@/lib/auth/roles";
+import { isValidRole } from "@/lib/auth/roles";
+import { requireSuperadminApi } from "@/lib/server/auth/apiGuard";
 import {
   countSuperadmins,
   getProfileBySub,
@@ -19,9 +18,9 @@ import type { ProfileRole } from "@/lib/types/auth/profile";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const identity = await readSession(token);
-  if (!isAtLeast(identity?.role, "superadmin")) return json({ error: "forbidden" }, 403);
+  // live-role-check — 쿠키 role 이 아니라 DB 상 등급·승인상태를 대조한다(강등 즉시 반영).
+  const denied = await requireSuperadminApi(request);
+  if (denied) return denied;
 
   const body = await parseBody(request);
   if (!body) return json({ error: "invalid_request" }, 400);

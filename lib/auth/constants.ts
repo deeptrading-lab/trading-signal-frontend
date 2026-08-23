@@ -13,7 +13,17 @@
 export const SESSION_COOKIE_NAME = "app_auth";
 
 /** 세션 수명 — 30일(초). 쿠키 `Max-Age` 와 토큰 `exp` 둘 다 동일 값. */
-export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 2_592_000 = 30일.
+/**
+ * 세션 수명 — 7일.
+ *
+ * live-role-check: 30일에서 줄였다. 등급·승인상태는 쿠키에 구워져 있어(role) 혹은 아예 실리지
+ * 않아(status) 강등·승인취소가 기존 쿠키에 반영되지 않는다. 특권 경로는 요청마다 DB 를 대조해
+ * 즉시 막지만(`lib/server/auth/liveRole`), 일반 조회 API 는 여전히 쿠키 유효기간만큼 열린다 —
+ * 그 잔여 노출 창을 30일에서 7일로 좁히는 값이다.
+ * (즉시 전면 차단은 Edge 게이트가 매 요청 revocation 을 조회해야 가능 — proxy.ts 의
+ *  "네트워크 I/O 0" 설계를 깨는 선택이라 채택하지 않았다.)
+ */
+export const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 604_800 = 7일.
 
 /**
  * 토큰 payload 버전.

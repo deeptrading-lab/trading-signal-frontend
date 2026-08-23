@@ -13,6 +13,7 @@
  * 역할별 메뉴 분리(위계 `isAtLeast`): 설정(전체) / 관리자 메뉴(admin 이상 — 성적표·유저관리).
  *   nav·설정은 client 라 role 노출 불가 → 서버 조건부 주입(플래시 0). role 위조는 readSession
  *   의 HMAC 서명 검증이 차단(+ `/admin`·각 라우트 자체 게이트).
+ *   live-role-check — 판정 기준은 쿠키 role 이 아니라 **조회된 프로필**의 등급·승인상태다.
  */
 
 import { cookies } from "next/headers";
@@ -20,7 +21,10 @@ import { ProfilePage } from "@/components/profile/ProfilePage";
 import { readSession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { isAtLeast } from "@/lib/auth/roles";
-import { getProfileBySub } from "@/lib/server/auth/profileStore";
+import {
+  getProfileBySub,
+  isProfileStoreConfigured,
+} from "@/lib/server/auth/profileStore";
 import {
   PROFILE_MENU_ITEMS,
   PROFILE_SCORECARD_MENU_ITEM,
@@ -44,19 +48,29 @@ const GUEST_PROFILE: Profile = {
 export default async function ProfileRoutePage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const identity = await readSession(token);
-  const isAdminOrAbove = isAtLeast(identity?.role, "admin");
 
-  let profile: Profile = GUEST_PROFILE;
-  if (identity?.sub) {
-    // DB 조회 실패는 페이지를 막지 않는다 — 세션 값만으로 축약 프로필(fail-soft).
-    const stored = await getProfileBySub(identity.sub).catch(() => null);
-    profile = stored ?? {
-      ...GUEST_PROFILE,
-      sub: identity.sub,
-      email: identity.email ?? GUEST_PROFILE.email,
-      role: identity.role ?? "user",
-    };
-  }
+  // DB 조회 실패는 페이지를 막지 않는다 — 세션 값만으로 축약 프로필(fail-soft).
+  const stored = identity?.sub
+    ? await getProfileBySub(identity.sub).catch(() => null)
+    : null;
+  const profile: Profile = identity?.sub
+    ? (stored ?? {
+        ...GUEST_PROFILE,
+        sub: identity.sub,
+        email: identity.email ?? GUEST_PROFILE.email,
+        role: identity.role ?? "user",
+      })
+    : GUEST_PROFILE;
+
+  // live-role-check — 관리자 메뉴는 **조회된 프로필**의 등급·승인상태로 판정한다. 쿠키 role 은
+  // 강등을 반영하지 못해, 강등된 관리자에게 메뉴가 계속 보였다.
+  //   · DB 확인분(stored) → 그 값으로 판정.
+  //   · 스토어 미설정(로컬 dev) → 세션 role 폴백(개발 무마찰).
+  //   · 스토어는 설정됐는데 조회 실패 → **메뉴 닫음**(fail-closed). 가드와 같은 정책 —
+  //     확인이 안 되면 열지 않는다. 표시용 축약 프로필은 그대로 두어 지면은 살린다.
+  const isAdminOrAbove = stored
+    ? stored.status === "approved" && isAtLeast(stored.role, "admin")
+    : !isProfileStoreConfigured() && isAtLeast(identity?.role, "admin");
 
   const adminItems: ProfileMenuItem[] | undefined = isAdminOrAbove
     ? [PROFILE_SCORECARD_MENU_ITEM, PROFILE_ADMIN_MENU_ITEM]
