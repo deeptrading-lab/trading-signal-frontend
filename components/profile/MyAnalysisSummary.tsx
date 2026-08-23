@@ -24,6 +24,7 @@ import {
   isBullishVerdict,
   isBearishVerdict,
 } from "@/components/stock/ai-analysis/verdictLabels";
+import type { FinalVerdict } from "@/lib/types/stock/aiAnalysis";
 import {
   MY_ANALYSIS_TITLE,
   MY_ANALYSIS_COUNT,
@@ -35,7 +36,7 @@ import {
 const PREVIEW_COUNT = 3;
 
 /** 판정 톤 — 목록 카드(AIDecisionCard)와 같은 강세/약세/중립 3분기. */
-function verdictToneClass(verdict: Parameters<typeof isBullishVerdict>[0]): string {
+function verdictToneClass(verdict: FinalVerdict): string {
   if (isBullishVerdict(verdict)) return "text-signal-up";
   if (isBearishVerdict(verdict)) return "text-signal-down";
   return "text-text-muted";

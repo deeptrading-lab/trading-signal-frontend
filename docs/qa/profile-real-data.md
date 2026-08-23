@@ -4,7 +4,7 @@
 - **일자**: 2026-08-23
 - **환경**: 로컬 `next dev` (Node), Supabase 운영 DB(읽기), OAuth env 설정됨(게이트 활성)
 - **PRD**: 없음 — 경량 반복 워크플로(버그·정리성 작업). 수용 기준은 변경 내용에서 도출.
-- **판정**: **PASS** (결함 1건 발견 → 같은 브랜치에서 수정 후 재검증 완료)
+- **판정**: **PASS** (QA 1건 + 리뷰 2건 발견 → 같은 브랜치에서 수정 후 재검증 완료)
 
 ## 검증 방법
 
@@ -62,6 +62,16 @@ pending 유저는 OAuth 콜백에서 **쿠키를 못 받고** `/pending` 으로 
 - `npx tsc --noEmit` 통과
 - `npx eslint app components hooks lib` 에러·경고 **0**
 - `npx vitest run` **1491 passed / 3 skipped** (삭제한 `lib/api/profile` 테스트 2건만큼 감소)
+
+## 리뷰 지적 및 조치
+
+| # | 지적 | 심각도 | 조치 |
+|---|---|---|---|
+| R1 | QA 용으로 만든 `qa-cookie.mts`(세션 서명 헬퍼)가 레포 루트에 커밋됨 — `git add -A` 에 쓸려 들어감 | 중 | 추적 해제 + 삭제 |
+| R2 | "N개 종목" 이 총계를 오도 — 목록 BFF 가 `CARD_LIST_LIMIT=20` 으로 자르므로 21건 이상이면 항상 "20개 종목". superadmin 실측이 정확히 20건이라 이미 오표기 상태였다 | 중 | "**최근** N개 종목" 으로 교정 |
+| R3 | `verdictToneClass(verdict: Parameters<typeof isBullishVerdict>[0])` — 우회 타입 표기 | 하 | `FinalVerdict` 직접 import |
+
+조치 후 `tsc`·`eslint`·`vitest`(1491 passed) 재통과, `/profile` 200 재확인.
 
 ## 관찰 (결함 아님)
 

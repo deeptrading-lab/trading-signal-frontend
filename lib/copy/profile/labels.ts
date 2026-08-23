@@ -16,7 +16,11 @@ export const PROFILE_STATUS_PENDING = "승인 대기";
 
 /* "내 분석" 요약 — 로그인 계정이 분석한 종목(analyze-owner-cards). */
 export const MY_ANALYSIS_TITLE = "내 분석";
-export const MY_ANALYSIS_COUNT = (n: number) => `${n}개 종목`;
+/**
+ * 목록 BFF 가 최근 20건만 내려주므로(CARD_LIST_LIMIT) 총계가 아니라 "최근 N개"로 표기한다.
+ * 총 분석 종목 수를 쓰려면 별도 count 조회가 필요 — 요약 지면에 그만한 값어치는 없다.
+ */
+export const MY_ANALYSIS_COUNT = (n: number) => `최근 ${n}개 종목`;
 export const MY_ANALYSIS_EMPTY = "아직 분석한 종목이 없어요.";
 export const MY_ANALYSIS_MORE = "전체 보기";
 export const MY_ANALYSIS_ERROR = "분석 이력을 불러오지 못했어요.";
