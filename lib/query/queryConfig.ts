@@ -158,17 +158,9 @@ export const queryConfig = {
    * 도메인 어댑터 TTL.
    * 화면 전환 후속 PR 진입 시 동일 TTL 참조.
    *
-   * - profile.holdings — 보유 종목 multi-price. stock.price 와 동일 실시간성 우선.
-   *   (home-market-redesign PR1 — dashboard.holdings → profile.holdings 이전.)
    * - market.indices — 시장 지수. 종목 현재가와 동등하게 짧은 TTL.
    * - watchlist.list — 관심종목 multi-price. stock.price 와 동등.
    */
-  profile: {
-    holdings: {
-      staleTime: 30 * SECOND, // perf: stock.price 와 동일 tier — 10s→30s 정합 상향.
-      gcTime: 5 * MINUTE,
-    },
-  },
   market: {
     /**
      * 시장 지수 — 실시간성 요구 낮음. KIS `inquire-index-price` rate limit 보호 위해

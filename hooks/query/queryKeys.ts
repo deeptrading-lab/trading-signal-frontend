@@ -75,10 +75,6 @@ export const queryKeys = {
     list: (ticker: string, count: number) =>
       ["disclosure", "list", ticker, count] as const,
   },
-  profile: {
-    holdings: (tickers: readonly string[]) =>
-      ["profile", "holdings", normalizeTickers(tickers)] as const,
-  },
   market: {
     indices: (codes: readonly string[]) =>
       ["market", "indices", normalizeTickers(codes)] as const,

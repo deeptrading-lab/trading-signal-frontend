@@ -3,7 +3,7 @@
  *
  * PR9 (finsight-redesign) → **profile-reskin**(카드리스 플랫 섹션).
  *
- * 시안 `Profile.tsx` L59~L78 정합 — 설정 항목 + 로그아웃.
+ * profile-real-data — 동작하지 않던 알림·보안·결제 행을 제거했다. 남은 행은 전부 실제로 동작한다.
  *
  * profile-reskin — 카드 셸(`card`)·항목별 rounded 박스 폐기 → `Section`(플랫 "설정" 제목) +
  *   `ul.divide-y`(행 사이 헤어라인, 양 끝 선 없음) + `.profile-menu-row` 플랫 행. 홈 랭킹 톤 정합.
@@ -16,17 +16,7 @@
  */
 
 import Link from "next/link";
-import {
-  Bell,
-  Bot,
-  ChevronRight,
-  CreditCard,
-  LogOut,
-  Moon,
-  Shield,
-  Target,
-  UserCheck,
-} from "lucide-react";
+import { Bot, ChevronRight, LogOut, Moon, Target, UserCheck } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import { ThemeMenuButton } from "@/components/theme/ThemeMenuButton";
@@ -36,9 +26,6 @@ import type {
 } from "@/lib/types/profile/menuItems";
 import {
   SETTINGS_SECTION_TITLE,
-  MENU_NOTIFICATIONS,
-  MENU_SECURITY,
-  MENU_BILLING,
   MENU_THEME,
   MENU_SCORECARD,
   MENU_PAPER_TRADING,
@@ -53,9 +40,6 @@ export interface SettingsMenuCardProps {
 }
 
 const MENU_LABEL: Record<ProfileMenuKey, string> = {
-  NOTIFICATIONS: MENU_NOTIFICATIONS,
-  SECURITY: MENU_SECURITY,
-  BILLING: MENU_BILLING,
   THEME: MENU_THEME,
   SCORECARD: MENU_SCORECARD,
   PAPER_TRADING: MENU_PAPER_TRADING,
@@ -64,9 +48,6 @@ const MENU_LABEL: Record<ProfileMenuKey, string> = {
 };
 
 const ICON_MAP = {
-  Bell,
-  Shield,
-  CreditCard,
   Moon,
   Target,
   Bot,

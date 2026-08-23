@@ -1,73 +1,52 @@
 /**
  * ProfilePage — `/profile` 셸 컴포저 (server component).
  *
- * PR9 (finsight-redesign) → home-market-redesign PR1 → **profile-reskin**(카드리스 화이트 포워드).
- *
- * profile-reskin — 노스스타 홈(`MarketOverviewPage`) 정합. 흰 바탕(`(main)/layout.tsx` 가 `/profile`
- *   한정 surface 덮음) 위에 섹션을 여백(`gap-2xl`)으로만 구분한다. 페이지 타이틀은 `sr-only`
- *   (아이덴티티 헤더가 시각 헤더 역할 — 홈이 검색바를 헤더로 두는 것과 동일 톤). 라이트 카드는
- *   "내 자산" 히어로(`asset-hero`) **하나만** — 나머지(보유종목·연동 거래소·설정)는 전부 플랫.
+ * profile-real-data — mock 3종(총자산 히어로·자산비중 도넛·보유종목 표 / 연동 거래소)을 삭제했다.
+ *   실계좌·거래소 연동은 원천이 없고(조회·분석 전용 스코프) 만들 계획도 없어, 가짜 숫자를
+ *   진짜처럼 보여주는 대신 **계정에 실제로 있는 데이터**로 지면을 채운다.
  *
  * 구조 (위→아래):
  *   1. sr-only 페이지 타이틀(문서 아웃라인용 h1).
- *   2. ProfileCard — 아이덴티티 헤더(카드리스 평탄 밴드).
- *   3. AssetSection — "내 자산"(총자산 히어로 라이트 카드 + 자산비중 도넛 + 보유종목 플랫 표).
- *   4. 2-column 그리드 (`md:grid-cols-2 gap-2xl`): 좌 = 연동 거래소, 우 = 설정 (+ admin 이상이면
- *      **관리자 메뉴** 섹션을 설정 아래 스택 — user-login-auth Phase 2). 전부 플랫 섹션.
+ *   2. ProfileCard — 아이덴티티 헤더(profiles 테이블 실데이터).
+ *   3. 2-column 그리드: 좌 = 내 분석(계정별 AI 판정) + 내 종목(관심·최근), 우 = 설정 (+ admin 메뉴).
  *
- * 모바일 — 1-column stacking. 데스크탑 (md+) — 2-column.
+ * 카드리스 화이트 포워드 유지 — 흰 바탕 위 섹션을 여백(`gap-2xl`)으로만 구분.
+ * 모바일 1-column stacking, 데스크탑(md+) 2-column.
  *
- * 클라이언트/서버:
- *   - 본 컴포넌트 + ProfileCard/Exchanges/Settings/AssetHero 모두 server-safe (useState 0).
- *   - HoldingsTable(AssetSection 내부)만 client(정렬 상태).
- *   - page.tsx 가 mock props + 세션 role 기반 메뉴 분리를 전달.
- *
- * BFF 무관 — 자산 섹션은 mock 단계로 BE 호출 0건. fetch · axios 호출 0건.
- *
- * Sidebar / BottomNav 의 "마이페이지" 메뉴 활성 — `isNavItemActive("/profile", "/profile")` true.
+ * 클라이언트/서버: 본 컴포넌트 + ProfileCard/Settings 는 server. 요약 2종만 client
+ *   (MyAnalysisSummary = TanStack Query, MyStocksSummary = localStorage).
  */
 
 import { ProfileCard } from "./ProfileCard";
-import { AssetSection } from "./AssetSection";
-import { ConnectedExchangesCard } from "./ConnectedExchangesCard";
+import { MyAnalysisSummary } from "./MyAnalysisSummary";
+import { MyStocksSummary } from "./MyStocksSummary";
 import { SettingsMenuCard } from "./SettingsMenuCard";
-import type { UserProfile } from "@/lib/types/profile/user";
-import type { ConnectedExchange } from "@/lib/types/profile/exchanges";
 import type { ProfileMenuItem } from "@/lib/types/profile/menuItems";
-import type { Portfolio } from "@/lib/types/profile/portfolio";
-import type { Holding } from "@/lib/types/profile/holdings";
+import type { Profile } from "@/lib/types/auth/profile";
 import {
   PROFILE_PAGE_TITLE,
   ADMIN_MENU_SECTION_TITLE,
 } from "@/lib/copy/profile/labels";
 
 export interface ProfilePageProps {
-  user: UserProfile;
-  exchanges: ConnectedExchange[];
+  profile: Profile;
   /** 설정 섹션 항목(모든 유저). */
   menuItems: ProfileMenuItem[];
   /** 관리자 메뉴 항목(admin 이상) — 있으면 "관리자 메뉴" 섹션을 설정 아래 렌더. 일반 유저는 undefined. */
   adminItems?: ProfileMenuItem[];
-  portfolio: Portfolio;
-  holdings: Holding[];
 }
 
-export function ProfilePage({
-  user,
-  exchanges,
-  menuItems,
-  adminItems,
-  portfolio,
-  holdings,
-}: ProfilePageProps) {
+export function ProfilePage({ profile, menuItems, adminItems }: ProfilePageProps) {
   return (
     <div className="mx-auto flex w-full max-w-main-max-w flex-col gap-2xl">
       {/* 문서 아웃라인용 접근성 제목(시각 비노출 — 아이덴티티 헤더가 페이지 헤더 역할, 홈 정합). */}
       <h1 className="sr-only">{PROFILE_PAGE_TITLE}</h1>
-      <ProfileCard user={user} />
-      <AssetSection portfolio={portfolio} holdings={holdings} />
+      <ProfileCard profile={profile} />
       <div className="grid grid-cols-1 gap-2xl md:grid-cols-2">
-        <ConnectedExchangesCard exchanges={exchanges} />
+        <div className="flex flex-col gap-2xl">
+          <MyAnalysisSummary />
+          <MyStocksSummary />
+        </div>
         {/* 우측 열 — 설정 + (admin 이상) 관리자 메뉴 스택. */}
         <div className="flex flex-col gap-2xl">
           <SettingsMenuCard items={menuItems} />
