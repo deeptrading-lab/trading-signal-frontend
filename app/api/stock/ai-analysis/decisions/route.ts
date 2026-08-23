@@ -9,7 +9,7 @@
  *   전역 proxy 게이트가 담당. 파괴적 작업(삭제)은 별도 라우트의 superadmin 가드 유지.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   getAIDecisionCardSummaries,
   getDecisionThesisLevels,
@@ -23,6 +23,7 @@ import {
   OUTCOME_MATCH_WINDOW_MS,
 } from "@/lib/stock/decisionOutcome";
 import { getActiveJobs } from "@/lib/server/ai/queueStore";
+import { sessionEmail } from "@/lib/server/auth/apiGuard";
 import { mergeActiveJobs } from "@/lib/server/ai/inflightMerge";
 import {
   jsonWithDataSource,
@@ -55,7 +56,10 @@ const KR_TICKER_RE = /^\d{6}$/;
  * 시세는 `intstock_multprice` 일괄 1콜(soft cap 30, 카드 목록은 최대 20건이라 1콜로 덮임).
  * KIS 미설정/비-prod 환경에서는 조회를 시도하지 않는다(mock 시세로 오배지 방지).
  */
-async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
+async function attachThesisBreach(
+  items: AIDecisionListItem[],
+  viewer: string | null,
+): Promise<void> {
   try {
     if (items.length === 0) return;
     if (!isKisConfigured() || resolveKisEnv() !== "prod") return;
@@ -64,7 +68,10 @@ async function attachThesisBreach(items: AIDecisionListItem[]): Promise<void> {
     if (tickers.length === 0) return;
 
     const [levels, quotes] = await withTimeout(
-      Promise.all([getDecisionThesisLevels(tickers), fetchIntstockMultprice(tickers)]),
+      Promise.all([
+        getDecisionThesisLevels(tickers, viewer),
+        fetchIntstockMultprice(tickers),
+      ]),
       BREACH_QUOTE_TIMEOUT_MS,
     );
     const priceByTicker = new Map(quotes.map((q) => [q.ticker, q.price]));
@@ -129,12 +136,15 @@ async function attachOutcome(items: AIDecisionListItem[]): Promise<void> {
   }
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
   try {
+    // analyze-owner-filter — 로그인 계정이 분석한 종목만. 소유자 미상(legacy) 행은 전 계정 노출,
+    // 미로그인(로컬 dev, 세션 없음)이면 null → 필터 없음(기존 동작 유지).
+    const viewer = await sessionEmail(request);
     const [decisions, activeJobs] = await withTimeout(
       Promise.all([
-        getAIDecisionCardSummaries(),
-        getActiveJobs(),
+        getAIDecisionCardSummaries(undefined, viewer),
+        getActiveJobs(undefined, viewer),
       ]),
       5_000,
     );
@@ -145,7 +155,7 @@ export async function GET(): Promise<Response> {
     // 테제 무효화 배지 — 라이브 시세 대비 무효화/손절 라인 돌파 여부. 전 구간 fail-soft:
     // 시세·레벨 조회가 실패하거나 느려도 배지만 빠지고 목록은 정상 응답한다(부가 정보).
     // 배지(현재 무효화 여부)와 채점 결과(지난 판정 성패)는 서로 독립 — 병렬로 붙여 지연을 합치지 않는다.
-    await Promise.all([attachThesisBreach(items), attachOutcome(items)]);
+    await Promise.all([attachThesisBreach(items, viewer), attachOutcome(items)]);
 
     const payload: AIDecisionListResponse = {
       configured: isAIDecisionStoreConfigured(),

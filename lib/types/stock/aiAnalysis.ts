@@ -126,6 +126,8 @@ export interface AIAnalysisDecisionSnapshot {
   sentiment: SentimentReport | null;
   /** 분석 시점 결정론 시그널 — legacy(이 컬럼 추가 이전) 행은 null. */
   signal: DecisionSignal | null;
+  /** 이 결론을 남긴 계정(analyze-owner-cards). `""` = 공용 버킷(legacy·미로그인). */
+  requestedBy: string;
   updatedAt: string;
 }
 

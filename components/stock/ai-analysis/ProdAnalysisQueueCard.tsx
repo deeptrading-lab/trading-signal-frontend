@@ -31,6 +31,7 @@ import {
   type ProdRequestPhase,
 } from "@/hooks/stock/useProdAnalysisRequest";
 import { useConfidenceCalibration } from "@/hooks/scorecard/useConfidenceCalibration";
+import { useMe } from "@/hooks/auth/useMe";
 import { VerdictHero } from "./VerdictHero";
 import { VerdictDetails } from "./VerdictDetails";
 import { ProdQueueBanner, type ProdQueueBannerTone } from "./ProdQueueBanner";
@@ -152,9 +153,17 @@ export function ProdAnalysisQueueCard({
         }
       : null;
   const shownBanner = banner ?? activeBanner;
+  // 미로그인은 분석을 요청할 수 없다(서버도 enqueue 401) — CTA 를 아예 안 그린다.
+  // 저장된 결과 열람은 그대로(데모 종목). 로딩 중에도 false = 안전 실패(권한 UI 선례).
+  const { authenticated } = useMe();
+
   // 요청을 보냈거나(배너) 이미 진행 중(activeJob)이면 재요청/첫요청 CTA 는 숨긴다 — 중복 요청 혼란 제거.
+  // 미로그인(!authenticated)도 같은 스위치로 한 번에 숨긴다(CTA 3곳 공통 게이트).
   const requested =
-    banner != null || request.phase === "requesting" || activeJob != null;
+    banner != null ||
+    request.phase === "requesting" ||
+    activeJob != null ||
+    !authenticated;
   // 로컬 SavedDecisionView 와 동일 staleness(3영업일+가격규칙) — 만료=상단 배너, 유효=하단 푸터로 갈린다.
   const staleness = snapshot
     ? evaluateDecisionStaleness({
@@ -192,6 +201,21 @@ export function ProdAnalysisQueueCard({
           action={errorRetryCta}
           leading={banner ? <WorkerActivityBadge /> : undefined}
         />
+      )}
+
+      {/* 미로그인 — CTA 대신 이유를 한 줄로. 결과(저장 카드)는 아래에 그대로 보인다. */}
+      {!authenticated && !shownBanner && (
+        <div
+          role="status"
+          className="rounded-lg bg-surface-muted p-card-px-mobile text-center"
+        >
+          <p className="text-body-sm-strong text-text-strong break-keep">
+            {COPY.prodQueue.loginRequiredTitle}
+          </p>
+          <p className="mt-1 text-body-sm text-text-muted leading-relaxed break-keep">
+            {COPY.prodQueue.loginRequiredDesc}
+          </p>
+        </div>
       )}
 
       {snapshot ? (

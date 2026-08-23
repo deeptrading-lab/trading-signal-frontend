@@ -62,7 +62,7 @@ async function main(): Promise<void> {
         skipped += 1;
         console.warn(`- ${d.ticker}: 종목명 미해석(KIS·시드 모두 없음) — 스킵`);
       } else {
-        const ok = await setDecisionName(d.ticker, name);
+        const ok = await setDecisionName(d.ticker, d.requestedBy, name);
         if (ok) {
           filled += 1;
           console.log(`✓ ${d.ticker} → ${name}`);

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimNextPending,
   enqueueAnalysis,
+  startProcessing,
   findActiveByTicker,
   getQueueDepth,
   isAnalysisQueueStoreConfigured,
@@ -575,5 +576,38 @@ describe("analysis queue store — fail-soft 예외 흡수", () => {
     await expect(getQueueDepth()).resolves.toBe(0);
 
     warnSpy.mockRestore();
+  });
+});
+
+describe("analysis queue store — 소유자 귀속(analyze-owner-filter)", () => {
+  beforeEach(configureEnv);
+
+  it("enqueue 시 requestedBy 를 requested_by 로 적재한다", async () => {
+    const fetchMock = vi
+      .fn()
+      // findActiveByTicker → 활성 row 없음.
+      .mockResolvedValueOnce(jsonRes([]))
+      // INSERT → 적재된 행 반환.
+      .mockResolvedValueOnce(jsonRes([{ id: 11 }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      enqueueAnalysis({ ticker: "005930", requestedBy: "a@b.com" }),
+    ).resolves.toEqual({ status: "queued", id: 11 });
+
+    const insertBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(insertBody.requested_by).toBe("a@b.com");
+  });
+
+  it("워커 경로(jobId 지정, 쿠키 없음)는 queue 행에서 소유자를 읽어온다", async () => {
+    // 요청 body 가 아니라 DB 행이 소유자의 출처 — 위조 불가.
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes([{ requested_by: "owner@b.com" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      startProcessing({ ticker: "005930", source: "prod", jobId: 42, requestedBy: null }),
+    ).resolves.toEqual({ jobId: 42, owned: false, requestedBy: "owner@b.com" });
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("id=eq.42");
   });
 });

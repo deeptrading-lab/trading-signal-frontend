@@ -10,11 +10,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { enqueueAnalysis } from "@/lib/server/ai/queueStore";
+import { requireProdSessionApi, sessionEmail } from "@/lib/server/auth/apiGuard";
 import { readHeartbeat } from "@/lib/server/ai/workerHeartbeat";
 import { getSymbolName } from "@/lib/api/kis";
 import { pickStockName } from "@/lib/utils/resolveStockName";
 
 export async function POST(req: NextRequest): Promise<Response> {
+  // 미로그인은 분석 실행 불가(analyze-owner-cards) — prod 한정. 로컬 dev·워커는 통과.
+  // prod 의 유일한 실행 경로가 이 enqueue 다(직접 실행 라우트는 Vercel 에서 이미 503).
+  const denied = await requireProdSessionApi(req);
+  if (denied) return denied;
+
   const body = (await req.json().catch(() => null)) as {
     ticker?: unknown;
     force?: unknown;
@@ -38,7 +44,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     typeof body.name === "string" ? body.name : undefined,
     getSymbolName(ticker),
   ]);
-  const result = await enqueueAnalysis({ ticker, force, name });
+  // 요청 계정 귀속(analyze-owner-filter) — 완료 결과 카드가 이 값으로 필터된다. 미로그인이면 null.
+  const requestedBy = await sessionEmail(req);
+  const result = await enqueueAnalysis({ ticker, force, name, requestedBy });
 
   if (result.status === "not_configured") {
     return NextResponse.json(

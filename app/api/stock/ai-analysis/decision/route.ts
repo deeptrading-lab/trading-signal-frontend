@@ -13,6 +13,7 @@ import {
   isAIDecisionStoreConfigured,
 } from "@/lib/server/ai/decisionStore";
 import { findActiveByTicker } from "@/lib/server/ai/queueStore";
+import { sessionEmail } from "@/lib/server/auth/apiGuard";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const ticker = (req.nextUrl.searchParams.get("ticker") ?? "")
@@ -23,8 +24,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "ticker가 필요합니다." }, { status: 400 });
   }
 
+  // 저장 결론은 요청 계정 스코프(analyze-owner-cards) — 내 카드/공용 버킷 중 최신.
+  const viewer = await sessionEmail(req);
   const [decision, activeRow] = await Promise.all([
-    getLatestAIDecision(ticker),
+    getLatestAIDecision(ticker, viewer),
     findActiveByTicker(ticker),
   ]);
 

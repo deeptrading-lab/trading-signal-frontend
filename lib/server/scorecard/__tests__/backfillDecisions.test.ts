@@ -77,7 +77,8 @@ function makeDecision(
     decision,
     sentiment: null,
     signal,
-    updatedAt: overrides.updatedAt ?? "2026-06-19T07:00:00.000Z",
+    requestedBy: "",
+  updatedAt: overrides.updatedAt ?? "2026-06-19T07:00:00.000Z",
   };
 }
 

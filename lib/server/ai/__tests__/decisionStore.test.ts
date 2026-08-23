@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DEMO_TICKERS,
   getAIDecisionCardSummaries,
   getLatestAIDecision,
   isAIDecisionStoreConfigured,
@@ -61,6 +62,7 @@ describe("AI decision Supabase store", () => {
     await expect(getLatestAIDecision("005930")).resolves.toBeNull();
     await expect(upsertAIDecision({
       ticker: "005930",
+      requestedBy: "",
       provider: "codex",
       decision,
       sentiment: null,
@@ -99,6 +101,7 @@ describe("AI decision Supabase store", () => {
       decision,
       sentiment: null,
       signal,
+      requestedBy: "",
       updatedAt: "2026-06-16T00:00:00.000Z",
     });
   });
@@ -195,6 +198,7 @@ describe("AI decision Supabase store", () => {
 
     const result = await upsertAIDecision({
       ticker: "005930",
+      requestedBy: "",
       provider: "claude",
       decision,
       sentiment: { band: "POSITIVE", score: 7, confidence: "medium", summary: "긍정" },
@@ -223,6 +227,7 @@ describe("AI decision Supabase store", () => {
     vi.stubGlobal("fetch", withName);
     await upsertAIDecision({
       ticker: "005930",
+      requestedBy: "",
       name: "삼성전자",
       provider: "claude",
       decision,
@@ -238,6 +243,7 @@ describe("AI decision Supabase store", () => {
     vi.stubGlobal("fetch", noName);
     await upsertAIDecision({
       ticker: "005930",
+      requestedBy: "",
       provider: "claude",
       decision,
       sentiment: null,
@@ -257,6 +263,7 @@ describe("AI decision Supabase store", () => {
     await expect(getLatestAIDecision("005930")).resolves.toBeNull();
     await expect(upsertAIDecision({
       ticker: "005930",
+      requestedBy: "",
       provider: "codex",
       decision,
       sentiment: null,
@@ -267,5 +274,42 @@ describe("AI decision Supabase store", () => {
     }));
 
     warnSpy.mockRestore();
+  });
+});
+
+describe("ai decision store — 계정별 카드(analyze-owner-cards)", () => {
+  it("로그인은 내 계정 행만·미로그인은 데모 종목만, 저장은 requested_by 를 PK 로 함께 쓴다", async () => {
+    configureEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+      text: async () => "",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // 로그인 — 내 계정 행만.
+    await getLatestAIDecision("005930", "me@x.com");
+    expect(decodeURIComponent(String(fetchMock.mock.calls[0][0]))).toContain(
+      "requested_by=eq.me@x.com",
+    );
+
+    // 미로그인 — 세션 없음 버킷('') + 데모 종목만. 남의 계정 행은 안 보인다.
+    await getLatestAIDecision("005930", null);
+    const anonUrl = decodeURIComponent(String(fetchMock.mock.calls[1][0]));
+    expect(anonUrl).toContain('or=(requested_by.eq."",ticker.in.(');
+    expect(anonUrl).toContain(DEMO_TICKERS[0]);
+
+    await upsertAIDecision({
+      ticker: "005930",
+      requestedBy: "me@x.com",
+      runId: "run-1",
+      provider: "claude",
+      decision,
+      sentiment: null,
+      signal: null,
+    });
+    const writeBody = JSON.parse(fetchMock.mock.calls[2][1].body as string);
+    expect(writeBody.requested_by).toBe("me@x.com");
+    expect(writeBody.run_id).toBe("run-1");
   });
 });

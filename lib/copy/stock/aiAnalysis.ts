@@ -403,6 +403,9 @@ export const COPY = {
    * 색·간격은 신규 토큰 0 — 기존 .card-info/.card-warn/.card-critical + accent-vivid 재사용.
    */
   prodQueue: {
+    /** 미로그인 — 분석 요청 차단(저장된 결과 열람은 가능) */
+    loginRequiredTitle: "로그인하면 분석을 요청할 수 있어요",
+    loginRequiredDesc: "지금은 저장된 분석 결과만 볼 수 있어요.",
     /** 빈 결과 인트로(S3) */
     emptyTitle: "아직 분석 결과가 없어요",
     emptyDesc: "요청하면 잠시 뒤 이 화면에서 결과를 볼 수 있어요.",
