@@ -51,11 +51,14 @@ export function ProfileCard({ profile }: ProfileCardProps) {
           {profile.status === "pending" && (
             <span className="badge-info">{PROFILE_STATUS_PENDING}</span>
           )}
-          <span className="text-caption text-text-muted">
-            {/* 3일 넘으면 절대 날짜(YYYY.MM.DD), 그 안이면 상대 표기 — 기존 헬퍼 재사용. */}
-            {formatRelativeTime(profile.createdAt)}
-            {PROFILE_JOINED_SUFFIX}
-          </span>
+          {/* 가입일은 값이 있을 때만 — 게스트(세션 없음)는 createdAt 이 비어 있어 "1970.01.01 가입"
+              같은 무의미한 표기가 새지 않게 한다. 3일 넘으면 절대 날짜, 그 안이면 상대 표기. */}
+          {profile.createdAt && (
+            <span className="text-caption text-text-muted">
+              {formatRelativeTime(profile.createdAt)}
+              {PROFILE_JOINED_SUFFIX}
+            </span>
+          )}
         </div>
       </div>
     </section>

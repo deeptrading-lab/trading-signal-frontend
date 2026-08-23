@@ -36,8 +36,9 @@ const GUEST_PROFILE: Profile = {
   role: "user",
   status: "approved",
   displayName: null,
-  createdAt: new Date(0).toISOString(),
-  updatedAt: new Date(0).toISOString(),
+  // 빈 문자열 = "가입일 없음" — ProfileCard 가 이 값일 때 가입일 표기를 건너뛴다.
+  createdAt: "",
+  updatedAt: "",
 };
 
 export default async function ProfileRoutePage() {
