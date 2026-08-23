@@ -8825,3 +8825,44 @@
   - `components/profile/` 폴더가 유저 프로필 컴포넌트와 **종목 상세 페이지 컴포넌트**(StockDailyChart · StockHeader · CompanyOverview · DisclosureList 등 15개)를 같이 담고 있다. "profile" 이 두 뜻으로 쓰여 혼란스러움 — `components/stock-detail/` 분리 검토.
   - 관심종목·최근 본 종목 서버 영구화(계정 귀속). `useWatchlistTickers` 가 저장소 중립이라 시그니처 유지한 채 store 만 교체 가능.
   - 알림·보안·결제 설정이 실제로 필요해지면 기능과 함께 메뉴 복원.
+
+### 2026-08-23 — fix(auth): 특권 경로는 쿠키 대신 DB 등급 대조 + 세션 7일 (#388)
+
+- **slug**: `hylee/live-role-check` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/388
+- **요약**: fix(auth): 특권 경로는 쿠키 대신 DB 등급 대조 + 세션 7일
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 문제
+  > 
+  > 세션 쿠키에 발급 시점 `role` 이 구워져 있고 `status` 는 아예 실리지 않는다. 그래서 **강등·승인취소가 기존 쿠키에 반영되지 않고**, 강등된 관리자가 쿠키 만료(30일)까지 관리자 API 를 계속 쓸 수 있었다. 서버가 남의 쿠키를 지울 방법은 없으므로, **특권을 판정하는 쪽이 요청 시점에 DB 를 확인**하도록 바꾼다.
+  > 
+  > ## B — 특권 경로 라이브 조회
+  > 
+  > `lib/server/auth/liveRole` 신설. 세션 `sub` 로 `profiles` 를 조회해 현재 `role`·`status` 를 돌려주고, 특권 판정(`hasLivePrivilege`)은 `approved` + 등급 위계를 함께 본다.
+  > 
+  > 적용 지점:
+  > - `apiGuard` 3함수 — `requireAdminApi` · `requireProdAdminApi` · `requireSuperadminApi`
+  > - `serverGuard.hasServerRole` — `/intraday` · `/intraday/[sessionId]` · `/dashboard/scorecard` · `/admin`
+  > - `app/api/admin/*` 3종의 인라인 게이트를 공용 가드로 통합(중복 제거)
+  > - `/api/auth/me` 도 DB 등급 반환 — 강등된 관리자에게 관리자 메뉴가 계속 보이던 **UI 불일치** 해소
+  > - `/profile` 관리자 메뉴도 조회된 프로필 기준으로 판정
+  > 
+  > **실패 정책**: 스토어 미설정(로컬 dev)은 세션 폴백(개발 무마찰), 스토어 오류·행 없음은 **거부(fail-closed)** — 설정됐는데 확인이 안 되면 열지 않는다.
+  > 
+  > **적용 범위는 저빈도 특권 경로만**. 일반 조회 API 와 Edge 게이트(`proxy.ts`)는 그대로 둔다 — 게이트는 "네트워크 I/O 0"(AC-15)이 명시적 설계 원칙이고, cron·스케줄러·워커는 HTTP 를 타지 않고 `lib/server` 를 직접 import 하므로 영향이 없다.
+  > 
+  > ## A — 세션 수명 30일 → 7일
+  > 
+  > 일반 조회 API 는 여전히 쿠키 유효기간만큼 열리므로, 그 잔여 노출 창을 좁힌다.
+  > 
+  > ## 검증
+  > 
+  > 실계정을 **하나도 바꾸지 않고** 강등을 재현했다 — 일반 유저(`DB role=user`)의 `sub` 로 `role: "superadmin"` 을 구운 **정상 서명 쿠키**를 만들면 "강등됐는데 옛 쿠키를 들고 있는 상태"와 동일하다.
+  > 
+  > | 검사 | 강등 상황 | 정상 superadmin |
+  > |---|---|---|
+  > | `/api/admin/users` | **403** | 200 |
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - **남는 노출(설계상 수용)**: 일반 조회 API 는 그대로라 승인취소된 유저가 쿠키 만료(7일)까지 데이터 열람 가능. 즉시 전면 차단이 필요해지면 KV revocation 마커 + Edge 게이트 대조로 확장(= 게이트 I/O 0 원칙을 깨는 결정이라 별도 판단 필요).
+  - 세션 슬라이딩 갱신(만료 임박 시 재서명) — 7일 재로그인이 번거로우면 검토.
