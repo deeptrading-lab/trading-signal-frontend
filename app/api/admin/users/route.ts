@@ -2,27 +2,20 @@
  * `GET /api/admin/users` — 전체 사용자 목록(BFF, Node 런타임). **superadmin 전용.**
  *
  * PRD user-login-auth Phase 2(3-tier 권한 — 유저 관리). 게이트는 role 을 안 보므로 라우트가
- * 직접 방어한다: `readSession` 이 **superadmin** 이 아니면 403(위계 `isAtLeast`). 스토어 오류 500.
+ * 직접 방어한다: 공용 가드(`requireAdminApi`)가 **DB 상 등급**을 대조해 미달이면 403. 스토어 오류 500.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readSession } from "@/lib/auth/session";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { isAtLeast } from "@/lib/auth/roles";
+import { requireAdminApi } from "@/lib/server/auth/apiGuard";
 import { listAllProfiles } from "@/lib/server/auth/profileStore";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const identity = await readSession(token);
   // 전체 목록 조회는 **admin 이상**(admin 은 읽기·승인만, 등급 변경은 superadmin 전용 /users/role).
-  if (!isAtLeast(identity?.role, "admin")) {
-    return NextResponse.json(
-      { error: "forbidden" },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  // live-role-check — 공용 가드가 DB 상 등급·승인상태를 대조한다(쿠키 role 불신).
+  const denied = await requireAdminApi(request);
+  if (denied) return denied;
 
   try {
     const profiles = await listAllProfiles();

@@ -1,6 +1,10 @@
 /**
  * route handler(BFF)용 role 게이트 — admin 전용 데이터 API 가 직접 fetch/URL 로 새지 않게 방어.
  *
+ * live-role-check: 등급 판정은 **쿠키가 아니라 DB** 를 본다(`resolveLiveIdentity`). 세션에는 발급
+ *   시점 role 이 구워져 있어 강등·승인취소가 반영되지 않기 때문. 관리자 라우트는 저빈도라
+ *   요청당 Supabase 1콜이 붙어도 무시할 만하다. 스토어 미설정(로컬 dev)이면 세션 값 폴백.
+ *
  * Edge proxy 게이트(`proxy.ts`)는 로그인 여부만 보고 role 은 안 보므로(설계상), admin 전용 데이터
  * 라우트는 각자 이 헬퍼로 방어한다. 페이지용 `lib/auth/serverGuard`(`cookies()` next/headers 기반)와
  * 달리 route handler 는 `NextRequest.cookies` 를 쓴다. `readSession` 이 HMAC 서명을 검증하므로
@@ -20,8 +24,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { isAtLeast } from "@/lib/auth/roles";
 import { isVercelEnv } from "@/lib/server/env";
+import {
+  hasLivePrivilege,
+  resolveLiveIdentity,
+  type LiveIdentity,
+} from "@/lib/server/auth/liveRole";
+import type { ProfileRole } from "@/lib/types/auth/profile";
 
 function forbidden(): NextResponse {
   return NextResponse.json(
@@ -30,17 +39,24 @@ function forbidden(): NextResponse {
   );
 }
 
-async function isAdminRequest(request: NextRequest): Promise<boolean> {
+/** 요청 쿠키의 세션을 DB 와 대조한 신원. 거부 대상이면 null. */
+async function liveIdentityOf(request: NextRequest): Promise<LiveIdentity | null> {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const identity = await readSession(token);
-  return isAtLeast(identity?.role, "admin");
+  return resolveLiveIdentity(await readSession(token));
+}
+
+async function hasRequestPrivilege(
+  request: NextRequest,
+  required: ProfileRole,
+): Promise<boolean> {
+  return hasLivePrivilege(await liveIdentityOf(request), required);
 }
 
 /** admin 미만이면 403, 아니면 null(통과). **환경 무관 admin+ 전용**(예: 성적표·A/B 리포트). */
 export async function requireAdminApi(
   request: NextRequest,
 ): Promise<NextResponse | null> {
-  return (await isAdminRequest(request)) ? null : forbidden();
+  return (await hasRequestPrivilege(request, "admin")) ? null : forbidden();
 }
 
 /**
@@ -52,7 +68,7 @@ export async function requireProdAdminApi(
   request: NextRequest,
 ): Promise<NextResponse | null> {
   if (!isVercelEnv()) return null;
-  return (await isAdminRequest(request)) ? null : forbidden();
+  return (await hasRequestPrivilege(request, "admin")) ? null : forbidden();
 }
 
 /**
@@ -72,12 +88,6 @@ export async function requireProdSessionApi(
   );
 }
 
-async function isSuperadminRequest(request: NextRequest): Promise<boolean> {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const identity = await readSession(token);
-  return isAtLeast(identity?.role, "superadmin");
-}
-
 /**
  * 요청 쿠키의 세션 이메일(소문자 정규화). 미로그인·서명 불일치·미설정이면 null.
  * analyze-owner-filter — "내가 분석한 종목만" 필터의 신원 출처. 가드가 아니라 **귀속용**이라
@@ -92,5 +102,5 @@ export async function sessionEmail(request: NextRequest): Promise<string | null>
 export async function requireSuperadminApi(
   request: NextRequest,
 ): Promise<NextResponse | null> {
-  return (await isSuperadminRequest(request)) ? null : forbidden();
+  return (await hasRequestPrivilege(request, "superadmin")) ? null : forbidden();
 }
