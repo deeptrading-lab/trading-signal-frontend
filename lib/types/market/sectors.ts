@@ -38,6 +38,14 @@ export type SectorRankingResponse = {
   sectors: SectorRankItem[];
   /** 기준 시각(ISO). */
   asOf: string;
+  /**
+   * 이 시세의 영업일 `YYYY-MM-DD`. 확보 실패 시 null.
+   *
+   * `asOf`(응답 시각)와 다르다. 주말·휴장일에 조회하면 `asOf` 는 오늘이지만 숫자는 직전 영업일
+   * 종가다. "9월 6일에 올랐다"처럼 틀린 문장이 나가지 않도록 시세의 날짜를 따로 싣는다.
+   * 업종 랭킹 TR 에는 영업일 필드가 없어 `fetchLatestTradingDate` 가 일자별 시세로 별도 조회한다.
+   */
+  tradingDate: string | null;
 };
 
 /** 구성종목 1행 — 대표/급등 종목(top-30 movers). */

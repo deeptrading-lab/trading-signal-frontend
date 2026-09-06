@@ -13,6 +13,7 @@
 
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { fetchSectorRanking } from "@/lib/api/kis/sectors";
+import { fetchLatestTradingDate } from "@/lib/api/kis/tradingDate";
 import { getMockSectorRanking } from "@/lib/mock/market/sectors";
 import type { SectorRankingResponse } from "@/lib/types/market/sectors";
 import {
@@ -39,11 +40,16 @@ export async function GET() {
   }
 
   try {
-    const sectors = await withTimeout(
-      fetchWithTransientRetryOrThrow(
-        () => fetchSectorRanking(TOP_N),
-        RETRY_BACKOFF_MS,
-      ),
+    // 거래일은 별도 TR 이라 랭킹과 나란히 부른다. `fetchLatestTradingDate` 는 자체적으로
+    // 실패를 null 로 흡수하므로 랭킹 조회를 망치지 않는다.
+    const [sectors, tradingDate] = await withTimeout(
+      Promise.all([
+        fetchWithTransientRetryOrThrow(
+          () => fetchSectorRanking(TOP_N),
+          RETRY_BACKOFF_MS,
+        ),
+        fetchLatestTradingDate(),
+      ]),
       BFF_TIMEOUT_MS,
     );
     if (sectors.length === 0) {
@@ -55,6 +61,7 @@ export async function GET() {
     const result: SectorRankingResponse = {
       sectors,
       asOf: new Date().toISOString(),
+      tradingDate,
     };
     return jsonWithDataSource(result, "kis", { "X-KIS-Env": resolveKisEnv() });
   } catch (error) {
