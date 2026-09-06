@@ -10,19 +10,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../price", () => ({ fetchStockDaily: vi.fn() }));
 
-import { fetchLatestTradingDate } from "../tradingDate";
+import { fetchLatestTradingDate, resetTradingDateCache } from "../tradingDate";
 import { fetchStockDaily } from "../price";
 import type { StockDailyCandle } from "../types";
 
 const mocked = vi.mocked(fetchStockDaily);
 
-function candle(date: string): StockDailyCandle {
-  return { date, open: 1, high: 1, low: 1, close: 1, volume: 1 };
+function candle(date: string, close = 1): StockDailyCandle {
+  return { date, open: 1, high: 1, low: 1, close, volume: close ? 1 : 0 };
 }
 
 describe("fetchLatestTradingDate", () => {
   beforeEach(() => {
     mocked.mockReset();
+    resetTradingDateCache();
   });
 
   it("과거순으로 와도 가장 최근 영업일을 고른다", async () => {
@@ -43,5 +44,40 @@ describe("fetchLatestTradingDate", () => {
   it("응답이 비면 null 을 준다", async () => {
     mocked.mockResolvedValue([]);
     await expect(fetchLatestTradingDate()).resolves.toBeNull();
+  });
+
+  it("체결 없는 자리채움 행은 거래일로 삼지 않는다", async () => {
+    // 개장 전에는 오늘 날짜의 종가·거래량 0 행이 먼저 올 수 있다. 그 행이 최댓값을 차지하면
+    // 아직 열리지 않은 날이 "이 시세의 거래일"로 나가 버린다.
+    mocked.mockResolvedValue([candle("2026-09-07", 0), candle("2026-09-04")]);
+    await expect(fetchLatestTradingDate()).resolves.toBe("2026-09-04");
+  });
+
+  it("형식이 깨진 날짜는 무시한다", async () => {
+    // formatDate 는 8자리가 아닌 원본을 그대로 통과시킨다. 사전식 비교에서는 그런 값이 이길 수 있다.
+    mocked.mockResolvedValue([candle("99999999"), candle("2026-09-04")]);
+    await expect(fetchLatestTradingDate()).resolves.toBe("2026-09-04");
+  });
+
+  it("TTL 안에서는 다시 조회하지 않는다", async () => {
+    mocked.mockResolvedValue([candle("2026-09-04")]);
+    await fetchLatestTradingDate(0);
+    await fetchLatestTradingDate(60_000);
+    expect(mocked).toHaveBeenCalledTimes(1);
+  });
+
+  it("TTL 이 지나면 다시 조회한다", async () => {
+    mocked.mockResolvedValue([candle("2026-09-04")]);
+    await fetchLatestTradingDate(0);
+    mocked.mockResolvedValue([candle("2026-09-07")]);
+    await expect(fetchLatestTradingDate(31 * 60_000)).resolves.toBe("2026-09-07");
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+
+  it("실패는 캐시하지 않는다", async () => {
+    mocked.mockRejectedValueOnce(new Error("KIS 500"));
+    await expect(fetchLatestTradingDate(0)).resolves.toBeNull();
+    mocked.mockResolvedValue([candle("2026-09-04")]);
+    await expect(fetchLatestTradingDate(1_000)).resolves.toBe("2026-09-04");
   });
 });
