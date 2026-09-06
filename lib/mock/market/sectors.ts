@@ -46,6 +46,8 @@ export function getMockSectorRanking(topN: number): SectorRankingResponse {
   return {
     sectors: MOCK_SECTORS.slice(0, topN),
     asOf: new Date().toISOString(),
+    // mock 은 어느 영업일의 값도 아니다. null 로 두어 소비자가 날짜를 적지 않게 한다.
+    tradingDate: null,
   };
 }
 

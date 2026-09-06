@@ -13,6 +13,7 @@
 
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { fetchSectorRanking } from "@/lib/api/kis/sectors";
+import { fetchLatestTradingDate } from "@/lib/api/kis/tradingDate";
 import { getMockSectorRanking } from "@/lib/mock/market/sectors";
 import type { SectorRankingResponse } from "@/lib/types/market/sectors";
 import {
@@ -24,6 +25,8 @@ import {
 
 const BFF_TIMEOUT_MS = 10_000; // breadth fan-out 포함이라 단건보다 여유.
 const RETRY_BACKOFF_MS = 250;
+/** 거래일 조회 예산 — 랭킹 예산을 잠식하지 않도록 짧게 끊는다. */
+const TRADING_DATE_TIMEOUT_MS = 2_000;
 /** 표시 상위 업종 수 — 토스 밀도(≈13) 정합. */
 const TOP_N = 13;
 
@@ -39,11 +42,20 @@ export async function GET() {
   }
 
   try {
-    const sectors = await withTimeout(
-      fetchWithTransientRetryOrThrow(
-        () => fetchSectorRanking(TOP_N),
-        RETRY_BACKOFF_MS,
-      ),
+    // 거래일은 별도 TR 이라 랭킹과 나란히 부르되, **자기 예산**을 준다.
+    // 예외는 `fetchLatestTradingDate` 가 스스로 흡수하지만 지연은 흡수하지 못한다. 랭킹의 10초를
+    // 나눠 쓰게 두면 토스 폴백·재시도로 느려진 거래일 조회 하나가 이미 성공한 랭킹까지 mock 으로
+    // 떨어뜨린다. 짧은 예산 안에 못 오면 날짜 없이 내보낸다(소비자는 null 이면 표기하지 않는다).
+    const [sectors, tradingDate] = await withTimeout(
+      Promise.all([
+        fetchWithTransientRetryOrThrow(
+          () => fetchSectorRanking(TOP_N),
+          RETRY_BACKOFF_MS,
+        ),
+        withTimeout(fetchLatestTradingDate(), TRADING_DATE_TIMEOUT_MS).catch(
+          () => null,
+        ),
+      ]),
       BFF_TIMEOUT_MS,
     );
     if (sectors.length === 0) {
@@ -55,6 +67,7 @@ export async function GET() {
     const result: SectorRankingResponse = {
       sectors,
       asOf: new Date().toISOString(),
+      tradingDate,
     };
     return jsonWithDataSource(result, "kis", { "X-KIS-Env": resolveKisEnv() });
   } catch (error) {
