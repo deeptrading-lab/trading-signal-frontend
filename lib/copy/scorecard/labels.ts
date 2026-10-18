@@ -142,3 +142,23 @@ export const METRIC_MODE_LABEL: Record<string, string> = {
   excess: "초과수익(시장 대비)",
   beta_adjusted: "베타보정 알파",
 };
+
+// ── 오픈베타 전환 기준(방향 적중 게이트) ─────────────────────────────────────────
+
+export const GATE_TITLE = "오픈베타 전환 기준";
+export function gateCriteria(marginPp: number, minN: number): string {
+  return `2주 뒤 방향 적중률이 찍기 점수보다 ${marginPp}%p 이상 높고, 방향별 ${minN}건 이상일 때 통과`;
+}
+export const GATE_BASE_NOTE =
+  "찍기 점수 = 같은 기간 채점된 전체 판정(중립 포함) 중 실제로 그 방향으로 움직인 비율";
+export const GATE_SIDE_LABEL = { bull: "오른다 (매수 계열)", bear: "내린다 (매도·주의 계열)" } as const;
+export const GATE_COL_SIDE = "방향";
+export const GATE_COL_N = "건수";
+export const GATE_COL_HIT_RATE = "적중률";
+export const GATE_COL_BASE = "찍기 점수";
+export const GATE_COL_DIFF = "차이";
+export const GATE_COL_RESULT = "판정";
+export const GATE_RESULT = { pass: "통과", fail: "미달", pending: "표본 부족" } as const;
+export function gateHeadline(pass: boolean, sample: number): string {
+  return pass ? `기준 통과 · 채점 ${sample}건` : `기준 미달 · 채점 ${sample}건`;
+}

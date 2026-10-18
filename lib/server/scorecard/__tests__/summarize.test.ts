@@ -6,7 +6,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { summarizeScorecard, countScored } from "@/lib/server/scorecard/summarize";
+import {
+  summarizeScorecard,
+  countScored,
+  summarizeDirectionGate,
+} from "@/lib/server/scorecard/summarize";
 import type { HorizonStatus, ScorecardRow } from "@/lib/types/scorecard/scorecard";
 
 function row(d1: HorizonStatus, overrides: Partial<ScorecardRow> = {}): ScorecardRow {
@@ -145,5 +149,62 @@ describe("summarizeScorecard — AC-7", () => {
   it("빈 입력 → 빈 셀 배열", () => {
     expect(summarizeScorecard([])).toEqual([]);
     expect(countScored([])).toBe(0);
+  });
+});
+
+describe("summarizeDirectionGate — 오픈베타 전환 기준", () => {
+  const w2 = (verdict: ScorecardRow["verdict"], ret: number | null, status: HorizonStatus = "hit") =>
+    row("pending", { verdict, w2Status: status, w2ReturnPct: ret });
+
+  it("찍기 점수는 전체 표본(HOLD 포함) 중 그 방향으로 움직인 비율", () => {
+    // 10건: 6 상승 · 4 하락. 강세 5건 중 4 상승, 약세 4건 중 2 하락, HOLD 1(상승).
+    const rows = [
+      ...[1, 2, 3, 4].map((r) => w2("OVERWEIGHT", r)),
+      w2("BUY", -1, "miss"),
+      w2("UNDERWEIGHT", -2),
+      w2("REDUCE", -3),
+      w2("UNDERWEIGHT", 2, "miss"),
+      w2("SELL", -4, "flat"),
+      w2("HOLD", 1),
+    ];
+    // 위: 상승 = 4(OW)+1(UW 2)+1(HOLD)=6, 하락 = BUY -1, UW -2, REDUCE -3, SELL -4 = 4
+    const g = summarizeDirectionGate(rows);
+    expect(g.sample).toBe(10);
+    expect(g.bull).toMatchObject({ n: 5, hits: 4, hitRate: 0.8, baseRate: 0.6 });
+    expect(g.bull.diffPp).toBeCloseTo(20);
+    expect(g.bear).toMatchObject({ n: 4, hits: 3, hitRate: 0.75, baseRate: 0.4 });
+    // 표본 부족이라 우위가 커도 통과 아님.
+    expect(g.bull.enoughSample).toBe(false);
+    expect(g.pass).toBe(false);
+  });
+
+  it("방향별 50건 이상 + 찍기 대비 +10%p 이상이면 통과, 경계 포함", () => {
+    // 강세 50건: 35 상승(70%). 약세 50건: 30 하락(60%). 전체 상승 35+20=55 → 55%, 하락 15+30=45 → 45%.
+    const bull = Array.from({ length: 50 }, (_, i) => w2("OVERWEIGHT", i < 35 ? 1 : -1));
+    const bear = Array.from({ length: 50 }, (_, i) => w2("UNDERWEIGHT", i < 30 ? -1 : 1));
+    const g = summarizeDirectionGate([...bull, ...bear]);
+    expect(g.bull.diffPp).toBeCloseTo(15);
+    expect(g.bear.diffPp).toBeCloseTo(15);
+    expect(g.pass).toBe(true);
+
+    // 강세 적중을 32건(64%)으로 낮추면 base 52% → +12%p 통과, 30건이면 60% vs 50% = +10%p 경계 통과.
+    const edge = Array.from({ length: 50 }, (_, i) => w2("OVERWEIGHT", i < 30 ? 1 : -1));
+    const g2 = summarizeDirectionGate([...edge, ...bear]);
+    expect(g2.bull.diffPp).toBeCloseTo(10);
+    expect(g2.bull.pass).toBe(true);
+  });
+
+  it("미채점(pending/skipped)·수익률 null·수익률 0 처리", () => {
+    const rows = [
+      w2("OVERWEIGHT", 3, "pending"),
+      w2("OVERWEIGHT", null, "skipped"),
+      w2("OVERWEIGHT", null),
+      w2("OVERWEIGHT", 0, "flat"),
+    ];
+    const g = summarizeDirectionGate(rows);
+    // 수익률 0 한 건만 표본 — 상승도 하락도 아님 → 적중 0, 찍기 0%.
+    expect(g.sample).toBe(1);
+    expect(g.bull).toMatchObject({ n: 1, hits: 0, hitRate: 0, baseRate: 0 });
+    expect(summarizeDirectionGate([]).bull).toMatchObject({ n: 0, hitRate: null, baseRate: null, diffPp: null });
   });
 });

@@ -14,7 +14,11 @@ import {
   getAllScorecardRows,
   isScorecardStoreConfigured,
 } from "@/lib/server/scorecard/scorecardStore";
-import { countScored, summarizeScorecard } from "@/lib/server/scorecard/summarize";
+import {
+  countScored,
+  summarizeDirectionGate,
+  summarizeScorecard,
+} from "@/lib/server/scorecard/summarize";
 import { SCORING_METRIC_MODE } from "@/lib/server/scorecard/constants";
 import {
   jsonWithDataSource,
@@ -38,6 +42,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       cells: [],
       scoredCount: 0,
       totalRows: 0,
+      directionGate: null,
       generatedAt: new Date().toISOString(),
     };
     return jsonWithDataSource(payload, "supabase-unconfigured");
@@ -51,6 +56,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       cells: summarizeScorecard(rows),
       scoredCount: countScored(rows),
       totalRows: rows.length,
+      directionGate: summarizeDirectionGate(rows),
       generatedAt: new Date().toISOString(),
     };
     return jsonWithDataSource(payload, "supabase");

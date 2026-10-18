@@ -21,6 +21,7 @@ import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryScorecardSummary } from "@/hooks/scorecard/useQueryScorecardSummary";
 import { ScorecardTable } from "./ScorecardTable";
+import { DirectionGatePanel } from "./DirectionGatePanel";
 import type {
   ScorecardDimension,
   ScorecardHorizon,
@@ -121,6 +122,10 @@ export function ScorecardContainer() {
 
   return (
     <div className="flex flex-col gap-md">
+      {data.directionGate && data.directionGate.sample > 0 ? (
+        <DirectionGatePanel gate={data.directionGate} />
+      ) : null}
+
       {/* 필터 + 새로고침 줄 */}
       <div className="flex flex-wrap items-end gap-md">
         <label className="flex flex-col gap-xs text-body-sm text-text-muted">
