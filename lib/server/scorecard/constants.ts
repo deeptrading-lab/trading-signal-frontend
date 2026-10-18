@@ -139,3 +139,17 @@ export const BENCH_INDEX_CODE = {
  * KOSPI 가 시총 비중이 커 시장 베타 근사로 더 보수적(과대 hit 위험 낮음). 한계는 PRD §6 명시.
  */
 export const BENCH_FALLBACK_CODE = BENCH_INDEX_CODE.KOSPI;
+
+// ─── 오픈베타 전환 기준(방향 적중 게이트) ────────────────────────────────────
+//
+// 종목 AI 분석이 "오른다/내린다" 기조를 맞히는지 본다. 50% 같은 고정 기준은 장세에 따라 찍기로도
+// 넘으므로, 같은 기간 분석 종목의 실제 상승·하락 비율(찍기 점수) 대비 우위를 요구한다.
+
+/** 게이트 판정 horizon — 2주(10영업일). */
+export const OPEN_BETA_HORIZON: ScorecardHorizon = "w2";
+
+/** 찍기 점수 대비 요구 우위(%p). 방향별 50건에서 우연 변동 ±7%p 를 넘는 폭. */
+export const OPEN_BETA_MARGIN_PP = 10;
+
+/** 방향별 최소 표본 수. 미만이면 그 방향은 판정 보류. */
+export const OPEN_BETA_MIN_N = 50;

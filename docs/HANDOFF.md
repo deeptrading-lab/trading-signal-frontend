@@ -8963,3 +8963,41 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 브랜드 8단계 05(신뢰) 진행 — 채점 기록 축적 과정 자체를 신뢰 증거로 설계.
   - 적중률 자체가 아직 찍기 수준(2주 BUY 40% vs 기준 45%) — AI 판정 품질(UNDERWEIGHT 쏠림) 개선 과제.
+
+### 2026-10-18 — feat(scorecard): 성적표에 오픈베타 전환 기준 표시 (#392)
+
+- **slug**: `scorecard-direction-gate` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/392
+- **요약**: feat(scorecard): 성적표에 오픈베타 전환 기준 표시
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > `/dashboard/scorecard`(운영자 전용) 상단에 **오픈베타 전환 기준** 판정을 표시한다. 기준을 매번 수동 스크립트로 재지 않고, 매일 채점 cron 결과로 늘 최신 상태를 본다.
+  > 
+  > **기준 (2026-10-18 확정)**
+  > - horizon 2주(10영업일).
+  > - 강세군(BUY·OVERWEIGHT) 적중 = 2주 수익률 > 0, 약세군(SELL·REDUCE·UNDERWEIGHT) 적중 = 수익률 < 0.
+  > - 찍기 점수 = 같은 표본 전체(HOLD 포함) 중 그 방향으로 움직인 비율. 고정 50% 는 장세에 따라 찍기로도 넘기 때문.
+  > - 방향별 적중률 ≥ 찍기 점수 + 10%p, 방향별 50건 이상 → 통과. 두 방향 모두 통과해야 전체 통과.
+  > 
+  > ## 변경
+  > - `lib/server/scorecard/constants.ts` — `OPEN_BETA_HORIZON`·`OPEN_BETA_MARGIN_PP`·`OPEN_BETA_MIN_N`.
+  > - `lib/server/scorecard/summarize.ts` — 순수 함수 `summarizeDirectionGate`. 경계(+10%p) 부동소수 오차(9.999…) 반올림 처리.
+  > - `lib/types/scorecard/scorecard.ts` — `DirectionGate`/`DirectionGateSide`, `ScorecardSummaryResponse.directionGate`.
+  > - `app/api/scorecard/summary/route.ts` — 응답에 `directionGate` (미설정이면 null). admin 게이트 그대로.
+  > - `components/scorecard/DirectionGatePanel.tsx` 신규 + `ScorecardContainer` 상단 배치. 판정 색 = 통과 `outcome-hit` / 미달 `warn` / 표본 부족 muted (등락색 미사용).
+  > 
+  > ## 확인
+  > - vitest scorecard 146건 통과(신규 3건: 찍기 점수 산출·50건/+10%p 경계·미채점/수익률 0/null 처리). tsc·eslint 통과.
+  > - 실데이터 130행으로 함수 실행 → 강세 20건 40% vs 찍기 45% (−4.6%p, 표본 부족) · 약세 101건 57% vs 55% (+2.0%p, 미달) → 전체 미달. 수동 측정값과 일치.
+  > 
+  > ## 한계
+  > - 찍기 점수는 전 기간 풀링(진입 주 매칭 아님) — 국면이 섞이면 왜곡 가능. 코드에 `ponytail:` 주석으로 업그레이드 경로 명시.
+  > 
+  > ## 다음 작업
+  > - AI 판정 품질: UNDERWEIGHT 쏠림(130건 중 79건)과 강세 판정 부족으로 강세군 50건 도달이 멀다.
+  > - 카드 채점 배지 부착률(20장 중 14장) 원인 확인.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - AI 판정 품질: UNDERWEIGHT 쏠림(130건 중 79건)과 강세 판정 부족으로 강세군 50건 도달이 멀다.
+  - 카드 채점 배지 부착률(20장 중 14장) 원인 확인.

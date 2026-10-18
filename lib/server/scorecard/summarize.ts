@@ -13,6 +13,8 @@
  */
 
 import type {
+  DirectionGate,
+  DirectionGateSide,
   HorizonStatus,
   ScorecardConfidence,
   ScorecardHorizon,
@@ -20,7 +22,13 @@ import type {
   ScorecardRow,
   ScorecardSummaryCell,
 } from "@/lib/types/scorecard/scorecard";
-import { HORIZONS, HIT_THRESHOLD_PCT } from "@/lib/server/scorecard/constants";
+import {
+  HORIZONS,
+  HIT_THRESHOLD_PCT,
+  OPEN_BETA_HORIZON,
+  OPEN_BETA_MARGIN_PP,
+  OPEN_BETA_MIN_N,
+} from "@/lib/server/scorecard/constants";
 import { scoreOutcome } from "@/lib/server/scorecard/scoring";
 
 type Counts = {
@@ -193,4 +201,77 @@ export function summarizeScorecard(rows: ScorecardRow[]): ScorecardSummaryCell[]
   }
 
   return cells;
+}
+
+const BULL_VERDICTS = new Set<ScorecardRow["verdict"]>(["BUY", "OVERWEIGHT"]);
+const BEAR_VERDICTS = new Set<ScorecardRow["verdict"]>(["SELL", "REDUCE", "UNDERWEIGHT"]);
+
+function gateSide(n: number, hits: number, baseCount: number, sample: number): DirectionGateSide {
+  const hitRate = n > 0 ? hits / n : null;
+  const baseRate = sample > 0 ? baseCount / sample : null;
+  // 소수 6자리 반올림 — (0.6 − 0.5) × 100 = 9.999… 처럼 부동소수 오차로 경계(+10%p)가 미달되는 것 방지.
+  const diffPp =
+    hitRate !== null && baseRate !== null
+      ? Math.round((hitRate - baseRate) * 100 * 1e6) / 1e6
+      : null;
+  const enoughSample = n >= OPEN_BETA_MIN_N;
+  return {
+    n,
+    hits,
+    hitRate,
+    baseRate,
+    diffPp,
+    enoughSample,
+    pass: enoughSample && diffPp !== null && diffPp >= OPEN_BETA_MARGIN_PP,
+  };
+}
+
+/**
+ * 오픈베타 전환 기준 — 강세군/약세군 방향 적중률이 같은 표본의 찍기 점수보다 MARGIN 이상 높은가.
+ *
+ * ponytail: 찍기 점수는 전 기간 풀링(같은 진입 주끼리 매칭 아님). 표본이 진입일별로 충분히 쌓이면
+ * 진입 주 단위 base rate 로 바꿀 것(풀링은 국면이 섞이면 Simpson 왜곡 가능).
+ */
+export function summarizeDirectionGate(
+  rows: ScorecardRow[],
+  h: ScorecardHorizon = OPEN_BETA_HORIZON,
+): DirectionGate {
+  let sample = 0;
+  let up = 0;
+  let down = 0;
+  let bullN = 0;
+  let bullHits = 0;
+  let bearN = 0;
+  let bearHits = 0;
+
+  for (const row of rows) {
+    const s = horizonStatus(row, h);
+    if (s !== "hit" && s !== "miss" && s !== "flat") continue;
+    const ret = horizonReturnPct(row, h);
+    if (ret === null || !Number.isFinite(ret)) continue;
+
+    sample += 1;
+    if (ret > 0) up += 1;
+    else if (ret < 0) down += 1;
+
+    if (BULL_VERDICTS.has(row.verdict)) {
+      bullN += 1;
+      if (ret > 0) bullHits += 1;
+    } else if (BEAR_VERDICTS.has(row.verdict)) {
+      bearN += 1;
+      if (ret < 0) bearHits += 1;
+    }
+  }
+
+  const bull = gateSide(bullN, bullHits, up, sample);
+  const bear = gateSide(bearN, bearHits, down, sample);
+  return {
+    horizon: h,
+    sample,
+    marginPp: OPEN_BETA_MARGIN_PP,
+    minN: OPEN_BETA_MIN_N,
+    bull,
+    bear,
+    pass: bull.pass && bear.pass,
+  };
 }

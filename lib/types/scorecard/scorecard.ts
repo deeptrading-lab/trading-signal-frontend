@@ -211,6 +211,39 @@ export interface ScorecardSummaryCell {
   absSample: number;
 }
 
+/**
+ * 오픈베타 전환 기준 — 한 방향(강세군/약세군)의 방향 적중 vs 찍기 점수.
+ * 강세군 적중 = 수익률 > 0, 약세군 적중 = 수익률 < 0(절대 수익률 기준 — 사용자가 체감하는 오르내림).
+ */
+export interface DirectionGateSide {
+  /** 이 방향으로 판정해 채점된 건수. */
+  n: number;
+  /** 방향이 맞은 건수. */
+  hits: number;
+  /** hits / n. n=0 이면 null. */
+  hitRate: number | null;
+  /** 찍기 점수 — 같은 표본 전체(HOLD 포함) 중 이 방향으로 움직인 비율. 표본 0 이면 null. */
+  baseRate: number | null;
+  /** (hitRate − baseRate) × 100 (%p). 둘 중 하나라도 null 이면 null. */
+  diffPp: number | null;
+  /** n ≥ OPEN_BETA_MIN_N. */
+  enoughSample: boolean;
+  /** enoughSample && diffPp ≥ OPEN_BETA_MARGIN_PP. */
+  pass: boolean;
+}
+
+export interface DirectionGate {
+  horizon: ScorecardHorizon;
+  /** 찍기 점수 분모 — 이 horizon 에서 수익률이 확정된 전체 판정 수. */
+  sample: number;
+  marginPp: number;
+  minN: number;
+  bull: DirectionGateSide;
+  bear: DirectionGateSide;
+  /** 두 방향 모두 pass. */
+  pass: boolean;
+}
+
 export interface ScorecardSummaryResponse {
   /** Supabase 연결 여부 — false 면 빈 집계 + 미설정 안내. */
   configured: boolean;
@@ -221,6 +254,8 @@ export interface ScorecardSummaryResponse {
   scoredCount: number;
   /** 채점 원장 전체 행 수(pending 포함). */
   totalRows: number;
+  /** 오픈베타 전환 기준 판정. 미설정이면 null. */
+  directionGate: DirectionGate | null;
   generatedAt: string;
 }
 
