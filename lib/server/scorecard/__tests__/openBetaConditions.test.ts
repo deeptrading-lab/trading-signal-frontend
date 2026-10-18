@@ -103,6 +103,11 @@ describe("summarizeBadgeCoverage", () => {
     expect(summarizeBadgeCoverage([], [], NOW).status).toBe("pending");
   });
 
+  it("성숙 카드가 있는데 원장이 비면(원장 조회 실패) 0% 미달이 아니라 확인 불가", () => {
+    const cards = [{ ticker: "005930", updatedAt: "2026-09-01T00:00:00.000Z", runId: null }];
+    expect(summarizeBadgeCoverage(cards, [], NOW).status).toBe("unknown");
+  });
+
   it("16일 성숙 전 카드·US 카드는 제외", () => {
     const res = summarizeBadgeCoverage(
       [

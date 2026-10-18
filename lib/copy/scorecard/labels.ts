@@ -226,8 +226,14 @@ export const OPEN_BETA_ITEMS = {
   },
 } as const;
 
+/** 실측 비율 — 소수 첫째 자리 **내림**(94.9% 가 "95%"로 올라가 기준을 넘은 것처럼 보이지 않게). */
+const measuredPct = (rate: number) => {
+  const v = Math.floor(rate * 1000) / 10;
+  return `${Number.isInteger(v) ? v : v.toFixed(1)}%`;
+};
+
 export function openBetaRatioValue(n: number, count: number, rate: number | null, empty: string): string {
-  return rate === null ? empty : `${pctOf(rate)} (${count}/${n})`;
+  return rate === null ? empty : `${measuredPct(rate)} (${count}/${n})`;
 }
 
 export const OPEN_BETA_CONTINUITY_REASON = {

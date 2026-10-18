@@ -124,6 +124,8 @@ export function summarizeBadgeCoverage(
     list.push(toOutcomeCandidate(row));
     byTicker.set(row.ticker, list);
   }
+  // 원장 조회 실패는 빈 배열로 온다 — 성숙 카드가 있는데 원장이 비면 "0% 미달"이 아니라 확인 불가.
+  if (rows.length === 0 && mature.length > 0) return { status: "unknown", n: 0, count: 0, rate: null };
   const withBadge = mature.filter(
     (c) => resolveDecisionOutcome(byTicker.get(c.ticker) ?? [], c.updatedAt, c.runId) !== null,
   ).length;
