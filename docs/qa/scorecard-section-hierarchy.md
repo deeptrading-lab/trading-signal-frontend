@@ -1,15 +1,64 @@
 # QA — scorecard-section-hierarchy (성적표 섹션 구분·정보 위계)
 
 - 실행: 2026-10-18 23:07 KST, QA 역할
-- 대상: PR #396 `feature/scorecard-section-hierarchy` @ `7591306` (1차), `5c9994b` (재QA)
+- 대상: PR #396 `feature/scorecard-section-hierarchy` @ `7591306` (1차), `5c9994b` (재QA), `aea24f5` (3차)
 - 근거: PR 본문 (사용자 피드백 "섹션 구분감 부족, 중요/부가 정보 구분 안 됨", 카드 UI 는 원하지 않음), 매니저가 준 AC 1~5. 별도 PRD 없음 (경량 UX 폴리시).
 - 방법: `.env.local` 로 Supabase·KV 를 **GET 만** 해서 실데이터 summary 를 만들었다 (`/tmp/qa396/live.json`, 원장 130행). 실제 `ScorecardContainer` 를 `renderToStaticMarkup` 으로 SSR 하고, `next build` CSS 두 청크를 실제 앱과 같은 순서(`08j4-82y0jq1w.css` → `0dkkqyqcjhd07.css`, `page_client-reference-manifest.js` 기준)로 붙여 headless Chromium(Playwright)에서 쟀다. 필터 상태(집계 기준·평가 시점)는 임시 vitest 하니스에서 `react` 의 `useState` 초기값을 바꿔 렌더했다. 다크 모드는 `<html class="dark">`.
   - 로컬 `next start` + 관리자 세션 렌더는 하지 않았다. 로컬 서버를 띄우면 서버 스케줄러(단타 자동틱 등)가 공유 Supabase 에 쓰기를 할 수 있어서 "GET 만" 조건을 지키려고 정적 렌더를 썼다. 관리자 세션을 쓰려면 세션 쿠키를 직접 서명해야 하는 점도 피했다.
   - 임시 파일(`qa-tmp396/`)은 삭제했고 커밋하지 않았다.
 
-## 최종 판정: qa-passed (재QA @ `5c9994b`, 실패 0건)
+## 최종 판정: qa-passed (3차 QA @ `aea24f5`, 실패 0건)
 
-1차(`7591306`)는 qa-failed 였고, 수정 커밋 `5c9994b` 에서 실패 2건(AC-3e/3f)이 해소됐다. 아래 "재QA (5c9994b)" 절 참고. 1차 기록은 그 아래에 그대로 둔다.
+1차(`7591306`)는 qa-failed 였고, `5c9994b` 에서 실패 2건(AC-3e/3f)이 해소됐다(재QA). 그 뒤 리뷰 변경 요청을 반영한 `aea24f5` 를 아래 "3차 QA (aea24f5)" 절에서 다시 검증했다. 재QA·1차 기록은 그 아래에 그대로 둔다.
+
+## 3차 QA (aea24f5)
+
+- 실행: 2026-10-18 23:17 KST. 재QA 와 같은 방법 — 실제 `ScorecardContainer` 를 `renderToStaticMarkup` 으로 SSR(조회 훅 mock + `useState` 초기값으로 필터 상태 지정), 새 `next build` CSS 두 청크를 `page_client-reference-manifest.js` 순서(`0m0i3yrsw667u.css` → `0dkkqyqcjhd07.css`)로 붙여 headless Chromium 에서 측정.
+- 데이터: 실데이터 스냅샷 `/tmp/qa396/live.json`(원장 130행) 재사용 + 성숙도 혼재 시드(판정별, BUY d1/w1/w2/m1 = 12/8/5/3, HOLD 전부 9). Supabase 신규 조회 없음(쓰기 0).
+- 임시 하니스(`qa-tmp396/`)는 삭제했고 커밋하지 않았다.
+
+### 수정 내용 (검증 대상)
+
+| 항목 | 변경 |
+|---|---|
+| 표본 부족 안내 | `SMALL_SAMPLE_HINT` 를 그룹 첫 행 구분 칸 → **각 행의 평가 시점 칸** 으로 이동 |
+| 모바일 열 | 보합·적중률(절대) 헤더·본문에 `hidden md:table-cell` (768px 미만 숨김) |
+| 정렬 | `orderDetailCells` 그룹 크기를 시점 필터 **후** 보이는 행 기준으로. `HORIZON_ORDER` 를 `ScorecardHorizon[]` 로 좁히고 모르는 값은 맨 뒤. 테스트 1건 추가 |
+
+### 결과
+
+| # | 항목 | 재현 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|---|
+| T-1 | 표본 부족 안내가 행마다 | 시드, verdict · 전체, 375·1280 라이트 | BUY +1달(3건) 행에 안내, 5건 이상 행엔 없음 | `적극 매수 +1달` 행 평가 시점 칸에 `표본 5건 미만 — 참고용`, 행 글자색 muted `rgb(91,100,112)`. 그룹 4번째 행(구분 칸은 sr-only)인데도 안내가 보임. +1일(12)·+1주(8)·+2주(5)·중립 4행(9)은 안내 없음, 색 `rgb(15,20,25)`. 두 뷰포트 같음 | 통과 |
+| T-2 | 표본 부족 안내 (실데이터) | confidence · 전체 | 표본 4건 그룹 모든 행에 안내 | `높음` +1일/+1주/+2주/+1달 4행 모두 안내 (재QA 는 첫 행에만). `보통` 4행은 없음 | 통과 |
+| T-3 | 375 참고 열 숨김 | 실데이터, verdict · 전체, 375 다크·라이트 | 보합·적중률(절대) 헤더·본문 숨김 | 헤더 `보합`·`적중률(절대)` `display:none`, 본문 16행 모두 숨김 td 2개 | 통과 |
+| T-4 | 375 핵심 열 첫 화면 | 같은 화면 | `적중률(초과)` 가 가로 스크롤 없이 보임 | 상세 표 폭 **347px = wrap 347px** (스크롤 0, 재QA 455px). `적중률(초과)` 헤더 x 283–361, wrap 오른쪽 끝 361 안. doc `375/375`. 스크린샷에서 `43%` 등 값 보임. 표본 부족 행이 있는 화면은 관찰 W-1 | 통과 |
+| T-5 | 1280 두 열 표시 | verdict · 전체 / 시드, 1280 다크·라이트 | 보합·적중률(절대) 보임 | 헤더 8열 모두 `table-cell` (`보합` x 632–714, `적중률(절대)` x 1020–1216), 숨김 td 0. 표 1152 = wrap 1152 | 통과 |
+| T-6 | 빌드 CSS | `.next/static/chunks/0m0i3yrsw667u.css` | `md:table-cell` 존재, `hidden` 보다 뒤 | `@media (min-width:768px){….md\:table-cell{display:table-cell}…}` (offset 92096 의 media 블록 안, 92488). `.hidden{display:none}` 은 offset 35072 — 변형이 뒤에 있어 768px 이상에서 이김(T-5 실측과 일치) | 통과 |
+| T-7 | w2 필터 표본 내림차순 | verdict / regime / signalScore · +2주 (실데이터), 시드 verdict · +2주 | 표본 열 내림차순 | verdict `79 → 22 → 20 → 9`, regime `75 → 43 → 12`, signalScore `73 → 36 → 21`, 시드 `중립 9 → 적극 매수 5` (이전 코드면 BUY 그룹 최대 12 로 BUY 가 먼저) | 통과 |
+| T-8 | 그룹화 회귀 | 시드 verdict · 전체, 실데이터 verdict · 전체 | 갈라짐 0, 그룹 안 +1일→+1주→+2주→+1달 | 시드 `적극 매수 4행 → 중립 4행`, 실데이터 `신규 진입 주의 → 분할 매도 → 분할 매수 → 중립`(79/22/20/9) 각 4행, 시점 순서 정확 | 통과 |
+| T-9 | tsc | `npx tsc --noEmit` | 0 | exit 0 | 통과 |
+| T-10 | eslint | `git diff --name-only -z main...HEAD -- '*.ts' '*.tsx' \| xargs -0 npx eslint` (8개 파일) | 0 | exit 0, 출력 없음 | 통과 |
+| T-11 | vitest | `npx vitest run lib/scorecard components/scorecard lib/server/scorecard` | 전부 통과 | 13 files / 186 passed (재QA 185 + 새 테스트 1건). `orderDetailCells.test.ts` 4 tests | 통과 |
+| T-12 | build | `npx next build` | 성공 | exit 0 | 통과 |
+| T-13 | 토큰·카피·BFF | 변경 diff hex/px/arbitrary grep, `git grep -nE "http://127\.0\.0\.1" -- app/` (route.ts 제외) | 0 / main 과 동일 | 0건 / 2건(재QA 와 같음). 새 카피 없음 | 통과 |
+| T-14 | 접근성 | DOM | 숨긴 열이 헤더·본문 같이 숨음, sr-only 유지 | 숨김은 `display:none` 이라 375 에서 스크린리더에도 두 열이 없음(헤더·셀 짝 일치, 열 어긋남 없음). 그룹 2번째 행부터 `sr-only` 라벨 유지 | 통과 |
+
+### 스크린샷 (커밋하지 않음)
+
+| 파일 | 내용 |
+|---|---|
+| `/tmp/qa396/v3-dark-1280.png` | 실데이터, 판정별 · 전체, 8열 |
+| `/tmp/qa396/v3-light-1280.png` | 같은 화면, 라이트 |
+| `/tmp/qa396/v3-dark-375.png` | 375, 6열, `적중률(초과)` 첫 화면 안 |
+| `/tmp/qa396/v3-light-375.png` | 375, 라이트 |
+| `/tmp/qa396/v3-mixed-light-375.png` | 시드, `+1달 표본 5건 미만 — 참고용` 행 안내 확인. 이 화면은 W-1 재현 화면이기도 함 |
+
+### 관찰 (머지를 막지 않음)
+
+- W-1 **표본 부족 행이 하나라도 있으면 375 에서 `적중률(초과)` 가 다시 화면 밖으로 밀린다.** 안내가 `whitespace-nowrap` 인 평가 시점 칸 안에 인라인으로 붙어 그 열이 약 60px → 157px 로 넓어지기 때문이다. 시드: 표 417px / wrap 347px, `적중률(초과)` x 353–431 이라 값이 전부 안 보인다. 실데이터 신뢰도별(높음 4건): 표 391px, 같은 열 x 328–405. 기본 화면(판정별 · 전체, 실데이터)은 표본 부족 행이 없어 T-4 대로 정상이다. 재QA(455px)보다는 모든 경우에 좁아졌으므로 회귀는 아니지만, 이번 커밋의 두 변경(행마다 안내 / 모바일 핵심 열 확보)이 표본 부족 화면에서 서로 부딪친다. 새 시점·새 구분이 막 채점되기 시작할 때마다 생기는 화면이라 자주 보일 수 있다. 대안: 안내를 md 미만에서 줄바꿈되는 블록으로 두거나(`block md:inline`), 모바일에선 짧은 표기만 남기기.
+- W-2 안내 span 에서 `text-text-muted` 가 빠졌지만 표본 부족 행 자체가 `text-text-muted` 라 색은 그대로 muted 로 상속된다(실측 `rgb(91,100,112)`). 변화 없음.
+
 
 ## 재QA (5c9994b)
 
