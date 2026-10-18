@@ -8932,3 +8932,34 @@
   - 오픈베타 전환 기준(방향별 적중률 ≥ 같은 기간 찍기 비율 + 10%p, 방향별 50건 이상) 측정을 정기화한다.
   - AI 판정이 UNDERWEIGHT 로 쏠림(130건 중 79건, BUY·SELL 0건) — 강한 방향 판단 회피 문제를 별도 과제로 다룬다.
   - 분석량 감소(8월 7건·9월 1건·10월 0건)로 표본이 쌓이지 않는다.
+
+### 2026-10-18 — fix(scorecard): 채점 적중·빗나감 색을 등락색과 분리 (#391)
+
+- **slug**: `scorecard-outcome-color` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/391
+- **요약**: fix(scorecard): 채점 적중·빗나감 색을 등락색과 분리
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 채점 결과 색이 등락색(상승 빨강·하락 파랑)과 겹쳐 "이 판단이 맞았나"가 "올랐나/내렸나"로 읽히던 문제를 고친다.
+  > 
+  > - `/analyze` 카드 채점 배지: '적중'이 `text-accent-vivid`(#1d4ed8) — `signal-down`(하락 파랑)과 같은 hex. 강세 판정의 "1주 적중"이 하락처럼 보였다.
+  > - `/dashboard/scorecard` 표: 적중=`signal-up` 빨강, 미적중=`signal-down` 파랑 — 약세 판정 적중이 상승색으로 칠해졌다.
+  > 
+  > ## 변경
+  > - DESIGN.md(`docs/design/finsight-redesign.md`)에 방향 무관 토큰 `outcome-hit` 추가 — 라이트 #166534 / 다크 #4ade80. `npm run design:sync` 로 `tailwind.theme.json`·`app/theme-vars.css` 재생성.
+  > - 적중 = `text-outcome-hit`, 빗나감·미적중 = `text-warn` 로 카드와 표 통일.
+  > - `signal-done`(#12b76a) 은 흰 배경 대비 2.6:1 이라 글자색 부적합 → 새 토큰(대비 7.1:1)으로 분리. warn 은 6.0:1.
+  > 
+  > ## 확인
+  > - `tsc --noEmit`, eslint(변경 2파일), vitest(components/scorecard·analyze 18건) 통과.
+  > - `next build` 통과, 빌드 CSS 에 `.text-outcome-hit{color:var(--fs-outcome-hit)}` 및 라이트/다크 변수 방출 확인.
+  > - `design.md lint` errors 0 (warnings 37→38, 추가분은 기존과 같은 orphaned-tokens 류).
+  > 
+  > ## 다음 작업
+  > - 브랜드 8단계 05(신뢰) 진행 — 채점 기록 축적 과정 자체를 신뢰 증거로 설계.
+  > - 적중률 자체가 아직 찍기 수준(2주 BUY 40% vs 기준 45%) — AI 판정 품질(UNDERWEIGHT 쏠림) 개선 과제.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 브랜드 8단계 05(신뢰) 진행 — 채점 기록 축적 과정 자체를 신뢰 증거로 설계.
+  - 적중률 자체가 아직 찍기 수준(2주 BUY 40% vs 기준 45%) — AI 판정 품질(UNDERWEIGHT 쏠림) 개선 과제.

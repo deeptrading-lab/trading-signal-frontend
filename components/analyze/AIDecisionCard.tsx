@@ -98,7 +98,8 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
   metaParts.push(<span className="tabular-nums">{tokenMetaLabel(item)}</span>);
   metaParts.push(formatRelativeTime(item.updatedAt));
 
-  // 채점 결과 — "이 판단이 맞았나". 방향(강세 빨강/약세 파랑)과 혼동되지 않도록 방향 무관 톤 사용.
+  // 채점 결과 — "이 판단이 맞았나". 방향(강세 빨강/약세 파랑)과 혼동되지 않도록 방향 무관 톤 사용
+  // (적중=outcome-hit 초록 / 빗나감=warn). accent-vivid 는 하락 파랑과 같은 hex 라 쓰지 않는다.
   const outcome = item.outcome;
   const outcomeNode = outcome ? (
     <span
@@ -114,7 +115,7 @@ export function AIDecisionCard({ item, name, onSelect }: AIDecisionCardProps) {
         className={cn(
           "font-medium",
           outcome.status === "hit"
-            ? "text-accent-vivid"
+            ? "text-outcome-hit"
             : outcome.status === "miss"
               ? "text-warn"
               : "text-text-muted",

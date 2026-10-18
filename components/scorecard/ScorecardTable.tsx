@@ -9,8 +9,9 @@
  *
  * scorecard-reskin(카드리스/화이트포워드) — 카드 박스 없이 흰 바탕 위 헤어라인 표
  * (홈 `AgentUsageTable`·`ModelCostBreakdown` 표 언어: thead 하단 헤어라인 + `text-label-sm`
- * 라벨, tbody 행 헤어라인 + hover, 셀 `py-md` 리듬). 등락색(적중=signal-up 빨강 / 미적중=
- * signal-down 파랑)·표본 N<5 회색 처리는 무변경. 색·px 직타 금지 — 디자인 토큰 + cn.
+ * 라벨, tbody 행 헤어라인 + hover, 셀 `py-md` 리듬). 적중/미적중은 등락색(빨강/파랑)을 쓰지 않는다 —
+ * 약세 판정의 적중이 "상승"으로 읽히기 때문. 적중=outcome-hit 초록 / 미적중=warn(카드 배지와 동일).
+ * 표본 N<5 회색 처리는 무변경. 색·px 직타 금지 — 디자인 토큰 + cn.
  */
 
 "use client";
@@ -120,10 +121,10 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                 <td className="py-md pr-md text-body-sm text-text-muted whitespace-nowrap">
                   {horizonLabel(cell.horizon)}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-signal-up">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums text-outcome-hit">
                   {cell.hit}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-signal-down">
+                <td className="py-md pl-md text-right text-body-sm tabular-nums text-warn">
                   {cell.miss}
                 </td>
                 <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
