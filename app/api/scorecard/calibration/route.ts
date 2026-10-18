@@ -6,10 +6,12 @@
  * 노출하려고 호출한다. 브라우저는 Supabase 를 직접 호출하지 않고 이 BFF 로만 읽는다.
  * - 채점 원장 집계(`summarizeScorecard`) → confidence 차원 셀 → `calibrateAllConfidences`.
  * - n<MIN_SAMPLE_N 버킷은 sufficient:false(클라가 "표본 부족" 표기, 모델 confidence 만).
- * - Vercel 가드 없음 → prod 동작. 미설정/채점 0건이면 빈 배열 + 200(graceful no-op).
+ * - **admin 전용** — 집계 적중률은 운영자 지표(사용자는 그걸로 할 행동이 없음 + 오픈베타 조건 5 "적중률 문구 0").
+ *   비관리자는 403, 클라 훅도 admin 일 때만 호출한다. 미설정/채점 0건이면 빈 배열 + 200(graceful no-op).
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireAdminApi } from "@/lib/server/auth/apiGuard";
 import {
   getAllScorecardRows,
   isScorecardStoreConfigured,
@@ -26,7 +28,10 @@ import type { ScorecardCalibrationResponse } from "@/lib/types/scorecard/scoreca
 
 const FALLBACK_TIMEOUT_MESSAGE = "신뢰도 보정 조회가 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+  const denied = await requireAdminApi(request);
+  if (denied) return denied;
+
   if (!isScorecardStoreConfigured()) {
     const payload: ScorecardCalibrationResponse = {
       configured: false,
