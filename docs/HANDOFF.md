@@ -9034,3 +9034,36 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - `/dashboard/scorecard` 에 오픈베타 조건 5항목(판정 정직성) 자동 표시 패널 — 방향 적중 패널은 참고로 강등.
   - 사용자 노출 카피 점검: 적중·수익 주장 문구 0 확인(조건 5).
+
+### 2026-10-18 — fix(scorecard): '실측 적중률' 배지·보정 API 를 관리자 전용으로 (#394)
+
+- **slug**: `calibration-admin-only` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/394
+- **요약**: fix(scorecard): '실측 적중률' 배지·보정 API 를 관리자 전용으로
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 오픈베타 조건 5 "사용자 노출 카피에 적중률·수익 보장 문구 0"(PRD `ai-direction-quality` §10-1) 점검 결과 위반 1곳을 고친다.
+  > 
+  > - AI 분석 패널(VerdictHero `.v-meta`)의 **"실측 적중률 N% (n=…)" 배지**가 일반 사용자에게 보였다. 집계 적중률은 운영자 지표다(사용자가 그걸로 할 행동이 없음 — 성적표를 운영자 전용으로 둔 2026-10-18 결정과 같은 원칙).
+  > - 그 데이터 API `/api/scorecard/calibration` 은 권한 검사 없이 매 호출 채점 원장 전체를 읽었다(Supabase egress).
+  > 
+  > ## 변경
+  > - `app/api/scorecard/calibration/route.ts` — `requireAdminApi` 게이트(비관리자 403, 원장 조회 전에 차단).
+  > - `hooks/scorecard/useConfidenceCalibration.ts` — `useMe().isAdmin` 일 때만 조회. 비관리자는 `null` → 배지 미표시(기존 "데이터 없음" 경로 그대로, 무회귀). 호출처 3곳(AIAnalysisPanel·SavedDecisionView·ProdAnalysisQueueCard)은 훅 한 곳에서 일괄 적용.
+  > - 라우트 테스트 2건(비관리자 403 + 원장 미조회 / 관리자 200).
+  > 
+  > ## 점검했지만 유지
+  > - `/analyze` 카드의 "1주 적중 / 2주 빗나감" — 개별 판정의 채점 결과(정직성 표시). 유지.
+  > - "신뢰도 상·중·하" — 모델 자기 평가 등급이지 적중률 주장 아님. 다만 거의 항상 '중'이라 정보 가치 낮음(별도 과제, 결정론 산출 권고 유지).
+  > - 성적표 메뉴 — 이미 admin 게이트(`app/(main)/profile/page.tsx`).
+  > - 단타 문구 — "수익 보장 아님" 고지 존재.
+  > 
+  > ## 확인
+  > - vitest(app/api/scorecard, hooks/scorecard) 통과, `tsc --noEmit`·eslint 통과.
+  > 
+  > ## 다음 작업
+  > - `/dashboard/scorecard` 에 오픈베타 조건(판정 정직성 5항목) 패널 — 방향 적중 패널은 참고로 강등.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `/dashboard/scorecard` 에 오픈베타 조건(판정 정직성 5항목) 패널 — 방향 적중 패널은 참고로 강등.
