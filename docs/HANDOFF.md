@@ -9001,3 +9001,36 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - AI 판정 품질: UNDERWEIGHT 쏠림(130건 중 79건)과 강세 판정 부족으로 강세군 50건 도달이 멀다.
   - 카드 채점 배지 부착률(20장 중 14장) 원인 확인.
+
+### 2026-10-18 — docs(analysis): AI 방향 품질 진단·새 입력 감사 + 오픈베타 조건 재정의 (#393)
+
+- **slug**: `ai-direction-quality-diagnosis` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/393
+- **요약**: docs(analysis): AI 방향 품질 진단·새 입력 감사 + 오픈베타 조건 재정의
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 종목 AI 종합분석의 "오른다/내린다" 기조 적중 격차를 진단하고, 새 입력 후보를 오프라인 감사했다. **앱 동작 변경 없음** — PRD·사전 등록·결과 문서, 오프라인 스크립트, 순수 계산 모듈만.
+  > 
+  > ## 결론
+  > - **Phase 1 진단** (`docs/analysis/ai-direction-diagnosis-2026-10-18.md`, 130행): 방향 예측력 없음(ρ = −0.003), 베타 착시 +12.4%p, 약세 판정은 이미 크게 빠진 종목(직전 20일 중앙값 −15.4%)에 몰림. 국면 추종·레짐 veto 원인은 기각.
+  > - **E-2 새 입력 감사** (`docs/analysis/new-input-audit-result.md`, 12.5만 관측): 수급·업종 상대강도·공시 8개 후보 중 발견 구간 통과 **0**.
+  > - **결정 (PRD §10, 사용자 확정)**: AI 종합분석 포지셔닝을 "방향 예측" → "근거 정리·가격 레벨 안내"로 전환. 오픈베타 조건 = **판정 정직성 5항목**(무효화 라인 보유율 ≥ 95%, 인용 가격 레벨 창작 0, 채점 워크플로 4주 무실패, 채점 배지 부착률 ≥ 95%, 적중·수익 문구 0). 방향 적중 게이트는 참고 지표로 강등.
+  > 
+  > ## 변경
+  > - `docs/prd/ai-direction-quality.md` — PRD + §10 결정 기록.
+  > - `docs/analysis/ai-direction-diagnosis-preregistration.md` → `…-2026-10-18.md` (사전 등록이 결과보다 먼저 커밋, 이후 수정 0).
+  > - `docs/analysis/new-input-audit-preregistration.md` → `new-input-audit-result.md` (동일).
+  > - `scripts/scorecard/direction-diagnosis.mts`, `lib/server/scorecard/directionDiagnosis.ts` + 테스트 20건 — Supabase GET 전용, `summarizeDirectionGate` 재사용.
+  > - `scripts/signal/collect-flow.mts`, `scripts/signal/new-input-audit.mts` — KIS 조회 전용 수집·감사. 캐시 `scripts/signal/__flow__/` gitignore.
+  > 
+  > ## 단일 PR 룰
+  > PRD §8-2 는 단계별 PR 을 계획했으나, 결정으로 Phase 0·2·E-1 이 보류돼 이 PR 하나로 시리즈를 닫는다.
+  > 
+  > ## 다음 작업
+  > - `/dashboard/scorecard` 에 오픈베타 조건 5항목(판정 정직성) 자동 표시 패널 — 방향 적중 패널은 참고로 강등.
+  > - 사용자 노출 카피 점검: 적중·수익 주장 문구 0 확인(조건 5).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - `/dashboard/scorecard` 에 오픈베타 조건 5항목(판정 정직성) 자동 표시 패널 — 방향 적중 패널은 참고로 강등.
+  - 사용자 노출 카피 점검: 적중·수익 주장 문구 0 확인(조건 5).
