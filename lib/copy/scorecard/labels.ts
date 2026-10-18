@@ -206,7 +206,7 @@ export const OPEN_BETA_ITEMS = {
   levels: {
     label: "인용 가격 레벨 창작 0",
     criteria: "판정이 인용한 가격 레벨이 실측과 일치",
-    manual: "수동 점검 — 최근 분석 10건 표본 감사",
+    manual: "최근 분석 10건을 표본으로 실제 차트와 대조해 확인",
   },
   continuity: {
     label: "채점 연속성",
@@ -222,7 +222,7 @@ export const OPEN_BETA_ITEMS = {
   claims: {
     label: "적중률·수익 주장 0",
     criteria: "사용자에게 보이는 문구에 적중률·수익 보장 표현 없음",
-    manual: `수동 점검 — 최근 점검 PR ${OPEN_BETA_COPY_AUDIT.pr}(${OPEN_BETA_COPY_AUDIT.date})`,
+    manual: `최근 점검: PR ${OPEN_BETA_COPY_AUDIT.pr} (${OPEN_BETA_COPY_AUDIT.date})`,
   },
 } as const;
 
@@ -244,3 +244,6 @@ export const OPEN_BETA_CONTINUITY_REASON = {
   unavailable: "실행 기록 조회 실패",
 } as const;
 export const OPEN_BETA_UNAVAILABLE = "조회 실패";
+
+// ── 판정별 상세 섹션 ───────────────────────────────────────────────────────────
+export const DETAIL_TITLE = "판정별 상세";

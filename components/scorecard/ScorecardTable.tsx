@@ -18,10 +18,7 @@
 
 import { cn } from "@/lib/utils/cn";
 import { formatPct } from "@/lib/utils/formatPct";
-import type {
-  ScorecardDimension,
-  ScorecardSummaryCell,
-} from "@/lib/types/scorecard/scorecard";
+import type { ScorecardDimension, ScorecardSummaryCell } from "@/lib/types/scorecard/scorecard";
 import {
   COL_FLAT,
   COL_HIT,
@@ -60,9 +57,7 @@ function horizonLabel(horizon: ScorecardSummaryCell["horizon"]): string {
 }
 
 function rateText(rate: number | null, denom: number): string {
-  return denom > 0 && rate !== null
-    ? formatPct(rate * 100, { digits: 0 })
-    : HIT_RATE_NA;
+  return denom > 0 && rate !== null ? formatPct(rate * 100, { digits: 0 }) : HIT_RATE_NA;
 }
 
 export function ScorecardTable({ cells }: ScorecardTableProps) {
@@ -99,44 +94,49 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
           </tr>
         </thead>
         <tbody>
-          {cells.map((cell) => {
+          {cells.map((cell, i) => {
             const denom = cell.hit + cell.miss;
             const small = cell.total < SMALL_SAMPLE_THRESHOLD;
+            // 같은 구분(판정 등)이 이어지면 한 그룹 — 구분 라벨은 첫 행에만, 헤어라인은 그룹 사이에만.
+            const groupStart = i === 0 || cells[i - 1].key !== cell.key;
             return (
               <tr
                 key={`${cell.dimension}-${cell.key}-${cell.horizon}`}
                 className={cn(
-                  "border-b border-border-line hover:bg-surface-muted",
+                  "hover:bg-surface-muted",
+                  groupStart && i > 0 && "border-t border-border-line",
                   small ? "text-text-muted" : "text-text-strong",
                 )}
               >
-                <td className="py-md pr-md text-body-sm-strong">
-                  <span>{rowLabel(cell.dimension, cell.key)}</span>
-                  {small && (
-                    <span className="ml-sm text-caption text-text-muted">
-                      {SMALL_SAMPLE_HINT}
-                    </span>
-                  )}
+                <td className="py-sm pr-md text-body-sm-strong align-top">
+                  {groupStart ? (
+                    <>
+                      <span>{rowLabel(cell.dimension, cell.key)}</span>
+                      {small && (
+                        <span className="ml-sm text-caption text-text-muted">
+                          {SMALL_SAMPLE_HINT}
+                        </span>
+                      )}
+                    </>
+                  ) : null}
                 </td>
-                <td className="py-md pr-md text-body-sm text-text-muted whitespace-nowrap">
+                <td className="py-sm pr-md text-body-sm text-text-muted whitespace-nowrap">
                   {horizonLabel(cell.horizon)}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-outcome-hit">
+                <td className="py-sm pl-md text-right text-body-sm tabular-nums text-outcome-hit">
                   {cell.hit}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-warn">
+                <td className="py-sm pl-md text-right text-body-sm tabular-nums text-warn">
                   {cell.miss}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
+                <td className="py-sm pl-md text-right text-body-sm tabular-nums text-text-muted">
                   {cell.flat}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums">
-                  {cell.total}
-                </td>
-                <td className="py-md pl-md text-right text-body-sm-strong tabular-nums text-text-strong">
+                <td className="py-sm pl-md text-right text-body-sm tabular-nums">{cell.total}</td>
+                <td className="py-sm pl-md text-right text-body-sm-strong tabular-nums text-text-strong">
                   {rateText(cell.hitRate, denom)}
                 </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
+                <td className="py-sm pl-md text-right text-body-sm tabular-nums text-text-muted">
                   {rateText(cell.absHitRate, cell.absSample)}
                 </td>
               </tr>
@@ -153,7 +153,7 @@ function Th({ children }: { children: React.ReactNode }) {
   return (
     <th
       scope="col"
-      className="py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
+      className="py-sm pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
     >
       {children}
     </th>
