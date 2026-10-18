@@ -6,14 +6,15 @@
  * - **게이트**: KIS 미설정/비-prod → 채점 skip + 헬스 마커 후 200(fail-soft, 재시도 폭주 방지).
  * - **로직**: pending horizon 행을 찾아 평가 시점 종가로 hit/miss/flat 확정(runScoring).
  *
- * 예약 실행은 중지되어 있다. 필요할 때 단일 디스패처(`flow-snapshot`) 또는 본 라우트를
- * 인증된 수동 호출로 실행한다. 각각 독립 try/catch 로 한 단계 실패가 다른 단계를 막지 않는다.
+ * GitHub Actions `score-decisions.yml` 이 매 영업일 예약 호출한다(flow-snapshot 예약 중지 후 채점만 분리).
+ * backfill → 채점 → 터치 스캔 순서. 각각 독립 try/catch 로 한 단계 실패가 다른 단계를 막지 않는다.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
 import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
 import { runBackfillDecisions } from "@/lib/server/scorecard/runBackfillDecisions";
+import { runTouchScan, type TouchScanResult } from "@/lib/server/scorecard/runTouchScan";
 import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
 import { createLogger } from "@/lib/server/logTag";
 
@@ -53,6 +54,22 @@ export async function GET(request: NextRequest) {
     log.warn("backfill 실패 — 채점은 계속", error);
   }
 
+  // 터치 스캔(phase-2) — 채점과 독립. 실패해도 채점 응답은 그대로 낸다.
+  const scanTouch = async (): Promise<TouchScanResult | null> => {
+    try {
+      const touch = await runTouchScan();
+      log(
+        `touch candidates=${touch.candidates} scanned=${touch.scanned} ` +
+          `targetHits=${touch.targetHits} stopHits=${touch.stopHits} ` +
+          `completed=${touch.completed} errors=${touch.errors}`,
+      );
+      return touch;
+    } catch (error) {
+      log.warn("터치 스캔 실패 — 채점 결과는 유지", error);
+      return null;
+    }
+  };
+
   try {
     const result = await relativeRunScoring();
     log(
@@ -61,7 +78,8 @@ export async function GET(request: NextRequest) {
         `skipped=${result.skipped} backfilled=${result.backfilled} errors=${result.errors}`,
     );
     await saveScorecardCronMeta({ at: new Date().toISOString(), ok: true, env, result });
-    return NextResponse.json({ ok: true, backfill, result }, { status: 200 });
+    const touch = await scanTouch();
+    return NextResponse.json({ ok: true, backfill, result, touch }, { status: 200 });
   } catch (error) {
     // fail-soft — 전체 throw 도 200(다른 cron·재시도 보호). 헬스 마커에 사유 기록.
     log.error("채점 예외", error);
@@ -71,6 +89,7 @@ export async function GET(request: NextRequest) {
       reason: "scoring-error",
       env,
     });
-    return NextResponse.json({ ok: false, reason: "scoring-error" }, { status: 200 });
+    const touch = await scanTouch();
+    return NextResponse.json({ ok: false, reason: "scoring-error", touch }, { status: 200 });
   }
 }

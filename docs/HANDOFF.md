@@ -8866,3 +8866,69 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - **남는 노출(설계상 수용)**: 일반 조회 API 는 그대로라 승인취소된 유저가 쿠키 만료(7일)까지 데이터 열람 가능. 즉시 전면 차단이 필요해지면 KV revocation 마커 + Edge 게이트 대조로 확장(= 게이트 I/O 0 원칙을 깨는 결정이라 별도 판단 필요).
   - 세션 슬라이딩 갱신(만료 임박 시 재서명) — 7일 재로그인이 번거로우면 검토.
+
+### 2026-10-18 — fix(scorecard): 멈춘 AI 판정 채점을 매 영업일 예약 실행으로 복구 (#390)
+
+- **slug**: `scorecard-schedule-restore` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/390
+- **요약**: fix(scorecard): 멈춘 AI 판정 채점을 매 영업일 예약 실행으로 복구
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > AI 판정 채점이 2026-07-27 부터 멈춰 있던 문제를 복구한다.
+  > 
+  > - **원인**: #371 이 "장 마감 후 자동 호출 중지" 정책으로 `flow-snapshot.yml` 의 예약(schedule)을 제거했다. 채점(backfill → relativeRunScoring → 터치 스캔)이 같은 디스패처에 묶여 있어 함께 멈췄다. 마지막 예약 실행 2026-07-27, 이후 `signal_scorecard` pending 50건 누적(7월 진입분 40건 포함).
+  > - **변경**
+  >   - `.github/workflows/score-decisions.yml` 신규 — 평일 17:10 KST(08:10 UTC) 예약 + 수동 실행. `/api/cron/score-decisions` 만 호출한다.
+  >   - `app/api/cron/score-decisions/route.ts` — 터치 스캔(`runTouchScan`) 단계를 채점 뒤에 추가(독립 try/catch). flow-snapshot 디스패처와 같은 채점 범위를 유지한다.
+  > - **유지**: `flow-snapshot`(수급 스냅샷)은 수동 실행 그대로. 단타 자동 호출 정책과 무관 — 채점은 pending 행의 일봉 종가만 하루 1회 조회한다.
+  > 
+  > ## 확인
+  > - 2026-10-18 `flow-snapshot` 수동 실행 2회로 밀린 pending 을 소진(배치 60건 상한). 1회차 응답: `scoring.scored=122 errors=0`, `touch.scanned=1`.
+  > - `tsc --noEmit`, `eslint` 통과.
+  > 
+  > ## 리스크
+  > - #371 의 "Supabase Egress 긴급 차단" 맥락과 충돌하는지 #371 작성자 확인 필요. 채점은 pending 부분 인덱스로 최대 60행 조회·갱신이라 egress 영향은 작다고 본다.
+  > 
+  > ## 다음 작업
+  > - 오픈베타 전환 기준(방향별 적중률 ≥ 같은 기간 찍기 비율 + 10%p, 방향별 50건 이상) 측정을 정기화한다.
+  > - AI 판정이 UNDERWEIGHT 로 쏠림(130건 중 79건, BUY·SELL 0건) — 강한 방향 판단 회피 문제를 별도 과제로 다룬다.
+  > - 분석량 감소(8월 7건·9월 1건·10월 0건)로 표본이 쌓이지 않는다.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 오픈베타 전환 기준(방향별 적중률 ≥ 같은 기간 찍기 비율 + 10%p, 방향별 50건 이상) 측정을 정기화한다.
+  - AI 판정이 UNDERWEIGHT 로 쏠림(130건 중 79건, BUY·SELL 0건) — 강한 방향 판단 회피 문제를 별도 과제로 다룬다.
+  - 분석량 감소(8월 7건·9월 1건·10월 0건)로 표본이 쌓이지 않는다.
+
+### 2026-10-18 — fix(scorecard): 멈춘 AI 판정 채점을 매 영업일 예약 실행으로 복구 (#390)
+
+- **slug**: `scorecard-schedule-restore` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/390
+- **요약**: fix(scorecard): 멈춘 AI 판정 채점을 매 영업일 예약 실행으로 복구
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > AI 판정 채점이 2026-07-27 부터 멈춰 있던 문제를 복구한다.
+  > 
+  > - **원인**: #371 이 "장 마감 후 자동 호출 중지" 정책으로 `flow-snapshot.yml` 의 예약(schedule)을 제거했다. 채점(backfill → relativeRunScoring → 터치 스캔)이 같은 디스패처에 묶여 있어 함께 멈췄다. 마지막 예약 실행 2026-07-27, 이후 `signal_scorecard` pending 50건 누적(7월 진입분 40건 포함).
+  > - **변경**
+  >   - `.github/workflows/score-decisions.yml` 신규 — 평일 17:10 KST(08:10 UTC) 예약 + 수동 실행. `/api/cron/score-decisions` 만 호출한다.
+  >   - `app/api/cron/score-decisions/route.ts` — 터치 스캔(`runTouchScan`) 단계를 채점 뒤에 추가(독립 try/catch). flow-snapshot 디스패처와 같은 채점 범위를 유지한다.
+  > - **유지**: `flow-snapshot`(수급 스냅샷)은 수동 실행 그대로. 단타 자동 호출 정책과 무관 — 채점은 pending 행의 일봉 종가만 하루 1회 조회한다.
+  > 
+  > ## 확인
+  > - 2026-10-18 `flow-snapshot` 수동 실행 2회로 밀린 pending 을 소진(배치 60건 상한). 1회차 응답: `scoring.scored=122 errors=0`, `touch.scanned=1`.
+  > - `tsc --noEmit`, `eslint` 통과.
+  > 
+  > ## 리스크
+  > - #371 의 "Supabase Egress 긴급 차단" 맥락과 충돌하는지 #371 작성자 확인 필요. 채점은 pending 부분 인덱스로 최대 60행 조회·갱신이라 egress 영향은 작다고 본다.
+  > 
+  > ## 다음 작업
+  > - 오픈베타 전환 기준(방향별 적중률 ≥ 같은 기간 찍기 비율 + 10%p, 방향별 50건 이상) 측정을 정기화한다.
+  > - AI 판정이 UNDERWEIGHT 로 쏠림(130건 중 79건, BUY·SELL 0건) — 강한 방향 판단 회피 문제를 별도 과제로 다룬다.
+  > - 분석량 감소(8월 7건·9월 1건·10월 0건)로 표본이 쌓이지 않는다.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 오픈베타 전환 기준(방향별 적중률 ≥ 같은 기간 찍기 비율 + 10%p, 방향별 50건 이상) 측정을 정기화한다.
+  - AI 판정이 UNDERWEIGHT 로 쏠림(130건 중 79건, BUY·SELL 0건) — 강한 방향 판단 회피 문제를 별도 과제로 다룬다.
+  - 분석량 감소(8월 7건·9월 1건·10월 0건)로 표본이 쌓이지 않는다.
