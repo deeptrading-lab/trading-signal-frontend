@@ -108,7 +108,7 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                   small ? "text-text-muted" : "text-text-strong",
                 )}
               >
-                <td className="py-sm pr-md text-body-sm-strong align-top">
+                <td className="py-sm pr-md text-body-sm-strong align-top whitespace-nowrap">
                   {groupStart ? (
                     <>
                       <span>{rowLabel(cell.dimension, cell.key)}</span>
@@ -118,7 +118,10 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                         </span>
                       )}
                     </>
-                  ) : null}
+                  ) : (
+                    // 그룹 2번째 행부터 라벨은 시각적으로 생략하되 스크린리더는 어느 구분인지 읽게.
+                    <span className="sr-only">{rowLabel(cell.dimension, cell.key)}</span>
+                  )}
                 </td>
                 <td className="py-sm pr-md text-body-sm text-text-muted whitespace-nowrap">
                   {horizonLabel(cell.horizon)}

@@ -21,6 +21,7 @@ import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryScorecardSummary } from "@/hooks/scorecard/useQueryScorecardSummary";
 import { ScorecardTable } from "./ScorecardTable";
+import { orderDetailCells } from "@/lib/scorecard/orderDetailCells";
 import { DirectionGatePanel } from "./DirectionGatePanel";
 import { OpenBetaConditionsPanel } from "./OpenBetaConditionsPanel";
 import type { ScorecardDimension, ScorecardHorizon } from "@/lib/types/scorecard/scorecard";
@@ -58,9 +59,8 @@ const DIMENSIONS: ScorecardDimension[] = [
 const dimensionLabel = (d: ScorecardDimension): string =>
   d === "regime" ? DIMENSION_LABEL_REGIME : DIMENSION_LABEL[d];
 const HORIZON_FILTERS: HorizonFilter[] = ["all", "d1", "w1", "w2", "m1"];
-/** 첫 섹션 아래 섹션 구분 — 위 헤어라인 + 여백. */
-const SECTION_DIVIDER = "border-t border-border-line pt-2xl";
-const HORIZON_ORDER: HorizonFilter[] = ["d1", "w1", "w2", "m1", "all"];
+/** 섹션 1개 — 부모 divide-y 가 섹션 사이에만 헤어라인을 긋는다(첫 섹션이 없어도 맨 위 선 없음). */
+const SECTION = "py-2xl first:pt-0 last:pb-0";
 
 export function ScorecardContainer() {
   const { data, isLoading, isError, isFetching, refetch } = useQueryScorecardSummary();
@@ -69,22 +69,10 @@ export function ScorecardContainer() {
 
   const cells = useMemo(() => data?.cells ?? [], [data]);
 
-  const filtered = useMemo(() => {
-    return cells
-      .filter((c) => c.dimension === dimension)
-      .filter((c) => {
-        // horizon 차원은 셀 자체가 horizon 별이라 필터 무관(전부 노출). 그 외는 평가시점 필터 적용.
-        if (dimension === "horizon") return true;
-        if (horizon === "all") return true;
-        return c.horizon === horizon;
-      })
-      .sort((a, b) => {
-        // 그룹(구분)은 표본 큰 순, 그룹 안은 평가 시점 순(1일 → 1주 → 2주 → 1달) — 표가 판정별로 묶여 읽힌다.
-        if (b.total !== a.total) return b.total - a.total;
-        if (a.key !== b.key) return a.key.localeCompare(b.key);
-        return HORIZON_ORDER.indexOf(a.horizon) - HORIZON_ORDER.indexOf(b.horizon);
-      });
-  }, [cells, dimension, horizon]);
+  const filtered = useMemo(
+    () => orderDetailCells(cells, dimension, horizon),
+    [cells, dimension, horizon],
+  );
 
   if (isLoading) {
     // 카드리스 플랫 스켈레톤 — 박스 없이 헤어라인 행(홈 표 로딩 정합).
@@ -125,20 +113,24 @@ export function ScorecardContainer() {
 
   return (
     // 섹션 3개(오픈베타 조건 · 방향 적중 참고 · 판정별 상세)를 넓은 간격 + 헤어라인으로 나눈다(카드리스).
-    <div className="flex flex-col gap-2xl">
-      {data.openBeta ? <OpenBetaConditionsPanel conditions={data.openBeta} /> : null}
+    <div className="flex flex-col divide-y divide-border-line">
+      {data.openBeta ? (
+        <div className={SECTION}>
+          <OpenBetaConditionsPanel conditions={data.openBeta} />
+        </div>
+      ) : null}
 
       {data.directionGate && data.directionGate.sample > 0 ? (
-        <div className={SECTION_DIVIDER}>
+        <div className={SECTION}>
           <DirectionGatePanel gate={data.directionGate} />
         </div>
       ) : null}
 
       <section
-        className={cn(SECTION_DIVIDER, "flex flex-col gap-md")}
+        className={cn(SECTION, "flex flex-col gap-md")}
         aria-labelledby="scorecard-detail-title"
       >
-        <h2 id="scorecard-detail-title" className="text-body-md font-bold text-text-strong">
+        <h2 id="scorecard-detail-title" className="text-h2 text-text-strong">
           {DETAIL_TITLE}
         </h2>
 

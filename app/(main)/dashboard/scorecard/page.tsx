@@ -21,7 +21,7 @@ export default async function ScorecardPage() {
   // 관리자 전용 — Edge 게이트는 role 을 안 보므로 직접 방어(직접 URL 접근 차단).
   if (!(await hasServerRole("admin"))) return <AccessDeniedView />;
   return (
-    <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-lg">
+    <div className="mx-auto w-full max-w-main-max-w flex flex-col gap-2xl">
       <header className="flex flex-col gap-xs">
         <h1 className="text-h1 text-text-strong">{SCORECARD_PAGE_TITLE}</h1>
         <p className="text-body-sm text-text-muted">{SCORECARD_PAGE_SUBTITLE}</p>
