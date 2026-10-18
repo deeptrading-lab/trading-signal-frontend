@@ -146,10 +146,15 @@ for (const [ticker, rs] of byTicker) {
       if (kis === null) {
         const dates = rs.map((x) => x.entryDate).sort();
         await delay(KIS_CALL_DELAY_MS);
-        kis = await fetchDailyChunked(ticker, ymd(shiftDays(dates[0], -45)), ymd(dates.at(-1)!)).catch((e: unknown) => {
-          console.warn(`  ${ticker} 일봉 실패: ${e instanceof Error ? e.message : String(e)}`);
-          return [];
-        });
+        const from = ymd(shiftDays(dates[0], -45));
+        const to = ymd(dates.at(-1)!);
+        // 일시 오류 1회 재시도 — 몇 행 결측만으로 H-B3 같은 경계 판정이 뒤집힌다(QA 관찰).
+        kis = await fetchDailyChunked(ticker, from, to)
+          .catch(() => delay(1_000).then(() => fetchDailyChunked(ticker, from, to)))
+          .catch((e: unknown) => {
+            console.warn(`  ${ticker} 일봉 실패: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
+            return [];
+          });
       }
       v = preReturn(kis, r.entryDate);
       if (v !== null) preSource.kis++;
@@ -159,6 +164,11 @@ for (const [ticker, rs] of byTicker) {
   }
 }
 console.log(`preReturn20d: 캐시 ${preSource.cache} · KIS ${preSource.kis} · 결측 ${preSource.missing}`);
+if (preSource.missing > 0) {
+  // 결측이 있으면 결과 문서와 다른 표본으로 판정하게 된다 — 조용히 진행하지 않고 실패로 끝낸다.
+  console.error(`preReturn20d 결측 ${preSource.missing}행 — 다시 실행하세요(KIS 일시 오류 가능).`);
+  process.exit(1);
+}
 
 const labels: Record<string, DiagnosisLabel> = {};
 const out: Record<string, unknown> = {};
