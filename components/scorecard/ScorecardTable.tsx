@@ -119,7 +119,12 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                 <td className="py-sm pr-md text-body-sm text-text-muted whitespace-nowrap">
                   {horizonLabel(cell.horizon)}
                   {/* 표본 부족은 행마다 — 그룹 첫 행에만 두면 이어지는 작은 표본 행이 색으로만 구분된다. */}
-                  {small && <span className="ml-sm text-caption">{SMALL_SAMPLE_HINT}</span>}
+                  {small && (
+                    // 모바일은 시점 아래 줄 + 줄바꿈 허용 — 칸이 넓어져 핵심 열(적중률 초과)이 밀리지 않게.
+                    <span className="block whitespace-normal text-caption md:ml-sm md:inline md:whitespace-nowrap">
+                      {SMALL_SAMPLE_HINT}
+                    </span>
+                  )}
                 </td>
                 <td className="py-sm pl-md text-right text-body-sm tabular-nums text-outcome-hit">
                   {cell.hit}
