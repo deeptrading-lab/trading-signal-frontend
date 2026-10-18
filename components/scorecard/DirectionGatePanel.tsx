@@ -61,7 +61,7 @@ export function DirectionGatePanel({ gate }: { gate: DirectionGate }) {
   return (
     <section className="flex flex-col gap-xs" aria-labelledby="direction-gate-title">
       <div className="flex flex-wrap items-baseline gap-x-md gap-y-xs">
-        <h2 id="direction-gate-title" className="text-body-md font-bold text-text-strong">
+        <h2 id="direction-gate-title" className="text-h2 text-text-strong">
           {GATE_TITLE}
         </h2>
         <span className={cn("text-body-sm font-medium", RESULT_TONE[overall])}>

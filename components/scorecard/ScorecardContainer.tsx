@@ -21,14 +21,13 @@ import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useQueryScorecardSummary } from "@/hooks/scorecard/useQueryScorecardSummary";
 import { ScorecardTable } from "./ScorecardTable";
+import { orderDetailCells } from "@/lib/scorecard/orderDetailCells";
 import { DirectionGatePanel } from "./DirectionGatePanel";
 import { OpenBetaConditionsPanel } from "./OpenBetaConditionsPanel";
-import type {
-  ScorecardDimension,
-  ScorecardHorizon,
-} from "@/lib/types/scorecard/scorecard";
+import type { ScorecardDimension, ScorecardHorizon } from "@/lib/types/scorecard/scorecard";
 import {
   DIMENSION_LABEL,
+  DETAIL_TITLE,
   DIMENSION_LABEL_REGIME,
   EMPTY_BODY,
   EMPTY_TITLE,
@@ -60,6 +59,8 @@ const DIMENSIONS: ScorecardDimension[] = [
 const dimensionLabel = (d: ScorecardDimension): string =>
   d === "regime" ? DIMENSION_LABEL_REGIME : DIMENSION_LABEL[d];
 const HORIZON_FILTERS: HorizonFilter[] = ["all", "d1", "w1", "w2", "m1"];
+/** 섹션 1개 — 부모 divide-y 가 섹션 사이에만 헤어라인을 긋는다(첫 섹션이 없어도 맨 위 선 없음). */
+const SECTION = "py-2xl first:pt-0 last:pb-0";
 
 export function ScorecardContainer() {
   const { data, isLoading, isError, isFetching, refetch } = useQueryScorecardSummary();
@@ -68,21 +69,10 @@ export function ScorecardContainer() {
 
   const cells = useMemo(() => data?.cells ?? [], [data]);
 
-  const filtered = useMemo(() => {
-    return cells
-      .filter((c) => c.dimension === dimension)
-      .filter((c) => {
-        // horizon 차원은 셀 자체가 horizon 별이라 필터 무관(전부 노출). 그 외는 평가시점 필터 적용.
-        if (dimension === "horizon") return true;
-        if (horizon === "all") return true;
-        return c.horizon === horizon;
-      })
-      .sort((a, b) => {
-        // 표본 큰 순 → 적중률 높은 순.
-        if (b.total !== a.total) return b.total - a.total;
-        return (b.hitRate ?? -1) - (a.hitRate ?? -1);
-      });
-  }, [cells, dimension, horizon]);
+  const filtered = useMemo(
+    () => orderDetailCells(cells, dimension, horizon),
+    [cells, dimension, horizon],
+  );
 
   if (isLoading) {
     // 카드리스 플랫 스켈레톤 — 박스 없이 헤어라인 행(홈 표 로딩 정합).
@@ -122,72 +112,88 @@ export function ScorecardContainer() {
   const isEmpty = data.scoredCount === 0;
 
   return (
-    <div className="flex flex-col gap-md">
-      {data.openBeta ? <OpenBetaConditionsPanel conditions={data.openBeta} /> : null}
-
-      {data.directionGate && data.directionGate.sample > 0 ? (
-        <DirectionGatePanel gate={data.directionGate} />
+    // 섹션 3개(오픈베타 조건 · 방향 적중 참고 · 판정별 상세)를 넓은 간격 + 헤어라인으로 나눈다(카드리스).
+    <div className="flex flex-col divide-y divide-border-line">
+      {data.openBeta ? (
+        <div className={SECTION}>
+          <OpenBetaConditionsPanel conditions={data.openBeta} />
+        </div>
       ) : null}
 
-      {/* 필터 + 새로고침 줄 */}
-      <div className="flex flex-wrap items-end gap-md">
-        <label className="flex flex-col gap-xs text-body-sm text-text-muted">
-          <span>{FILTER_DIMENSION_LABEL}</span>
-          <select
-            className="h-input-h rounded-md border border-border-line bg-surface-muted px-md text-text-strong"
-            value={dimension}
-            onChange={(e) => setDimension(e.target.value as ScorecardDimension)}
+      {data.directionGate && data.directionGate.sample > 0 ? (
+        <div className={SECTION}>
+          <DirectionGatePanel gate={data.directionGate} />
+        </div>
+      ) : null}
+
+      <section
+        className={cn(SECTION, "flex flex-col gap-md")}
+        aria-labelledby="scorecard-detail-title"
+      >
+        <h2 id="scorecard-detail-title" className="text-h2 text-text-strong">
+          {DETAIL_TITLE}
+        </h2>
+
+        {/* 필터 + 새로고침 줄 */}
+        <div className="flex flex-wrap items-end gap-md">
+          <label className="flex flex-col gap-xs text-body-sm text-text-muted">
+            <span>{FILTER_DIMENSION_LABEL}</span>
+            <select
+              className="h-input-h rounded-md border border-border-line bg-surface-muted px-md text-text-strong"
+              value={dimension}
+              onChange={(e) => setDimension(e.target.value as ScorecardDimension)}
+            >
+              {DIMENSIONS.map((d) => (
+                <option key={d} value={d}>
+                  {dimensionLabel(d)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label
+            className={cn(
+              "flex flex-col gap-xs text-body-sm text-text-muted",
+              dimension === "horizon" && "opacity-50",
+            )}
           >
-            {DIMENSIONS.map((d) => (
-              <option key={d} value={d}>
-                {dimensionLabel(d)}
-              </option>
-            ))}
-          </select>
-        </label>
+            <span>{FILTER_HORIZON_LABEL}</span>
+            <select
+              className="h-input-h rounded-md border border-border-line bg-surface-muted px-md text-text-strong disabled:cursor-not-allowed"
+              value={horizon}
+              disabled={dimension === "horizon"}
+              onChange={(e) => setHorizon(e.target.value as HorizonFilter)}
+            >
+              {HORIZON_FILTERS.map((h) => (
+                <option key={h} value={h}>
+                  {HORIZON_LABEL[h]}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label
-          className={cn(
-            "flex flex-col gap-xs text-body-sm text-text-muted",
-            dimension === "horizon" && "opacity-50",
-          )}
-        >
-          <span>{FILTER_HORIZON_LABEL}</span>
-          <select
-            className="h-input-h rounded-md border border-border-line bg-surface-muted px-md text-text-strong disabled:cursor-not-allowed"
-            value={horizon}
-            disabled={dimension === "horizon"}
-            onChange={(e) => setHorizon(e.target.value as HorizonFilter)}
+          <button
+            type="button"
+            className="ml-auto inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
+            onClick={() => refetch()}
+            disabled={isFetching}
           >
-            {HORIZON_FILTERS.map((h) => (
-              <option key={h} value={h}>
-                {HORIZON_LABEL[h]}
-              </option>
-            ))}
-          </select>
-        </label>
+            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} aria-hidden="true" />
+            {STATE_REFRESH}
+          </button>
+        </div>
 
-        <button
-          type="button"
-          className="ml-auto inline-flex items-center gap-xs text-caption text-text-muted hover:text-text-strong"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} aria-hidden="true" />
-          {STATE_REFRESH}
-        </button>
-      </div>
+        <p className="text-caption text-text-muted">
+          {summaryHeadline(data.scoredCount, data.totalRows)} · {HIT_RATE_NOTE}
+        </p>
+        <p className="text-caption text-text-muted">{METRIC_NOTE_EXCESS}</p>
 
-      <p className="text-caption text-text-muted">
-        {summaryHeadline(data.scoredCount, data.totalRows)} · {HIT_RATE_NOTE}
-      </p>
-      <p className="text-caption text-text-muted">{METRIC_NOTE_EXCESS}</p>
-
-      {isEmpty || filtered.length === 0 ? (
-        <StatusBlock title={EMPTY_TITLE} body={EMPTY_BODY} />
-      ) : (
-        <ScorecardTable cells={filtered} />
-      )}
+        {isEmpty || filtered.length === 0 ? (
+          <StatusBlock title={EMPTY_TITLE} body={EMPTY_BODY} />
+        ) : (
+          <ScorecardTable cells={filtered} />
+        )}
+      </section>
     </div>
   );
 }
