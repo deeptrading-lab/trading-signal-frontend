@@ -1,7 +1,7 @@
 name: flow-snapshot
 
 # 장 마감 뒤 자동 분석·호출 중지 정책에 따라 예약 실행은 두지 않는다.
-# 수급 스냅샷·AI 판정 채점이 필요할 때 운영자가 수동으로 트리거한다.
+# 수급 스냅샷이 필요할 때 운영자가 수동으로 트리거한다(AI 판정 채점은 score-decisions.yml 이 매 영업일 예약 실행).
 #
 # 사전 설정: 저장소 Settings → Secrets and variables → Actions 에 `CRON_SECRET` 추가
 #   (Vercel Production 의 CRON_SECRET 과 같은 값).

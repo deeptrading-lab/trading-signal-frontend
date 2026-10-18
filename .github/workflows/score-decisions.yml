@@ -23,3 +23,5 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://trading-signal-frontend.vercel.app/api/cron/score-decisions")
           echo "response: $resp"
+          # route 는 fail-soft 로 늘 200 — ok:false(채점 실패·KIS 미설정)면 job 을 실패시켜 조용한 정지를 드러낸다.
+          echo "$resp" | jq -e '.ok == true' > /dev/null
