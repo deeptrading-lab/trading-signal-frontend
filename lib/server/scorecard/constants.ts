@@ -153,3 +153,22 @@ export const OPEN_BETA_MARGIN_PP = 10;
 
 /** 방향별 최소 표본 수. 미만이면 그 방향은 판정 보류. */
 export const OPEN_BETA_MIN_N = 50;
+
+// ─── 오픈베타 조건 — 판정 정직성(ai-direction-quality §10-1) ─────────────────
+//
+// 방향 적중 게이트(위)는 참고 지표로 강등됐다. 오픈베타 조건은 "판정이 정직한가" 를 본다.
+
+/** 무효화 라인 보유율·채점 배지 부착률의 통과 하한. */
+export const OPEN_BETA_COVERAGE_MIN_RATE = 0.95;
+
+/** 무효화 라인 보유율 측정 창 — 최근 N달력일(entry_date, KST) 진입분. */
+export const OPEN_BETA_STOP_LINE_WINDOW_DAYS = 28;
+
+/**
+ * 채점 연속성 — 마지막 채점 cron 이 ok 이고 오늘(KST)부터 N영업일 이내면 통과.
+ * cron 은 평일 매일 돌아 정상이면 0~1, 공휴일 1~2일을 흡수하는 여유로 3.
+ */
+export const OPEN_BETA_CRON_MAX_BUSINESS_DAYS = 3;
+
+/** 채점 배지 부착률 대상 — 카드 updated_at 이 N달력일 이상 지난 것(2주=10영업일 채점이 끝났을 시점). */
+export const OPEN_BETA_BADGE_MATURE_DAYS = 16;

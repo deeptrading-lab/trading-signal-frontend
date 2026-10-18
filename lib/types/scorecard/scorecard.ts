@@ -254,9 +254,53 @@ export interface ScorecardSummaryResponse {
   scoredCount: number;
   /** 채점 원장 전체 행 수(pending 포함). */
   totalRows: number;
-  /** 오픈베타 전환 기준 판정. 미설정이면 null. */
+  /** 방향 적중 게이트(참고 지표 — 오픈베타 조건 아님). 미설정이면 null. */
   directionGate: DirectionGate | null;
+  /** 오픈베타 조건(판정 정직성) 자동 항목. 미설정이면 null. */
+  openBeta: OpenBetaConditions | null;
   generatedAt: string;
+}
+
+// ─── 오픈베타 조건 — 판정 정직성(ai-direction-quality §10-1) ─────────────────
+
+/** 자동 항목 판정 — pass 통과 / fail 미달 / pending 표본 없음 / unknown 조회 실패(확인 불가). */
+export type OpenBetaCheckStatus = "pass" | "fail" | "pending" | "unknown";
+
+/** 비율 항목(무효화 라인 보유율·채점 배지 부착률). */
+export interface OpenBetaRatioCheck {
+  status: OpenBetaCheckStatus;
+  /** 분모 — 대상 판정(카드) 수. */
+  n: number;
+  /** 분자 — 조건을 만족한 수. */
+  count: number;
+  /** count / n. n=0 이면 null. */
+  rate: number | null;
+}
+
+/** 채점 연속성 사유 — 미달·확인 불가 원인 표시용. */
+export type OpenBetaContinuityReason = "ok" | "no_marker" | "not_ok" | "stale" | "unavailable";
+
+export interface OpenBetaContinuityCheck {
+  status: OpenBetaCheckStatus;
+  reason: OpenBetaContinuityReason;
+  /** 마지막 cron 실행 시각(ISO). 마커 없으면 null. */
+  lastRunAt: string | null;
+  /** 마지막 실행일(KST) → 오늘(KST) 경과 영업일. 마커 없으면 null. */
+  businessDaysAgo: number | null;
+}
+
+export interface OpenBetaConditions {
+  /** 1. 강세·약세 판정의 무효화 라인 보유율(최근 28일 진입). */
+  stopLine: OpenBetaRatioCheck;
+  /** 3. 채점 연속성(KV 헬스 마커 대리 지표). */
+  continuity: OpenBetaContinuityCheck;
+  /** 4. 채점 시점이 지난 카드의 채점 배지 부착률. */
+  badge: OpenBetaRatioCheck;
+  /** 비율 통과 하한(0~1). */
+  minRate: number;
+  windowDays: number;
+  maxBusinessDays: number;
+  matureDays: number;
 }
 
 // ─── 신뢰도 캘리브레이션(scorecard-feedback (가)) ────────────────────────────

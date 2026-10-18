@@ -366,6 +366,42 @@ export async function getDecisionThesisLevels(
 }
 
 /**
+ * 오픈베타 조건(채점 배지 부착률)용 — `updated_at` 이 `beforeIso` 이하인 카드의 ticker·updated_at·run_id 만.
+ * decision JSONB 를 끌어오지 않는다(Supabase egress). 전 계정 대상(운영자 집계).
+ * 미설정·실패는 null — 호출부가 "확인 불가"로 표시한다(빈 배열 = 대상 0건과 구분).
+ */
+export async function getDecisionCardKeysBefore(
+  beforeIso: string,
+  limit = 1000,
+): Promise<Array<{ ticker: string; updatedAt: string; runId: string | null }> | null> {
+  const config = supabaseConfig();
+  if (!config) return null;
+
+  const url = new URL(`${config.url}/rest/v1/ai_analysis_decisions`);
+  url.searchParams.set("select", "ticker,updated_at,run_id");
+  url.searchParams.set("updated_at", `lte.${beforeIso}`);
+  url.searchParams.set("order", "updated_at.desc");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { ...headers(config.key), Accept: "application/json" },
+    cache: "no-store",
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.warn(`[ai-decision-store] 카드 키 조회 실패 status=${res?.status ?? "network"}`);
+    return null;
+  }
+  const rows = (await res.json().catch(() => null)) as Array<{
+    ticker: string;
+    updated_at: string;
+    run_id: string | null;
+  }> | null;
+  if (!Array.isArray(rows)) return null;
+  return rows.map((r) => ({ ticker: r.ticker, updatedAt: r.updated_at, runId: r.run_id ?? null }));
+}
+
+/**
  * 백필용(decision-stock-name) — ticker 행의 종목명만 부분 갱신. 다른 컬럼은 건드리지 않는다.
  * name 빈 값/미설정/오류는 no-op(false 반환, fail-soft). 멱등 — 이미 채워진 행에 다시 써도 무방.
  */

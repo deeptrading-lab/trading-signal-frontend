@@ -19,13 +19,22 @@ import {
   summarizeDirectionGate,
   summarizeScorecard,
 } from "@/lib/server/scorecard/summarize";
-import { SCORING_METRIC_MODE } from "@/lib/server/scorecard/constants";
+import {
+  OPEN_BETA_BADGE_MATURE_DAYS,
+  SCORING_METRIC_MODE,
+} from "@/lib/server/scorecard/constants";
+import { readScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
+import { summarizeOpenBetaConditions } from "@/lib/server/scorecard/openBetaConditions";
+import { getDecisionCardKeysBefore } from "@/lib/server/ai/decisionStore";
 import {
   jsonWithDataSource,
   withTimeout,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 import type { ScorecardSummaryResponse } from "@/lib/types/scorecard/scorecard";
+
+/** 오픈베타 부가 조회(카드 키·KV 마커) 예산 — 실패·초과는 해당 항목만 "확인 불가". */
+const OPEN_BETA_AUX_TIMEOUT_MS = 3_000;
 
 const FALLBACK_TIMEOUT_MESSAGE = "채점 집계 조회가 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 
@@ -43,13 +52,27 @@ export async function GET(request: NextRequest): Promise<Response> {
       scoredCount: 0,
       totalRows: 0,
       directionGate: null,
+      openBeta: null,
       generatedAt: new Date().toISOString(),
     };
     return jsonWithDataSource(payload, "supabase-unconfigured");
   }
 
   try {
-    const rows = await withTimeout(getAllScorecardRows(), 5_000);
+    const now = new Date();
+    const cardsBeforeIso = new Date(
+      now.getTime() - OPEN_BETA_BADGE_MATURE_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    // 원장 조회만 필수 — 카드 키·KV 마커는 부가라 실패해도 전체 응답을 깨지 않는다.
+    const [rows, cards, cronMeta] = await Promise.all([
+      withTimeout(getAllScorecardRows(), 5_000),
+      withTimeout(getDecisionCardKeysBefore(cardsBeforeIso), OPEN_BETA_AUX_TIMEOUT_MS).catch(
+        () => null,
+      ),
+      withTimeout(readScorecardCronMeta(), OPEN_BETA_AUX_TIMEOUT_MS).catch(
+        () => "unavailable" as const,
+      ),
+    ]);
     const payload: ScorecardSummaryResponse = {
       configured: true,
       metric: SCORING_METRIC_MODE,
@@ -57,7 +80,8 @@ export async function GET(request: NextRequest): Promise<Response> {
       scoredCount: countScored(rows),
       totalRows: rows.length,
       directionGate: summarizeDirectionGate(rows),
-      generatedAt: new Date().toISOString(),
+      openBeta: summarizeOpenBetaConditions({ rows, cards, cronMeta, now }),
+      generatedAt: now.toISOString(),
     };
     return jsonWithDataSource(payload, "supabase");
   } catch (error) {
