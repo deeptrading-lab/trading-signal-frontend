@@ -62,7 +62,8 @@
         "market-open": "#166534",
         "market-open-soft": "#dcfce7",
         "signal-done": "#12b76a",
-        "signal-done-soft": "#e6f6ee"
+        "signal-done-soft": "#e6f6ee",
+        "outcome-hit": "#166534"
       },
       "fontFamily": {
         "display": [

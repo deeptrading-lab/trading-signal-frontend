@@ -64,6 +64,7 @@ colors:
   market-open-soft: "#dcfce7"
   signal-done: "#12b76a"
   signal-done-soft: "#e6f6ee"
+  outcome-hit: "#166534"
 colors-dark:
   primary: "#cdd9e5"
   surface: "#161d26"
@@ -126,6 +127,7 @@ colors-dark:
   market-open-soft: "#14321f"
   signal-done: "#3fcf6a"
   signal-done-soft: "#14321f"
+  outcome-hit: "#4ade80"
 shadows:
   card: "0 1px 2px rgba(15, 23, 42, 0.05)"
   elevated: "0 10px 28px rgba(23, 32, 42, 0.08)"
