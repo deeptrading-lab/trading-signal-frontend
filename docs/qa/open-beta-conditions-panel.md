@@ -117,3 +117,37 @@ KV 장애가 "확인 불가"가 아니라 "미달 · 실행 기록 없음"으로
 - O-2 상태 NULL 정규화: `getRecentOutcomeRows` 는 NULL 상태를 `"pending"` 으로 바꾸고 `toRow` 는 그대로 둔다. 판정 결과는 같지만, 주석의 "같은 필드 규칙"을 엄밀히 하려면 맞춰 두는 편이 낫다.
 - O-3 375 아래쪽 기존 `ScorecardTable` 에서 "구분" 열이 글자 단위로 꺾인다 (스크린샷 하단). 이 PR 이전부터 있던 표시이고 범위 밖이다.
 - O-4 route 단위 테스트가 없다. AC-2 의 fail-soft·게이트 검증은 QA 임시 테스트로만 했다. AC-2b 를 고칠 때 route 테스트를 함께 두길 권한다.
+
+## 재QA (faf2dec)
+
+- 실행: 2026-10-18 20:32 KST, QA 역할. 대상 `faf2dec` (`fix(scorecard): KV 장애·원장 조회 실패를 '확인 불가'로, 실측 비율은 내림 표기`).
+- 방법: 1차 임시 테스트(`kvreal`·`route`·`pure`)를 다시 돌리고, route 전체 경로용 임시 테스트를 하나 더 만들었다. 이 테스트는 `requireAdminApi`·원장·카드 조회만 mock 하고 **`readScorecardCronMeta` 는 실제 코드, KV 는 실제 `UpstashKisStore`** 를 쓴다. 패널은 `renderToStaticMarkup` 로 확인했다. 임시 파일은 삭제했고 커밋하지 않았다.
+
+### 판정: qa-passed (실패 0건)
+
+AC-2b 가 해결됐다. 관찰 O-1(반올림)·O-4(route 테스트 부재)도 이번 커밋으로 해소됐다.
+
+| 항목 | 재현 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|
+| R-1a KV throw (1차 kvreal) | 실제 `UpstashKisStore` 의 `redis.get` 이 `ECONNREFUSED` throw | unknown / unavailable | `meta=unavailable`, `{"status":"unknown","reason":"unavailable"}` | 통과 |
+| R-1b KV 2초 지연 (1차 kvreal) | `redis.get` 2초 지연 (store 타임아웃 600ms) | unknown / unavailable | 604ms 후 `{"status":"unknown","reason":"unavailable"}` | 통과 |
+| R-1c KV throw, route 전체 경로 | `GET /api/scorecard/summary` + 실제 store throw | 200, continuity 확인 불가, 나머지 정상 | 200, `{"status":"unknown","reason":"unavailable"}`, stopLine pass. 패널에 "확인 불가"가 있고 "실행 기록 없음"은 없음 | 통과 |
+| R-1d KV 지연, route 전체 경로 | 같은 경로, 2초 지연 | 확인 불가 | 603ms, `unknown/unavailable` | 통과 |
+| R-1e 정상 store, 마커 없음 | `redis.get` → `null` (정상) | 미달 · 실행 기록 없음 | `{"status":"fail","reason":"no_marker"}`, 패널 "미달"·"실행 기록 없음" | 통과 |
+| R-1f 정상 store, 오늘 ok 마커 | `{at: now, ok: true}` | 통과 | `pass, ok, 0영업일` | 통과 |
+| R-1g degraded 플래그 리셋 | 첫 get throw → 다음 요청은 정상 null | 1번째 unavailable, 2번째 no_marker | 기대와 같음 (이전 장애 상태가 다음 요청에 남지 않음) | 통과 |
+| R-2a 원장 [] + 성숙 카드 | 원장 `[]`, 20일 전 카드 1장 | 배지 확인 불가 | `{"status":"unknown","n":0,"count":0,"rate":null}`, 패널 "확인 불가" | 통과 |
+| R-2b 원장 [] + 카드 [] | 둘 다 빈 배열 | 보류 | `{"status":"pending",...}`, 패널 "보류" | 통과 |
+| R-2c 원장 있음 + 카드 미매칭 | 원장 ticker 000660, 카드 005930 | 0% 미달 유지 (회귀 없음) | `{"status":"fail","n":1,"count":0,"rate":0}` | 통과 |
+| R-3a 표시 문자열 | `openBetaRatioValue` | 949/1000 → `94.9% (949/1000)`, 1000/1000 → `100%`, 19/20 → `95%` | `94.9% (949/1000)`, `100% (1000/1000)`, `95% (19/20)`. 참고: 996/1000 → `99.6%`, 1/3 → `33.3%`, 2/3 → `66.6%` (내림), 0/5 → `0%` | 통과 |
+| R-3b 949/1000 패널 | route 에 BUY 949 stop + 51 null | `94.9% (949/1000)` + 미달 | stopLine `fail n1000 count949 rate 0.949`, 패널 `94.9% (949/1000)`·"미달" | 통과 |
+| R-3c 부동소수 내림 오차 | n=1..2000, 모든 count 에서 `Math.floor(c/n*1000)/10` 와 정수 연산 `Math.floor(c*1000/n)/10` 비교 | 불일치 0 | 불일치 0건 (19/20 이 94.9% 로 떨어지는 경우 없음) | 통과 |
+| R-4a tsc | `npx tsc --noEmit -p .` | 0 | exit 0 | 통과 |
+| R-4b eslint | `npx eslint $(git diff --name-only main...HEAD -- '*.ts' '*.tsx')` (13개 파일) | 0 | 출력 없음 | 통과 |
+| R-4c vitest | `npx vitest run lib/server/scorecard app/api/scorecard lib/stock` | 전부 통과 | 17 files / 232 passed (1차 16/228 대비 `scorecardCronMeta.test.ts` 3개 + 배지 1개 추가) | 통과 |
+| R-4d build | `npx next build` | 성공 | 성공, 라우트 표 출력 | 통과 |
+| R-4e 임시 테스트 묶음 | 1차 `kvreal`·`route`·`pure` + 재QA `reqa` | 전부 통과 | 4 files / 37 passed | 통과 |
+
+### 관찰 (머지를 막지 않음)
+
+- O-5 `UpstashKisStore.lastDegraded` 는 인스턴스 하나에 있는 플래그다. 같은 프로세스에서 다른 KV 호출(KIS 토큰 등)이 `get` 이 끝난 뒤, `wasLastCallDegraded()` 를 읽기 전에 끝나면 플래그가 덮어써질 수 있다. 이 route 안에서는 동시에 도는 KV 호출이 없어서 문제가 생기지 않는다. 생기더라도 한 요청이 확인 불가와 미달 사이에서 잘못 표시될 뿐이고, 기존 `wasLastCallDegraded` 사용처와 같은 패턴이다. 필요하면 나중에 `get` 이 `{ value, degraded }` 를 돌려주는 API 로 바꿀 수 있다.
