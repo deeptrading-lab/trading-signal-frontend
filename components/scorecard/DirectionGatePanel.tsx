@@ -25,8 +25,11 @@ import {
 } from "@/lib/copy/scorecard/labels";
 
 const pct = (v: number | null) => (v === null ? HIT_RATE_NA : `${Math.round(v * 100)}%`);
-const pp = (v: number | null) =>
-  v === null ? HIT_RATE_NA : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%p`;
+const pp = (v: number | null) => {
+  if (v === null) return HIT_RATE_NA;
+  const r = Math.round(v * 10) / 10; // 부호는 반올림 결과 기준 — "−0.0%p" 방지.
+  return `${r > 0 ? "+" : r < 0 ? "−" : ""}${Math.abs(r).toFixed(1)}%p`;
+};
 
 function resultOf(side: DirectionGateSide): keyof typeof GATE_RESULT {
   if (!side.enoughSample) return "pending";
@@ -55,9 +58,11 @@ export function DirectionGatePanel({ gate }: { gate: DirectionGate }) {
   const overall = overallOf(gate);
 
   return (
-    <section className="flex flex-col gap-xs" aria-label={GATE_TITLE}>
+    <section className="flex flex-col gap-xs" aria-labelledby="direction-gate-title">
       <div className="flex flex-wrap items-baseline gap-x-md gap-y-xs">
-        <h2 className="text-body-md font-bold text-text-strong">{GATE_TITLE}</h2>
+        <h2 id="direction-gate-title" className="text-body-md font-bold text-text-strong">
+          {GATE_TITLE}
+        </h2>
         <span className={cn("text-body-sm font-medium", RESULT_TONE[overall])}>
           {gateHeadline(overall, gate.sample)}
         </span>

@@ -150,7 +150,7 @@ export function gateCriteria(marginPp: number, minN: number): string {
   return `2주 뒤 방향 적중률이 찍기 점수보다 ${marginPp}%p 이상 높고, 방향별 ${minN}건 이상일 때 통과`;
 }
 export const GATE_BASE_NOTE =
-  "찍기 점수 = 같은 기간 채점된 전체 판정(중립 포함) 중 실제로 그 방향으로 움직인 비율";
+  "찍기 점수 = 같은 기간 채점된 전체 판정(중립 포함) 중 실제로 그 방향으로 움직인 비율 · 오른다 = 적극 매수·분할 매수, 내린다 = 매도/회피·분할 매도·신규 진입 주의";
 export const GATE_SIDE_LABEL = { bull: "오른다", bear: "내린다" } as const;
 /** 방향 라벨 hover — 어떤 판정이 묶이는지. */
 export const GATE_SIDE_HINT = {

@@ -157,7 +157,7 @@ describe("summarizeDirectionGate — 오픈베타 전환 기준", () => {
     row("pending", { verdict, w2Status: status, w2ReturnPct: ret });
 
   it("찍기 점수는 전체 표본(HOLD 포함) 중 그 방향으로 움직인 비율", () => {
-    // 10건: 6 상승 · 4 하락. 강세 5건 중 4 상승, 약세 4건 중 2 하락, HOLD 1(상승).
+    // 10건: 6 상승 · 4 하락. 강세 5건 중 4 상승, 약세 4건 중 3 하락, HOLD 1(상승).
     const rows = [
       ...[1, 2, 3, 4].map((r) => w2("OVERWEIGHT", r)),
       w2("BUY", -1, "miss"),
@@ -187,7 +187,7 @@ describe("summarizeDirectionGate — 오픈베타 전환 기준", () => {
     expect(g.bear.diffPp).toBeCloseTo(15);
     expect(g.pass).toBe(true);
 
-    // 강세 적중을 32건(64%)으로 낮추면 base 52% → +12%p 통과, 30건이면 60% vs 50% = +10%p 경계 통과.
+    // 강세 적중 30건(60%)이면 전체 상승 30+20=50% → 정확히 +10%p 경계 — 통과(부동소수 오차 흡수).
     const edge = Array.from({ length: 50 }, (_, i) => w2("OVERWEIGHT", i < 30 ? 1 : -1));
     const g2 = summarizeDirectionGate([...edge, ...bear]);
     expect(g2.bull.diffPp).toBeCloseTo(10);
