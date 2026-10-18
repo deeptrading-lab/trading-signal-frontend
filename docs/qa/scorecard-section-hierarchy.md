@@ -1,13 +1,73 @@
 # QA — scorecard-section-hierarchy (성적표 섹션 구분·정보 위계)
 
 - 실행: 2026-10-18 23:07 KST, QA 역할
-- 대상: PR #396 `feature/scorecard-section-hierarchy` @ `7591306`
+- 대상: PR #396 `feature/scorecard-section-hierarchy` @ `7591306` (1차), `5c9994b` (재QA)
 - 근거: PR 본문 (사용자 피드백 "섹션 구분감 부족, 중요/부가 정보 구분 안 됨", 카드 UI 는 원하지 않음), 매니저가 준 AC 1~5. 별도 PRD 없음 (경량 UX 폴리시).
 - 방법: `.env.local` 로 Supabase·KV 를 **GET 만** 해서 실데이터 summary 를 만들었다 (`/tmp/qa396/live.json`, 원장 130행). 실제 `ScorecardContainer` 를 `renderToStaticMarkup` 으로 SSR 하고, `next build` CSS 두 청크를 실제 앱과 같은 순서(`08j4-82y0jq1w.css` → `0dkkqyqcjhd07.css`, `page_client-reference-manifest.js` 기준)로 붙여 headless Chromium(Playwright)에서 쟀다. 필터 상태(집계 기준·평가 시점)는 임시 vitest 하니스에서 `react` 의 `useState` 초기값을 바꿔 렌더했다. 다크 모드는 `<html class="dark">`.
   - 로컬 `next start` + 관리자 세션 렌더는 하지 않았다. 로컬 서버를 띄우면 서버 스케줄러(단타 자동틱 등)가 공유 Supabase 에 쓰기를 할 수 있어서 "GET 만" 조건을 지키려고 정적 렌더를 썼다. 관리자 세션을 쓰려면 세션 쿠키를 직접 서명해야 하는 점도 피했다.
   - 임시 파일(`qa-tmp396/`)은 삭제했고 커밋하지 않았다.
 
-## 판정: qa-failed (실패 1건)
+## 최종 판정: qa-passed (재QA @ `5c9994b`, 실패 0건)
+
+1차(`7591306`)는 qa-failed 였고, 수정 커밋 `5c9994b` 에서 실패 2건(AC-3e/3f)이 해소됐다. 아래 "재QA (5c9994b)" 절 참고. 1차 기록은 그 아래에 그대로 둔다.
+
+## 재QA (5c9994b)
+
+- 실행: 2026-10-18 23:13 KST. 1차와 같은 방법 — 실제 `ScorecardContainer` 를 `renderToStaticMarkup` 으로 SSR(훅 mock + `useState` 초기값으로 필터 상태 지정), 새 `next build` CSS 두 청크를 `page_client-reference-manifest.js` 순서(`0biu4.gmyj3~7.css` → `0dkkqyqcjhd07.css`)로 붙여 headless Chromium 에서 측정. 페이지 머리글은 `page.tsx` 의 새 마크업(`gap-2xl`)을 그대로 옮겼다.
+- 데이터: 1차에 Supabase GET 으로 받아 둔 실데이터 스냅샷 `/tmp/qa396/live.json`(원장 130행)을 다시 썼다. 실패를 같은 데이터로 재확인하기 위해서이며, 이번에는 Supabase 를 새로 조회하지 않았다(쓰기 0).
+- 임시 하니스(`qa-tmp396/`)는 삭제했고 커밋하지 않았다.
+
+### 수정 내용 (검증 대상)
+
+| 항목 | 변경 |
+|---|---|
+| 상세 표 정렬 | 순수 함수 `lib/scorecard/orderDetailCells.ts`. 그룹 순서 = 그 구분 셀들의 최대 표본(내림차순) → key → 그룹 안 `d1, w1, w2, m1`. 평가 시점별 차원은 key 를 시점 순으로 |
+| 섹션 구분 | 부모 `divide-y divide-border-line`, 각 섹션 `py-2xl first:pt-0 last:pb-0` (O-5 대응) |
+| 제목 | 섹션 h2 3개 모두 `text-h2` |
+| 머리글 간격 | `page.tsx` `gap-lg` → `gap-2xl` |
+| 구분 칸 | `whitespace-nowrap` (O-2), 그룹 2번째 행부터 `sr-only` 라벨 (O-3) |
+
+### 결과
+
+| # | 항목 | 재현 | 기대 | 실측 | 판정 |
+|---|---|---|---|---|---|
+| R-1 | 1차 실패 AC-3e: 시장 국면별 · 전체 (실데이터) | regime · all, 1280 다크 | 국면마다 한 덩어리, 그룹 안 +1일→+1주→+2주→+1달 | `약세장(52/83/75/79) → 횡보장(54/6/12/5) → 강세장(24/41/43/46)`. 그룹 최대 표본 83 > 54 > 46 순. 각 그룹 시점 순서 정확, 같은 라벨 재등장 0, 행 위 선은 그룹 첫 행(첫 그룹 제외)만 | 통과 |
+| R-2 | 1차 실패 AC-3f: 성숙도 혼재 시드 | verdict · all, BUY d1/w1/w2/m1 = 12/8/5/3, HOLD 전부 9 | BUY 4행 한 그룹 | `적극 매수 +1일, +1주, +2주, +1달` → `중립 +1일, +1주, +2주, +1달`. 갈라짐 0 | 통과 |
+| R-3 | 평가 시점별 순서 (1차 O-1) | horizon · all | +1일→+1주→+2주→+1달 | `+1일, +1주, +2주, +1달` | 통과 |
+| R-4 | 그룹화 회귀 (다른 차원·필터) | verdict·all / regime·+1달 / confidence·all / signalScore·all | 갈라짐 0 | 4가지 모두 갈라짐 0, 그룹 안 시점 순서 정확. regime·+1달 은 3행 각 1행 그룹, 모든 행에 라벨·선. confidence "높음" 표본 5건 미만 힌트는 그룹 첫 행에만 | 통과 |
+| R-5 | 섹션 구분선 (기본) | 실데이터, 1280·375, 다크·라이트 | 섹션 사이에만 선, 첫 섹션 위 없음 | 오픈베타 `border-bottom 1px`, pt 0 / pb 24. 방향 적중 `border-bottom 1px`, pt 24 / pb 24. 판정별 상세 선 없음, pt 24 / pb 0. 모든 섹션 `border-top 0`. 선 색 다크 `rgb(42,51,62)`, 라이트 `rgb(236,239,243)` | 통과 |
+| R-6 | 섹션 구분선 (`openBeta: null`) | openBeta 만 null / openBeta·directionGate 둘 다 null | 첫 섹션 위 선 없음 | openBeta null: 방향 적중이 첫 섹션 — pt 0, `border-top 0`, 아래에만 선. 둘 다 null: 판정별 상세 하나 — 선 0, pt 0 / pb 0. 1차 O-5 해소 | 통과 |
+| R-7 | 빌드 CSS 에 새 클래스 존재 | `.next/static/chunks/0biu4.gmyj3~7.css` grep | 존재 | `:where(.divide-y>:not(:last-child)){…border-bottom-width:calc(1px * calc(1 - var(--tw-divide-y-reverse)))}`, `:where(.divide-border-line>:not(:last-child)){border-color:var(--fs-border-line)}`, `.py-2xl{padding-block:24px}`, `.first\:pt-0:first-child{padding-top:…0}`, `.last\:pb-0:last-child{padding-bottom:…0}`, `.gap-2xl{gap:24px}`, `.sr-only{…position:absolute…}`, `.text-h2{font-size:17px;…700}`, `.whitespace-nowrap`. 순서: `.py-2xl`(offset 64168) 뒤에 `first:pt-0`(85318)·`last:pb-0`(85707) — 변형이 이김 (R-5 실측과 일치) | 통과 |
+| R-8 | 섹션 제목 위계 | computed style | h2 3개 `text-h2` | h1 `20px/700`, h2 3개 모두 `17px/700`. 머리글 하단 → 첫 섹션 24px (1차 `gap-lg` 보다 넓어짐) | 통과 |
+| R-9 | 375 구분 라벨 줄바꿈 (1차 O-2) | 375, 다크·라이트 | 글자 단위 세로 꺾임 없음 | 구분 칸 `white-space: nowrap`. 상세 표 16행 높이 모두 33~34px(1차는 그룹 첫 행만 5줄 높이). `신규 진입 주의` 한 줄 | 통과 |
+| R-10 | 375 페이지 가로 스크롤 | 375, 다크·라이트, 기본 + openBeta null | 0 | doc scrollWidth/clientWidth `375/375` (4가지 모두). 표 wrap: 오픈베타 `347/347`, 방향 `347/347`, 상세 `347/455` (내부 overflow-x, 1차 `347/387` 보다 넓어짐 — 관찰 V-2) | 통과 |
+| R-11 | sr-only 라벨 (1차 O-3) | DOM | 그룹 2번째 행부터 구분 칸에 sr-only 라벨 | 12행(기본 화면 4그룹×3) 모두 `<span class="sr-only">` 에 그룹 라벨. 시각 출력 없음, 레이아웃 영향 없음(doc 폭 그대로) | 통과 |
+| R-12 | tsc | `npx tsc --noEmit` | 0 | exit 0 | 통과 |
+| R-13 | eslint | `git diff --name-only -z main...HEAD -- '*.ts' '*.tsx' \| xargs -0 npx eslint` (8개 파일) | 0 | exit 0, 출력 없음 | 통과 |
+| R-14 | vitest | `npx vitest run lib/scorecard components/scorecard lib/server/scorecard` | 전부 통과 | 13 files / 185 passed (1차 12/182 + `orderDetailCells.test.ts` 3건) | 통과 |
+| R-15 | build | `npx next build` | 성공 | exit 0 | 통과 |
+| R-16 | 토큰·카피 | 변경 파일 hex/px/arbitrary 값 grep, 주석 외 한글 | 0 | 0건 (`#396` 주석이 hex 패턴에 걸린 오탐 1건 제외). 새 카피 없음 | 통과 |
+| R-17 | BFF 무회귀 | `git grep -nE "http://127\.0\.0\.1" -- app/` (route.ts 제외) | main 과 동일 | 2건, 1차와 같음 | 통과 |
+
+### 스크린샷 (커밋하지 않음)
+
+| 파일 | 내용 |
+|---|---|
+| `/tmp/qa396/v2-dark-1280.png` | 실데이터, 판정별 · 전체 |
+| `/tmp/qa396/v2-light-1280.png` | 같은 화면, 라이트 |
+| `/tmp/qa396/v2-dark-375.png` | 375, 다크 |
+| `/tmp/qa396/v2-light-375.png` | 375, 라이트 |
+| `/tmp/qa396/v2-regime-dark-1280.png` | 1차 실패 재현 화면(시장 국면별 · 전체) — 이제 3그룹 정상 |
+| `/tmp/qa396/v2-mixed-light-1280.png` | 성숙도 혼재 시드 — BUY 한 그룹 |
+
+### 관찰 (머지를 막지 않음)
+
+- V-1 섹션 h2 3개가 이제 모두 `17px/700` 으로 같다. 1차 O-4 의 "1px 차이" 문제는 없어졌지만, 대신 "오픈베타 조건"과 "방향 적중 (참고 지표)"가 글자 크기로는 구분되지 않는다. 중요/참고 구분은 순서, 제목의 "(참고 지표)" 문구, 오른쪽 상태 문구 색이 맡는다. 실제 화면에서는 섹션 사이 선 + 24px 여백이 분명해서 덩어리 구분은 잘 보인다.
+- V-2 375 에서 상세 표가 `whitespace-nowrap` 때문에 455px 로 넓어져, 가장 중요한 `적중률(초과)` 열이 첫 화면에서 잘려 보이지 않는다(가로로 밀어야 보임). 스크롤 힌트(그림자·페이드)는 없다. 1차의 세로 꺾임보다는 낫지만, 모바일에서 핵심 열을 먼저 보이게 하려면 열 순서나 숨김을 따로 고민해야 한다.
+- V-3 라이트 모드 헤어라인(`rgb(236,239,243)` on 흰 배경)은 여전히 옅다. 스크린샷에서 겨우 보이는 정도이고, 구분은 주로 여백이 맡는다 (1차 O-4 와 같음).
+- V-4 그룹 사이 선(상세 표)과 섹션 사이 선이 같은 색·같은 두께라, 상세 표 안에서는 "그룹 경계"와 "섹션 경계"가 같은 무게로 보인다. 섹션 경계는 위아래 24px 여백이 있어 구분은 된다.
+
+## 1차 판정: qa-failed (실패 1건) — 재QA 에서 해소
 
 "판정별 상세" 표의 그룹화가 **그룹 안에서 평가 시점마다 표본수가 다르면** 깨진다 (AC-3). 실데이터에서도 집계 기준을 "시장 국면별"로 바꾸면 바로 재현된다. 나머지 항목은 통과다.
 
