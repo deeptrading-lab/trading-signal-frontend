@@ -77,7 +77,7 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
             </th>
             <Th>{COL_HIT}</Th>
             <Th>{COL_MISS}</Th>
-            <Th>{COL_FLAT}</Th>
+            <Th className="hidden md:table-cell">{COL_FLAT}</Th>
             <Th>{COL_TOTAL}</Th>
             <th
               scope="col"
@@ -87,7 +87,7 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
             </th>
             <th
               scope="col"
-              className="py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
+              className="hidden py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap md:table-cell"
             >
               {COL_HIT_RATE_ABS}
             </th>
@@ -110,14 +110,7 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
               >
                 <td className="py-sm pr-md text-body-sm-strong align-top whitespace-nowrap">
                   {groupStart ? (
-                    <>
-                      <span>{rowLabel(cell.dimension, cell.key)}</span>
-                      {small && (
-                        <span className="ml-sm text-caption text-text-muted">
-                          {SMALL_SAMPLE_HINT}
-                        </span>
-                      )}
-                    </>
+                    <span>{rowLabel(cell.dimension, cell.key)}</span>
                   ) : (
                     // 그룹 2번째 행부터 라벨은 시각적으로 생략하되 스크린리더는 어느 구분인지 읽게.
                     <span className="sr-only">{rowLabel(cell.dimension, cell.key)}</span>
@@ -125,6 +118,8 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                 </td>
                 <td className="py-sm pr-md text-body-sm text-text-muted whitespace-nowrap">
                   {horizonLabel(cell.horizon)}
+                  {/* 표본 부족은 행마다 — 그룹 첫 행에만 두면 이어지는 작은 표본 행이 색으로만 구분된다. */}
+                  {small && <span className="ml-sm text-caption">{SMALL_SAMPLE_HINT}</span>}
                 </td>
                 <td className="py-sm pl-md text-right text-body-sm tabular-nums text-outcome-hit">
                   {cell.hit}
@@ -132,14 +127,14 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
                 <td className="py-sm pl-md text-right text-body-sm tabular-nums text-warn">
                   {cell.miss}
                 </td>
-                <td className="py-sm pl-md text-right text-body-sm tabular-nums text-text-muted">
+                <td className="hidden py-sm pl-md text-right text-body-sm tabular-nums text-text-muted md:table-cell">
                   {cell.flat}
                 </td>
                 <td className="py-sm pl-md text-right text-body-sm tabular-nums">{cell.total}</td>
                 <td className="py-sm pl-md text-right text-body-sm-strong tabular-nums text-text-strong">
                   {rateText(cell.hitRate, denom)}
                 </td>
-                <td className="py-sm pl-md text-right text-body-sm tabular-nums text-text-muted">
+                <td className="hidden py-sm pl-md text-right text-body-sm tabular-nums text-text-muted md:table-cell">
                   {rateText(cell.absHitRate, cell.absSample)}
                 </td>
               </tr>
@@ -152,11 +147,15 @@ export function ScorecardTable({ cells }: ScorecardTableProps) {
 }
 
 /** 우측 정렬 숫자 컬럼 헤더(적중/미적중/보합/표본수) — 홈 표 헤더 언어. */
-function Th({ children }: { children: React.ReactNode }) {
+/** 우측 정렬 숫자 컬럼 헤더. 모바일에서 참고 열(보합·절대)은 `hidden md:table-cell` 로 숨겨 핵심 열을 첫 화면에 둔다. */
+function Th({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <th
       scope="col"
-      className="py-sm pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
+      className={cn(
+        "py-sm pl-md text-right text-label-sm text-text-muted whitespace-nowrap",
+        className,
+      )}
     >
       {children}
     </th>

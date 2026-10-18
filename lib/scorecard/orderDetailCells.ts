@@ -12,8 +12,12 @@ import type {
   ScorecardSummaryCell,
 } from "@/lib/types/scorecard/scorecard";
 
-const HORIZON_ORDER: string[] = ["d1", "w1", "w2", "m1", "all"];
-const horizonRank = (h: string) => HORIZON_ORDER.indexOf(h);
+const HORIZON_ORDER: readonly ScorecardHorizon[] = ["d1", "w1", "w2", "m1"];
+/** 모르는 값("all" 등)은 맨 뒤로. */
+const horizonRank = (h: string) => {
+  const i = HORIZON_ORDER.indexOf(h as ScorecardHorizon);
+  return i === -1 ? HORIZON_ORDER.length : i;
+};
 
 export function orderDetailCells(
   cells: ScorecardSummaryCell[],
@@ -26,15 +30,15 @@ export function orderDetailCells(
     return [...inDim].sort((a, b) => horizonRank(a.key) - horizonRank(b.key));
   }
 
+  const shown = inDim.filter((c) => horizon === "all" || c.horizon === horizon);
+  // 그룹 크기는 **보이는 행** 기준 — 특정 시점 필터일 때 표본 열이 내림차순으로 읽히게.
   const groupSize = new Map<string, number>();
-  for (const c of inDim) groupSize.set(c.key, Math.max(groupSize.get(c.key) ?? 0, c.total));
+  for (const c of shown) groupSize.set(c.key, Math.max(groupSize.get(c.key) ?? 0, c.total));
 
-  return inDim
-    .filter((c) => horizon === "all" || c.horizon === horizon)
-    .sort((a, b) => {
-      const diff = (groupSize.get(b.key) ?? 0) - (groupSize.get(a.key) ?? 0);
-      if (diff !== 0) return diff;
-      if (a.key !== b.key) return a.key.localeCompare(b.key);
-      return horizonRank(a.horizon) - horizonRank(b.horizon);
-    });
+  return shown.sort((a, b) => {
+    const diff = (groupSize.get(b.key) ?? 0) - (groupSize.get(a.key) ?? 0);
+    if (diff !== 0) return diff;
+    if (a.key !== b.key) return a.key.localeCompare(b.key);
+    return horizonRank(a.horizon) - horizonRank(b.horizon);
+  });
 }

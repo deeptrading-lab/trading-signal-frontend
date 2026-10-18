@@ -56,6 +56,15 @@ describe("orderDetailCells", () => {
     expect(order(orderDetailCells(cells, "verdict", "w2"))).toEqual(["BUY:w2"]);
   });
 
+  it("특정 시점 필터에선 보이는 행의 표본으로 그룹 순서를 정한다", () => {
+    const cells = [
+      cell("verdict", "BUY", "d1", 12),
+      cell("verdict", "BUY", "w2", 5),
+      cell("verdict", "HOLD", "w2", 9),
+    ];
+    expect(order(orderDetailCells(cells, "verdict", "w2"))).toEqual(["HOLD:w2", "BUY:w2"]);
+  });
+
   it("평가 시점별 차원은 필터 무관 + 시점 순", () => {
     const cells = [
       cell("horizon", "m1", "m1", 42),
