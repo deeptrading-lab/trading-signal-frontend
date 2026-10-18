@@ -35,12 +35,13 @@ export function useConfidenceCalibration(
 
   return useMemo(() => {
     const byConfidence = new Map<ScorecardConfidence, ConfidenceCalibration>();
-    for (const c of data?.calibrations ?? []) {
+    // 같은 탭에서 강등되면 캐시된 data 가 남으므로 isAdmin 으로 한 번 더 거른다.
+    for (const c of (isAdmin ? data?.calibrations : undefined) ?? []) {
       byConfidence.set(c.confidence, c);
     }
     return {
       getCalibration: (confidence) => byConfidence.get(confidence) ?? null,
       minSampleN: data?.minSampleN ?? 0,
     };
-  }, [data]);
+  }, [data, isAdmin]);
 }
