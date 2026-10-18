@@ -1,5 +1,5 @@
 /**
- * DirectionGatePanel — 오픈베타 전환 기준(방향 적중 vs 찍기 점수) 운영자 표시.
+ * DirectionGatePanel — 방향 적중 vs 찍기 점수 운영자 표시(참고 지표 — 오픈베타 조건 아님, ai-direction-quality §10).
  *
  * 강세군·약세군 각각 2주 뒤 방향 적중률을 같은 표본의 찍기 점수와 나란히 두고 기준 통과 여부를 보인다.
  * 판정 색은 등락색이 아닌 채점 톤(통과=outcome-hit / 미달=warn / 표본 부족=muted).
@@ -15,6 +15,7 @@ import {
   GATE_COL_N,
   GATE_COL_RESULT,
   GATE_COL_SIDE,
+  GATE_REFERENCE_NOTE,
   GATE_RESULT,
   GATE_SIDE_HINT,
   GATE_SIDE_LABEL,
@@ -67,6 +68,7 @@ export function DirectionGatePanel({ gate }: { gate: DirectionGate }) {
           {gateHeadline(overall, gate.sample)}
         </span>
       </div>
+      <p className="text-caption text-text-muted">{GATE_REFERENCE_NOTE}</p>
       <p className="text-caption text-text-muted">{gateCriteria(gate.marginPp, gate.minN)}</p>
 
       <div className="overflow-x-auto">
