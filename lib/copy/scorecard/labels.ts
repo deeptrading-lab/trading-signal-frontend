@@ -151,7 +151,12 @@ export function gateCriteria(marginPp: number, minN: number): string {
 }
 export const GATE_BASE_NOTE =
   "찍기 점수 = 같은 기간 채점된 전체 판정(중립 포함) 중 실제로 그 방향으로 움직인 비율";
-export const GATE_SIDE_LABEL = { bull: "오른다 (매수 계열)", bear: "내린다 (매도·주의 계열)" } as const;
+export const GATE_SIDE_LABEL = { bull: "오른다", bear: "내린다" } as const;
+/** 방향 라벨 hover — 어떤 판정이 묶이는지. */
+export const GATE_SIDE_HINT = {
+  bull: "적극 매수·분할 매수 판정",
+  bear: "매도/회피·분할 매도·신규 진입 주의 판정",
+} as const;
 export const GATE_COL_SIDE = "방향";
 export const GATE_COL_N = "건수";
 export const GATE_COL_HIT_RATE = "적중률";
@@ -159,6 +164,7 @@ export const GATE_COL_BASE = "찍기 점수";
 export const GATE_COL_DIFF = "차이";
 export const GATE_COL_RESULT = "판정";
 export const GATE_RESULT = { pass: "통과", fail: "미달", pending: "표본 부족" } as const;
-export function gateHeadline(pass: boolean, sample: number): string {
-  return pass ? `기준 통과 · 채점 ${sample}건` : `기준 미달 · 채점 ${sample}건`;
+export const GATE_HEADLINE = { pass: "기준 통과", fail: "기준 미달", pending: "판정 보류 (표본 부족)" } as const;
+export function gateHeadline(state: keyof typeof GATE_HEADLINE, sample: number): string {
+  return `${GATE_HEADLINE[state]} · 채점 ${sample}건`;
 }

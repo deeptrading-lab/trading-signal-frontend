@@ -16,6 +16,7 @@ import {
   GATE_COL_RESULT,
   GATE_COL_SIDE,
   GATE_RESULT,
+  GATE_SIDE_HINT,
   GATE_SIDE_LABEL,
   GATE_TITLE,
   HIT_RATE_NA,
@@ -25,7 +26,7 @@ import {
 
 const pct = (v: number | null) => (v === null ? HIT_RATE_NA : `${Math.round(v * 100)}%`);
 const pp = (v: number | null) =>
-  v === null ? HIT_RATE_NA : `${v > 0 ? "+" : ""}${v.toFixed(1)}%p`;
+  v === null ? HIT_RATE_NA : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%p`;
 
 function resultOf(side: DirectionGateSide): keyof typeof GATE_RESULT {
   if (!side.enoughSample) return "pending";
@@ -38,79 +39,87 @@ const RESULT_TONE = {
   pending: "text-text-muted",
 } as const;
 
+/** 전체 판정 — 한쪽이라도 표본 충분한데 미달이면 미달, 그 외 표본 부족이 있으면 보류. */
+function overallOf(gate: DirectionGate): keyof typeof GATE_RESULT {
+  if (gate.pass) return "pass";
+  const sides = [gate.bull, gate.bear];
+  if (sides.some((s) => s.enoughSample && !s.pass)) return "fail";
+  return "pending";
+}
+
 export function DirectionGatePanel({ gate }: { gate: DirectionGate }) {
   const sides = [
     ["bull", gate.bull],
     ["bear", gate.bear],
   ] as const;
+  const overall = overallOf(gate);
 
   return (
     <section className="flex flex-col gap-xs" aria-label={GATE_TITLE}>
       <div className="flex flex-wrap items-baseline gap-x-md gap-y-xs">
         <h2 className="text-body-md font-bold text-text-strong">{GATE_TITLE}</h2>
-        <span
-          className={cn("text-body-sm font-medium", gate.pass ? "text-outcome-hit" : "text-warn")}
-        >
-          {gateHeadline(gate.pass, gate.sample)}
+        <span className={cn("text-body-sm font-medium", RESULT_TONE[overall])}>
+          {gateHeadline(overall, gate.sample)}
         </span>
       </div>
       <p className="text-caption text-text-muted">{gateCriteria(gate.marginPp, gate.minN)}</p>
 
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b border-border-line">
-            <th scope="col" className="py-md pr-md text-left text-label-sm text-text-muted">
-              {GATE_COL_SIDE}
-            </th>
-            {[GATE_COL_N, GATE_COL_HIT_RATE, GATE_COL_BASE, GATE_COL_DIFF, GATE_COL_RESULT].map(
-              (label) => (
-                <th
-                  key={label}
-                  scope="col"
-                  className="py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
-                >
-                  {label}
-                </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {sides.map(([key, side]) => {
-            const result = resultOf(side);
-            return (
-              <tr key={key} className="border-b border-border-line last:border-b-0">
-                <th
-                  scope="row"
-                  className="py-md pr-md text-left text-body-sm font-normal text-text-strong"
-                >
-                  {GATE_SIDE_LABEL[key]}
-                </th>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums">
-                  {side.n}/{gate.minN}
-                </td>
-                <td className="py-md pl-md text-right text-body-sm-strong tabular-nums text-text-strong">
-                  {pct(side.hitRate)}
-                </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
-                  {pct(side.baseRate)}
-                </td>
-                <td className="py-md pl-md text-right text-body-sm tabular-nums">
-                  {pp(side.diffPp)}
-                </td>
-                <td
-                  className={cn(
-                    "py-md pl-md text-right text-body-sm font-medium whitespace-nowrap",
-                    RESULT_TONE[result],
-                  )}
-                >
-                  {GATE_RESULT[result]}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-border-line">
+              <th scope="col" className="py-md pr-md text-left text-label-sm text-text-muted">
+                {GATE_COL_SIDE}
+              </th>
+              {[GATE_COL_N, GATE_COL_HIT_RATE, GATE_COL_BASE, GATE_COL_DIFF, GATE_COL_RESULT].map(
+                (label) => (
+                  <th
+                    key={label}
+                    scope="col"
+                    className="py-md pl-md text-right text-label-sm text-text-muted whitespace-nowrap"
+                  >
+                    {label}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {sides.map(([key, side]) => {
+              const result = resultOf(side);
+              return (
+                <tr key={key} className="border-b border-border-line last:border-b-0">
+                  <th
+                    scope="row"
+                    className="py-md pr-md text-left text-body-sm font-normal text-text-strong whitespace-nowrap"
+                    title={GATE_SIDE_HINT[key]}
+                  >
+                    {GATE_SIDE_LABEL[key]}
+                  </th>
+                  <td className="py-md pl-md text-right text-body-sm tabular-nums">{side.n}</td>
+                  <td className="py-md pl-md text-right text-body-sm-strong tabular-nums text-text-strong">
+                    {pct(side.hitRate)}
+                  </td>
+                  <td className="py-md pl-md text-right text-body-sm tabular-nums text-text-muted">
+                    {pct(side.baseRate)}
+                  </td>
+                  <td className="py-md pl-md text-right text-body-sm tabular-nums">
+                    {pp(side.diffPp)}
+                  </td>
+                  <td
+                    className={cn(
+                      "py-md pl-md text-right text-body-sm font-medium whitespace-nowrap",
+                      RESULT_TONE[result],
+                    )}
+                  >
+                    {GATE_RESULT[result]}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       <p className="text-caption text-text-muted">{GATE_BASE_NOTE}</p>
     </section>
   );
