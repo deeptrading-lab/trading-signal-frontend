@@ -9067,3 +9067,45 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - `/dashboard/scorecard` 에 오픈베타 조건(판정 정직성 5항목) 패널 — 방향 적중 패널은 참고로 강등.
+
+### 2026-10-18 — feat(scorecard): 성적표에 오픈베타 조건(판정 정직성) 패널 (#395)
+
+- **slug**: `open-beta-conditions-panel` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/395
+- **요약**: feat(scorecard): 성적표에 오픈베타 조건(판정 정직성) 패널
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 운영자 전용 `/dashboard/scorecard` 최상단에 **오픈베타 조건 (판정 정직성)** 패널을 추가했다. 근거는 `docs/prd/ai-direction-quality.md` §10-1(2026-10-18 확정된 5항목)이다. 경량 흐름이라 새 PRD는 쓰지 않았다. 기존 `DirectionGatePanel` 은 패널 아래로 내리고 제목을 "방향 적중 (참고 지표)"로 바꿨으며, "오픈베타 조건이 아니에요" 안내를 붙였다.
+  > 
+  > | # | 항목 | 방식 | 통과 기준 |
+  > |---|---|---|---|
+  > | 1 | 무효화 라인 보유율 | 자동 | 최근 28일(entry_date, KST) 진입한 BUY·OVERWEIGHT·SELL·REDUCE·UNDERWEIGHT 중 `stopLossPct != null` ≥ 95%. 표본이 0건이면 판정 보류 |
+  > | 2 | 인용 가격 레벨 창작 0 | 수동 | 안내만 표시: "최근 분석 10건 표본 감사" |
+  > | 3 | 채점 연속성 | 자동 (**대리 지표**) | `readScorecardCronMeta()` 의 마지막 실행이 `ok` 이고 오늘(KST) 기준 3영업일 이내 |
+  > | 4 | 채점 배지 부착률 | 자동 | `updated_at` 이 16일 이상 지난 KR 카드 중 `resolveDecisionOutcome` 결과가 non-null 인 비율 ≥ 95% |
+  > | 5 | 적중률·수익 주장 0 | 수동 | 안내만 표시: "최근 점검 PR #394(2026-10-18)" (카피 상수) |
+  > 
+  > **3번은 대리 지표다.** PRD 원문은 "최근 4주 `score-decisions` 워크플로 실패 0" 이다. 서버에서 GitHub API를 부르지 않으려고 KV 헬스 마커로 대신 판정한다. 마커에는 마지막 1회 실행만 남기 때문에, 중간에 실패했다가 회복한 경우는 잡지 못한다. 원 정의는 계속 `gh run list` 로 수동 확인해야 한다. 이 내용은 패널 설명 문구에 적었고, PRD §10-1 표의 3번 측정 칸도 이 정의로 바꿨다.
+  > 
+  > 헤드라인 규칙은 이렇다. 자동 3항목이 모두 통과면 "자동 항목 통과 · 수동 2항목 확인 필요", 하나라도 미달이면 "미달 N항목", 미달은 없고 보류나 확인 불가가 있으면 "판정 보류 N항목". 색은 통과 `text-outcome-hit`, 미달 `text-warn`, 보류·확인 불가·수동 `text-text-muted` 를 쓴다. 등락색은 쓰지 않았다.
+  > 
+  > ## 구조
+  > - `lib/server/scorecard/openBetaConditions.ts` — 순수 함수 3개와 묶음 함수 1개. `now` 를 인자로 받아 결과가 결정론적이다. 영업일 계산은 기존 `businessDaysBetween` 을 재사용했다(주말만 제외하고, 공휴일은 3영업일 여유로 흡수). KST 날짜를 로컬 자정으로 바꿔 넘기므로 실행 TZ와 상관없다(테스트를 TZ=UTC·LA에서도 통과시킴).
+  > - `lib/stock/decisionOutcome.ts` — `toOutcomeCandidate(ScorecardRow)` 를 추가했다. 이미 로드한 원장 행을 후보로 재사용하기 위해서다. route 의 attachOutcome 은 매핑을 route 안에 두지 않고 `getRecentOutcomeRows`(raw projection)에서 하기 때문에, 그 함수와 같은 필드 규칙의 순수 함수만 새로 두었다. **같은 ticker 후보 안에서만 매칭**한다(attachOutcome 의 byTicker 와 같은 규칙).
+  > - `lib/server/ai/decisionStore.ts` — `getDecisionCardKeysBefore(beforeIso)` 를 추가했다. `select=ticker,updated_at,run_id` 만 가져오고 decision JSONB 는 끌어오지 않는다(egress 절약). 실패하면 `null` 을 반환해 "대상 0건(빈 배열)"과 구분한다.
+  > - `app/api/scorecard/summary/route.ts` — 응답에 `openBeta` 를 추가했다. admin 게이트는 그대로다. 원장, 카드 키, KV 마커를 병렬로 조회한다. 카드 키나 KV 조회가 실패하거나 3초 안에 끝나지 않으면 해당 항목만 "확인 불가"로 표시하고 응답 전체는 정상으로 돌려준다(fail-soft). Supabase 미설정이면 `openBeta: null`.
+  > - 튜닝값은 `lib/server/scorecard/constants.ts` 의 코드 상수 `OPEN_BETA_COVERAGE_MIN_RATE` / `_STOP_LINE_WINDOW_DAYS` / `_CRON_MAX_BUSINESS_DAYS` / `_BADGE_MATURE_DAYS` 로 두었다(env 없음).
+  > - `components/scorecard/OpenBetaConditionsPanel.tsx` — 새 패널. 표 스타일과 `overflow-x-auto` 래퍼는 DirectionGatePanel 과 같은 패턴이다. 카피는 `lib/copy/scorecard/labels.ts` 에 있다.
+  > 
+  > ## 실데이터 실측 (2026-10-18, 로컬 임시 스크립트, 커밋 안 함)
+  > | # | 결과 | 값 |
+  > |---|---|---|
+  > | 1 무효화 라인 | **판정 보류** | 최근 28일 진입 0건(원장 130행 중 마지막 진입 2026-09-02). 참고로 전체 방향 판정 121건은 모두 stop 을 보유(121/121) |
+  > | 3 채점 연속성 | **통과** | 마지막 실행 2026-10-18T08:05:52Z, ok:true, 0영업일 전 |
+  > | 4 채점 배지 | **통과** | 100% (67/67). 카드 67건 중 `run_id` 컬럼을 가진 건 1건뿐이고, 나머지는 시각 근접(±10분) 폴백으로 매칭됐다 |
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - QA: admin 로그인 상태로 `/dashboard/scorecard` 를 375/1280 두 뷰포트에서 확인한다(5행 표의 가로 스크롤, 조건 설명 줄바꿈, 헤드라인 색).
+  - 수동 2·5번은 점검할 때마다 `OPEN_BETA_COPY_AUDIT`(lib/copy/scorecard/labels.ts) 의 PR·날짜를 갱신한다. 3번 원 정의(4주 워크플로 실패 0)는 `gh run list --workflow score-decisions.yml` 로 따로 확인해야 한다.
+  - 1번은 새 분석이 들어와야 판정이 난다. 원장이 2000행을 넘기면 `getAllScorecardRows` 상한 때문에 오래된 카드의 배지 부착률이 과소 집계될 수 있으니, 그때 4번 조회 범위를 좁힌다.

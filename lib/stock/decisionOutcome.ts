@@ -20,7 +20,11 @@
  * `skipped`(봉 부재)는 표시 대상에서 제외한다 — 판정의 성패가 아니라 데이터 사정이다.
  */
 
-import type { HorizonStatus, ScorecardHorizon } from "@/lib/types/scorecard/scorecard";
+import type {
+  HorizonStatus,
+  ScorecardHorizon,
+  ScorecardRow,
+} from "@/lib/types/scorecard/scorecard";
 
 /** 카드에 붙일 채점 결과 — 어느 시점에 어떤 결과였는지 + 그때 초과수익. */
 export interface DecisionOutcome {
@@ -106,4 +110,23 @@ export function resolveDecisionOutcome(
   runId?: string | null,
 ): DecisionOutcome | null {
   return selectDecisionOutcome(pickOutcomeRow(candidates, decisionUpdatedAt, runId));
+}
+
+/**
+ * 이미 로드한 채점 원장 행 → 매칭 후보. `getRecentOutcomeRows` 의 projection 과 같은 필드 규칙
+ * (ticker·decidedAt·runId + horizon 별 status·초과수익).
+ */
+export function toOutcomeCandidate(row: ScorecardRow): OutcomeCandidate {
+  return {
+    ticker: row.ticker,
+    decidedAt: row.decidedAt,
+    runId: row.runId,
+    statuses: { d1: row.d1Status, w1: row.w1Status, w2: row.w2Status, m1: row.m1Status },
+    excess: {
+      d1: row.d1ExcessReturnPct,
+      w1: row.w1ExcessReturnPct,
+      w2: row.w2ExcessReturnPct,
+      m1: row.m1ExcessReturnPct,
+    },
+  };
 }

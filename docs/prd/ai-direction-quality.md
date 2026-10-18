@@ -330,9 +330,11 @@ Phase 1 진단(`docs/analysis/ai-direction-diagnosis-2026-10-18.md`) 결과: H-B
 |---|---|---|
 | 1 | 강세·약세 판정의 무효화 라인 보유율 ≥ 95% | `signal_scorecard.stop_loss_pct` 가 있는 비율 (최근 4주 진입분) |
 | 2 | 판정이 인용한 가격 레벨이 실측과 일치, 창작 0 | 최근 분석 10건 표본 감사 (#375 라이브 검증 방식) |
-| 3 | 채점 연속성 — 최근 4주 `score-decisions` 워크플로 실패 0 | `gh run list --workflow score-decisions.yml` |
+| 3 | 채점 연속성 — 마지막 채점 cron 실행이 `ok` 이고 오늘(KST) 기준 3영업일 이내 | KV 헬스 마커 `readScorecardCronMeta()` (대리 지표 — 원 정의 "최근 4주 `score-decisions` 워크플로 실패 0" 은 서버에서 GitHub API 를 부르지 않기 위해 대체. 마커는 마지막 1회만 남아 중간 실패 후 회복은 못 잡으므로, 원 정의는 `gh run list --workflow score-decisions.yml` 로 수동 확인) |
 | 4 | 채점 시점(2주)이 지난 카드의 채점 배지 부착률 ≥ 95% | `/analyze` 카드 ↔ 원장 매칭 (`resolveDecisionOutcome`) |
 | 5 | 사용자 노출 카피에 적중률·수익 보장 문구 0 | `lib/copy/**` 검토 |
+
+표시 위치: 운영자 화면 `/dashboard/scorecard` 최상단 `OpenBetaConditionsPanel` (자동 1·3·4 = `lib/server/scorecard/openBetaConditions.ts`, 수동 2·5 = 점검 안내). 방향 적중 게이트는 그 아래 "방향 적중 (참고 지표)".
 
 ### 10-2. E-2 결과 (2026-10-18)
 

@@ -31,7 +31,14 @@ export async function saveScorecardCronMeta(meta: ScorecardCronMeta): Promise<vo
   await getKisStore().set(META_KEY, meta, TTL_SEC);
 }
 
-/** 마지막 cron 실행 마커 조회(없으면 null). */
+/**
+ * 마지막 cron 실행 마커 조회(없으면 null).
+ * store 는 장애·타임아웃도 null 로 삼키므로(fail-soft), 그 경우는 "마커 없음"과 구분되게 throw 한다
+ * — 호출부가 "확인 불가"로 표시하고 "실행 기록 없음(미달)"으로 오표시하지 않도록.
+ */
 export async function readScorecardCronMeta(): Promise<ScorecardCronMeta | null> {
-  return getKisStore().get<ScorecardCronMeta>(META_KEY);
+  const store = getKisStore();
+  const meta = await store.get<ScorecardCronMeta>(META_KEY);
+  if (meta === null && store.wasLastCallDegraded?.()) throw new Error("scorecard cron meta: store degraded");
+  return meta;
 }

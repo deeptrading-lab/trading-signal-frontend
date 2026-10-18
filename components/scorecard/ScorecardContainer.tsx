@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils/cn";
 import { useQueryScorecardSummary } from "@/hooks/scorecard/useQueryScorecardSummary";
 import { ScorecardTable } from "./ScorecardTable";
 import { DirectionGatePanel } from "./DirectionGatePanel";
+import { OpenBetaConditionsPanel } from "./OpenBetaConditionsPanel";
 import type {
   ScorecardDimension,
   ScorecardHorizon,
@@ -122,6 +123,8 @@ export function ScorecardContainer() {
 
   return (
     <div className="flex flex-col gap-md">
+      {data.openBeta ? <OpenBetaConditionsPanel conditions={data.openBeta} /> : null}
+
       {data.directionGate && data.directionGate.sample > 0 ? (
         <DirectionGatePanel gate={data.directionGate} />
       ) : null}
