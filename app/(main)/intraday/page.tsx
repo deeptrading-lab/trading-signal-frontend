@@ -1,4 +1,4 @@
-import { IntradayWatchWorkspace } from "@/components/intraday/IntradayWatchWorkspace";
+import { IntradayWorkspaceTabs } from "@/components/intraday/IntradayWorkspaceTabs";
 import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
 import { hasServerRole } from "@/lib/auth/serverGuard";
 import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
@@ -9,5 +9,5 @@ export default async function IntradayPage() {
   if (isVercelRuntime() && !(await hasServerRole("admin"))) {
     return <AccessDeniedView />;
   }
-  return <IntradayWatchWorkspace />;
+  return <IntradayWorkspaceTabs />;
 }

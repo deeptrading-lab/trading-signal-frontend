@@ -55,3 +55,6 @@ next-env.d.ts
 
 # Vercel 로컬 링크 설정 — 공유 금지(.vercel/README.txt 자체 명시)
 .vercel
+
+# Local program trading replay account
+.local/program-trading/
