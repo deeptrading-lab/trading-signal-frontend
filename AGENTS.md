@@ -118,3 +118,9 @@ lib/query/             TanStack Query 인프라 (클라이언트 설정 등)
 lib/utils/             도메인 무관 헬퍼 (cn, formatMoney, formatPct 등)
 lib/server/            route handler(BFF) 서버 전용 유틸 (withTimeout·delay·jsonWithDataSource 등)
 ```
+
+## 프로그램 자동매매 기준 다이어그램 유지
+
+- 프로그램 자동매매 기준을 변경하면 `docs/program-trading/rules.template.html`의 매수·매도 다이어그램 조건·분기·우선순위를 같은 작업에서 갱신한다. HTML에는 줄글 설명이나 계산기 대신 다이어그램만 노출한다. 논의 중인 제안과 실제 구현을 구분한다.
+- `npm run program:rules`로 `docs/program-trading/rules.html`을 재생성하고 `npm run program:rules:check`로 일치 여부를 확인한다. 생성 HTML 직접 수정 금지.
+- 엔진 상수는 생성기가 직접 읽지만 조건 문장과 시간·후보 정책은 수동 동기화가 필요하다. 다이어그램은 AI 단타 가이드가 아닌 프로그램 매매 엔진 기준이다.
