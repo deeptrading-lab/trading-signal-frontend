@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { RULES } from '../lib/server/programTrading/engine';
 
 async function main() {
-const sources = ['lib/server/programTrading/engine.ts', 'lib/server/programTrading/candidates.ts', 'lib/validation/programTrading/candidateGate.ts', 'lib/mock/programTrading/quotes.ts', 'scripts/programTradingWorker.ts'];
+const sources = ['lib/server/programTrading/engine.ts', 'lib/server/programTrading/candidateRefresh.ts', 'lib/server/programTrading/candidates.ts', 'lib/validation/programTrading/candidateGate.ts', 'lib/mock/programTrading/quotes.ts', 'scripts/programTradingWorker.ts'];
 const sourceText = await Promise.all(sources.map(path => readFile(path, 'utf8')));
 const fingerprint = createHash('sha256').update(sourceText.join('\n')).digest('hex').slice(0, 12);
 const theme = JSON.parse(await readFile('tailwind.theme.json', 'utf8')).theme.extend;

@@ -1,3 +1,4 @@
+import { createCandidateRefresh } from "../lib/server/programTrading/candidateRefresh";
 import { loadCandidates } from "../lib/server/programTrading/candidates";
 import { hasCandidates, emptyCandidateSnapshot } from "../lib/validation/programTrading/candidateGate";
 import { createServer } from "node:http";
@@ -12,19 +13,21 @@ await mkdir(dir,{recursive:true});
 let state: TradingState = initialState();
 try { const saved=JSON.parse(await readFile(`${dir}/state.json`,"utf8")); if(saved.version!==1) throw new Error("state version"); state=saved; state.running=false; state.candidates=emptyCandidateSnapshot(); } catch(e) { if ((e as NodeJS.ErrnoException).code!=="ENOENT") throw e; }
 const seeds = new Map(state.positions.map(p=>[p.ticker,{ticker:p.ticker,name:p.ticker,price:p.entry}]));
-async function refreshCandidates() {
-  state.candidates=await loadCandidates();
-  if(!hasCandidates(state.candidates)) state.running=false;
-  for(const row of state.candidates.rows) if(!seeds.has(row.ticker)) seeds.set(row.ticker,row);
-}
 async function persist() { await writeFile(`${dir}/state.tmp`,JSON.stringify(state,null,2)); await rename(`${dir}/state.tmp`,`${dir}/state.json`); }
 let queue=Promise.resolve();
 function serial(fn:()=>Promise<void>) { const next=queue.then(fn); queue=next.catch(e=>{ state.running=false; state.lastError=String(e); console.error(e); }); return next; }
+const refreshCandidates = createCandidateRefresh(loadCandidates, snapshot => serial(async () => {
+  state.candidates = snapshot;
+  if (!hasCandidates(snapshot)) state.running = false;
+  for (const row of snapshot.rows) if (!seeds.has(row.ticker)) seeds.set(row.ticker, row);
+  await persist();
+}));
 async function report() {
   const exits=state.trades.filter(t=>t.side==="sell");
   const text=`# 프로그램 매매 오답노트\n\n합성 시세 리플레이 · 규칙 v1 · AI 분석 전 원장 요약\n\n- 틱: ${state.tick} / 청산: ${exits.length} / 실현손익: ${state.realized}원\n- 수수료·매도세·슬리피지: 가정값. 실제 계좌와 다름.\n- 규칙 변경은 검토 후 코드·테스트로 적용. 자동 변경 없음.\n\n|거래|사유|비용후 손익|\n|---|---|---|\n${exits.map(t=>`|${t.id}|${t.reason}|${t.net}|`).join("\n")}\n\n## 다음 검토\n손절 후 재진입·갭 손실·비용 민감도·독립 거래 수·미사용 기간 검증. 합성 결과는 전략 성과 증거가 아니다.\n`;
   await writeFile(`${dir}/review.md`,text);
 }
+let commandVersion = 0;
 const server=createServer(async(req,res)=>{
   res.setHeader("Content-Type","application/json; charset=utf-8");
   if(req.headers.host!=="127.0.0.1:4318" || req.headers.origin) {res.writeHead(403);res.end("{}");return;}
@@ -34,7 +37,12 @@ const server=createServer(async(req,res)=>{
       let body=""; for await(const chunk of req) {body+=chunk; if(body.length>1024) {res.writeHead(413);res.end("{}");return;}}
       const action=JSON.parse(body).action;
       if(!["start","pause","flatten"].includes(action)){res.writeHead(400);res.end("{}");return;}
-      await serial(async()=>{if(action==="start") await refreshCandidates();
+      const requestVersion = ++commandVersion;
+      if (action === "start") await refreshCandidates();
+      await serial(async()=>{
+        if (action === "start" && requestVersion !== commandVersion) {
+          res.writeHead(409);res.end(JSON.stringify({error:"더 최근의 운용 명령이 있어 시작 요청을 취소했어요."}));return;
+        }
         if(action==="start" && !hasCandidates(state.candidates)) {
           await persist(); res.writeHead(409);res.end(JSON.stringify({error:"후보 목록이 없거나 조회할 수 없어 실행하지 않았어요."}));return;
         }
@@ -46,16 +54,17 @@ const server=createServer(async(req,res)=>{
 });
 server.listen(4318,"127.0.0.1",()=>{
   console.log("Program mock worker http://127.0.0.1:4318/state (ranked candidates only)");
-  void serial(async()=>{await refreshCandidates();await persist();});
+  void refreshCandidates().catch(console.error);
 });
 server.on("error",e=>{console.error(e);process.exit(1);});
-// Coalesce ticks during ranking IO instead of replaying a backlog of timer callbacks.
+// Ranking requests run independently; slow network IO must not block position checks.
+const candidateTimer = setInterval(() => { void refreshCandidates().catch(console.error); }, 60_000);
+// Coalesce ticks during local processing instead of replaying a backlog of timer callbacks.
 let tickPending=false;
-setInterval(()=>{
+const tradingTimer = setInterval(()=>{
   if(tickPending)return;
   tickPending=true;
   void serial(async()=>{
-    if(Date.now()-Date.parse(state.candidates.checkedAt)>=60_000) await refreshCandidates();
     if(!hasCandidates(state.candidates)) state.running=false;
     if(!state.running && !state.positions.length) { await persist(); return; }
     const tickers=new Set([...state.candidates.rows.map(c=>c.ticker),...state.positions.map(p=>p.ticker)]);
@@ -64,7 +73,7 @@ setInterval(()=>{
     await persist();await report();
   }).finally(()=>{tickPending=false;}).catch(()=>{});
 },2000);
-for(const sig of ["SIGINT","SIGTERM"] as const) process.on(sig,()=>{void serial(async()=>{state.running=false;await persist();server.close(()=>process.exit(0));});});
+for(const sig of ["SIGINT","SIGTERM"] as const) process.on(sig,()=>{clearInterval(candidateTimer);clearInterval(tradingTimer);void serial(async()=>{state.running=false;await persist();server.close(()=>process.exit(0));});});
 
 }
 void main().catch(e=>{console.error(e);process.exit(1);});
