@@ -1,7 +1,8 @@
 /**
  * 스윙 규칙서 v1 오프라인 검증 데이터 수집 — PRD `swing-judgment` PR-1.
  *
- *   npx tsx scripts/swing/collect.mts <probe|universe|bars|flow|index|dart|status>
+ *   npx tsx scripts/swing/collect.mts <probe|universe|bars|flow|index|dart|status> [--ignore-window]
+ *   npx tsx scripts/swing/collect.mts <probe2|flowx|credit|program|opinion>   # v2 후보 입력(규칙서 v1 판정 미사용)
  *
  * 출력 scripts/swing/__cache__/ (gitignore):
  *   universe.json               symbols.json 스냅샷(스팩·리츠 제외)
@@ -10,6 +11,11 @@
  *   index/<code>.json           KIS 업종지수 종가 [{date,close}] — 0001 KOSPI · 1001 KOSDAQ
  *   dart/<Y|K>_<bgn>_<end>.json OpenDART 주요사항보고 — fetchMajorReports
  *   failures.json               마지막 실행의 실패 목록
+ *   — v2 후보 입력(별도 사전 등록 감사 전까지 판정에 쓰지 않는다) —
+ *   flowx/<t>.json              수급 세부 주체(금융투자·투신·보험·은행·종금·기타법인·기타단체·외국인 등록/비등록)
+ *   credit/<t>.json             신용잔고 일별(결제일 포함)
+ *   program/<t>.json            프로그램매매 일별
+ *   extra/opinion_<t>.json      증권사 투자의견·목표가 이력
  *
  * 규칙
  * - 재실행 = 이어받기(있는 파일 건너뜀). 실패한 종목은 파일을 만들지 않는다(빈 배열 저장 금지).
@@ -27,12 +33,12 @@ for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
 }
 
 const CACHE = fileURLToPath(new URL("./__cache__/", import.meta.url));
-for (const d of ["", "bars", "flow", "index", "dart"]) fs.mkdirSync(`${CACHE}${d}`, { recursive: true });
+for (const d of ["", "bars", "flow", "flowx", "credit", "program", "index", "dart", "extra"]) fs.mkdirSync(`${CACHE}${d}`, { recursive: true });
 
 const { getKisClient } = await import("@/lib/api/kis/client");
 const { getAccessToken } = await import("@/lib/api/kis/token");
 const { fetchStockDailyChartKis } = await import("@/lib/api/kis/price");
-const { fetchInvestorTradeDaily } = await import("@/lib/api/kis/investor-flow");
+const { fetchInvestorTradeDaily, fetchInvestorTradeDailyDetail } = await import("@/lib/api/kis/investor-flow");
 const { fetchIndexDailyChart } = await import("@/lib/api/kis/index-chart");
 const { CHUNK_DAYS: INDEX_CHUNK_DAYS } = await import("@/lib/api/kis/indexChartChunked");
 const { fetchMajorReports } = await import("@/lib/api/dart/disclosure");
@@ -184,6 +190,40 @@ if (mode === "probe") {
   console.log("lib fetchInvestorTradeDaily", lib.length, JSON.stringify(lib.at(-1)));
 }
 
+// ── probe2 — v2 후보 TR 파라미터·키·과거 조회 깊이 확인 ──────────────────────
+if (mode === "probe2") {
+  const raw = async (path: string, trId: string, params: Record<string, string>) => {
+    const token = await getAccessToken();
+    await sleep(400);
+    try {
+      const r = await getKisClient().get(`/uapi/domestic-stock/v1/quotations/${path}`, {
+        headers: { authorization: `Bearer ${token}`, appkey: process.env.KIS_APP_KEY!, appsecret: process.env.KIS_APP_SECRET!, tr_id: trId, custtype: "P" },
+        params,
+      });
+      return r.data as Record<string, unknown>;
+    } catch (e) {
+      return { http: (e as { response?: { status?: number } }).response?.status ?? "net" };
+    }
+  };
+  const show = (label: string, d: Record<string, unknown>) => {
+    const arrKey = ["output", "output1", "output2"].find((k) => Array.isArray(d[k]) && (d[k] as unknown[]).length > 0);
+    const arr = (arrKey ? d[arrKey] : []) as Record<string, string>[];
+    const dateKey = arr[0] ? Object.keys(arr[0]).find((k) => /date|bsop|dt$/.test(k)) : undefined;
+    console.log(`${label}: rt ${d.rt_cd ?? "-"} ${d.msg_cd ?? ""} ${String(d.msg1 ?? d.http ?? "")} · ${arrKey ?? "배열 없음"} ${arr.length}행 · ${dateKey ? `${arr.at(-1)?.[dateKey]}~${arr[0]?.[dateKey]}` : ""}`);
+    if (arr[0]) console.log(`   keys: ${Object.keys(arr[0]).join(" ")}`);
+  };
+  for (const date of ["20261030", "20220103"]) {
+    show(`신용잔고 ${date}`, await raw("daily-credit-balance", "FHPST04760000", { fid_cond_mrkt_div_code: "J", fid_cond_scr_div_code: "20476", fid_input_iscd: "005930", fid_input_date_1: date }));
+    show(`프로그램 ${date}`, await raw("program-trade-by-stock-daily", "FHPPG04650201", { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: "005930", FID_INPUT_DATE_1: date }));
+  }
+  for (const [s, e] of [["20261001", "20261030"], ["20220103", "20220131"]]) {
+    show(`대차 ${s}~${e}`, await raw("daily-loan-trans", "HHPST074500C0", { MRKT_DIV_CLS_CODE: "3", MKSC_SHRN_ISCD: "005930", START_DATE: s, END_DATE: e, CTS: "" }));
+  }
+  for (const [s, e] of [["20260101", "20261030"], ["20220101", "20221231"]]) {
+    show(`투자의견 ${s}~${e}`, await raw("invest-opinion", "FHKST663300C0", { FID_COND_MRKT_DIV_CODE: "J", FID_COND_SCR_DIV_CODE: "16633", FID_INPUT_ISCD: "005930", FID_INPUT_DATE_1: s, FID_INPUT_DATE_2: e }));
+  }
+}
+
 // ── universe ─────────────────────────────────────────────────────────────────
 if (mode === "universe") {
   const sym = readJson<{ $meta: { createdAt: string }; symbols: UniverseSymbol[] }>(`${ROOT}lib/api/kis/symbols.json`);
@@ -257,12 +297,16 @@ function neededFlowDates(bars: BarTuple[]): string[] {
   return [...need].sort();
 }
 
-if (mode === "flow") {
+/**
+ * 날짜 커서 페이징 수집(수급류 공용) — 필요한 날짜(neededFlowDates)를 덮을 때까지 가장 늦은 미수집 날짜를
+ * 커서로 페이지를 받는다. page 는 오름차순 [date, ...값] 튜플을 돌려줘야 한다.
+ */
+async function collectPaged(dir: string, fetchPage: (ticker: string, cursorYmd: string) => Promise<Array<[string, ...number[]]>>) {
   const { symbols } = loadUniverse();
   const todo: Array<{ ticker: string; need: string[] }> = [];
   let notNeeded = 0;
   for (const s of symbols) {
-    if (fs.existsSync(`${CACHE}flow/${s.ticker}.json`)) continue;
+    if (fs.existsSync(`${CACHE}${dir}/${s.ticker}.json`)) continue;
     const bf = `${CACHE}bars/${s.ticker}.json`;
     if (!fs.existsSync(bf)) continue; // 일봉 먼저
     const need = neededFlowDates(readJson<BarTuple[]>(bf));
@@ -273,22 +317,20 @@ if (mode === "flow") {
     todo.push({ ticker: s.ticker, need });
   }
   const pagesEst = todo.reduce((s, x) => s + Math.ceil(x.need.length / 30), 0);
-  console.log(`flow 대상 ${todo.length} (불필요 ${notNeeded}) · 예상 최소 ${pagesEst}콜`);
+  console.log(`${dir} 대상 ${todo.length} (불필요 ${notNeeded}) · 예상 최소 ${pagesEst}콜`);
   let done = 0;
   let calls = 0;
   const complete = await runPool(todo, async ({ ticker, need }) => {
-    const rows = new Map<string, FlowTuple>();
+    const rows = new Map<string, [string, ...number[]]>();
     const pending = new Set(need);
     try {
       for (let guard = 0; pending.size > 0 && guard < 120; guard++) {
         const cursor = [...pending].sort().at(-1)!;
-        const page = await kisCall(() => fetchInvestorTradeDaily(ticker, ymd(cursor)));
+        const page = await kisCall(() => fetchPage(ticker, ymd(cursor)));
         calls++;
         if (page.length === 0) break; // 조회 가능 과거 끝
-        for (const r of page) {
-          rows.set(r.date, [r.date, r.tradingValue, r.person, r.foreign, r.institution, r.pension, r.privateEquity]);
-        }
-        const oldest = page[0].date;
+        for (const r of page) rows.set(r[0], r);
+        const oldest = page[0][0];
         for (const d of [...pending]) if (d >= oldest && d <= cursor) pending.delete(d);
         if (oldest >= cursor) break; // 진전 없음 방어
       }
@@ -298,14 +340,155 @@ if (mode === "flow") {
     }
     const list = [...rows.values()].sort((a, b) => a[0].localeCompare(b[0]));
     if (list.length === 0) {
-      failures.push({ mode, ticker, error: "수급 응답 0행" });
+      failures.push({ mode, ticker, error: "응답 0행" });
       return;
     }
-    fs.writeFileSync(`${CACHE}flow/${ticker}.json`, JSON.stringify(list));
-    if (++done % 25 === 0) console.log(`  flow ${done}/${todo.length} · 콜 ${calls} · ${elapsed()} · 실패 ${failures.length}`);
+    fs.writeFileSync(`${CACHE}${dir}/${ticker}.json`, JSON.stringify(list));
+    if (++done % 25 === 0) console.log(`  ${dir} ${done}/${todo.length} · 콜 ${calls} · ${elapsed()} · 실패 ${failures.length}`);
   });
   saveFailures();
-  console.log(`flow ${complete ? "완료" : "⏸ 중단 — 점검 시간 또는 연속 실패(재실행하면 이어받음)"}: 신규 ${done} · 콜 ${calls} · 실패 ${failures.length} · ${elapsed()}`);
+  console.log(`${dir} ${complete ? "완료" : "⏸ 중단 — 점검 시간 또는 연속 실패(재실행하면 이어받음)"}: 신규 ${done} · 콜 ${calls} · 실패 ${failures.length} · ${elapsed()}`);
+}
+
+if (mode === "flow") {
+  await collectPaged("flow", async (ticker, cursor) =>
+    (await fetchInvestorTradeDaily(ticker, cursor)).map(
+      (r): FlowTuple => [r.date, r.tradingValue, r.person, r.foreign, r.institution, r.pension, r.privateEquity],
+    ),
+  );
+}
+
+/**
+ * flowx — v2 후보 입력: 같은 수급 TR 의 세부 주체까지.
+ * [date, tv(원), 개인, 외국인, 기관계, 연기금, 사모, 금융투자, 투신, 보험, 은행, 종금, 기타법인, 기타단체, 외국인등록, 외국인비등록] (백만원)
+ */
+if (mode === "flowx") {
+  await collectPaged("flowx", async (ticker, cursor) =>
+    (await fetchInvestorTradeDailyDetail(ticker, cursor)).map((r) => [
+      r.date, r.tradingValue, r.person, r.foreign, r.institution, r.pension, r.privateEquity,
+      r.detail.securities, r.detail.investmentTrust, r.detail.insurance, r.detail.bank, r.detail.merchantBank,
+      r.detail.otherCorp, r.detail.otherOrg, r.detail.foreignRegistered, r.detail.foreignUnregistered,
+    ]),
+  );
+}
+
+// ── v2 후보 입력 — 신용잔고·프로그램매매·투자의견 (원본 조회, 엄격 파싱) ─────────────
+/** quotations 원본 GET — rt_cd≠0 은 ApiError 모양으로 throw(kisCall 재시도 판정용). */
+async function kisRaw(path: string, trId: string, params: Record<string, string>): Promise<Record<string, unknown>> {
+  const token = await getAccessToken();
+  let r;
+  try {
+    r = await getKisClient().get(`/uapi/domestic-stock/v1/quotations/${path}`, {
+      headers: { authorization: `Bearer ${token}`, appkey: process.env.KIS_APP_KEY!, appsecret: process.env.KIS_APP_SECRET!, tr_id: trId, custtype: "P" },
+      params,
+    });
+  } catch (e) {
+    const status = (e as { response?: { status?: number } }).response?.status;
+    throw { kind: status ? "server" : "network", status, message: `${trId} HTTP ${status ?? "network"}` };
+  }
+  const d = r.data as { rt_cd?: string; msg_cd?: string; msg1?: string };
+  if (d.rt_cd !== "0") throw { kind: "server", status: 200, message: `${trId} ${d.msg_cd} ${d.msg1}`, detail: { msg_cd: d.msg_cd } };
+  return r.data as Record<string, unknown>;
+}
+/** 엄격 숫자 — 키 누락·비숫자는 throw(가짜 0 차단). */
+function num(row: Record<string, string>, key: string, ctx: string): number {
+  const raw = row[key];
+  const v = raw === undefined || raw.trim() === "" ? Number.NaN : Number(raw);
+  if (!Number.isFinite(v)) throw new Error(`${ctx}: ${key} 없음/비숫자`);
+  return v;
+}
+const isoFromYmd = (s: string) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+
+/**
+ * credit — 신용잔고 일별(FHPST04760000). 거래일 기준 행, 결제일(stlm_date)이 약 2영업일 늦다 →
+ * 판정 시점 t 에는 stlm_date ≤ t 인 행만 쓸 수 있다(감사 쪽 책임).
+ * [date(거래일), 결제일 YYYYMMDD, 융자잔고금액, 융자잔고율%, 융자신규금액, 융자상환금액, 대주잔고금액, 대주잔고율%]
+ */
+if (mode === "credit") {
+  await collectPaged("credit", async (ticker, cursor) => {
+    const d = await kisRaw("daily-credit-balance", "FHPST04760000", { fid_cond_mrkt_div_code: "J", fid_cond_scr_div_code: "20476", fid_input_iscd: ticker, fid_input_date_1: cursor });
+    const rows = ((d.output as Record<string, string>[]) ?? []).filter((r) => /^\d{8}$/.test(r.deal_date ?? ""));
+    return rows
+      .map((r): [string, ...number[]] => {
+        const ctx = `credit ${ticker} ${r.deal_date}`;
+        return [
+          isoFromYmd(r.deal_date), num(r, "stlm_date", ctx),
+          num(r, "whol_loan_rmnd_amt", ctx), num(r, "whol_loan_rmnd_rate", ctx), num(r, "whol_loan_new_amt", ctx), num(r, "whol_loan_rdmp_amt", ctx),
+          num(r, "whol_stln_rmnd_amt", ctx), num(r, "whol_stln_rmnd_rate", ctx),
+        ];
+      })
+      .sort((a, b) => a[0].localeCompare(b[0]));
+  });
+}
+
+/** program — 종목별 프로그램매매 일별(FHPPG04650201). [date, 순매수금액, 순매수수량, 매수금액, 매도금액] (원본 단위 그대로). */
+if (mode === "program") {
+  await collectPaged("program", async (ticker, cursor) => {
+    const d = await kisRaw("program-trade-by-stock-daily", "FHPPG04650201", { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: ticker, FID_INPUT_DATE_1: cursor });
+    const rows = ((d.output as Record<string, string>[]) ?? []).filter((r) => /^\d{8}$/.test(r.stck_bsop_date ?? ""));
+    return rows
+      .map((r): [string, ...number[]] => {
+        const ctx = `program ${ticker} ${r.stck_bsop_date}`;
+        return [
+          isoFromYmd(r.stck_bsop_date),
+          num(r, "whol_smtn_ntby_tr_pbmn", ctx), num(r, "whol_smtn_ntby_qty", ctx),
+          num(r, "whol_smtn_shnu_tr_pbmn", ctx), num(r, "whol_smtn_seln_tr_pbmn", ctx),
+        ];
+      })
+      .sort((a, b) => a[0].localeCompare(b[0]));
+  });
+}
+
+/**
+ * opinion — 증권사 투자의견·목표가 이력(FHKST663300C0). 1콜 최대 100건이라 2021-01~2026-10 전체를 한 번에 물어보고,
+ * 100건이 차면 기간을 반으로 나눠 다시 묻는다. 수급 수집 대상(유동성 1회 이상 통과) 종목만.
+ * 객체 배열 {d, opn, opnCode, prevOpn, prevCode, broker, target, prevClose}.
+ */
+if (mode === "opinion") {
+  const { symbols } = loadUniverse();
+  const todo = symbols.filter((s) => {
+    if (fs.existsSync(`${CACHE}extra/opinion_${s.ticker}.json`)) return false;
+    const bf = `${CACHE}bars/${s.ticker}.json`;
+    return fs.existsSync(bf) && neededFlowDates(readJson<BarTuple[]>(bf)).length > 0;
+  });
+  console.log(`opinion 대상 ${todo.length}`);
+  let done = 0;
+  let calls = 0;
+  type Op = { d: string; opn: string; opnCode: string; prevOpn: string; prevCode: string; broker: string; target: number; prevClose: number };
+  const fetchRange = async (ticker: string, from: string, to: string, depth: number): Promise<Op[]> => {
+    const d = await kisCall(() => kisRaw("invest-opinion", "FHKST663300C0", { FID_COND_MRKT_DIV_CODE: "J", FID_COND_SCR_DIV_CODE: "16633", FID_INPUT_ISCD: ticker, FID_INPUT_DATE_1: ymd(from), FID_INPUT_DATE_2: ymd(to) }));
+    calls++;
+    const rows = ((d.output as Record<string, string>[]) ?? []).filter((r) => /^\d{8}$/.test(r.stck_bsop_date ?? ""));
+    if (rows.length >= 100 && depth < 8 && from < to) {
+      const mid = isoOf(new Date((Date.parse(`${from}T00:00:00Z`) + Date.parse(`${to}T00:00:00Z`)) / 2));
+      return [...(await fetchRange(ticker, from, mid, depth + 1)), ...(await fetchRange(ticker, addDays(mid, 1), to, depth + 1))];
+    }
+    return rows.map((r) => {
+      const ctx = `opinion ${ticker} ${r.stck_bsop_date}`;
+      return {
+        d: isoFromYmd(r.stck_bsop_date),
+        opn: (r.invt_opnn ?? "").trim(),
+        opnCode: (r.invt_opnn_cls_code ?? "").trim(),
+        prevOpn: (r.rgbf_invt_opnn ?? "").trim(),
+        prevCode: (r.rgbf_invt_opnn_cls_code ?? "").trim(),
+        broker: (r.mbcr_name ?? "").trim(),
+        target: num(r, "hts_goal_prc", ctx),
+        prevClose: num(r, "stck_prdy_clpr", ctx),
+      };
+    });
+  };
+  const complete = await runPool(todo, async (s) => {
+    try {
+      const list = (await fetchRange(s.ticker, "2021-01-01", TO, 0)).sort((a, b) => a.d.localeCompare(b.d) || a.broker.localeCompare(b.broker));
+      fs.writeFileSync(`${CACHE}extra/opinion_${s.ticker}.json`, JSON.stringify(list)); // 0건도 정상(커버리지 없음)
+    } catch (e) {
+      failures.push({ mode, ticker: s.ticker, error: errMsg(e) });
+      return;
+    }
+    if (++done % 100 === 0) console.log(`  opinion ${done}/${todo.length} · 콜 ${calls} · ${elapsed()} · 실패 ${failures.length}`);
+  });
+  saveFailures();
+  console.log(`opinion ${complete ? "완료" : "⏸ 중단"}: 신규 ${done} · 콜 ${calls} · 실패 ${failures.length} · ${elapsed()}`);
 }
 
 // ── index ────────────────────────────────────────────────────────────────────

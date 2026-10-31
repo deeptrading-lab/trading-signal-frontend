@@ -257,6 +257,61 @@ export async function fetchInvestorTradeDaily(
   ticker: string,
   toDate: string,
 ): Promise<InvestorTradeDay[]> {
+  return (await requestInvestorTradeDaily(ticker, toDate))
+    .map((row) => mapInvestorTradeDay(row, ticker))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 기관계·외국인 세부 주체 순매수(백만원) — 스윙 v2 후보 입력 수집용(같은 응답, 추가 호출 없음). */
+export type InvestorTradeDetail = {
+  /** 금융투자(증권, 키 `scrt_*`). */
+  securities: number;
+  /** 투자신탁(키 `ivtr_*`). */
+  investmentTrust: number;
+  insurance: number;
+  bank: number;
+  /** 종금(키 `mrbn_*`). */
+  merchantBank: number;
+  /** 기타법인(키 `etc_corp_*`) — 회사의 자사주 매입이 여기 잡힌다. */
+  otherCorp: number;
+  /** 기타단체(키 `etc_orgt_*`). */
+  otherOrg: number;
+  /** 외국인 등록(거래소 신고) — 금액 키만 `frgn_reg_ntby_pbmn`(패턴 예외, probe 확인). */
+  foreignRegistered: number;
+  /** 외국인 비등록 — 금액 키 `frgn_nreg_ntby_pbmn`. */
+  foreignUnregistered: number;
+};
+
+const INVESTOR_DETAIL_KEYS = {
+  securities: "scrt_ntby_tr_pbmn",
+  investmentTrust: "ivtr_ntby_tr_pbmn",
+  insurance: "insu_ntby_tr_pbmn",
+  bank: "bank_ntby_tr_pbmn",
+  merchantBank: "mrbn_ntby_tr_pbmn",
+  otherCorp: "etc_corp_ntby_tr_pbmn",
+  otherOrg: "etc_orgt_ntby_tr_pbmn",
+  foreignRegistered: "frgn_reg_ntby_pbmn",
+  foreignUnregistered: "frgn_nreg_ntby_pbmn",
+} as const satisfies Record<keyof InvestorTradeDetail, string>;
+
+/** `fetchInvestorTradeDaily` 와 같은 요청 — 세부 주체까지 담아 돌려준다. */
+export async function fetchInvestorTradeDailyDetail(
+  ticker: string,
+  toDate: string,
+): Promise<Array<InvestorTradeDay & { detail: InvestorTradeDetail }>> {
+  return (await requestInvestorTradeDaily(ticker, toDate))
+    .map((row) => ({
+      ...mapInvestorTradeDay(row, ticker),
+      detail: strictFields(row, INVESTOR_DETAIL_KEYS, ticker) as InvestorTradeDetail,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** FHPTJ04160001 원본 행(날짜 8자리인 것만). */
+async function requestInvestorTradeDaily(
+  ticker: string,
+  toDate: string,
+): Promise<Record<string, string>[]> {
   const client = getKisClient();
   const headers = await buildAuthHeaders("FHPTJ04160001");
 
@@ -295,21 +350,17 @@ export async function fetchInvestorTradeDaily(
     throw makeKisBusinessError(data.msg1, data.msg_cd);
   }
 
-  return (data.output2 ?? [])
-    .filter((row) => /^\d{8}$/.test(row.stck_bsop_date ?? ""))
-    .map((row) => mapInvestorTradeDay(row, ticker))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  return (data.output2 ?? []).filter((row) => /^\d{8}$/.test(row.stck_bsop_date ?? ""));
 }
 
-/** 원본 1행 → `InvestorTradeDay`. 키 누락·비숫자는 throw(가짜 0 차단). */
-export function mapInvestorTradeDay(
+/** 원본 1행에서 키 묶음을 숫자로 — 키 누락·비숫자는 throw(가짜 0 차단). */
+function strictFields<K extends string>(
   row: Record<string, string>,
+  keys: Record<K, string>,
   ticker: string,
-): InvestorTradeDay {
-  const out = { date: formatDate(row.stck_bsop_date) } as InvestorTradeDay;
-  for (const [field, key] of Object.entries(INVESTOR_TRADE_KEYS) as Array<
-    [keyof typeof INVESTOR_TRADE_KEYS, string]
-  >) {
+): Record<K, number> {
+  const out = {} as Record<K, number>;
+  for (const [field, key] of Object.entries(keys) as Array<[K, string]>) {
     const raw = row[key];
     const value = raw === undefined || raw.trim() === "" ? Number.NaN : Number(raw);
     if (!Number.isFinite(value)) {
@@ -320,4 +371,12 @@ export function mapInvestorTradeDay(
     out[field] = value;
   }
   return out;
+}
+
+/** 원본 1행 → `InvestorTradeDay`. 키 누락·비숫자는 throw(가짜 0 차단). */
+export function mapInvestorTradeDay(
+  row: Record<string, string>,
+  ticker: string,
+): InvestorTradeDay {
+  return { date: formatDate(row.stck_bsop_date), ...strictFields(row, INVESTOR_TRADE_KEYS, ticker) };
 }
