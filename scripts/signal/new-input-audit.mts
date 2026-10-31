@@ -19,7 +19,7 @@ for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
 const DAILY = fileURLToPath(new URL("./__daily__/", import.meta.url));
 const FLOW = fileURLToPath(new URL("./__flow__/", import.meta.url));
 const { evaluateSignal } = await import("@/lib/signal/engine");
-const { spearman, mean, median } = await import("@/lib/server/scorecard/directionDiagnosis");
+const { spearman, mean, median, neweyWestT } = await import("@/lib/server/scorecard/directionDiagnosis");
 
 // ── 사전 등록 상수 (§1·§4) ───────────────────────────────────────────────────
 const H = 10;
@@ -57,16 +57,7 @@ function classifyReport(name: string): Array<"F5a" | "F5b" | "F5c" | "F5d"> {
   return out;
 }
 
-/** Newey-West(Bartlett) t — 겹침 수익률로 자기상관된 날짜 IC 시계열용. */
-function neweyWestT(xs: number[], lag: number): number {
-  const n = xs.length;
-  const m = mean(xs) ?? 0;
-  const d = xs.map((x) => x - m);
-  const gamma = (l: number) => { let s = 0; for (let i = l; i < n; i++) s += d[i] * d[i - l]; return s / n; };
-  let v = gamma(0);
-  for (let l = 1; l <= lag; l++) v += 2 * (1 - l / (lag + 1)) * gamma(l);
-  return v > 0 ? m / Math.sqrt(v / n) : Number.NaN;
-}
+// neweyWestT 는 lib/server/scorecard/directionDiagnosis.ts 로 이동(스윙 규칙서 감사와 공용, 수식 동일).
 function naiveT(xs: number[]): number {
   const n = xs.length, m = mean(xs) ?? 0;
   const sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));

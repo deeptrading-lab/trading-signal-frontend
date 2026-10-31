@@ -20,6 +20,7 @@ import {
   judgeB3,
   median,
   mulberry32,
+  neweyWestT,
   quantile,
   spearman,
   splitTerciles,
@@ -194,5 +195,24 @@ describe("판정 규칙 경계", () => {
     expect(judgeB3(15, -5, 0.6, 0.5)).toBe("판정 불가");
     expect(judgeB3(15, -1, 0.1, 0.5)).toBe("기각");
     expect(judgeB3(15, -3, 0.1, 0.5)).toBe("판정 불가");
+  });
+});
+
+describe("neweyWestT", () => {
+  it("lag 0 — 평균 ÷ √(편향 분산/n) 손계산 일치", () => {
+    // [1,2,3,4]: 평균 2.5, γ0 = 1.25 → t = 2.5 / √(1.25/4) = √20
+    expect(neweyWestT([1, 2, 3, 4], 0)).toBeCloseTo(Math.sqrt(20), 10);
+  });
+
+  it("양의 자기상관이면 lag 를 늘릴수록 |t| 가 작아진다", () => {
+    const xs = [2, 2, 2, 0, 0, 0, 2, 2, 2, 0, 0, 0];
+    const t0 = neweyWestT(xs, 0);
+    const t2 = neweyWestT(xs, 2);
+    expect(t2).toBeGreaterThan(0);
+    expect(t2).toBeLessThan(t0);
+  });
+
+  it("분산 0 이면 NaN", () => {
+    expect(neweyWestT([1, 1, 1], 2)).toBeNaN();
   });
 });

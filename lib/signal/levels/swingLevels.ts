@@ -43,7 +43,18 @@ export function findSwingLows(
   candles: StockDailyCandle[],
   window = 3,
 ): number[] {
-  const result: number[] = [];
+  return swingLowPoints(candles, window).map((p) => p.price);
+}
+
+/** 피벗 저점 — 봉 인덱스 포함. 쌍바닥·다이버전스처럼 저점 위치의 지표값을 맞춰 볼 때 쓴다. */
+export type SwingPoint = { index: number; price: number };
+
+/** `findSwingLows` 와 같은 엄격 비교 — 결과에 봉 인덱스를 함께 돌려준다(오름차순). */
+export function swingLowPoints(
+  candles: StockDailyCandle[],
+  window = 3,
+): SwingPoint[] {
+  const result: SwingPoint[] = [];
   for (let i = window; i < candles.length - window; i++) {
     const l = candles[i].low;
     let isSwing = true;
@@ -53,7 +64,7 @@ export function findSwingLows(
         break;
       }
     }
-    if (isSwing) result.push(l);
+    if (isSwing) result.push({ index: i, price: l });
   }
   return result;
 }
