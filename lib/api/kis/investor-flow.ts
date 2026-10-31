@@ -350,7 +350,19 @@ async function requestInvestorTradeDaily(
     throw makeKisBusinessError(data.msg1, data.msg_cd);
   }
 
-  return (data.output2 ?? []).filter((row) => /^\d{8}$/.test(row.stck_bsop_date ?? ""));
+  return (data.output2 ?? []).filter(
+    (row) => /^\d{8}$/.test(row.stck_bsop_date ?? "") && !isInvestorTradeFiller(row),
+  );
+}
+
+/**
+ * 거래가 없던 날(상장 전·장기 정지)의 채움 행 — 종가·거래대금이 비고 순매수는 0 으로 온다(2026-11-01 실측:
+ * 2025-10-27 상장 종목을 조회하면 그 전 날짜가 이 모양으로 섞여 온다). 데이터가 아니므로 버린다.
+ * 일부 칸만 빈 행은 여기 걸리지 않고 `mapInvestorTradeDay` 에서 거부된다.
+ */
+export function isInvestorTradeFiller(row: Record<string, string>): boolean {
+  const blank = (k: string) => (row[k] ?? "").trim() === "";
+  return blank("stck_clpr") && blank("acml_tr_pbmn");
 }
 
 /** 원본 1행에서 키 묶음을 숫자로 — 키 누락·비숫자는 throw(가짜 0 차단). */
