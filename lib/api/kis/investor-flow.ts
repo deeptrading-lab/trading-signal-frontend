@@ -215,3 +215,109 @@ function mapInvestorDay(item: KisInquireInvestorItem): StockInvestorDay {
     orgNetBuyQty: toNumber(item.orgn_ntby_qty),
   };
 }
+
+/** 종목별 일별 투자자 매매 1일 — 스윙 규칙서 수급 입력(PRD `swing-judgment`). */
+export type InvestorTradeDay = {
+  /** YYYY-MM-DD. */
+  date: string;
+  /** 누적 거래대금 — **원**. 포털 문서는 백만원이라 적었지만 2026-10-31 probe 실측은 원(종가×거래량과 일치). */
+  tradingValue: number;
+  /** 주체별 순매수 거래대금 — **백만원**, 음수 = 순매도. */
+  person: number;
+  foreign: number;
+  /** 기관계(증권·투신·사모·은행·보험·종금·연기금 합). */
+  institution: number;
+  /** 연기금(포털 표기 "기금", 키 `fund_*`). */
+  pension: number;
+  /** 사모펀드(키 `pe_fund_*`). */
+  privateEquity: number;
+};
+
+/** 수급 1일에 꼭 있어야 하는 원본 키 — 하나라도 없거나 숫자가 아니면 그 응답 전체를 거부한다(0 으로 채우지 않는다). */
+const INVESTOR_TRADE_KEYS = {
+  tradingValue: "acml_tr_pbmn",
+  person: "prsn_ntby_tr_pbmn",
+  foreign: "frgn_ntby_tr_pbmn",
+  institution: "orgn_ntby_tr_pbmn",
+  pension: "fund_ntby_tr_pbmn",
+  privateEquity: "pe_fund_ntby_tr_pbmn",
+} as const satisfies Record<keyof Omit<InvestorTradeDay, "date">, string>;
+
+/**
+ * 표면 C — 종목별 일별 투자자 매매(`FHPTJ04160001`, KRX 'J'). ⚠️ 실전 전용.
+ *
+ * `toDate`(YYYYMMDD) **이하** 최근 약 30거래일을 오름차순으로 돌려준다. 더 과거는 가장 이른 날
+ * 직전 날짜를 다음 `toDate` 로 넘겨 페이징한다(2021-11 까지 조회 확인, 2026-10-31 probe).
+ * 당일 데이터는 15:40 이후 가집계 — 스윙 판정은 다음 날 아침에 확정치로 돈다.
+ *
+ * 오프라인 수집기(`scripts/swing/collect.mts`)와 라이브(PR-2)가 이 함수 하나를 같이 써서 파라미터가
+ * 어긋날 여지를 없앤다.
+ */
+export async function fetchInvestorTradeDaily(
+  ticker: string,
+  toDate: string,
+): Promise<InvestorTradeDay[]> {
+  const client = getKisClient();
+  const headers = await buildAuthHeaders("FHPTJ04160001");
+
+  let response;
+  try {
+    response = await client.get<KisEnvelope<unknown> & { output2?: Record<string, string>[] }>(
+      "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily",
+      {
+        headers,
+        params: {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_DATE_1: toDate,
+          FID_ORG_ADJ_PRC: "",
+          FID_ETC_CLS_CODE: "1",
+        },
+      },
+    );
+  } catch (error) {
+    const status =
+      typeof (error as { response?: { status?: number } }).response?.status ===
+      "number"
+        ? (error as { response: { status: number } }).response.status
+        : undefined;
+    throw makeKisTransportError({
+      status,
+      message:
+        error instanceof Error
+          ? error.message
+          : "KIS 종목 투자자 매매 조회 중 네트워크 오류가 발생했어요.",
+    });
+  }
+
+  const data = response.data;
+  if (data.rt_cd !== "0") {
+    throw makeKisBusinessError(data.msg1, data.msg_cd);
+  }
+
+  return (data.output2 ?? [])
+    .filter((row) => /^\d{8}$/.test(row.stck_bsop_date ?? ""))
+    .map((row) => mapInvestorTradeDay(row, ticker))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 원본 1행 → `InvestorTradeDay`. 키 누락·비숫자는 throw(가짜 0 차단). */
+export function mapInvestorTradeDay(
+  row: Record<string, string>,
+  ticker: string,
+): InvestorTradeDay {
+  const out = { date: formatDate(row.stck_bsop_date) } as InvestorTradeDay;
+  for (const [field, key] of Object.entries(INVESTOR_TRADE_KEYS) as Array<
+    [keyof typeof INVESTOR_TRADE_KEYS, string]
+  >) {
+    const raw = row[key];
+    const value = raw === undefined || raw.trim() === "" ? Number.NaN : Number(raw);
+    if (!Number.isFinite(value)) {
+      throw makeKisTransportError({
+        message: `KIS 투자자 매매 응답에 ${key} 값이 없어요(${ticker} ${row.stck_bsop_date}).`,
+      });
+    }
+    out[field] = value;
+  }
+  return out;
+}
