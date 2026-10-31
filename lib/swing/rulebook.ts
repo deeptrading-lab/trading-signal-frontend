@@ -81,8 +81,9 @@ export const RULEBOOK: Rulebook = {
   haltLookbackBars: 5,
   excludeNamePatterns: ["스팩", "리츠$"],
   atrPeriod: 14,
-  // 잠정값 — 사전 등록 커밋에서 시장별 67퍼센타일로 확정한다(수익률 미사용 분포).
-  highVolAtrPct: { KOSPI: 5.3, KOSDAQ: 5.3 },
+  // 발견 구간(2024–2025) 유니버스 종목-일 ATR14% 67퍼센타일, 0.01 반올림 — 수익률 미사용 분포로 확정
+  // (KOSPI 123,104 · KOSDAQ 160,082 종목-일, `audit.mts dist atr`, 사전 등록 §0-1).
+  highVolAtrPct: { KOSPI: 4.97, KOSDAQ: 7.32 },
   overheat: { r20Pct: 20, rsi: 75 },
   dart: {
     lookbackBars: 20,
