@@ -33,7 +33,8 @@ const { getKisClient } = await import("@/lib/api/kis/client");
 const { getAccessToken } = await import("@/lib/api/kis/token");
 const { fetchStockDailyChartKis } = await import("@/lib/api/kis/price");
 const { fetchInvestorTradeDaily } = await import("@/lib/api/kis/investor-flow");
-const { fetchIndexDailyChunked } = await import("@/lib/api/kis/indexChartChunked");
+const { fetchIndexDailyChart } = await import("@/lib/api/kis/index-chart");
+const { CHUNK_DAYS: INDEX_CHUNK_DAYS } = await import("@/lib/api/kis/indexChartChunked");
 const { fetchMajorReports } = await import("@/lib/api/dart/disclosure");
 
 // ── 수집 범위 ────────────────────────────────────────────────────────────────
@@ -59,8 +60,15 @@ const addDays = (iso: string, n: number) => {
 };
 const readJson = <T,>(f: string): T => JSON.parse(fs.readFileSync(f, "utf8")) as T;
 
+/** `--ignore-window` — 시간대 대신 연속 실패 차단기로만 멈춘다(실제 점검 시작은 날마다 다르다). */
+const IGNORE_WINDOW = process.argv.includes("--ignore-window");
+/** 종목 연속 실패가 이만큼 쌓이면 점검·장애로 보고 멈춘다(실패 종목은 파일 미작성 → 재실행이 이어받음). */
+const MAX_CONSECUTIVE_FAILS = 10;
+let consecutiveFails = 0;
+
 /** KIS 야간 점검 창(21:45~07:00 KST) 안이면 true. */
 function inKisMaintenance(): boolean {
+  if (IGNORE_WINDOW) return false;
   const kst = new Date(Date.now() + 9 * 3600_000);
   const min = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   return min >= 21 * 60 + 45 || min < 7 * 60;
@@ -107,12 +115,14 @@ async function runPool<T>(items: T[], worker: (item: T) => Promise<void>): Promi
   await Promise.all(
     Array.from({ length: WORKERS }, async () => {
       while (!stopped && i < items.length) {
-        if (inKisMaintenance()) {
+        if (inKisMaintenance() || consecutiveFails >= MAX_CONSECUTIVE_FAILS) {
           stopped = true;
           break;
         }
         const item = items[i++];
+        const before = failures.length;
         await worker(item);
+        consecutiveFails = failures.length > before ? consecutiveFails + 1 : 0;
       }
     }),
   );
@@ -226,7 +236,7 @@ if (mode === "bars") {
     if (++done % 50 === 0) console.log(`  bars ${done}/${todo.length} · ${elapsed()} · 실패 ${failures.length}`);
   });
   saveFailures();
-  console.log(`bars ${complete ? "완료" : "⏸ KIS 점검 시간 — 중단(재실행하면 이어받음)"}: 신규 ${done} · 실패 ${failures.length} · ${elapsed()}`);
+  console.log(`bars ${complete ? "완료" : "⏸ 중단 — 점검 시간 또는 연속 실패(재실행하면 이어받음)"}: 신규 ${done} · 실패 ${failures.length} · ${elapsed()}`);
 }
 
 // ── flow ─────────────────────────────────────────────────────────────────────
@@ -295,18 +305,27 @@ if (mode === "flow") {
     if (++done % 25 === 0) console.log(`  flow ${done}/${todo.length} · 콜 ${calls} · ${elapsed()} · 실패 ${failures.length}`);
   });
   saveFailures();
-  console.log(`flow ${complete ? "완료" : "⏸ KIS 점검 시간 — 중단(재실행하면 이어받음)"}: 신규 ${done} · 콜 ${calls} · 실패 ${failures.length} · ${elapsed()}`);
+  console.log(`flow ${complete ? "완료" : "⏸ 중단 — 점검 시간 또는 연속 실패(재실행하면 이어받음)"}: 신규 ${done} · 콜 ${calls} · 실패 ${failures.length} · ${elapsed()}`);
 }
 
 // ── index ────────────────────────────────────────────────────────────────────
+// fetchIndexDailyChunked 는 청크 하나만 500 이 나도 전체가 실패한다(재시도 없음). 다른 수집과 호출이 겹치면
+// KIS 가 간헐적으로 500 을 주므로, 여기서는 같은 60일 청크를 직접 돌며 청크마다 kisCall 로 재시도한다.
 if (mode === "index") {
   for (const code of ["0001", "1001"]) {
     const f = `${CACHE}index/${code}.json`;
     if (fs.existsSync(f)) continue;
-    const rows = await fetchIndexDailyChunked(code, ymd(BAR_FROM), ymd(TO));
-    if (rows.length === 0) throw new Error(`지수 ${code} 0행`);
-    fs.writeFileSync(f, JSON.stringify(rows));
-    console.log(`index ${code}: ${rows.length}행 ${rows[0].date}~${rows.at(-1)!.date}`);
+    const rows = new Map<string, { date: string; close: number }>();
+    for (let end = TO; end >= BAR_FROM; end = addDays(end, -INDEX_CHUNK_DAYS)) {
+      const startRaw = addDays(end, -INDEX_CHUNK_DAYS + 1);
+      const start = startRaw < BAR_FROM ? BAR_FROM : startRaw;
+      const chunk = await kisCall(() => fetchIndexDailyChart(code, ymd(start), ymd(end)));
+      for (const r of chunk) rows.set(r.date, r);
+    }
+    const list = [...rows.values()].sort((a, b) => a.date.localeCompare(b.date));
+    if (list.length === 0) throw new Error(`지수 ${code} 0행`);
+    fs.writeFileSync(f, JSON.stringify(list));
+    console.log(`index ${code}: ${list.length}행 ${list[0].date}~${list.at(-1)!.date}`);
   }
 }
 
