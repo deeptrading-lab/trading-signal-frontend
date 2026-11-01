@@ -92,6 +92,25 @@ export function spearman(xs: number[], ys: number[]): number {
   return pearson(averageRanks(xs), averageRanks(ys));
 }
 
+/**
+ * Newey-West(Bartlett 커널) t — 기간이 겹치는 수익률처럼 자기상관된 시계열의 평균 t.
+ * lag = 겹침 길이 − 1 (10거래일 수익이면 9). 분산이 0 이하이면 NaN.
+ * (E-2 `scripts/signal/new-input-audit.mts` 에서 이동 — 수식 동일, 스윙 규칙서 감사와 공용.)
+ */
+export function neweyWestT(xs: number[], lag: number): number {
+  const n = xs.length;
+  const m = mean(xs) ?? 0;
+  const d = xs.map((x) => x - m);
+  const gamma = (l: number) => {
+    let s = 0;
+    for (let i = l; i < n; i++) s += d[i] * d[i - l];
+    return s / n;
+  };
+  let v = gamma(0);
+  for (let l = 1; l <= lag; l++) v += 2 * (1 - l / (lag + 1)) * gamma(l);
+  return v > 0 ? m / Math.sqrt(v / n) : Number.NaN;
+}
+
 /** 결정론 PRNG — mulberry32. [0, 1) 균등. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
