@@ -5,11 +5,12 @@
  */
 
 import { httpClient } from "@/lib/api/client";
+import type { SwingMarket } from "@/lib/swing/rulebook";
 import type { SwingScreenerFilter, SwingScreenerResponse } from "@/lib/types/swing/api";
 
 export async function fetchSwingScreener(
   filter: SwingScreenerFilter,
-  market: "KOSPI" | "KOSDAQ" | null,
+  market: SwingMarket | null,
 ): Promise<SwingScreenerResponse> {
   const response = await httpClient.get<SwingScreenerResponse>("/swing/screener", {
     params: { filter, ...(market ? { market } : {}) },

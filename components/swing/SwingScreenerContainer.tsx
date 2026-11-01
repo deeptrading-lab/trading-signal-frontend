@@ -12,6 +12,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { SegmentedTabs } from "@/components/analyze/SegmentedTabs";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingScreener } from "@/hooks/swing/useQuerySwingScreener";
+import type { SwingMarket } from "@/lib/swing/rulebook";
 import { cn } from "@/lib/utils/cn";
 import type { SwingScreenerFilter, SwingScreenerResponse } from "@/lib/types/swing/api";
 import {
@@ -35,7 +36,7 @@ import { SwingScreenerRow } from "./SwingScreenerRow";
 import { swingFilterFromParam, swingMarketFromParam, swingTabHref } from "./swingTab";
 
 const FILTER_OPTIONS = (["flow", "excluded", "all"] as const).map((key) => ({ key, label: SWING_TAB_LABEL[key] }));
-type MarketKey = "ALL" | "KOSPI" | "KOSDAQ";
+type MarketKey = "ALL" | SwingMarket;
 const MARKET_OPTIONS: ReadonlyArray<{ key: MarketKey; label: string }> = [
   { key: "ALL", label: SWING_MARKET_ALL },
   { key: "KOSPI", label: "KOSPI" },
@@ -62,7 +63,10 @@ export function SwingScreenerContainer() {
           <p className="text-body-sm-strong text-text-strong">{swingBasisLabel(data.tradeDate)}</p>
         ) : null}
         <p className="text-caption text-text-muted">{SWING_PAGE_SUBTITLE}</p>
-        {data?.run && !data.run.ok ? <p className="text-caption text-warn">{SWING_RUN_PARTIAL}</p> : null}
+        {/* 보이는 거래일의 집계가 끝까지(ok) 돌았다는 마커가 없으면 목록이 일부일 수 있다(집계 중·실패). */}
+        {data?.tradeDate && (!data.run?.ok || data.run.tradeDate !== data.tradeDate) ? (
+          <p className="text-caption text-warn">{SWING_RUN_PARTIAL}</p>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-md">
@@ -74,7 +78,6 @@ export function SwingScreenerContainer() {
         filter={filter}
         data={data}
         isLoading={query.isLoading}
-        isError={query.isError}
         isStale={query.isPlaceholderData}
         onRetry={() => query.refetch()}
       />
@@ -88,18 +91,17 @@ function ScreenerBody({
   filter,
   data,
   isLoading,
-  isError,
   isStale,
   onRetry,
 }: {
   filter: SwingScreenerFilter;
   data: SwingScreenerResponse | undefined;
   isLoading: boolean;
-  isError: boolean;
   isStale: boolean;
   onRetry: () => void;
 }) {
-  if (isLoading) {
+  // 탭 전환 중 이전 탭이 빈 목록이면(placeholder) 새 탭의 "없어요" 문구가 잘못 보이므로 스켈레톤.
+  if (isLoading || (isStale && data?.items.length === 0)) {
     return (
       <div aria-busy="true" className="flex flex-col gap-lg py-md">
         <span className="sr-only">{SWING_LOADING}</span>
@@ -109,7 +111,8 @@ function ScreenerBody({
       </div>
     );
   }
-  if (isError || !data) {
+  // 백그라운드 재요청이 실패해도 이미 받은 목록이 있으면 그대로 보여 준다.
+  if (!data) {
     return (
       <div className="flex flex-col items-start gap-md py-md" role="alert">
         <p className="text-body-sm text-text-muted">{SWING_STATE_ERROR}</p>

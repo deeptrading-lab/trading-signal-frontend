@@ -9,6 +9,7 @@
 
 import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { fetchSwingScreener } from "@/lib/api/swing/screener";
+import type { SwingMarket } from "@/lib/swing/rulebook";
 import type { SwingScreenerFilter, SwingScreenerResponse } from "@/lib/types/swing/api";
 import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
@@ -16,7 +17,7 @@ import type { ApiError } from "@/lib/api/errors";
 
 export function useQuerySwingScreener(
   filter: SwingScreenerFilter,
-  market: "KOSPI" | "KOSDAQ" | null,
+  market: SwingMarket | null,
 ): UseQueryResult<SwingScreenerResponse, ApiError> {
   return useQuery<SwingScreenerResponse, ApiError>({
     queryKey: queryKeys.swing.screener(filter, market),

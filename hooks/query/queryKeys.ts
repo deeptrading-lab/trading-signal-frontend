@@ -19,6 +19,8 @@
 
 import type { FluctuationDirection } from "@/lib/types/market/fluctuation";
 import type { VolumeRankBy } from "@/lib/types/market/volumeRank";
+import type { SwingMarket } from "@/lib/swing/rulebook";
+import type { SwingScreenerFilter } from "@/lib/types/swing/api";
 
 function normalizeTickers(tickers: readonly string[]): string {
   return tickers.slice().sort().join(",");
@@ -110,7 +112,7 @@ export const queryKeys = {
   },
   swing: {
     /** 스윙 체크 스크리너 목록 — 필터·시장별(거래일은 서버가 최신으로 정한다). */
-    screener: (filter: "flow" | "excluded" | "all", market: "KOSPI" | "KOSDAQ" | null) =>
+    screener: (filter: SwingScreenerFilter, market: SwingMarket | null) =>
       ["swing", "screener", filter, market ?? "ALL"] as const,
     /** 종목 스윙 체크 상세. */
     judgment: (ticker: string) => ["swing", "judgment", ticker] as const,

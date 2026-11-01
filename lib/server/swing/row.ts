@@ -3,11 +3,8 @@
  * 필요한 열만(PRD `swing-judgment` PR-2 설계). 상세는 같은 엔진으로 즉시 계산한다.
  */
 
-import { hasItemBit, itemBits, metCount, SWING_ITEM_BITS, SWING_MET_ITEMS } from "@/lib/swing/itemBits";
+import { itemBits, metCount } from "@/lib/swing/itemBits";
 import type { SwingJudgment } from "@/lib/swing/judge";
-
-// 비트·충족 수 헬퍼는 화면과 공유하려고 lib/swing/itemBits.ts 로 옮겼다(재노출 — 기존 import 경로 유지).
-export { hasItemBit, itemBits, metCount, SWING_ITEM_BITS, SWING_MET_ITEMS };
 
 export type SwingJudgmentRow = {
   trade_date: string;

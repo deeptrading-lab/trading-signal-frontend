@@ -5,9 +5,10 @@
  * 종목 상세로 갔다가 뒤로 와도 보던 탭이 유지된다(analyzeTab 과 같은 패턴).
  */
 
+import type { SwingMarket } from "@/lib/swing/rulebook";
 import type { SwingScreenerFilter } from "@/lib/types/swing/api";
 
-export type SwingMarketFilter = "KOSPI" | "KOSDAQ" | null;
+export type SwingMarketFilter = SwingMarket | null;
 
 export function swingFilterFromParam(v: string | null | undefined): SwingScreenerFilter {
   return v === "excluded" || v === "all" ? v : "flow";

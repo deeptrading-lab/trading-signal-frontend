@@ -48,9 +48,15 @@ describe("describeExclusion — 실측값 + 기준값", () => {
   it("공시는 보고서명에서 접두어·괄호를 걷어 낸다", () => {
     expect(describeExclusion("dart_event", judgment(), RULEBOOK)).toBe("최근 20거래일 공시: 유상증자결정");
   });
-  it("거래대금 부족은 억 원 단위(부호 없음)", () => {
-    expect(describeExclusion("illiquid", judgment({}, { adv20: 2.1e9 }), RULEBOOK)).toBe(
+  it("유동성 — 걸린 쪽만(거래대금·종가 하한·둘 다)", () => {
+    expect(describeExclusion("illiquid", judgment({}, { close: 5000, adv20: 2.1e9 }), RULEBOOK)).toBe(
       "최근 20일 평균 거래대금 21억 원 (기준 30억 원)",
+    );
+    expect(describeExclusion("illiquid", judgment({}, { close: 850, adv20: 5e9 }), RULEBOOK)).toBe(
+      "종가 850원 (기준 1,000원 이상)",
+    );
+    expect(describeExclusion("illiquid", judgment({}, { close: 850, adv20: 2.1e9 }), RULEBOOK)).toBe(
+      "종가 850원 (기준 1,000원 이상) · 최근 20일 평균 거래대금 21억 원 (기준 30억 원)",
     );
   });
 });
@@ -75,6 +81,13 @@ describe("describeItem — 수급 강도 S × ADV20 = 순매수 금액", () => {
     expect(describeItem("D", j, RULEBOOK)).toBe("MACD 교차 2일 전 · RSI 77");
     expect(describeItem("E", j, RULEBOOK)).toBe("쌍바닥 없음");
     expect(describeItem("B", judgment({ plan: null }), RULEBOOK)).toBe("계산 불가");
+  });
+});
+
+describe("조건 이름의 기준값 = 규칙서", () => {
+  it("손익비·RSI 범위를 RULEBOOK 에서 읽는다", () => {
+    expect(copy.SWING_ITEM_LABEL.B).toBe(`구조적 지지 · 손익비 ${RULEBOOK.plan.minRr} 이상`);
+    expect(copy.SWING_ITEM_LABEL.D).toBe(`골든크로스 + RSI ${RULEBOOK.momentum.rsiMin}~${RULEBOOK.momentum.rsiMax}`);
   });
 });
 

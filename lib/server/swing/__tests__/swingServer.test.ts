@@ -3,8 +3,9 @@ import { judgeSwing } from "@/lib/swing/judge";
 import { flatCloses, makeInput, ramp } from "@/lib/swing/__tests__/_swingFixtures";
 import { passesPrefilter, swingInputHash } from "../compute";
 import { createKisPacer, isTransientKisError } from "../pace";
-import { hasItemBit, itemBits, metCount, toSwingRow } from "../row";
-import { isScreenerRunOk, swingUniverse } from "../screener";
+import { hasItemBit, itemBits, metCount } from "@/lib/swing/itemBits";
+import { toSwingRow } from "../row";
+import { isScreenerRunOk, screenerListDate, swingUniverse } from "../screener";
 import { kstToday, pickTradeDate } from "../tradeDate";
 
 const strongFlow = { lastN: 5, nets: { person: -1_000, foreign: 600, institution: 500, pension: 100, privateEquity: 0 } };
@@ -117,5 +118,17 @@ describe("swingUniverse · isScreenerRunOk", () => {
     expect(isScreenerRunOk(1_000, 20)).toBe(true);
     expect(isScreenerRunOk(1_000, 21)).toBe(false);
     expect(isScreenerRunOk(0, 0)).toBe(false);
+  });
+});
+
+describe("screenerListDate — 집계 도중엔 마지막 완료 거래일", () => {
+  const done = { at: "x", ok: true, tradeDate: "2026-10-30", version: "swing-v1" };
+  it("새 거래일 집계 중(완료 마커는 전날)이면 전날 목록", () => {
+    expect(screenerListDate(done, "2026-11-02", "swing-v1")).toBe("2026-10-30");
+  });
+  it("마커 없음·실패·다른 버전이면 최신 저장일", () => {
+    expect(screenerListDate(null, "2026-11-02", "swing-v1")).toBe("2026-11-02");
+    expect(screenerListDate({ ...done, ok: false, tradeDate: "2026-11-02" }, "2026-11-02", "swing-v1")).toBe("2026-11-02");
+    expect(screenerListDate({ ...done, version: "swing-v2" }, "2026-11-02", "swing-v1")).toBe("2026-11-02");
   });
 });

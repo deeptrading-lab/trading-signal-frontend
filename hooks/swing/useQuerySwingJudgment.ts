@@ -3,7 +3,7 @@
  *
  * - queryKey = `queryKeys.swing.judgment(ticker)`.
  * - staleTime / gcTime = `queryConfig.swing.judgment` — 전 거래일 종가 기준이라 장중에도 같다.
- * - `enabled=false`(미국 종목 등)면 요청하지 않는다.
+ * - 404(지원하지 않는 종목·일봉 없음)는 다시 시도해도 같아서 재시도하지 않는다.
  */
 
 "use client";
@@ -15,17 +15,13 @@ import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
 
-export function useQuerySwingJudgment(
-  ticker: string,
-  enabled = true,
-): UseQueryResult<SwingJudgmentResponse, ApiError> {
+export function useQuerySwingJudgment(ticker: string): UseQueryResult<SwingJudgmentResponse, ApiError> {
   return useQuery<SwingJudgmentResponse, ApiError>({
     queryKey: queryKeys.swing.judgment(ticker),
     queryFn: () => fetchSwingJudgment(ticker),
-    enabled,
     staleTime: queryConfig.swing.judgment.staleTime,
     gcTime: queryConfig.swing.judgment.gcTime,
-    retry: 1,
+    retry: (count, error) => error.status !== 404 && count < 1,
     refetchOnWindowFocus: false,
   });
 }

@@ -8,6 +8,7 @@
 
 "use client";
 
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
@@ -41,14 +42,22 @@ import {
   swingBasisLabel,
   swingExclusionLabel,
   swingMetChip,
+  swingMetChipSr,
   swingStatsSentence,
 } from "@/lib/copy/swing/labels";
 
 const TITLE_ID = "swing-judgment-card-title";
 
-export function SwingJudgmentCard({ ticker }: { ticker: string }) {
-  const { data, isLoading, isError, error, refetch } = useQuerySwingJudgment(ticker);
+/**
+ * @param fallback 스윙 체크를 지원하지 않는 종목(404 — ETF·ETN 등)에서 대신 보여 줄 노드. 미국 종목처럼
+ *   기존 요약을 유지하려는 용도. 없으면 안내 문구.
+ */
+export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallback?: ReactNode }) {
+  const { data, isLoading, error, refetch } = useQuerySwingJudgment(ticker);
 
+  // 백그라운드 재요청이 실패해도 이미 받은 판정이 있으면 그대로 보여 준다.
+  if (data) return <JudgmentBody data={data} />;
+  if (error?.status === 404 && fallback) return <>{fallback}</>;
   if (isLoading) {
     return (
       <div aria-busy="true" className="flex flex-col gap-md">
@@ -60,23 +69,21 @@ export function SwingJudgmentCard({ ticker }: { ticker: string }) {
       </div>
     );
   }
-  if (isError || !data) {
-    // 404 = 지원하지 않는 종목(국내 6자리 아님) — 다시 시도해도 같다.
-    return (
-      <section aria-labelledby={TITLE_ID} className="flex flex-col items-start gap-md" role="alert">
-        <h2 id={TITLE_ID} className="text-h2 text-text-strong">
-          {SWING_CARD_TITLE}
-        </h2>
-        <p className="text-body-sm text-text-muted">{error?.message ?? SWING_STATE_ERROR}</p>
-        {error?.status === 404 ? null : (
-          <button type="button" className="button-secondary" onClick={() => refetch()}>
-            {SWING_RETRY}
-          </button>
-        )}
-      </section>
-    );
-  }
-  return <JudgmentBody data={data} />;
+  // 페이지 진입 때 자동으로 뜨는 카드라 role="alert" 로 알리지 않는다(지원 안 함 404 는 예상된 상태).
+  // 404 = 지원하지 않는 종목 — 다시 시도해도 같다.
+  return (
+    <section aria-labelledby={TITLE_ID} className="flex flex-col items-start gap-md">
+      <h2 id={TITLE_ID} className="text-h2 text-text-strong">
+        {SWING_CARD_TITLE}
+      </h2>
+      <p className="text-body-sm text-text-muted">{error?.message ?? SWING_STATE_ERROR}</p>
+      {error?.status === 404 ? null : (
+        <button type="button" className="button-secondary" onClick={() => refetch()}>
+          {SWING_RETRY}
+        </button>
+      )}
+    </section>
+  );
 }
 
 function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
@@ -89,7 +96,10 @@ function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
           <h2 id={TITLE_ID} className="text-h2 text-text-strong">
             {SWING_CARD_TITLE}
           </h2>
-          <Badge variant="accent">{swingMetChip(metCount(j.items))}</Badge>
+          <Badge variant="accent">
+            <span aria-hidden="true">{swingMetChip(metCount(j.items))}</span>
+            <span className="sr-only">{swingMetChipSr(metCount(j.items))}</span>
+          </Badge>
         </div>
         <p className="text-caption text-text-muted">
           {swingBasisLabel(data.tradeDate)} · {SWING_CARD_HELP}
@@ -144,7 +154,7 @@ function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
 function CautionCallout({ j, statsLine }: { j: SwingJudgment; statsLine: string | null }) {
   return (
     <div className="flex flex-col gap-sm rounded-md bg-warn-soft p-lg text-warn">
-      <p className="text-body-sm-strong">{SWING_CAUTION_TITLE}</p>
+      <h3 className="text-body-sm-strong">{SWING_CAUTION_TITLE}</h3>
       <ul className="flex flex-col gap-xs">
         {j.exclusions.map((code) => (
           <li key={code} className="text-body-sm">

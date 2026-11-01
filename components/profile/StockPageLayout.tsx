@@ -200,7 +200,12 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
       {/* ── 항시: 국내 = 스윙 체크(규칙서 결정론 판정, swing-judgment PR-3) / 미국 = 기존 4축 시그널 요약.
        *  시맨틱 <section> 은 자식이 소유 ── */}
       <div className="mt-lg border-t border-border-line pt-lg">
-        {isUs ? <SignalSummary ticker={ticker} /> : <SwingJudgmentCard ticker={ticker} />}
+        {/* 스윙 체크 미지원 국내 종목(ETF·ETN 등, 404)은 미국과 같이 기존 요약으로 대체. */}
+        {isUs ? (
+          <SignalSummary ticker={ticker} />
+        ) : (
+          <SwingJudgmentCard ticker={ticker} fallback={<SignalSummary ticker={ticker} />} />
+        )}
       </div>
 
       {/* ── 온디맨드(T4): 회사개요·최근공시·수급 — KR 전용 소스라 미국 종목에선 숨김 ── */}

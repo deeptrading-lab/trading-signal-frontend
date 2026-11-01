@@ -10,12 +10,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { RULEBOOK } from "@/lib/swing/rulebook";
-import { readSwingScreenerMeta } from "@/lib/server/swing/screener";
+import { readSwingScreenerMeta, screenerListDate } from "@/lib/server/swing/screener";
 import { SWING_RELEASE } from "@/lib/server/swing/stats";
 import { isSwingStoreConfigured, latestSwingTradeDate, listSwingRows, type SwingListFilter } from "@/lib/server/swing/store";
-import type { SwingScreenerResponse } from "@/lib/types/swing/api";
+import { SWING_SCREENER_LIMIT, type SwingScreenerResponse } from "@/lib/types/swing/api";
 
-const LIMIT = 50;
 const FILTERS: SwingListFilter[] = ["flow", "excluded", "all"];
 
 export async function GET(request: NextRequest) {
@@ -31,12 +30,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "스윙 판정 저장소가 설정되지 않았어요." }, { status: 503 });
   }
 
-  const [tradeDate, meta] = await Promise.all([
+  const [latest, meta] = await Promise.all([
     dateParam ? Promise.resolve(dateParam) : latestSwingTradeDate(RULEBOOK.version),
     readSwingScreenerMeta(),
   ]);
+  // 날짜 지정이 없으면 집계 도중의 일부 목록 대신 마지막으로 끝까지 돈 거래일(screenerListDate).
+  const tradeDate = dateParam ?? screenerListDate(meta, latest, RULEBOOK.version);
   const rows = tradeDate
-    ? await listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: LIMIT })
+    ? await listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: SWING_SCREENER_LIMIT })
     : [];
   if (rows === null) {
     return NextResponse.json({ error: "스윙 판정 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." }, { status: 502 });
