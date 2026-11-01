@@ -9132,3 +9132,43 @@
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - 오픈베타 감사(분석 10건 → 조건 1·2) 진행 후 수동 항목 2번 "최근 감사" 카피 갱신.
+
+### 2026-11-01 — [PR-1/5] 스윙 규칙서 swing-v1 오프라인 검증 — 체크리스트 출시 결정 (#397)
+
+- **slug**: `swing-rulebook` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/397
+- **요약**: [PR-1/5] 스윙 규칙서 swing-v1 오프라인 검증 — 체크리스트 출시 결정
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > AI 종합분석(12에이전트가 판정)을 **규칙은 사람이 정하고 판정은 코드가 하는 스윙 판정 엔진**으로 재구축하는 시리즈(단일 PR 룰 예외, 5PR)의 첫 PR. 사용자 스윙 체크리스트를 버전 고정 규칙서 `swing-v1`(lib/swing)로 옮기고, 과거 데이터로 **사전 등록 검증**했다. **앱 동작 변경 없음** — `app/`·`components/`·`hooks/` diff 0.
+  > 
+  > ## 결론
+  > - **v1 체크리스트 전체("매수 후보")**: 발견 구간(2024–25) 평균 +0.41% 이나 NW t 1.00(임계 2.24), 중앙값 −0.41%(왜도 구동) → **미달 → 사전 등록 결정표대로 KOSPI·KOSDAQ 체크리스트 출시**.
+  > - **v2 (미사용 홀드아웃 2022–23·2026 으로 검증, 사용자 결정)**:
+  >   - ✅ **제외 집단(고변동·과열·자금조달 공시·거래정지) 저조 — 홀드아웃 2.5년 −0.568%/10일, t −3.87, 음수 달 79%**. 세 구간·두 시장 모두 같은 방향. 이번 작업에서 표본 밖까지 성립한 유일한 규칙.
+  >   - ❌ 수급 동시 조건(개인−·외국인+·기관+) 증분: +0.047%, t 0.26 — 발견 구간 +0.33%p 재현 안 됨.
+  >   - ❌ 새 데이터 피처 8종(투신·금융투자·기타법인 수급, 신용잔고율·변화율, 프로그램매매, 목표가 상승여력·수정): 발견 통과 0.
+  > - 제품 함의: 스크리너의 단단한 가치 = "지금 피해야 할 종목과 그 이유". 매수 쪽은 체크리스트(조건별 실측값 + 과거 통계).
+  > 
+  > ## 변경
+  > - `lib/swing/` — rulebook(SSOT)·features·patterns(쌍바닥)·plan(손절/목표/사후 결과)·judge(등급) + audit·auditV2·candidates + `stats-v1.json`(147셀, 재실행 해시 동일) + 테스트.
+  > - `lib/api/kis/investor-flow.ts` — `fetchInvestorTradeDaily`·`…Detail`(FHPTJ04160001, 개인·외국인·기관계·연기금·사모 + 세부 주체, 엄격 파싱·상장 전 채움 행 제거). `lib/api/dart/disclosure.ts` — `fetchMajorReports`. 앱 라우트 미사용(PR-2 가 씀).
+  > - `lib/signal/levels/swingLevels.ts` — 인덱스 반환 `swingLowPoints`(기존 동작 불변). `neweyWestT` 를 `directionDiagnosis.ts` 로 이동.
+  > - `scripts/swing/collect.mts`(KIS·DART 조회 전용 수집, 캐시 gitignore) · `audit.mts`(v1) · `audit-v2.mts`(v2).
+  > - 문서: `docs/prd/swing-judgment.md`(시리즈 PRD + 결정 기록), 사전 등록·결과 v1·v2, `docs/qa/swing-rulebook.md`.
+  > 
+  > ## 검증
+  > - `npm test` 1,652 통과 · `typecheck` 0 · `lint` 에러 0(경고 3건은 기존 스크립트)
+  > - 사전 등록 커밋 → 수익률 계산 → 결과 커밋 순서: v1 `56e97a1` → `b813039`, v2 `0b1307b` → `3a10721` (동결 코드 변경 없음)
+  > - 재실행 결과(v1 발견·v2 홀드아웃·과거 통계) 해시 동일
+  > - 수집: 일봉 2,534 · 수급/세부/신용/프로그램/투자의견 각 2,445, 주문 API 0
+  > 
+  > ## 다음 작업
+  > - PR-2 `swing-live-engine`: 매일 07:20 KST 스크리너(GHA→Vercel 배치 크론), `swing_judgments` 저장(유니버스 전 종목 = 전진 검증 데이터), `/api/swing/screener`·`/api/swing/judgment/[ticker]` BFF. 체크리스트 모드 + 제외 사유 우선.
+  > - PR-2b(dev-manager-bot) Slack 봇 계약 전환 → PR-3 `swing-ui`(`/swing`, 판정 카드, DESIGN.md) → PR-4 AI 뉴스 노트 → PR-5 기존 12에이전트 파이프라인 정리.
+  > - 홀드아웃은 소진됨 — 규칙 변경(예: 기타법인 순매수 v3 후보)은 2026-11 이후 전진 데이터로만 확인.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2 `swing-live-engine`: 매일 07:20 KST 스크리너(GHA→Vercel 배치 크론), `swing_judgments` 저장(유니버스 전 종목 = 전진 검증 데이터), `/api/swing/screener`·`/api/swing/judgment/[ticker]` BFF. 체크리스트 모드 + 제외 사유 우선.
+  - PR-2b(dev-manager-bot) Slack 봇 계약 전환 → PR-3 `swing-ui`(`/swing`, 판정 카드, DESIGN.md) → PR-4 AI 뉴스 노트 → PR-5 기존 12에이전트 파이프라인 정리.
+  - 홀드아웃은 소진됨 — 규칙 변경(예: 기타법인 순매수 v3 후보)은 2026-11 이후 전진 데이터로만 확인.
