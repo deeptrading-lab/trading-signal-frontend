@@ -19,6 +19,8 @@
 
 import type { FluctuationDirection } from "@/lib/types/market/fluctuation";
 import type { VolumeRankBy } from "@/lib/types/market/volumeRank";
+import type { SwingMarket } from "@/lib/swing/rulebook";
+import type { SwingScreenerFilter } from "@/lib/types/swing/api";
 
 function normalizeTickers(tickers: readonly string[]): string {
   return tickers.slice().sort().join(",");
@@ -107,6 +109,13 @@ export const queryKeys = {
     /** 관심종목 종목명·메타 (긴 TTL) — 후속 메타 단독 훅 분리 시 참조. */
     info: (tickers: readonly string[]) =>
       ["watchlist", "info", normalizeTickers(tickers)] as const,
+  },
+  swing: {
+    /** 스윙 체크 스크리너 목록 — 필터·시장별(거래일은 서버가 최신으로 정한다). */
+    screener: (filter: SwingScreenerFilter, market: SwingMarket | null) =>
+      ["swing", "screener", filter, market ?? "ALL"] as const,
+    /** 종목 스윙 체크 상세. */
+    judgment: (ticker: string) => ["swing", "judgment", ticker] as const,
   },
   scorecard: {
     /** AI 판정 적중률 집계 — Supabase signal_scorecard BFF. 인자 없는 단일 키. */

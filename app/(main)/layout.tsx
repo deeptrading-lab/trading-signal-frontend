@@ -61,6 +61,7 @@ function isWhiteSurfaceRoute(pathname: string): boolean {
     pathname.startsWith("/stock") ||
     pathname === "/watchlist" ||
     pathname === "/analyze" ||
+    pathname === "/swing" ||
     pathname === "/profile" ||
     pathname.startsWith("/intraday") ||
     pathname === "/dashboard/scorecard"

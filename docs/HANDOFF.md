@@ -9211,3 +9211,39 @@
   - prod 적용(위 3단계) 후 다음 영업일 07:20 예약 실행 확인(GHA·KV 마커 `swing:screener:meta`).
   - PR-2b(dev-manager-bot) Slack 봇이 `/api/swing/judgment/{ticker}` 를 쓰도록 계약 전환.
   - PR-3 `swing-ui`: `/swing` 스크리너(수급 조건 목록 + **제외 종목·사유를 가장 눈에 띄게**) + 종목 판정 카드(조건별 실측값·과거 통계·체크리스트 모드 문구) + DESIGN.md.
+
+### 2026-11-01 — feat(swing): 스윙 체크 화면 — /swing 스크리너 + 종목 카드 [PR-3/5] (#399)
+
+- **slug**: `swing-ui` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/399
+- **요약**: feat(swing): 스윙 체크 화면 — /swing 스크리너 + 종목 카드 [PR-3/5]
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 스윙 규칙서 swing-v1 판정(PR-2 가 매일 07:20 KST 저장)을 화면에 낸다. PR-1 검증 결과대로 **체크리스트 모드** — 매수 추천이 아니라 "조건이 몇 개 맞는지, 지금 피해야 할 이유가 있는지"를 숫자로 보여 준다. 표본 밖까지 성립한 유일한 규칙인 **주의(제외) 사유**를 가장 눈에 띄게 둔다.
+  > 
+  > ## 변경
+  > - **`/swing` 스크리너** — 탭 3개(수급 조건 충족 · 주의 종목 · 전체) × 시장(전체 · KOSPI · KOSDAQ). 탭 상태는 URL 쿼리(`?tab=`·`?market=`)라 종목 상세에 갔다 뒤로 와도 유지. 거래대금 순(PRD OQ-2 권고), 행마다 "충족 n/7"·연기금 순매수·국면 칩, 주의 종목은 사유 칩.
+  > - **종목 상세 스윙 체크 카드(국내)** — 기존 4축 시그널 요약 자리를 대체(미국 종목은 기존 유지). 주의 사유(실측값 + 기준값 + 그 상태의 과거 통계) → 조건별 실측값(수급 금액 = S × ADV20, 억 원) → 참고 지지·저항(호가 단위)·2주 통상 변동폭 → 과거 통계(n ≥ 30 일 때만) → 면책.
+  > - **내비** "AI 분석"(/analyze) → "스윙 체크"(/swing). /analyze 는 PR-5 까지 URL 로만 접근.
+  > - 클라이언트 계층: `lib/api/swing/*` · `hooks/swing/useQuerySwing*` · `queryKeys.swing` · `queryConfig.swing` · `lib/copy/swing/labels.ts`. 조건 비트 헬퍼는 `lib/swing/itemBits.ts` 로 옮겨 서버·화면 공용(기존 import 경로는 재노출로 유지).
+  > - 미지원 종목 404 문구 정정 — 국내 ETF 에 "국내 종목만 지원"은 틀린 안내라 "KOSPI·KOSDAQ 상장 주식만(ETF·ETN·해외 제외)".
+  > - DESIGN.md `docs/design/swing-ui.md` — 기존 토큰만(신규 색·타이포·spacing 0), lint 0/0.
+  > 
+  > ## 검증
+  > - `vitest` 1,683 통과 · `tsc` 0 · `lint` 에러 0 · `next build` 통과(`/swing` 정적 프리렌더)
+  > - 카피 테스트: 주의 사유·조건 실측값 문장, 과거 통계 문장, **체크리스트 모드 금지어 가드**(매수 후보·추천·확실·손절가·목표가 등), 탭 URL 매핑
+  > - 390×844 · 1440×900 캡처(prod 데이터 2026-10-30): 수급 조건 충족 3종목, KOSDAQ 주의 종목 50행, 빈 목록, 삼성전자 고변동 주의 카드(ATR 7.0% vs KOSPI 4.97%, 과거 16,674건 −0.48%p), 한국가스공사 충족 5/7 카드, ETF 404, 미국 종목 카드 없음
+  > - QA `docs/qa/swing-ui.md` — 캡처 중 고친 것 4건(천 단위·호가 단위·줄표·빈 목록 문구)
+  > 
+  > ## 다음 작업
+  > - PR-2b(dev-manager-bot): Slack 봇이 `/api/swing/judgment/{ticker}` 를 쓰도록 계약 전환(체크리스트 모드 문구).
+  > - PR-4 `swing-ai-note`: 뉴스·공시 수집(고정 JSON) + 해설 검증기, 사용자 요청 시 큐 → 로컬 워커. 판정 불가침.
+  > - PR-5 `swing-retire-legacy`: 12에이전트 파이프라인 삭제·테이블 동결·`/analyze` → `/swing` 리다이렉트. 이때 `SegmentedTabs` 를 `components/ui/` 로 이동.
+  > - 후속(미룸): 판정 레벨 차트 오버레이 — 체크리스트 모드에선 카드 숫자로 충분, 필요해지면.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2b(dev-manager-bot): Slack 봇이 `/api/swing/judgment/{ticker}` 를 쓰도록 계약 전환(체크리스트 모드 문구).
+  - PR-4 `swing-ai-note`: 뉴스·공시 수집(고정 JSON) + 해설 검증기, 사용자 요청 시 큐 → 로컬 워커. 판정 불가침.
+  - PR-5 `swing-retire-legacy`: 12에이전트 파이프라인 삭제·테이블 동결·`/analyze` → `/swing` 리다이렉트. 이때 `SegmentedTabs` 를 `components/ui/` 로 이동.
+  - 후속(미룸): 판정 레벨 차트 오버레이 — 체크리스트 모드에선 카드 숫자로 충분, 필요해지면.

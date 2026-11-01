@@ -105,6 +105,14 @@ export async function readSwingScreenerMeta(): Promise<SwingScreenerMeta | null>
   return getKisStore().get<SwingScreenerMeta>(META_KEY);
 }
 
+/**
+ * 목록 기본 거래일 — 크론은 구간마다 저장하고 완료 마커는 finalize 에서만 쓴다. 집계 도중엔 새 거래일 행이
+ * 일부뿐이라 마지막으로 끝까지 돈(ok) 같은 버전 거래일을 우선하고, 마커가 없거나 실패면 최신 저장일.
+ */
+export function screenerListDate(meta: SwingScreenerMeta | null, latest: string | null, version: string): string | null {
+  return meta?.ok && meta.tradeDate && meta.version === version ? meta.tradeDate : latest;
+}
+
 /** 완료 판정 — 끝까지 처리했고 실패가 2% 이하. */
 export function isScreenerRunOk(processed: number, failed: number): boolean {
   return processed > 0 && failed / processed <= 0.02;

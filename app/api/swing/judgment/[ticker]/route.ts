@@ -17,7 +17,7 @@ import { RULEBOOK } from "@/lib/swing/rulebook";
 import { computeSwingJudgment, getMajorReportEvents } from "@/lib/server/swing/compute";
 import { createKisPacer } from "@/lib/server/swing/pace";
 import { SWING_RELEASE, swingStatsFor } from "@/lib/server/swing/stats";
-import { getStoredSwingRow } from "@/lib/server/swing/store";
+import { getStoredSwingRow, latestSwingTradeDate } from "@/lib/server/swing/store";
 import { kstToday, resolveTradeDate } from "@/lib/server/swing/tradeDate";
 import type { SwingJudgmentResponse } from "@/lib/types/swing/api";
 import { createLogger } from "@/lib/server/logTag";
@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ ticker
   const { ticker } = await ctx.params;
   const market = /^\d{6}$/.test(ticker) ? getMarketByTicker(ticker) : null;
   if (!market) {
-    return NextResponse.json({ error: "스윙 판정은 국내(KOSPI·KOSDAQ) 종목만 지원해요." }, { status: 404 });
+    return NextResponse.json({ error: "스윙 체크는 KOSPI·KOSDAQ 상장 주식만 지원해요(ETF·ETN·해외 종목 제외)." }, { status: 404 });
   }
   if (!isKisConfigured()) {
     return NextResponse.json({ error: "시세 연결이 설정되지 않아 판정할 수 없어요." }, { status: 503 });
@@ -48,9 +48,12 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ ticker
     const tdKey = `swing:td:${kstToday()}`;
     let tradeDate = await store.get<string>(tdKey);
     if (!tradeDate) {
-      tradeDate = await resolveTradeDate(call);
+      const resolved = await resolveTradeDate(call).catch(() => null);
+      if (resolved) await store.set(tdKey, resolved, TRADE_DATE_TTL_SEC);
+      // KIS 야간 점검 등으로 지수를 못 부르면 마지막 스크리너 거래일로 — 그날 판정이 캐시돼 있으면 그대로 보여 준다.
+      // (점검 중 값은 캐시하지 않는다 — 풀리면 다시 KIS 로 정한다.)
+      tradeDate = resolved ?? (await latestSwingTradeDate(RULEBOOK.version));
       if (!tradeDate) throw new Error("거래일을 정하지 못했어요");
-      await store.set(tdKey, tradeDate, TRADE_DATE_TTL_SEC);
     }
 
     const key = `swing:judgment:${RULEBOOK.version}:${tradeDate}:${ticker}`;

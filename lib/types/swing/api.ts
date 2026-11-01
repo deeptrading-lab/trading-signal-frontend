@@ -35,6 +35,9 @@ export type SwingStatsCell = {
 
 export type SwingScreenerFilter = "flow" | "excluded" | "all";
 
+/** 스크리너 응답 최대 행 수(거래대금 상위) — BFF 와 화면 문구가 같은 값을 쓴다. */
+export const SWING_SCREENER_LIMIT = 50;
+
 export type SwingScreenerItem = {
   ticker: string;
   name: string;
@@ -44,7 +47,7 @@ export type SwingScreenerItem = {
   metCount: number;
   flowPass: boolean;
   exclusions: string[];
-  /** 조건 비트(`lib/server/swing/row.ts` SWING_ITEM_BITS 순서). */
+  /** 조건 비트(`lib/swing/itemBits.ts` SWING_ITEM_BITS 순서). */
   items: number;
   stage: string | null;
   close: number;

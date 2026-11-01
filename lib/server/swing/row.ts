@@ -3,25 +3,8 @@
  * 필요한 열만(PRD `swing-judgment` PR-2 설계). 상세는 같은 엔진으로 즉시 계산한다.
  */
 
-import type { SwingItems, SwingJudgment } from "@/lib/swing/judge";
-
-/** 조건 비트 순서 — 바꾸면 저장된 행 해석이 깨진다(추가만 끝에). */
-export const SWING_ITEM_BITS = ["A1", "A2", "A3", "Aplus", "A", "B", "C", "D", "E"] as const;
-
-/** "충족 n/m" 의 대상 — 수급 3 + 매물대·국면·모멘텀·쌍바닥. 연기금(가점)·A(묶음)는 세지 않는다. */
-export const SWING_MET_ITEMS = ["A1", "A2", "A3", "B", "C", "D", "E"] as const;
-
-export function metCount(items: SwingItems): number {
-  return SWING_MET_ITEMS.filter((k) => items[k].pass === true).length;
-}
-
-export function itemBits(items: SwingItems): number {
-  return SWING_ITEM_BITS.reduce((acc, k, i) => acc | (items[k].pass === true ? 1 << i : 0), 0);
-}
-
-export function hasItemBit(bits: number, key: (typeof SWING_ITEM_BITS)[number]): boolean {
-  return (bits & (1 << SWING_ITEM_BITS.indexOf(key))) !== 0;
-}
+import { itemBits, metCount } from "@/lib/swing/itemBits";
+import type { SwingJudgment } from "@/lib/swing/judge";
 
 export type SwingJudgmentRow = {
   trade_date: string;
