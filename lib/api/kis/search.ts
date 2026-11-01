@@ -109,6 +109,13 @@ export function getCorpCode(ticker: string): string | null {
   return found?.corp_code ?? null;
 }
 
+/** 국내 시드 전 종목(KOSPI·KOSDAQ) — 스윙 스크리너 유니버스 원천. 오프라인 시드라 호출 비용 0. */
+export function listDomesticSymbols(): Array<{ ticker: string; name: string; market: "KOSPI" | "KOSDAQ" }> {
+  return KR_SYMBOLS.filter((s): s is SymbolEntry & { market: "KOSPI" | "KOSDAQ" } => s.market === "KOSPI" || s.market === "KOSDAQ").map(
+    (s) => ({ ticker: s.ticker, name: s.name, market: s.market }),
+  );
+}
+
 /**
  * ticker → 시드 종목명 역참조. 시드(symbols.json) 미수록이면 null.
  *

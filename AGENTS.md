@@ -9,7 +9,8 @@
 - 데이터 페칭: TanStack Query v5 + axios (BFF 경유)
 - 배포: Vercel
 - BFF: Next.js route handler (`app/api/**/route.ts`) — 브라우저는 FastAPI를 직접 호출하지 않는다
-- 분석 엔진: `trading-signal-engine` 의 FastAPI
+- 분석 엔진: `trading-signal-engine` 의 FastAPI (workbench 한정)
+- 종목 스윙 판정: `lib/swing` 결정론 규칙서 엔진(PRD `swing-judgment`) — 규칙은 사람이 `rulebook.ts` 에 정하고 판정은 코드가 한다. FastAPI·LLM 미사용
 - DB 예정: Supabase. MVP 현재 단계에서는 DB를 붙이지 않는다.
 
 ## 작업 원칙
@@ -117,4 +118,5 @@ lib/mock/<domain>/     로컬/폴백용 목 데이터
 lib/query/             TanStack Query 인프라 (클라이언트 설정 등)
 lib/utils/             도메인 무관 헬퍼 (cn, formatMoney, formatPct 등)
 lib/server/            route handler(BFF) 서버 전용 유틸 (withTimeout·delay·jsonWithDataSource 등)
+lib/swing/             스윙 판정 순수 엔진(규칙서·피처·판정·감사) — 오프라인 감사(scripts/swing)와 라이브(lib/server/swing·app/api/swing) 공용
 ```

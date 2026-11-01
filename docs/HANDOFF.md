@@ -9172,3 +9172,42 @@
   - PR-2 `swing-live-engine`: 매일 07:20 KST 스크리너(GHA→Vercel 배치 크론), `swing_judgments` 저장(유니버스 전 종목 = 전진 검증 데이터), `/api/swing/screener`·`/api/swing/judgment/[ticker]` BFF. 체크리스트 모드 + 제외 사유 우선.
   - PR-2b(dev-manager-bot) Slack 봇 계약 전환 → PR-3 `swing-ui`(`/swing`, 판정 카드, DESIGN.md) → PR-4 AI 뉴스 노트 → PR-5 기존 12에이전트 파이프라인 정리.
   - 홀드아웃은 소진됨 — 규칙 변경(예: 기타법인 순매수 v3 후보)은 2026-11 이후 전진 데이터로만 확인.
+
+### 2026-11-01 — [PR-2/5] 라이브 스윙 판정 — 07:20 스크리너·압축 저장·조회 API (#398)
+
+- **slug**: `swing-live-engine` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/398
+- **요약**: [PR-2/5] 라이브 스윙 판정 — 07:20 스크리너·압축 저장·조회 API
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 스윙 규칙서 swing-v1(PR-1, 결정론 엔진 `lib/swing`)을 라이브로 돌린다. **매일 07:20 KST 전 거래일 확정 데이터로 전 종목 판정·저장**하고, 목록·종목 상세 조회 API 를 연다. LLM 호출 0. **화면 변화 없음**(UI 는 PR-3).
+  > 
+  > PR-1 결과(체크리스트 출시, 표본 밖까지 성립한 건 제외 규칙뿐)를 반영해 계획보다 가볍게 만들었다 — 압축 열만 저장, 상세는 같은 엔진으로 즉시 계산 + KV 캐시, 5·10일 결과 채우기는 오프라인 감사로.
+  > 
+  > ## 변경
+  > - `lib/server/swing/compute.ts` — `computeSwingJudgment`: 스크리너·즉시 판정 **공용**. KIS 일봉(1차 거르기 1콜 → 통과 시 3콜) + 수급 1콜 + DART 시장 전체(45일, KV 캐시) → `judgeSwing`. 입력 해시.
+  > - `app/api/cron/swing-screener` — 거래일 t = KOSPI 지수 마지막 봉, 230초 예산 구간 처리 + `next` 이어받기, 완료 마커 skip, `finalize`(실패 ≤ 2%). KIS 페이서(초당 8회 이하, 일시 오류 재시도).
+  > - `app/api/swing/screener`(최신 거래일, `flow`·`excluded`·`all`, ADV20 순 50행) · `app/api/swing/judgment/[ticker]`(즉시 계산·36시간 캐시 + 과거 통계 셀 + 저장 행 해시 대조 + 시장경보 오버레이).
+  > - `docs/sql/swing-judgments.sql`(수동 1회 적용) · `.github/workflows/swing-screener.yml`(07:20 + 08:20·09:20 재시도).
+  > - PRD PR-2 AC + **#371 예외 결정**(LLM 0·다음 날 07:20·호출 상한). AGENTS.md 에 `lib/swing` 도메인.
+  > 
+  > ## 검증
+  > - `npm test` 1,668 통과 · `typecheck` 0 · `lint` 에러 0
+  > - **라이브 vs 오프라인 정합**: 같은 날(2026-10-30) 4종목(삼성전자·SK하이닉스·에코프로비엠·알테오젠) 입력 해시·판정 **완전 일치** → 백테스트 과거 통계를 라이브 판정에 그대로 붙여도 된다는 근거
+  > - 로컬 dev `/api/swing/judgment/005930` 200(첫 7.0초·캐시 0.4초), 미국 종목 404 한글 안내, 목록 API 빈 상태 정상
+  > - QA `docs/qa/swing-live-engine.md` — AC-2.7(prod 적용)만 승인 대기
+  > 
+  > ## prod 적용 순서 (사용자 승인 필요)
+  > 1. Supabase SQL Editor 에서 `docs/sql/swing-judgments.sql` 1회 실행
+  > 2. 머지 → Vercel 배포
+  > 3. Actions `swing-screener` `workflow_dispatch` 1회 → `select count(*) from swing_judgments where trade_date = '…'` 확인
+  > 
+  > ## 다음 작업
+  > - prod 적용(위 3단계) 후 다음 영업일 07:20 예약 실행 확인(GHA·KV 마커 `swing:screener:meta`).
+  > - PR-2b(dev-manager-bot) Slack 봇이 `/api/swing/judgment/{ticker}` 를 쓰도록 계약 전환.
+  > - PR-3 `swing-ui`: `/swing` 스크리너(수급 조건 목록 + **제외 종목·사유를 가장 눈에 띄게**) + 종목 판정 카드(조건별 실측값·과거 통계·체크리스트 모드 문구) + DESIGN.md.
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - prod 적용(위 3단계) 후 다음 영업일 07:20 예약 실행 확인(GHA·KV 마커 `swing:screener:meta`).
+  - PR-2b(dev-manager-bot) Slack 봇이 `/api/swing/judgment/{ticker}` 를 쓰도록 계약 전환.
+  - PR-3 `swing-ui`: `/swing` 스크리너(수급 조건 목록 + **제외 종목·사유를 가장 눈에 띄게**) + 종목 판정 카드(조건별 실측값·과거 통계·체크리스트 모드 문구) + DESIGN.md.
