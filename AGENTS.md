@@ -10,7 +10,7 @@
 - 배포: Vercel
 - BFF: Next.js route handler (`app/api/**/route.ts`) — 브라우저는 FastAPI를 직접 호출하지 않는다
 - 분석 엔진: `trading-signal-engine` 의 FastAPI (workbench 한정)
-- 종목 스윙 판정: `lib/swing` 결정론 규칙서 엔진(PRD `swing-judgment`) — 규칙은 사람이 `rulebook.ts` 에 정하고 판정은 코드가 한다. FastAPI·LLM 미사용
+- 종목 스윙 판정: `lib/swing` 결정론 규칙서 엔진(PRD `swing-judgment`) — 규칙은 사람이 `rulebook.ts` 에 정하고 판정은 코드가 한다. 판정은 FastAPI·LLM 미사용. AI 는 종목 뉴스·공시 정리(노트, 사용자 요청 시 로컬 워커)만 하고 판정 저장소에 쓰지 않는다
 - DB 예정: Supabase. MVP 현재 단계에서는 DB를 붙이지 않는다.
 
 ## 작업 원칙
