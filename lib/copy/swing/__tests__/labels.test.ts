@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as copy from "../labels";
+import * as noteCopy from "../note";
 import {
   describeExclusion,
   describeItem,
@@ -121,10 +122,17 @@ describe("날짜·개수", () => {
   });
 });
 
+describe("AI 노트 시각·날짜", () => {
+  it("KST 로 표시", () => {
+    expect(noteCopy.swingNoteTimeLabel("2026-11-01T16:23:00Z")).toBe("11월 2일 01:23 정리");
+    expect(noteCopy.swingNoteDateLabel("2026-10-08")).toBe("10.8");
+  });
+});
+
 describe("체크리스트 모드 금지어", () => {
   // 매수 추천으로 읽히는 표현 금지(디자인 swing-ui Do's and Don'ts). 면책 문구의 "보장하지 않아요"는 허용.
   const BANNED = /매수 후보|추천|확실|지금 사|매수하세요|매도하세요|손절가|목표가/;
-  const strings = Object.values(copy).flatMap((v) =>
+  const strings = [...Object.values(copy), ...Object.values(noteCopy)].flatMap((v) =>
     typeof v === "string" ? [v] : typeof v === "object" && v !== null ? Object.values(v).filter((x) => typeof x === "string") : [],
   );
   it("화면 카피 상수에 금지어가 없다", () => {

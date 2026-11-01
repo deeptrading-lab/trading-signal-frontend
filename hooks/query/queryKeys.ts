@@ -116,6 +116,8 @@ export const queryKeys = {
       ["swing", "screener", filter, market ?? "ALL"] as const,
     /** 종목 스윙 체크 상세. */
     judgment: (ticker: string) => ["swing", "judgment", ticker] as const,
+    /** 종목 AI 노트(뉴스·공시 정리) — 판정과 별개. */
+    note: (ticker: string) => ["swing", "note", ticker] as const,
   },
   scorecard: {
     /** AI 판정 적중률 집계 — Supabase signal_scorecard BFF. 인자 없는 단일 키. */

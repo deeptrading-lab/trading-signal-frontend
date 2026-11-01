@@ -3,6 +3,7 @@
  */
 
 import type { SwingJudgment } from "@/lib/swing/judge";
+import type { SwingNoteItem } from "@/lib/swing/note";
 import type { SwingMarket } from "@/lib/swing/rulebook";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
@@ -66,6 +67,23 @@ export type SwingScreenerResponse = {
   items: SwingScreenerItem[];
   /** 마지막 크론 실행 요약. */
   run: { at: string; ok: boolean; tradeDate: string | null } | null;
+};
+
+/** AI 노트(뉴스·공시 정리) — `/api/swing/note/[ticker]` (PR-4). 판정과 무관한 별도 저장소. */
+export type SwingNote = {
+  id: number;
+  ticker: string;
+  status: "pending" | "processing" | "done" | "failed";
+  /** done 일 때만 — 검증 통과 항목(0건이면 최근 뉴스 없음). */
+  items: SwingNoteItem[] | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+};
+export type SwingNoteResponse = {
+  note: SwingNote | null;
+  /** 새로 정리를 요청할 수 있나 — 진행 중이거나 6시간 안에 만든 노트가 있으면 false(서버가 판단). */
+  canRequest: boolean;
 };
 
 export type SwingJudgmentResponse = {

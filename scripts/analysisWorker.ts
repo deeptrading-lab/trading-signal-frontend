@@ -13,6 +13,7 @@
  *      SSE 를 {type:'done'} 까지 **끝까지 소비**(중간에 끊으면 AbortController 로 분석·저장 중단) →
  *      성공 markDone / 실패 markFailed. 슬롯 가득(429)이면 백오프 재시도.
  *   4) 슬롯 꽉 참 → 하나 끝날 때까지 대기(Promise.race). 큐 비었으면 짧게 sleep.
+ *   5) 남는 슬롯에서 스윙 AI 노트(swing_ai_notes pending, 뉴스·공시 정리)를 CLI 1회로 처리(swing-judgment PR-4).
  * 별도 타이머로 하트비트를 주기 갱신(분석 중에도 끊기지 않게) → worker-status 가 온라인으로 본다.
  *
  * ⚠️ SSE 를 done 까지 소비해야 핸들러 내부 upsertAIDecision 이 실행된다(A6/AC-3).
@@ -35,6 +36,8 @@ import {
   type WorkerStatus,
 } from "@/lib/server/ai/workerHeartbeat";
 import type { AnalysisQueueRow } from "@/lib/types/stock/analysisQueue";
+import { claimNextSwingNote, failStuckSwingNotes } from "@/lib/server/swing/noteStore";
+import { runSwingNote } from "@/lib/server/swing/noteRunner";
 
 const BASE_URL =
   process.env.WORKER_BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
@@ -169,6 +172,19 @@ async function loop(): Promise<void> {
         const job = await claimNextPending(WORKER_ID);
         if (!job) break; // 큐 비었음
         const p = processClaimedJob(job).finally(() => {
+          inFlight.delete(p);
+        });
+        inFlight.add(p);
+      }
+
+      // 스윙 AI 노트(뉴스·공시 정리, swing-judgment PR-4) — 남는 슬롯에서. 노트 저장소만 쓰고 판정은 건드리지 않는다.
+      // 테이블 미적용(SQL 전)·오류면 조용히 건너뛴다(분석 큐 흐름 무회귀).
+      await failStuckSwingNotes(STUCK_TIMEOUT_MS).catch(() => undefined);
+      while (running && inFlight.size < WORKER_CONCURRENCY) {
+        const note = await claimNextSwingNote(WORKER_ID).catch(() => null);
+        if (!note) break;
+        log(`swing-note id=${note.id} ticker=${note.ticker}`);
+        const p = runSwingNote(note, pickProvider()).finally(() => {
           inFlight.delete(p);
         });
         inFlight.add(p);
