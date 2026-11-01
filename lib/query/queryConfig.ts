@@ -251,6 +251,12 @@ export const queryConfig = {
       staleTime: 10 * MINUTE,
       gcTime: 30 * MINUTE,
     },
+    /** AI 노트 — 처리 중엔 훅이 따로 폴링(pollMs), 완료 후엔 사용자가 다시 요청할 때만 바뀐다. */
+    note: {
+      staleTime: 1 * MINUTE,
+      gcTime: 30 * MINUTE,
+      pollMs: 10 * SECOND,
+    },
   },
   scorecard: {
     /**

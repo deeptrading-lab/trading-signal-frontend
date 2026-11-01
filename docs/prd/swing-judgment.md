@@ -86,6 +86,10 @@
 
 ### 3-4. PR-2b (dev-manager-bot) — Slack 봇 계약 전환
 
+- **발견(2026-11-02)**: 봇은 `TRADING_APP_BASE_URL`(기본 `localhost:3000`)을 부르는데, 로컬 `.env.local` 에 Google 로그인 게이트가 켜져 있어 `/api/swing/judgment` 가 401. 기존 AI 분석은 SSE 경로 하나가 프록시 matcher 에서 빠져 있어 통과했던 것.
+- **프론트 선행(PR-4 에 동봉)**: 프록시에 봇 전용 우회 — `GET /api/swing/judgment/<ticker>` 한 경로만, `Authorization: Bearer ${SWING_BOT_TOKEN}`(32자 이상, 미설정이면 꺼짐). 다른 경로·메서드는 그대로 게이트.
+- **봇 레포**: `analyze.py` 가 위 경로를 토큰과 함께 호출(같은 토큰을 봇 env 에), `formatter.py` 는 체크리스트 모드 문구(충족 n/7·주의 사유 실측값·참고 레벨·면책, 긍정 반응 이모지 없음). 이 세션은 워크트리 격리라 봇 레포 git 작업은 봇 레포 세션에서 한다.
+
 ### 3-5. PR-3 `swing-ui` — `/swing` 스크리너 + 종목 판정 카드 + 차트 오버레이 (DESIGN.md 선행)
 
 ### 3-6. PR-4 `swing-ai-note` — 뉴스·공시 수집(고정 JSON) + 해설 검증기. 사용자 요청 시 큐 → 로컬 워커.
@@ -141,8 +145,24 @@
 - **AC-3.6** 수급 금액 = S × ADV20(억 원, 부호·천 단위) · 참고 레벨은 호가 단위 — 카피 테스트.
 - **AC-3.7** 브라우저는 BFF(`/api/swing/*`)만 호출(클라이언트 `fetch(` 0).
 
-### PR-4~PR-5
-각 PR 착수 시 이 절에 추가한다(계획: `/Users/hayoung/.claude/plans/adaptive-sleeping-bubble.md` 승인본).
+### PR-4 `swing-ai-note` (2026-11-02 — AI 는 수집·요약만)
+
+설계(계획 대비 축소 — ponytail):
+- **노트 테이블이 곧 큐**: `swing_ai_notes`(SQL 수동 적용) — pending → 로컬 워커 claim → done(items)/failed. 등급·조건·가격 컬럼 없음. 기존 `ai_analysis_queue` 는 건드리지 않는다.
+- **수집 에이전트 1개**(CLI, 웹 검색) → 고정 JSON(날짜·제목·출처·URL·분류/방향/중요도 enum·요약) → `validateSwingNote`(최근 30일, http(s) URL, enum, 요약의 권유·단정 표현 제거, URL+제목 중복 제거, 최대 10건). 응답의 닫는 괄호 누락(실측)은 1회 보정.
+- **해설 에이전트는 뺐다**: 카드의 조건별 실측값 문장이 이미 코드 템플릿 해설이라 LLM 해설은 숫자 위조 위험만 늘린다.
+- **요청**: 카드의 "AI로 정리하기" → `POST /api/swing/note/[ticker]`(prod 로그인 필요). 진행 중이거나 6시간 안의 완료 노트는 재사용, 대기 상한 20건(넘으면 429). 예약 자동 호출 없음(#371 정책).
+- **판정 불가침**: 노트 모듈·라우트는 `swing_judgments`·판정 함수를 참조하지 않는다(코드 검사 테스트).
+
+- **AC-4.1** 테스트·타입·린트 통과.
+- **AC-4.2** 검증기: enum·날짜창·URL 스킴·권유 표현·중복·상한 — 단위 테스트.
+- **AC-4.3** 노트 경로는 판정 저장소·판정 함수를 참조하지 않는다 — 테스트.
+- **AC-4.4** 실제 CLI 1회 이상 스모크: 응답이 검증기를 통과해 항목이 나온다.
+- **AC-4.5** 카드의 노트 섹션 세 상태(없음 → 요청 버튼, 처리 중 → 안내 + 10초 폴링, 완료 → 목록·정리 시각) 캡처. 테이블 미적용이면 섹션만 "불러오지 못했어요", 카드 나머지 무회귀.
+- **AC-4.6** 봇 토큰 경로: 맞는 토큰 + `GET /api/swing/judgment/<ticker>` 만 통과, 그 외 경로·메서드·틀린 토큰·미설정은 게이트 — 프록시 테스트.
+
+### PR-5
+착수 시 이 절에 추가한다(계획: `/Users/hayoung/.claude/plans/adaptive-sleeping-bubble.md` 승인본).
 
 ## 6. 가정·제약
 

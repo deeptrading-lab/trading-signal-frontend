@@ -96,6 +96,23 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
+/**
+ * Slack 봇(dev-manager-bot) 전용 우회(PRD `swing-judgment` PR-2b) — `GET /api/swing/judgment/<ticker>` 한 경로만,
+ * `Authorization: Bearer ${SWING_BOT_TOKEN}` 가 맞을 때. 토큰이 없거나 32자 미만이면 항상 false(기본 꺼짐).
+ * 다른 경로·메서드는 그대로 게이트. 비교는 길이 고정 XOR(응답 시간으로 토큰을 추측하지 못하게).
+ */
+function isSwingBotRequest(request: NextRequest, pathname: string): boolean {
+  const token = process.env.SWING_BOT_TOKEN ?? "";
+  if (token.length < 32 || request.method !== "GET") return false;
+  if (!/^\/api\/swing\/judgment\/[0-9A-Za-z]+$/.test(pathname)) return false;
+  const got = request.headers.get("authorization") ?? "";
+  const want = `Bearer ${token}`;
+  if (got.length !== want.length) return false;
+  let diff = 0;
+  for (let i = 0; i < want.length; i++) diff |= got.charCodeAt(i) ^ want.charCodeAt(i);
+  return diff === 0;
+}
+
 /** `/api/*` 요청인지(401 JSON 분기 대상). 인증 API 는 위 isPublicPath 가 이미 통과시킴. */
 function isApiRequest(pathname: string): boolean {
   return pathname.startsWith("/api/");
@@ -151,6 +168,11 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const valid = await verifySession(token);
   if (valid) {
+    return NextResponse.next();
+  }
+
+  // Slack 봇 전용 — 스윙 판정 조회 한 경로만 Bearer 토큰으로 통과(토큰 미설정이면 꺼짐).
+  if (isSwingBotRequest(request, pathname)) {
     return NextResponse.next();
   }
 

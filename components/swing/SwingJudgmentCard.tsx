@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
+import { SwingNoteSection } from "./SwingNoteSection";
 import { metCount } from "@/lib/swing/itemBits";
 import type { SwingJudgment } from "@/lib/swing/judge";
 import { RULEBOOK } from "@/lib/swing/rulebook";
@@ -146,6 +147,12 @@ function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
       ) : null}
 
       {j.exclusions.length === 0 && statsLine ? <p className="text-caption text-text-muted">{statsLine}</p> : null}
+
+      {/* AI 노트(PR-4) — 판정과 별개 섹션. 사용자가 요청할 때만 만든다. */}
+      <div className="border-t border-border-line pt-lg">
+        <SwingNoteSection ticker={j.ticker} />
+      </div>
+
       <p className="text-caption text-text-muted">{SWING_DISCLAIMER}</p>
     </section>
   );

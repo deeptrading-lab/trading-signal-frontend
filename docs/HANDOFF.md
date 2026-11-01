@@ -9247,3 +9247,47 @@
   - PR-4 `swing-ai-note`: 뉴스·공시 수집(고정 JSON) + 해설 검증기, 사용자 요청 시 큐 → 로컬 워커. 판정 불가침.
   - PR-5 `swing-retire-legacy`: 12에이전트 파이프라인 삭제·테이블 동결·`/analyze` → `/swing` 리다이렉트. 이때 `SegmentedTabs` 를 `components/ui/` 로 이동.
   - 후속(미룸): 판정 레벨 차트 오버레이 — 체크리스트 모드에선 카드 숫자로 충분, 필요해지면.
+
+### 2026-11-01 — feat(swing): AI 뉴스·공시 정리 노트 + 봇 토큰 경로 [PR-4/5] (#400)
+
+- **slug**: `swing-ai-note` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/400
+- **요약**: feat(swing): AI 뉴스·공시 정리 노트 + 봇 토큰 경로 [PR-4/5]
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > AI 는 **수집·요약만** 한다는 재구축 원칙의 마지막 조각. 종목 스윙 체크 카드에 "최근 뉴스·공시 (AI 정리)" 섹션을 붙인다 — 사용자가 누를 때만 로컬 AI 워커가 웹 검색 1회로 최근 30일 기사·공시를 고정 JSON 으로 모으고, 서버 검증기를 통과한 항목만 보여 준다. **판정(조건 충족·주의 사유)에는 쓰지 않고, 노트 경로는 판정 저장소를 아예 모른다(테스트로 고정).**
+  > 
+  > 함께: Slack 봇(PR-2b)이 새 판정 API 를 부르면 로컬 로그인 게이트에 401 로 막히는 문제를 찾아, 프록시에 **봇 전용 토큰 경로**(판정 조회 GET 한 경로만)를 넣었다 — PR 수를 늘리지 않으려고 여기에 동봉.
+  > 
+  > ## 변경
+  > - `docs/sql/swing-ai-notes.sql` — 노트 테이블이 곧 큐(pending → 워커 claim → done/failed). 등급·가격 컬럼 없음. **수동 1회 적용 필요.**
+  > - `lib/swing/note.ts` `validateSwingNote` — 최근 30일·http(s) URL·분류/방향/중요도 enum·요약의 권유·단정 표현 제거·(URL+제목) 중복 제거·최대 10건.
+  > - `lib/server/swing/noteStore.ts`(요청: 진행 중·6시간 안 완료면 재사용, 대기 20건 상한) · `noteRunner.ts`(CLI 1회 + 닫는 괄호 누락 1회 보정) · `scripts/analysisWorker.ts` 남는 슬롯에서 노트 처리.
+  > - `/api/swing/note/[ticker]` GET·POST(prod 로그인 필요, 상한이면 429).
+  > - 카드 `SwingNoteSection` — 없음(요청 버튼)·처리 중(안내 + 10초 폴링)·완료(제목 링크·요약·날짜·출처·분류·방향·중요 배지·정리 시각).
+  > - `proxy.ts` 봇 경로 — `GET /api/swing/judgment/<ticker>` + `Authorization: Bearer ${SWING_BOT_TOKEN}`(32자 이상, 미설정이면 꺼짐). 다른 경로·메서드는 그대로 게이트.
+  > - 해설 에이전트는 뺐다 — 카드의 조건별 실측값 문장이 이미 코드 해설이라, LLM 해설은 숫자 위조 위험만 늘린다.
+  > 
+  > ## 검증
+  > - `vitest` 1,706 통과 · `tsc` 0 · `lint` 에러 0 · `next build` 통과
+  > - **실제 CLI 스모크 2회**(DB 쓰기 없음): 한국가스공사 235초 — 응답 끝 `}` 누락으로 실패 → 보정 추가. 삼성전자 260초 — 같은 기사에서 뽑은 다른 사실이 URL 중복으로 빠짐 → 기준을 URL+제목으로. 이후 3건 모두 통과.
+  > - 노트 섹션 세 상태 390×844 캡처(가짜 응답 + 실측 항목). 테이블 미적용 상태에선 섹션만 "불러오지 못했어요", 카드 나머지 무회귀.
+  > - 프록시 테스트 4건(맞는 토큰만 통과, 다른 경로·POST·하위 경로·틀린/짧은/미설정 토큰은 게이트).
+  > - QA `docs/qa/swing-ai-note.md`
+  > 
+  > ## 머지 후 사용자 작업
+  > 1. Supabase SQL Editor 에서 `docs/sql/swing-ai-notes.sql` 1회 실행
+  > 2. 노트를 쓰려면 로컬 `npm run all`(또는 `npm run analyze:worker`)
+  > 3. 봇 연동 시 `SWING_BOT_TOKEN`(32자 이상) 을 프론트 `.env.local` 과 봇 env 에 같은 값으로(봇이 prod 를 부르면 Vercel env 에도)
+  > 
+  > ## 다음 작업
+  > - PR-2b(dev-manager-bot 레포 세션): `analyze.py` 가 `GET /api/swing/judgment/{ticker}` 를 `Authorization: Bearer <SWING_BOT_TOKEN>` 으로 호출, `formatter.py` 는 체크리스트 모드 문구(충족 n/7·주의 사유 실측값·참고 레벨·면책, 긍정 반응 이모지 없음).
+  > - PR-5 `swing-retire-legacy`(봇 PR 머지 뒤): 12에이전트 파이프라인 삭제·`ai_analysis_decisions`·`signal_scorecard` 쓰기 동결·`/analyze` → `/swing`·`SegmentedTabs` 를 `components/ui/` 로 이동.
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - PR-2b(dev-manager-bot 레포 세션): `analyze.py` 가 `GET /api/swing/judgment/{ticker}` 를 `Authorization: Bearer <SWING_BOT_TOKEN>` 으로 호출, `formatter.py` 는 체크리스트 모드 문구(충족 n/7·주의 사유 실측값·참고 레벨·면책, 긍정 반응 이모지 없음).
+  - PR-5 `swing-retire-legacy`(봇 PR 머지 뒤): 12에이전트 파이프라인 삭제·`ai_analysis_decisions`·`signal_scorecard` 쓰기 동결·`/analyze` → `/swing`·`SegmentedTabs` 를 `components/ui/` 로 이동.
+  - (리뷰 보강) 사용자: Supabase SQL `docs/sql/swing-ai-notes.sql` 1회 실행 — 그 전엔 카드의 노트 섹션만 "불러오지 못했어요".
+  - (리뷰 보강) PR-5 주의: 노트 처리는 `scripts/analysisWorker.ts` 루프 안에 있다 — 분석 파이프라인을 걷어내도 워커 루프·노트 경로는 남겨야 한다.
+  - (리뷰 보강) CLI 하드닝: 노트·분석가 CLI 는 이 PR 에서 로컬 도구 차단(`--disallowedTools`)·임시 폴더 실행으로 막았다. 워크벤치 어댑터(`app/api/workbench/_adapters/claudeCli.ts`)는 웹 도구가 없어 그대로 — 필요하면 같은 규칙 적용. 자식 프로세스 env 에 `.env.local` 비밀이 그대로 들어가는 점은 도구 차단으로 막혀 있지만, env 걸러 넘기기는 후속 검토.
