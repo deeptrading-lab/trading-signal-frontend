@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ ticker
   const { ticker } = await ctx.params;
   const market = /^\d{6}$/.test(ticker) ? getMarketByTicker(ticker) : null;
   if (!market) {
-    return NextResponse.json({ error: "스윙 판정은 국내(KOSPI·KOSDAQ) 종목만 지원해요." }, { status: 404 });
+    return NextResponse.json({ error: "스윙 체크는 KOSPI·KOSDAQ 상장 주식만 지원해요(ETF·ETN·해외 종목 제외)." }, { status: 404 });
   }
   if (!isKisConfigured()) {
     return NextResponse.json({ error: "시세 연결이 설정되지 않아 판정할 수 없어요." }, { status: 503 });

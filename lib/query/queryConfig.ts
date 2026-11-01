@@ -240,6 +240,18 @@ export const queryConfig = {
       gcTime: 5 * MINUTE,
     },
   },
+  swing: {
+    /** 스윙 체크 스크리너 — 하루 1회(07:20 KST) 갱신. 서버 응답도 private max-age=60. */
+    screener: {
+      staleTime: 5 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
+    /** 종목 스윙 체크 — 전 거래일 종가 기준이라 장중에도 바뀌지 않는다(서버 KV 36시간 캐시). */
+    judgment: {
+      staleTime: 10 * MINUTE,
+      gcTime: 30 * MINUTE,
+    },
+  },
   scorecard: {
     /**
      * AI 판정 적중률 집계 — cron 이 하루 1회 채점하므로 장중 재호출 무의미. 내부 운영자 뷰라

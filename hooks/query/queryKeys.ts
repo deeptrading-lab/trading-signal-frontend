@@ -108,6 +108,13 @@ export const queryKeys = {
     info: (tickers: readonly string[]) =>
       ["watchlist", "info", normalizeTickers(tickers)] as const,
   },
+  swing: {
+    /** 스윙 체크 스크리너 목록 — 필터·시장별(거래일은 서버가 최신으로 정한다). */
+    screener: (filter: "flow" | "excluded" | "all", market: "KOSPI" | "KOSDAQ" | null) =>
+      ["swing", "screener", filter, market ?? "ALL"] as const,
+    /** 종목 스윙 체크 상세. */
+    judgment: (ticker: string) => ["swing", "judgment", ticker] as const,
+  },
   scorecard: {
     /** AI 판정 적중률 집계 — Supabase signal_scorecard BFF. 인자 없는 단일 키. */
     summary: ["scorecard", "summary"] as const,

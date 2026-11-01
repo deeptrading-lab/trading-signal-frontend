@@ -12,7 +12,7 @@ export const NAV_BRAND_LABEL = "FinSight";
 
 export const NAV_MENU_DASHBOARD = "대시보드";
 export const NAV_MENU_HOME = "홈";
-export const NAV_MENU_ANALYZE = "AI 분석";
+export const NAV_MENU_SWING = "스윙 체크";
 export const NAV_MENU_MARKET = "시장 동향";
 export const NAV_MENU_STOCK = "종목 분석";
 export const NAV_MENU_INTRADAY = "AI 단타";
@@ -25,7 +25,7 @@ export const NAV_MENU_PROFILE = "마이페이지";
  * 펼친 상태·모바일 BottomNav 는 위의 전체 라벨(`NAV_MENU_*`) 을 그대로 쓴다.
  */
 export const NAV_MENU_HOME_SHORT = "홈";
-export const NAV_MENU_ANALYZE_SHORT = "AI";
+export const NAV_MENU_SWING_SHORT = "스윙";
 export const NAV_MENU_STOCK_SHORT = "종목";
 export const NAV_MENU_INTRADAY_SHORT = "단타";
 export const NAV_MENU_WATCHLIST_SHORT = "관심";

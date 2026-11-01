@@ -25,6 +25,7 @@ import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
 import { StockDepthSection } from "@/components/stock/StockDepthSection";
+import { SwingJudgmentCard } from "@/components/swing/SwingJudgmentCard";
 import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
 import { useAIAnalysisContext } from "@/hooks/stock/aiAnalysisProvider";
@@ -196,9 +197,10 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
         </div>
       ) : null}
 
-      {/* ── 항시: 컴팩트 시그널 요약(플랫) — 시맨틱 <section> 은 자식(SignalSummary)이 소유 ── */}
+      {/* ── 항시: 국내 = 스윙 체크(규칙서 결정론 판정, swing-judgment PR-3) / 미국 = 기존 4축 시그널 요약.
+       *  시맨틱 <section> 은 자식이 소유 ── */}
       <div className="mt-lg border-t border-border-line pt-lg">
-        <SignalSummary ticker={ticker} />
+        {isUs ? <SignalSummary ticker={ticker} /> : <SwingJudgmentCard ticker={ticker} />}
       </div>
 
       {/* ── 온디맨드(T4): 회사개요·최근공시·수급 — KR 전용 소스라 미국 종목에선 숨김 ── */}
