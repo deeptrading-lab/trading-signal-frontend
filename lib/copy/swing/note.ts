@@ -9,11 +9,21 @@ export const SWING_NOTE_TITLE = "최근 뉴스·공시 (AI 정리)";
 export const SWING_NOTE_HELP = "AI가 최근 30일 기사·공시를 찾아 요약해요. 스윙 체크 결과(조건 충족·주의 사유)에는 쓰지 않아요.";
 export const SWING_NOTE_REQUEST = "AI로 정리하기";
 export const SWING_NOTE_REFRESH = "다시 정리하기";
-export const SWING_NOTE_PENDING = "정리하고 있어요. 보통 1~3분 걸리고, 오래 걸리면 AI 워커가 꺼져 있을 수 있어요.";
+export const SWING_NOTE_PENDING = "정리하고 있어요. 보통 3~5분 걸리고, 10분 넘게 걸리면 AI 워커가 꺼져 있을 수 있어요.";
 export const SWING_NOTE_EMPTY = "최근 30일 관련 기사·공시를 찾지 못했어요.";
 export const SWING_NOTE_FAILED = "정리하지 못했어요. 다시 요청해 주세요.";
 export const SWING_NOTE_ERROR = "AI 노트를 불러오지 못했어요.";
 export const SWING_NOTE_HIGH = "중요";
+export const SWING_NOTE_RUNNING = "정리 중…";
+
+/** 링크 실제 도메인 — 출처 이름은 AI 가 쓴 값이라 실제 주소를 옆에 같이 보여 준다("www." 생략). */
+export function swingNoteHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
 
 export const SWING_NOTE_CATEGORY_LABEL = {
   earnings: "실적",

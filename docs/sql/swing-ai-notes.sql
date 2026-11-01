@@ -31,6 +31,11 @@ create index if not exists swing_ai_notes_pending_idx
   on public.swing_ai_notes (created_at)
   where status = 'pending';
 
+-- 종목당 진행 중(pending·processing) 노트는 1행만 — 동시 요청이 CLI 를 두 번 돌리지 않게(앱은 409 면 기존 행 반환).
+create unique index if not exists swing_ai_notes_one_active_per_ticker
+  on public.swing_ai_notes (ticker)
+  where status in ('pending', 'processing');
+
 -- 멈춘 처리 정리(processing + claimed_at < cutoff).
 create index if not exists swing_ai_notes_processing_idx
   on public.swing_ai_notes (claimed_at)

@@ -10,7 +10,8 @@ import type { SwingNoteItem } from "@/lib/swing/note";
 import type { SwingNote } from "@/lib/types/swing/api";
 
 const TABLE = "swing_ai_notes";
-const COLUMNS = "id,ticker,status,items,error,created_at,finished_at";
+/** 화면에 주는 열 — `error`(CLI 경로·사용자명이 섞일 수 있는 내부 사유)는 내보내지 않는다. */
+const COLUMNS = "id,ticker,status,items,created_at,finished_at";
 /** 같은 종목 완료 노트를 다시 쓰는 기간 — 이 안에 다시 요청하면 새로 만들지 않는다. */
 export const NOTE_FRESH_MS = 6 * 3_600_000;
 /** 대기(pending) 상한 — 넘으면 새 요청을 받지 않는다(워커 꺼짐·남용 대비). */
@@ -21,7 +22,6 @@ type Row = {
   ticker: string;
   status: SwingNote["status"];
   items: SwingNoteItem[] | null;
-  error: string | null;
   created_at: string;
   finished_at: string | null;
 };
@@ -32,10 +32,15 @@ const toNote = (r: Row): SwingNote => ({
   ticker: r.ticker,
   status: r.status,
   items: r.items,
-  error: r.error,
   createdAt: r.created_at,
   finishedAt: r.finished_at,
 });
+
+class RestError extends Error {
+  constructor(readonly status: number, method: string) {
+    super(`swing note ${method} status=${status}`);
+  }
+}
 
 export function isSwingNoteStoreConfigured(): boolean {
   return getSupabaseServiceConfig() !== null;
@@ -56,7 +61,7 @@ async function rest<T>(query: string, init?: { method?: string; body?: unknown; 
     body: init?.body === undefined ? undefined : JSON.stringify(init.body),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`swing note ${init?.method ?? "GET"} status=${res.status}`);
+  if (!res.ok) throw new RestError(res.status, init?.method ?? "GET");
   return (init?.prefer === "return=minimal" ? null : await res.json()) as T;
 }
 
@@ -65,11 +70,12 @@ export async function getLatestSwingNote(ticker: string): Promise<SwingNote | nu
   return rows[0] ? toNote(rows[0]) : null;
 }
 
-/** 새로 만들지 않고 기존 노트를 돌려줄지 — 진행 중이거나, 완료된 지 NOTE_FRESH_MS 안이면. */
+/** 새로 만들지 않고 기존 노트를 돌려줄지 — 진행 중이거나, 완료된 지(finishedAt) NOTE_FRESH_MS 안이면. */
 export function reusableNote(latest: SwingNote | null, now: number): SwingNote | null {
   if (!latest) return null;
   if (latest.status === "pending" || latest.status === "processing") return latest;
-  if (latest.status === "done" && now - Date.parse(latest.createdAt) < NOTE_FRESH_MS) return latest;
+  const doneAt = Date.parse(latest.finishedAt ?? latest.createdAt);
+  if (latest.status === "done" && now - doneAt < NOTE_FRESH_MS) return latest;
   return null;
 }
 
@@ -84,12 +90,21 @@ export async function requestSwingNote(
   if (reuse) return reuse;
   const pending = await rest<{ id: number }[]>(`select=id&status=eq.pending&limit=${NOTE_PENDING_CAP}`);
   if (pending.length >= NOTE_PENDING_CAP) return "busy";
-  const rows = await rest<Row[]>(`select=${COLUMNS}`, {
-    method: "POST",
-    body: { ticker, name, requested_by: requestedBy },
-    prefer: "return=representation",
-  });
-  return toNote(rows[0]);
+  try {
+    const rows = await rest<Row[]>(`select=${COLUMNS}`, {
+      method: "POST",
+      body: { ticker, name, requested_by: requestedBy },
+      prefer: "return=representation",
+    });
+    return toNote(rows[0]);
+  } catch (e) {
+    // 동시 요청 — 종목당 진행 중 1행 유니크 인덱스(SQL)에 걸리면 먼저 들어간 행을 돌려준다.
+    if (e instanceof RestError && e.status === 409) {
+      const latest = await getLatestSwingNote(ticker);
+      if (latest) return latest;
+    }
+    throw e;
+  }
 }
 
 /** 가장 오래된 pending 1건을 processing 으로 — 조건부 PATCH 라 워커끼리 겹치지 않는다. 없으면 null. */

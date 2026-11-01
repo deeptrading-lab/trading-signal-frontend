@@ -24,8 +24,10 @@ import {
   SWING_NOTE_PENDING,
   SWING_NOTE_REFRESH,
   SWING_NOTE_REQUEST,
+  SWING_NOTE_RUNNING,
   SWING_NOTE_TITLE,
   swingNoteDateLabel,
+  swingNoteHost,
   swingNoteTimeLabel,
 } from "@/lib/copy/swing/note";
 
@@ -35,6 +37,7 @@ export function SwingNoteSection({ ticker }: { ticker: string }) {
   const { data, isLoading } = useQuerySwingNote(ticker);
   const request = useMutationSwingNote(ticker);
   const note = data?.note ?? null;
+  const active = isSwingNoteActive(data);
 
   return (
     <section aria-labelledby={TITLE_ID} className="flex flex-col gap-sm">
@@ -42,20 +45,28 @@ export function SwingNoteSection({ ticker }: { ticker: string }) {
         <h3 id={TITLE_ID} className="text-body-sm-strong text-text-strong">
           {SWING_NOTE_TITLE}
         </h3>
-        {data?.canRequest ? (
+        {/* 처리 중에도 버튼을 남겨(비활성) 키보드 포커스가 사라지지 않게 한다. */}
+        {data?.canRequest || active ? (
           <button
             type="button"
             className="button-secondary"
-            disabled={request.isPending}
+            disabled={active || request.isPending}
             onClick={() => request.mutate()}
           >
-            {note ? SWING_NOTE_REFRESH : SWING_NOTE_REQUEST}
+            {active ? SWING_NOTE_RUNNING : note ? SWING_NOTE_REFRESH : SWING_NOTE_REQUEST}
           </button>
         ) : null}
       </div>
       <p className="text-caption text-text-muted">{SWING_NOTE_HELP}</p>
-      {isLoading ? <Skeleton variant="line" /> : <NoteBody data={data ? note : undefined} active={isSwingNoteActive(data)} />}
-      {request.isError ? <p className="text-caption text-warn">{request.error.message}</p> : null}
+      {/* 항상 붙어 있는 알림 영역 — 처리 중 → 완료 전환을 스크린리더가 읽는다. */}
+      <div aria-live="polite">
+        {isLoading ? <Skeleton variant="line" /> : <NoteBody data={data ? note : undefined} active={active} />}
+      </div>
+      {request.isError ? (
+        <p role="alert" className="text-caption text-warn">
+          {request.error.message}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -64,13 +75,7 @@ export function SwingNoteSection({ ticker }: { ticker: string }) {
 function NoteBody({ data, active }: { data: SwingNote | null | undefined; active: boolean }) {
   if (data === undefined) return <p className="text-caption text-text-muted">{SWING_NOTE_ERROR}</p>;
   if (data === null) return null;
-  if (active) {
-    return (
-      <p className="text-caption text-text-muted" aria-live="polite">
-        {SWING_NOTE_PENDING}
-      </p>
-    );
-  }
+  if (active) return <p className="text-caption text-text-muted">{SWING_NOTE_PENDING}</p>;
   if (data.status === "failed") return <p className="text-caption text-text-muted">{SWING_NOTE_FAILED}</p>;
   const items = data.items ?? [];
   return (
@@ -92,8 +97,8 @@ function NoteBody({ data, active }: { data: SwingNote | null | undefined; active
               <p className="text-caption text-text-muted">{it.summary}</p>
               <p className="flex flex-wrap items-center gap-xs text-caption text-text-muted">
                 <span>
-                  {swingNoteDateLabel(it.date)} · {it.source} · {SWING_NOTE_CATEGORY_LABEL[it.category]} ·{" "}
-                  {SWING_NOTE_DIRECTION_LABEL[it.direction]}
+                  {swingNoteDateLabel(it.date)} · {it.source}({swingNoteHost(it.url)}) ·{" "}
+                  {SWING_NOTE_CATEGORY_LABEL[it.category]} · {SWING_NOTE_DIRECTION_LABEL[it.direction]}
                 </span>
                 {it.materiality === "high" ? <Badge variant="accent">{SWING_NOTE_HIGH}</Badge> : null}
               </p>

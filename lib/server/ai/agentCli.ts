@@ -1,5 +1,7 @@
 import { execFile, type ExecFileOptionsWithStringEncoding } from "child_process";
 import {
+  CLAUDE_CLI_CWD,
+  CLAUDE_CLI_DISALLOWED_TOOLS,
   invokeClaudeAgentStream,
   type AgentCallOpts,
   type AgentStreamResult,
@@ -55,6 +57,7 @@ export function buildAgentCliInvocation(
       "--print",
       "--output-format", "json",
       "--system-prompt", request.systemPrompt,
+      "--disallowedTools", CLAUDE_CLI_DISALLOWED_TOOLS,
     ];
     if (request.webSearch) {
       args.push("--allowedTools", "WebSearch,WebFetch");
@@ -199,6 +202,8 @@ function executeAgentCli(request: AgentCliRequest): Promise<string> {
       encoding: "utf-8",
       timeout: request.timeoutMs,
       maxBuffer: MAX_STDOUT,
+      // 저장소 루트(프로젝트 설정·.env.local) 밖에서 실행 — claudeAgent 와 같은 규칙. codex 는 --cd 로 따로 지정.
+      cwd: CLAUDE_CLI_CWD,
     };
 
     const child = execFile(invocation.bin, invocation.args, execOpts, (error, stdout) => {

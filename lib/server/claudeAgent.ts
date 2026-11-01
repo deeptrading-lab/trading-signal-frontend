@@ -15,8 +15,17 @@
  */
 
 import { spawn } from "child_process";
+import { tmpdir } from "node:os";
 import readline from "node:readline";
 import { type AgentUsage, UNMEASURED_USAGE } from "@/lib/types/stock/aiAnalysis";
+
+/**
+ * CLI 에이전트에게 막는 로컬 도구 — 웹 검색 결과에 섞인 지시(프롬프트 주입)로 명령 실행·파일 읽기를 못 하게.
+ * 저장소의 프로젝트 설정(`.claude/settings.json`)이나 사용자 설정이 허용해도 deny 가 이긴다.
+ * 함께 실행 디렉터리를 임시 폴더(`CLAUDE_CLI_CWD`)로 둬 저장소 설정·`.env.local` 옆에서 돌지 않게 한다.
+ */
+export const CLAUDE_CLI_DISALLOWED_TOOLS = "Bash,Read,Edit,Write,Glob,Grep,NotebookEdit";
+export const CLAUDE_CLI_CWD = tmpdir();
 
 export interface AgentCallOpts {
   systemPrompt: string;
@@ -89,6 +98,7 @@ export function invokeClaudeAgentStream(
       "--output-format", "stream-json",
       "--verbose",
       "--system-prompt", opts.systemPrompt,
+      "--disallowedTools", CLAUDE_CLI_DISALLOWED_TOOLS,
     ];
     if (opts.tools.length > 0) {
       args.push("--allowedTools", opts.tools.join(","));
@@ -103,6 +113,7 @@ export function invokeClaudeAgentStream(
     const child = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, NO_COLOR: "1" },
+      cwd: CLAUDE_CLI_CWD,
     });
 
     if (child.stdin) {

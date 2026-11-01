@@ -9288,3 +9288,6 @@
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
   - PR-2b(dev-manager-bot 레포 세션): `analyze.py` 가 `GET /api/swing/judgment/{ticker}` 를 `Authorization: Bearer <SWING_BOT_TOKEN>` 으로 호출, `formatter.py` 는 체크리스트 모드 문구(충족 n/7·주의 사유 실측값·참고 레벨·면책, 긍정 반응 이모지 없음).
   - PR-5 `swing-retire-legacy`(봇 PR 머지 뒤): 12에이전트 파이프라인 삭제·`ai_analysis_decisions`·`signal_scorecard` 쓰기 동결·`/analyze` → `/swing`·`SegmentedTabs` 를 `components/ui/` 로 이동.
+  - (리뷰 보강) 사용자: Supabase SQL `docs/sql/swing-ai-notes.sql` 1회 실행 — 그 전엔 카드의 노트 섹션만 "불러오지 못했어요".
+  - (리뷰 보강) PR-5 주의: 노트 처리는 `scripts/analysisWorker.ts` 루프 안에 있다 — 분석 파이프라인을 걷어내도 워커 루프·노트 경로는 남겨야 한다.
+  - (리뷰 보강) CLI 하드닝: 노트·분석가 CLI 는 이 PR 에서 로컬 도구 차단(`--disallowedTools`)·임시 폴더 실행으로 막았다. 워크벤치 어댑터(`app/api/workbench/_adapters/claudeCli.ts`)는 웹 도구가 없어 그대로 — 필요하면 같은 규칙 적용. 자식 프로세스 env 에 `.env.local` 비밀이 그대로 들어가는 점은 도구 차단으로 막혀 있지만, env 걸러 넘기기는 후속 검토.

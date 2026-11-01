@@ -13,7 +13,6 @@ const note = (over: Partial<SwingNote>): SwingNote => ({
   ticker: "005930",
   status: "done",
   items: [],
-  error: null,
   createdAt: new Date(NOW - 60_000).toISOString(),
   finishedAt: null,
   ...over,
@@ -28,6 +27,13 @@ describe("reusableNote — 새로 만들지 않고 돌려줄 노트", () => {
     expect(reusableNote(note({}), NOW)).not.toBeNull();
     const old = note({ createdAt: new Date(NOW - NOTE_FRESH_MS - 1).toISOString() });
     expect(reusableNote(old, NOW)).toBeNull();
+  });
+  it("신선도는 완료 시각 기준(워커가 늦게 처리해도 6시간 온전히)", () => {
+    const lateDone = note({
+      createdAt: new Date(NOW - NOTE_FRESH_MS - 3_600_000).toISOString(),
+      finishedAt: new Date(NOW - 60_000).toISOString(),
+    });
+    expect(reusableNote(lateDone, NOW)).not.toBeNull();
   });
   it("실패·없음이면 새로", () => {
     expect(reusableNote(note({ status: "failed" }), NOW)).toBeNull();
@@ -55,6 +61,12 @@ describe("buildSwingNotePrompt", () => {
   });
 });
 
+// 주석("판정 저장소를 건드리지 않는다" 같은 설명)은 빼고 코드만 본다.
+const codeOf = (f: string) =>
+  readFileSync(path.resolve(process.cwd(), f), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
 describe("판정 불가침 — 노트 경로는 swing_judgments 를 모른다", () => {
   const files = [
     "lib/server/swing/noteStore.ts",
@@ -62,10 +74,22 @@ describe("판정 불가침 — 노트 경로는 swing_judgments 를 모른다", 
     "app/api/swing/note/[ticker]/route.ts",
   ];
   it.each(files)("%s", (f) => {
-    // 주석("판정 저장소를 건드리지 않는다" 같은 설명)은 빼고 코드만 본다.
-    const src = readFileSync(path.resolve(process.cwd(), f), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    expect(src).not.toMatch(/swing_judgments|upsertSwingRows|server\/swing\/store"|judgeSwing|computeSwingJudgment/);
+    expect(codeOf(f)).not.toMatch(/swing_judgments|upsertSwingRows|server\/swing\/store"|judgeSwing|computeSwingJudgment/);
+  });
+});
+
+describe("판정 불가침(반대 방향) — 판정 경로는 노트를 읽지 않는다", () => {
+  const files = [
+    "lib/swing/judge.ts",
+    "lib/swing/features.ts",
+    "lib/server/swing/compute.ts",
+    "lib/server/swing/store.ts",
+    "lib/server/swing/screener.ts",
+    "app/api/swing/judgment/[ticker]/route.ts",
+    "app/api/swing/screener/route.ts",
+    "app/api/cron/swing-screener/route.ts",
+  ];
+  it.each(files)("%s", (f) => {
+    expect(codeOf(f)).not.toMatch(/swing_ai_notes|noteStore|noteRunner|swing\/note"/);
   });
 });

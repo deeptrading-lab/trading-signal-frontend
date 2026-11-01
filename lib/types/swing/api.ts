@@ -74,9 +74,8 @@ export type SwingNote = {
   id: number;
   ticker: string;
   status: "pending" | "processing" | "done" | "failed";
-  /** done 일 때만 — 검증 통과 항목(0건이면 최근 뉴스 없음). */
+  /** done 일 때만 — 검증 통과 항목(0건이면 최근 뉴스 없음). 실패 사유는 내보내지 않는다(서버 로그·DB 에만). */
   items: SwingNoteItem[] | null;
-  error: string | null;
   createdAt: string;
   finishedAt: string | null;
 };
