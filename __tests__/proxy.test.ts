@@ -225,3 +225,43 @@ describe("proxy — OAuth 게이트 활성 조건", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 });
+
+describe("proxy — 스윙 봇 토큰 경로(swing-judgment PR-2b)", () => {
+  const TOKEN = "t".repeat(40);
+  const ORIGINAL_BOT = process.env.SWING_BOT_TOKEN;
+  const botRequest = (path: string, auth: string | null, method = "GET") =>
+    new NextRequest(`http://localhost${path}`, { method, headers: auth ? { authorization: auth } : {} });
+
+  beforeEach(() => {
+    activateOAuthGate();
+    process.env.SWING_BOT_TOKEN = TOKEN;
+  });
+  afterEach(() => {
+    restoreEnv();
+    if (ORIGINAL_BOT === undefined) delete process.env.SWING_BOT_TOKEN;
+    else process.env.SWING_BOT_TOKEN = ORIGINAL_BOT;
+  });
+
+  it("맞는 토큰 + GET /api/swing/judgment/<ticker> → 통과", async () => {
+    const res = await proxy(botRequest("/api/swing/judgment/005930", `Bearer ${TOKEN}`));
+    expect(res.status).toBe(200);
+  });
+
+  it("틀린 토큰·토큰 없음 → 401", async () => {
+    expect((await proxy(botRequest("/api/swing/judgment/005930", `Bearer ${"x".repeat(40)}`))).status).toBe(401);
+    expect((await proxy(botRequest("/api/swing/judgment/005930", null))).status).toBe(401);
+  });
+
+  it("다른 경로·다른 메서드는 토큰이 맞아도 게이트", async () => {
+    expect((await proxy(botRequest("/api/swing/screener", `Bearer ${TOKEN}`))).status).toBe(401);
+    expect((await proxy(botRequest("/api/swing/note/005930", `Bearer ${TOKEN}`, "POST"))).status).toBe(401);
+    expect((await proxy(botRequest("/api/swing/judgment/005930/x", `Bearer ${TOKEN}`))).status).toBe(401);
+  });
+
+  it("토큰 미설정·짧은 토큰이면 경로가 꺼진다", async () => {
+    delete process.env.SWING_BOT_TOKEN;
+    expect((await proxy(botRequest("/api/swing/judgment/005930", "Bearer "))).status).toBe(401);
+    process.env.SWING_BOT_TOKEN = "short";
+    expect((await proxy(botRequest("/api/swing/judgment/005930", "Bearer short"))).status).toBe(401);
+  });
+});
