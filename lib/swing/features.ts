@@ -89,6 +89,23 @@ export type SwingFeatures = {
 
 const pct = (a: number, b: number) => (a / b - 1) * 100;
 
+/**
+ * KIS 일봉 정규화 — 거래정지일은 시·고·저가가 0 으로 올 수 있어 종가로 채운다(가격 이동 없음).
+ * 오프라인 수집기(`scripts/swing/collect.mts`)와 같은 처리 — 라이브도 이 함수로 맞춘다.
+ * 종가가 0 이하인 봉은 버린다(null).
+ */
+export function normalizeDailyBar(c: StockDailyCandle): StockDailyCandle | null {
+  if (!(c.close > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(c.date)) return null;
+  return {
+    date: c.date,
+    open: c.open > 0 ? c.open : c.close,
+    high: c.high > 0 ? c.high : c.close,
+    low: c.low > 0 ? c.low : c.close,
+    close: c.close,
+    volume: c.volume >= 0 ? c.volume : 0,
+  };
+}
+
 /** 창 — 오름차순 보장 후 마지막 n 봉. 정렬돼 있으면 복사 없이 slice. */
 export function windowOf(bars: StockDailyCandle[], n: number): StockDailyCandle[] {
   let sorted = true;
