@@ -1,0 +1,51 @@
+name: swing-screener
+
+# 스윙 스크리너 — 매 영업일 아침 전 거래일 확정 데이터로 전 종목 판정·저장(PRD swing-judgment PR-2).
+# LLM 호출 없음(#371 "장 마감 후 자동 호출 중지"의 예외, PRD §9 OQ-1).
+# 07:20 KST 실행 + 08:20·09:20 재시도 — 이미 끝난 거래일이면 route 가 skip:"done" 을 돌려준다.
+# 사전 설정: Actions secret CRON_SECRET(Vercel Production 과 같은 값, score-decisions 와 공용).
+
+on:
+  schedule:
+    - cron: "20 22 * * 0-4" # 07:20 KST 월~금
+    - cron: "20 23 * * 0-4" # 08:20 KST 재시도
+    - cron: "20 0 * * 1-5" # 09:20 KST 재시도
+  workflow_dispatch: {}
+
+concurrency:
+  group: swing-screener
+  cancel-in-progress: false
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BASE: https://trading-signal-frontend.vercel.app/api/cron/swing-screener
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Run screener slices
+        run: |
+          set -euo pipefail
+          offset=0; processed=0; failed=0; next=""
+          for i in $(seq 1 20); do
+            resp=""
+            for attempt in 1 2 3; do
+              if resp=$(curl -fsS -m 295 -H "Authorization: Bearer $CRON_SECRET" "$BASE?offset=$offset&limit=400"); then break; fi
+              echo "offset=$offset 시도 $attempt 실패 — 10초 뒤 재시도"; resp=""; sleep 10
+            done
+            [ -n "$resp" ] || { echo "offset=$offset 3회 실패"; exit 1; }
+            echo "$resp"
+            # route 는 게이트 사유(kis-not-prod 등)를 ok:false 로 돌려준다 → job 실패로 조용한 정지를 드러낸다.
+            echo "$resp" | jq -e '.ok == true' > /dev/null
+            if [ "$(echo "$resp" | jq -r '.skip // empty')" = "done" ]; then echo "이미 완료된 거래일 — 종료"; exit 0; fi
+            processed=$((processed + $(echo "$resp" | jq -r '.processed')))
+            failed=$((failed + $(echo "$resp" | jq -r '.failed')))
+            next=$(echo "$resp" | jq -r '.next // empty')
+            [ -z "$next" ] && break
+            offset=$next
+          done
+          [ -z "$next" ] || { echo "20회 안에 끝나지 않음(offset=$offset)"; exit 1; }
+          fin=$(curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$BASE?finalize=1&processed=$processed&failed=$failed")
+          echo "$fin"
+          echo "$fin" | jq -e '.ok == true' > /dev/null
