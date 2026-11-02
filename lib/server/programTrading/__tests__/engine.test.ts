@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { command, initialState as blankState, step } from "../engine";
 import type { Quote } from "@/lib/types/programTrading/programTrading";
 const quote: Quote={ticker:"005930",name:"삼성전자",price:10100,previousHigh:10000,volumeRatio:2,spreadBps:8,ageMs:0,halted:false};
-function initialState() { const s=blankState();s.candidates={status:"ready",rows:[{ticker:quote.ticker,name:quote.name,price:quote.price,sources:["volume"]}],checkedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+120000).toISOString()};return s; }
+function initialState() { const s=blankState();const now=Date.now();s.candidates={status:"ready",rows:[{ticker:quote.ticker,name:quote.name,price:quote.price,sources:["volume"]}],checkedAt:new Date(now).toISOString(),expiresAt:new Date(now+120000).toISOString()};return s; }
 describe("program trading risk invariants",()=>{
  it("only enters eligible signals, prevents duplicates and negative cash",()=>{const s=initialState();command(s,"start");step(s,[quote,quote],600);expect(s.positions).toHaveLength(1);expect(s.cash).toBeGreaterThan(0);expect(s.positions[0].quantity* s.positions[0].entry).toBeLessThanOrEqual(s.initial*.2);});
  it("rejects stale, halted, wide spread and nonfinite quotes",()=>{for(const q of [{...quote,ageMs:6000},{...quote,halted:true},{...quote,spreadBps:20},{...quote,price:NaN}]) {const s=initialState();command(s,"start");step(s,[q],600);expect(s.positions).toHaveLength(0);}});
@@ -14,4 +14,21 @@ describe("program trading risk invariants",()=>{
  it("refuses start with no list and blocks symbols outside the ranked union",()=>{const s=blankState();command(s,"start");expect(s.running).toBe(false);step(s,[quote],600);expect(s.positions).toHaveLength(0);const ready=initialState();command(ready,"start");step(ready,[{...quote,ticker:"999999"}],600);expect(ready.positions).toHaveLength(0);});
  it("stops entries after empty, failed or expired ranking refresh but preserves stop management",()=>{for(const status of ["empty","unavailable","ready"] as const){const s=initialState();command(s,"start");step(s,[quote],600);s.candidates={status,rows:[],checkedAt:new Date(0).toISOString(),expiresAt:new Date(0).toISOString()};step(s,[{...quote,price:9800}],601);expect(s.running).toBe(false);expect(s.positions).toHaveLength(0);expect(s.trades.at(-1)?.reason).toBe("stop");}});
  it("manual flatten is idempotent",()=>{const s=initialState();command(s,"start");step(s,[quote],600);command(s,"flatten");const cash=s.cash;command(s,"flatten");expect(s.cash).toBe(cash);expect(s.positions).toHaveLength(0);expect(s.running).toBe(false);});
+});
+
+describe("session completion", () => {
+ it("retries manual close after invalid quotes and never finalizes with holdings", () => {
+  const s=initialState(); command(s,"start"); step(s,[quote],600);
+  s.quotes=[{...quote,halted:true}]; command(s,"flatten");
+  expect(s.lifecycle?.status).toBe("stopping"); expect(s.lifecycle?.afterBalance).toBeNull();
+  command(s,"start"); expect(s.running).toBe(false);
+  step(s,[quote],601); expect(s.positions).toHaveLength(0);
+  expect(s.lifecycle?.status).toBe("completed"); expect(s.lifecycle?.afterBalance).toBe(s.cash);
+  command(s,"start"); expect(s.running).toBe(false);
+ });
+ it("keeps rules after target and does not complete merely on take-profit", () => {
+  const s=initialState(); command(s,"start"); step(s,[quote],600);
+  step(s,[{...quote,price:12500}],601); expect(s.lifecycle?.status).toBe("running");
+  command(s,"flatten"); expect(s.lifecycle?.reviewDecision).toBe("keep");
+ });
 });

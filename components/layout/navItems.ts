@@ -18,6 +18,7 @@ import {
   Star,
   User,
   Zap,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,6 +27,8 @@ import {
   NAV_MENU_ANALYZE,
   NAV_MENU_STOCK,
   NAV_MENU_INTRADAY,
+  NAV_MENU_PROGRAM,
+  NAV_MENU_PROGRAM_SHORT,
   NAV_MENU_WATCHLIST,
   NAV_MENU_PROFILE,
   NAV_MENU_HOME_SHORT,
@@ -64,6 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/analyze", label: NAV_MENU_ANALYZE, shortLabel: NAV_MENU_ANALYZE_SHORT, icon: Compass },
   // 단타 워치 — 로컬은 전체, prod 는 admin 이상만(localOnly). 마이페이지 바로 위 고정.
   { path: "/intraday", label: NAV_MENU_INTRADAY, shortLabel: NAV_MENU_INTRADAY_SHORT, icon: Zap, localOnly: true },
+  { path: "/program-trading", label: NAV_MENU_PROGRAM, shortLabel: NAV_MENU_PROGRAM_SHORT, icon: Bot, localOnly: true },
   { path: "/profile", label: NAV_MENU_PROFILE, shortLabel: NAV_MENU_PROFILE_SHORT, icon: User },
 ];
 

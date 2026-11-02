@@ -14,7 +14,7 @@ export function unavailableCandidates(now = Date.now()): CandidateSnapshot {
 // Unlike the display BFF, never substitute demo or timeout fallback candidates.
 export function mergeCandidates(volume: Row[], foreign: Row[], institution: Row[]): ProgramCandidate[] {
   const result = new Map<string, ProgramCandidate>();
-  const groups: [CandidateSource, Row[]][] = [["volume",volume.filter(isRegularStock).slice(0,14)],["foreign",foreign.slice(0,10)],["institution",institution.slice(0,10)]];
+  const groups: [CandidateSource, Row[]][] = [["volume",volume.filter(isRegularStock).slice(0,10)],["foreign",foreign.slice(0,10)],["institution",institution.slice(0,10)]];
   for(const [source, rows] of groups) for(const row of rows) {
     if(!/^\d{6}$/.test(row.ticker) || !Number.isFinite(row.price) || row.price<=0) continue;
     const existing=result.get(row.ticker);

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
-import { isVercelEnv } from "@/lib/server/env";
+import { allowsLocalProgram } from "@/lib/server/programTrading/localRequest";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 async function proxy(request: NextRequest) {
-  if(isVercelEnv() || process.env.NODE_ENV!=="development") return NextResponse.json({error:"로컬 개발 환경에서만 사용할 수 있어요."},{status:403});
+  if(!allowsLocalProgram(request, request.method === "POST")) return NextResponse.json({error:"로컬 개발 환경에서만 사용할 수 있어요."},{status:403});
   try {
     let data;
     if(request.method==="POST") {

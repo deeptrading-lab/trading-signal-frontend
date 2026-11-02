@@ -1,8 +1,15 @@
 import { hasCandidates, emptyCandidateSnapshot } from "@/lib/validation/programTrading/candidateGate";
 import type { Command, Quote, Reason, TradingState } from "@/lib/types/programTrading/programTrading";
-export const RULES = { stop: .01, target: .02, dailyLoss: .02, allocation: .2, risk: .0025, maxPositions: 2, cooldown: 10, fee: .00015, sellTax: .002, slippage: .0005 } as const;
+export const RULES = { sessionTarget: .01, stop: .01, target: .02, dailyLoss: .02, allocation: .2, risk: .0025, maxPositions: 2, cooldown: 10, fee: .00015, sellTax: .002, slippage: .0005 } as const;
 export function initialState(): TradingState {
   return { version: 1, candidates: emptyCandidateSnapshot(), running: false, killed: false, tick: 0, minute: 550, cash: 10_000_000, initial: 10_000_000, equity: 10_000_000, realized: 0, positions: [], trades: [], quotes: [], cooldown: {}, updatedAt: new Date().toISOString(), lastError: null };
+}
+export function finishSession(s: TradingState) {
+  if (!s.lifecycle || s.lifecycle.status === "idle" || s.lifecycle.status === "completed" || s.running || s.positions.length) return;
+  if (s.lifecycle.status !== "stopping" && !s.killed && s.minute < 920) return;
+  const after = s.equity;
+  const result = (after / s.lifecycle.beforeBalance - 1) * 100;
+  s.lifecycle = { ...s.lifecycle, status: "completed", finishedAt: new Date().toISOString(), afterBalance: after, returnPct: result, reviewDecision: result >= s.lifecycle.targetReturnPct ? "keep" : "review" };
 }
 function mark(s: TradingState) { s.equity = s.cash + s.positions.reduce((v,p) => v + p.quantity * p.mark * (1-RULES.slippage) * (1-RULES.fee-RULES.sellTax), 0); }
 function validQuote(q: Quote | undefined): q is Quote { return !!q && !q.halted && Number.isFinite(q.ageMs) && q.ageMs>=0 && q.ageMs<=5000 && Number.isFinite(q.price) && q.price>0; }
@@ -21,10 +28,18 @@ function sell(s: TradingState, ticker: string, reason: Reason) {
   s.trades.push({ id: `${s.tick}-${ticker}-sell`, minute: s.minute, ticker, side: "sell", quantity: p.quantity, price, fee, reason, net });
 }
 export function command(s: TradingState, action: Command) {
-  if (action === "start" && !s.lastError && !s.killed && s.minute < 920 && hasCandidates(s.candidates)) s.running = true;
+  if (s.lifecycle?.status === "completed") return;
+  if (action === "start" && !s.lastError && !s.killed && s.minute < 920 && hasCandidates(s.candidates)) {
+    if (s.lifecycle?.status === "stopping") return;
+    s.lifecycle = { status: "running", startedAt: s.lifecycle?.startedAt ?? new Date().toISOString(), finishedAt: null, beforeBalance: s.lifecycle?.beforeBalance ?? s.equity, afterBalance: null, returnPct: null, targetReturnPct: s.lifecycle?.targetReturnPct ?? RULES.sessionTarget * 100, reviewDecision: "pending" };
+    s.running = true;
+  }
   if (action === "pause") s.running = false;
-  if (action === "flatten") { s.running = false; for (const p of [...s.positions]) sell(s,p.ticker,"manual"); }
+  if (action === "flatten") {
+    if (!s.lifecycle && (s.positions.length || s.trades.length)) s.lifecycle = { status: "stopping", startedAt: s.updatedAt, finishedAt: null, beforeBalance: s.initial, afterBalance: null, returnPct: null, targetReturnPct: RULES.sessionTarget * 100, reviewDecision: "pending" };
+    if (s.lifecycle) s.lifecycle.status = "stopping"; s.running = false; for (const p of [...s.positions]) sell(s,p.ticker,"manual"); }
   mark(s);
+  finishSession(s);
 }
 export function step(s: TradingState, quotes: Quote[], minute: number) {
   s.tick++; s.minute = minute; s.quotes = quotes; s.updatedAt = new Date().toISOString();
@@ -33,7 +48,7 @@ export function step(s: TradingState, quotes: Quote[], minute: number) {
   if (s.equity <= s.initial*(1-RULES.dailyLoss)) { s.killed=true; s.running=false; }
   for (const p of [...s.positions]) {
     const change=p.mark/p.entry-1;
-    const reason: Reason | null = s.killed ? "kill" : minute>=920 ? "close" : change<=-RULES.stop ? "stop" : change>=RULES.target ? "target" : null;
+    const reason: Reason | null = s.lifecycle?.status === "stopping" ? "manual" : s.killed ? "kill" : minute>=920 ? "close" : change<=-RULES.stop ? "stop" : change>=RULES.target ? "target" : null;
     if (reason) sell(s,p.ticker,reason);
   }
   if (minute>=920) s.running=false;
@@ -50,6 +65,7 @@ export function step(s: TradingState, quotes: Quote[], minute: number) {
     s.trades.push({id:`${s.tick}-${q.ticker}-buy`,minute, ticker:q.ticker,side:"buy",quantity,price,fee,reason:"breakout",net:null});
   }
   mark(s);
-  // Storage is intentionally bounded for a local one-day replay.
+  finishSession(s);
+  // UI snapshot is bounded; worker append-only journal retains the complete ledger.
   s.trades=s.trades.slice(-2000);
 }

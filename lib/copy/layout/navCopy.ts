@@ -16,6 +16,8 @@ export const NAV_MENU_ANALYZE = "AI 분석";
 export const NAV_MENU_MARKET = "시장 동향";
 export const NAV_MENU_STOCK = "종목 분석";
 export const NAV_MENU_INTRADAY = "AI 단타";
+export const NAV_MENU_PROGRAM = "자동매매";
+export const NAV_MENU_PROGRAM_SHORT = "자동";
 export const NAV_MENU_WATCHLIST = "관심 종목";
 export const NAV_MENU_PROFILE = "마이페이지";
 

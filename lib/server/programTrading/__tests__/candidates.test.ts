@@ -14,3 +14,10 @@ describe("ranking candidate admission",()=>{
  it("expires the union and only generates quotes for its symbols",async()=>{const snapshot=await loadCandidates(deps);const now=Date.parse(snapshot.checkedAt);expect(hasCandidates(snapshot,now)).toBe(true);expect(hasCandidates(snapshot,now+120000)).toBe(false);expect(mockQuotes(1,snapshot.rows).map(q=>q.ticker)).toEqual(snapshot.rows.map(q=>q.ticker));});
  it("excludes invalid prices and deduplicates within a source",()=>{expect(mergeCandidates([samsung,samsung,{...hynix,price:NaN}],[],[])).toEqual([{...samsung,sources:["volume"]}]);});
 });
+
+it("caps each ranking source at ten before the union", () => {
+ const rows=Array.from({length:14},(_,i)=>({ticker:String(100000+i),name:`종목${i}`,price:1000}));
+ const merged=mergeCandidates(rows,rows,rows);
+ expect(merged).toHaveLength(10);
+ expect(merged.every(row=>row.sources.length===3)).toBe(true);
+});

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { RULES } from '../lib/server/programTrading/engine';
 
 async function main() {
-const sources = ['lib/server/programTrading/engine.ts', 'lib/server/programTrading/candidateRefresh.ts', 'lib/server/programTrading/candidates.ts', 'lib/validation/programTrading/candidateGate.ts', 'lib/mock/programTrading/quotes.ts', 'scripts/programTradingWorker.ts'];
+const sources = ['lib/server/programTrading/engine.ts', 'lib/server/programTrading/candidateRefresh.ts', 'lib/server/programTrading/candidates.ts', 'lib/validation/programTrading/candidateGate.ts', 'lib/mock/programTrading/quotes.ts', 'scripts/programTradingWorker.ts', 'lib/server/programTrading/journal.ts', 'lib/server/programTrading/liveEngine.ts', 'lib/server/programTrading/liveStore.ts', 'lib/server/programTrading/liveTypes.ts', 'lib/server/programTrading/liveQuotes.ts', 'lib/server/programTrading/kisTransport.ts', 'lib/server/programTrading/kisBroker.ts'];
 const sourceText = await Promise.all(sources.map(path => readFile(path, 'utf8')));
 const fingerprint = createHash('sha256').update(sourceText.join('\n')).digest('hex').slice(0, 12);
 const theme = JSON.parse(await readFile('tailwind.theme.json', 'utf8')).theme.extend;
@@ -16,14 +16,17 @@ const output = template.replace('/* DESIGN_TOKENS */', `${tokens};${spacing}`)
     const value = RULES[key as keyof typeof RULES];
     return ['maxPositions', 'cooldown'].includes(key) ? String(value) : String(Number((value * 100).toFixed(4)));
   }).replaceAll('__FINGERPRINT__', fingerprint);
-const target = 'docs/program-trading/rules.html';
-if (process.argv.includes('--check')) {
-  if (await readFile(target, 'utf8') !== output) throw new Error('자동매매 기준 HTML을 갱신하세요: npm run program:rules');
-  console.log('자동매매 기준 HTML 최신 상태 확인');
-} else {
-  await writeFile(target, output);
-  console.log(`${target} 생성 완료 · 근거 ${fingerprint}`);
+const outputs = [
+  ["rules.html", output],
+  ["summary.html", output.replace(/<article class="detail">[\s\S]*?<\/article>/, "")],
+  ["detail.html", output.replace(/<article class="summary">[\s\S]*?<\/article>/, "")],
+];
+for (const [name, html] of outputs) {
+  const target = `docs/program-trading/${name}`;
+  if (process.argv.includes("--check")) {
+    if (await readFile(target, "utf8") !== html) throw new Error(`자동매매 기준 HTML을 갱신하세요: ${target}`);
+  } else await writeFile(target, html);
 }
-
+console.log(`요약·상세 다이어그램 ${process.argv.includes("--check") ? "일치 확인" : "생성 완료"} · 근거 ${fingerprint}`);
 }
 void main().catch(error => { console.error(error); process.exitCode = 1; });

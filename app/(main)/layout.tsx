@@ -63,6 +63,7 @@ function isWhiteSurfaceRoute(pathname: string): boolean {
     pathname === "/analyze" ||
     pathname === "/profile" ||
     pathname.startsWith("/intraday") ||
+    pathname === "/program-trading" ||
     pathname === "/dashboard/scorecard"
   );
 }

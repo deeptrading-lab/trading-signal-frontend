@@ -23,7 +23,10 @@
     "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs && node scripts/inject-shadows.mjs && node scripts/inject-motion.mjs",
     "program:worker": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programTradingWorker.ts",
     "program:rules": "node --import tsx scripts/renderProgramTradingRules.ts",
-    "program:rules:check": "node --import tsx scripts/renderProgramTradingRules.ts --check"
+    "program:rules:check": "node --import tsx scripts/renderProgramTradingRules.ts --check",
+    "program:dev": "concurrently --kill-others-on-fail -n dev,program -c blue,green \"npm run dev -- --hostname 127.0.0.1\" \"npm run program:worker\"",
+    "program:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programTradingReadOnlyCheck.ts",
+    "program:resolve": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programTradingResolveOrder.ts"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
