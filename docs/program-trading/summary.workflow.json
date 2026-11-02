@@ -2,16 +2,19 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "자동매매 요약 흐름",
+    "title": "자동매매 · 전체 흐름",
     "locale": "ko",
     "quality_profile": "showcase",
     "legend": {
       "entries": {
         "backend": {
-          "label": "운용 단계"
+          "label": "실행·결과"
         },
         "security": {
-          "label": "매매 조건"
+          "label": "확인·대기"
+        },
+        "database": {
+          "label": "비용 가정"
         }
       }
     },
@@ -24,222 +27,242 @@
   },
   "lanes": [
     {
-      "id": "s0r0",
-      "label": "01 · 계좌 연결 → 거래"
+      "id": "connect",
+      "label": "계좌 준비"
     },
     {
-      "id": "s0r1",
-      "label": "01 · 계좌 연결 → 거래 · 계속"
+      "id": "ready",
+      "label": "시작 전 확인"
     },
     {
-      "id": "s0r2",
-      "label": "01 · 계좌 연결 → 거래 · 계속"
+      "id": "run",
+      "label": "운용"
     },
     {
-      "id": "s1r0",
-      "label": "02 · 종료 → 복기"
+      "id": "stop",
+      "label": "종료"
     },
     {
-      "id": "s1r1",
-      "label": "02 · 종료 → 복기 · 계속"
+      "id": "confirm",
+      "label": "완료 확인"
     },
     {
-      "id": "s1r2",
-      "label": "02 · 종료 → 복기 · 계속"
+      "id": "review",
+      "label": "결과 판단"
+    },
+    {
+      "id": "improve",
+      "label": "미달 시 검토"
     }
   ],
   "nodes": [
     {
-      "id": "summary-s0n0",
-      "lane": "s0r0",
+      "id": "connect",
+      "lane": "connect",
       "col": 0,
-      "type": "backend",
-      "label": "한투 계좌 연결 · 운용 유형 확인",
+      "label": "계좌 연결",
       "sublabel": "실전 / 한투 모의 · 키는 서버에만 저장",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 232
-    },
-    {
-      "id": "summary-s0n1",
-      "lane": "s0r0",
-      "col": 1,
       "type": "backend",
-      "label": "후보 조회 · 기존 잔고/미체결 확인",
-      "sublabel": "거래량 10 + 외국인 10 + 기관 10 · 중복 제거",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 256.4
+      "icon": "active",
+      "width": 240
     },
     {
-      "id": "summary-s0n2",
-      "lane": "s0r1",
-      "col": 1,
-      "type": "backend",
-      "label": "사용자가 매매 시작",
-      "sublabel": "시작 전 계좌자산 · 목표 1% · 규칙 고정",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 236
-    },
-    {
-      "id": "summary-s0n3",
-      "lane": "s0r1",
+      "id": "ready",
+      "lane": "ready",
       "col": 0,
+      "label": "시작 준비 확인",
+      "sublabel": "유효 후보 · 기존 보유 0 · 미체결 0",
       "type": "security",
-      "label": "매도 위험관리 → 조건 충족 매수",
-      "sublabel": "한국 장 시간 · 시세/호가/분봉 확인",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 225.5
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "summary-s0n4",
-      "lane": "s0r2",
+      "id": "run",
+      "lane": "run",
       "col": 0,
+      "label": "사용자가 시작 → 자동매매",
+      "sublabel": "매도 위험 관리 우선 · 조건 충족 매수",
       "type": "backend",
-      "label": "주문 접수 → 체결·잔고 대사",
-      "sublabel": "최대 2종목 · 종목당 20% · 주문기록 누적",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 241.1
+      "tag": "주문 접수 ≠ 체결 · 체결·잔고 대사",
+      "icon": "active",
+      "width": 240
     },
     {
-      "id": "summary-s1n0",
-      "lane": "s1r0",
+      "id": "stop",
+      "lane": "stop",
       "col": 0,
+      "label": "종료 요청",
+      "sublabel": "종료 버튼 · 일일 손실 2% · 15:20",
       "type": "backend",
-      "label": "종료 버튼 / 일일 손실 / 15:20",
-      "sublabel": "신규 매수 차단",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 220
+      "icon": "active",
+      "width": 240
     },
     {
-      "id": "summary-s1n1",
-      "lane": "s1r0",
-      "col": 1,
+      "id": "confirm",
+      "lane": "confirm",
+      "col": 0,
+      "label": "종료 조건을 모두 충족했나요?",
+      "sublabel": "미체결 0 · 보유 0 · 최신 계좌 확인",
       "type": "security",
-      "label": "미체결 취소 확인 → 보유분 청산",
-      "sublabel": "부분체결·취소 중에는 종료 처리 중 · 주문 결과 불명 → 추가 주문 잠금 · 자동 재전송 금지 · 대사 필요",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 557.3
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "summary-s1n2",
-      "lane": "s1r1",
+      "id": "review",
+      "lane": "review",
+      "col": 0,
+      "label": "수익률이 목표 1% 이상인가요?",
+      "sublabel": "전체 주문·체결 원장으로 종료 복기",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "pending",
+      "lane": "confirm",
       "col": 1,
-      "type": "backend",
-      "label": "미체결 0 + 보유 0 + 계좌 재확인",
-      "sublabel": "모든 조건 충족 후 종료 자산·수익률 확정",
+      "label": "종료·정산 대기",
+      "sublabel": "부분체결·취소 중·결과 불명은 완료 아님",
+      "type": "security",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 236
+      "tag": "결과 불명: 주문 잠금 · 자동 재전송 금지",
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "summary-s1n3",
-      "lane": "s1r1",
-      "col": 0,
+      "id": "keep",
+      "lane": "review",
+      "col": 1,
+      "label": "규칙 유지",
+      "sublabel": "목표 달성 · 보완 제안 없음",
       "type": "backend",
-      "label": "누적 주문·체결 JSONL → 종료 복기",
-      "sublabel": "",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 245
+      "icon": "active",
+      "width": 240
     },
     {
-      "id": "summary-s1n4",
-      "lane": "s1r2",
+      "id": "improve",
+      "lane": "improve",
       "col": 0,
-      "type": "backend",
-      "label": "목표 달성 → 규칙 유지",
+      "label": "검토 가이드 생성",
       "sublabel": "미달 → 검토 가이드 · 사람 검토 후 별도 적용",
+      "type": "backend",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 261.5
+      "tag": "실행 중 규칙 자동 변경 없음",
+      "icon": "active",
+      "width": 240
     }
   ],
   "edges": [
     {
-      "from": "summary-s0n0",
-      "to": "summary-s0n1"
+      "from": "connect",
+      "to": "ready",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "summary-s0n1",
-      "to": "summary-s0n2"
+      "from": "ready",
+      "to": "run",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "summary-s0n2",
-      "to": "summary-s0n3"
+      "from": "run",
+      "to": "stop",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "summary-s0n3",
-      "to": "summary-s0n4"
+      "from": "stop",
+      "to": "confirm",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "summary-s1n0",
-      "to": "summary-s1n1"
+      "from": "confirm",
+      "to": "review",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "summary-s1n1",
-      "to": "summary-s1n2"
+      "from": "confirm",
+      "to": "pending",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "summary-s1n2",
-      "to": "summary-s1n3"
+      "from": "review",
+      "to": "keep",
+      "label": "예"
     },
     {
-      "from": "summary-s1n3",
-      "to": "summary-s1n4"
-    },
-    {
-      "from": "summary-s0n4",
-      "to": "summary-s1n0"
+      "from": "review",
+      "to": "improve",
+      "label": "아니오",
+      "fromSide": "bottom",
+      "toSide": "top"
     }
   ],
   "mainPath": [
-    "summary-s0n0",
-    "summary-s0n1"
+    "connect",
+    "ready",
+    "run",
+    "stop",
+    "confirm",
+    "review",
+    "improve"
   ]
 }

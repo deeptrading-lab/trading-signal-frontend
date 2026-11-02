@@ -2,16 +2,19 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "자동매매 상세 실행 기준",
+    "title": "자동매매 · 매수 조건",
     "locale": "ko",
     "quality_profile": "showcase",
     "legend": {
       "entries": {
         "backend": {
-          "label": "운용 단계"
+          "label": "실행·결과"
         },
         "security": {
-          "label": "매매 조건"
+          "label": "확인·대기"
+        },
+        "database": {
+          "label": "비용 가정"
         }
       }
     },
@@ -24,504 +27,394 @@
   },
   "lanes": [
     {
-      "id": "s0r0",
-      "label": "01 · 시작 검증 → 매수"
+      "id": "buy0",
+      "label": "계좌 확인"
     },
     {
-      "id": "s0r1",
-      "label": "01 · 시작 검증 → 매수 · 계속"
+      "id": "buy1",
+      "label": "거래 시간"
     },
     {
-      "id": "s0r2",
-      "label": "01 · 시작 검증 → 매수 · 계속"
+      "id": "buy2",
+      "label": "후보 유효성"
     },
     {
-      "id": "s0r3",
-      "label": "01 · 시작 검증 → 매수 · 계속"
+      "id": "buy3",
+      "label": "보유·재진입"
     },
     {
-      "id": "s1r0",
-      "label": "02 · 주문 대사 → 매도 우선순위"
+      "id": "buy4",
+      "label": "시세 확인"
     },
     {
-      "id": "s1r1",
-      "label": "02 · 주문 대사 → 매도 우선순위 · 계속"
+      "id": "buy5",
+      "label": "진입 신호"
     },
     {
-      "id": "s1r2",
-      "label": "02 · 주문 대사 → 매도 우선순위 · 계속"
+      "id": "buy6",
+      "label": "수량·예산"
     },
     {
-      "id": "s1r3",
-      "label": "02 · 주문 대사 → 매도 우선순위 · 계속"
-    },
-    {
-      "id": "s2r0",
-      "label": "03 · 종료 확인 → 정산 → 개선 판단"
-    },
-    {
-      "id": "s2r1",
-      "label": "03 · 종료 확인 → 정산 → 개선 판단 · 계속"
-    },
-    {
-      "id": "s2r2",
-      "label": "03 · 종료 확인 → 정산 → 개선 판단 · 계속"
-    },
-    {
-      "id": "s2r3",
-      "label": "03 · 종료 확인 → 정산 → 개선 판단 · 계속"
+      "id": "buy7",
+      "label": "주문 전송"
     }
   ],
   "nodes": [
     {
-      "id": "detail-s0n0",
-      "lane": "s0r0",
+      "id": "buy0",
+      "lane": "buy0",
       "col": 0,
-      "type": "backend",
-      "label": "계좌·실전/모의 유형 일치 확인",
+      "label": "계좌·운용 유형이 일치하나요?",
       "sublabel": "기존 보유/미체결 거부 · 잔고 조회 성공",
+      "type": "security",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 220
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s0n1",
-      "lane": "s0r0",
+      "id": "buy0no",
+      "lane": "buy0",
       "col": 1,
+      "label": "시작 차단",
+      "sublabel": "계좌 유형·기존 보유·미체결 재확인",
       "type": "security",
-      "label": "09:10~15:00 미만 · 손실잠금 없음?",
-      "sublabel": "KST · 휴장/장상태 확인 · 아니오 → 신규 매수 대기 · 보유 위험관리 계속",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 360.4
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s0n2",
-      "lane": "s0r1",
+      "id": "buy1",
+      "lane": "buy1",
+      "col": 0,
+      "label": "매수 가능한 시간인가요?",
+      "sublabel": "KST 09:10~15:00 미만",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "거래일·장 상태 확인 · 손실 잠금 없음",
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "buy1no",
+      "lane": "buy1",
       "col": 1,
+      "label": "신규 매수 대기",
+      "sublabel": "보유분 위험 관리 유지",
       "type": "security",
-      "label": "후보 유효 · ticker 포함?",
-      "sublabel": "60초 후보 갱신 · 시작 재검증 · 120초 만료 · 아니오 → 매수 중지 · 회복 후 직접 시작",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 427.59999999999997
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s0n3",
-      "lane": "s0r1",
+      "id": "buy2",
+      "lane": "buy2",
       "col": 0,
+      "label": "종목이 유효 후보에 포함되나요?",
+      "sublabel": "60초 후보 갱신 · 시작 재검증 · 120초 만료",
       "type": "security",
-      "label": "2종목 미만 · 미보유 · 재진입 대기 완료?",
-      "sublabel": "실거래 10분 / 리플레이 10틱",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 290.5
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s0n4",
-      "lane": "s0r2",
-      "col": 0,
+      "id": "buy2no",
+      "lane": "buy2",
+      "col": 1,
+      "label": "신규 매수 중지",
+      "sublabel": "목록 회복 후 직접 시작",
       "type": "security",
-      "label": "최신 시세·호가 · 거래정지 아님?",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "buy3",
+      "lane": "buy3",
+      "col": 0,
+      "label": "보유·재진입 조건을 충족하나요?",
+      "sublabel": "보유·미체결 매수 합계 2종목 미만",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "미보유 · 실거래 10분 / 리플레이 10틱 대기",
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "buy3no",
+      "lane": "buy3",
+      "col": 1,
+      "label": "해당 후보 대기",
+      "sublabel": "보유 한도·재진입 대기 재확인",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "buy4",
+      "lane": "buy4",
+      "col": 0,
+      "label": "시세·호가가 유효한가요?",
       "sublabel": "시세 5초 이내 · 스프레드 0~15bps",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 238.5
-    },
-    {
-      "id": "detail-s0n5",
-      "lane": "s0r2",
-      "col": 1,
       "type": "security",
-      "label": "직전 3분 고가 × 1.001 돌파 · 거래량 ≥ 1.5배?",
-      "sublabel": "리플레이는 합성 3틱 · 조건 미충족 → 해당 후보 제외",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 329.5
+      "tag": "거래정지 아님 · 유효한 양수 시세",
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s0n6",
-      "lane": "s0r3",
+      "id": "buy4no",
+      "lane": "buy4",
       "col": 1,
-      "type": "backend",
-      "label": "수량 = 최소(비중 20%, 위험 0.25%, 매수한도, 가용현금)",
-      "sublabel": "비용 포함 · 소수점 버림 · 1주 미만 제외",
+      "label": "해당 후보 보류",
+      "sublabel": "유효한 최신 시세에서 다시 확인",
+      "type": "security",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 368.5
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s0n7",
-      "lane": "s0r3",
+      "id": "buy5",
+      "lane": "buy5",
       "col": 0,
-      "type": "backend",
-      "label": "주문 의도 파일 기록 → 한투 지정가 매수",
-      "sublabel": "매수 1회 한도 이내 · 후보 1개씩 순환 점검",
+      "label": "돌파·거래량을 함께 충족하나요?",
+      "sublabel": "직전 3분 고가 +0.1% 초과 · 거래량 1.5배 이상",
+      "type": "security",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 277.5
+      "tag": "리플레이는 합성 3틱",
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s1n0",
-      "lane": "s1r0",
+      "id": "buy5no",
+      "lane": "buy5",
+      "col": 1,
+      "label": "해당 후보 제외",
+      "sublabel": "다음 후보를 점검",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "buy6",
+      "lane": "buy6",
       "col": 0,
+      "label": "주문 수량 계산",
+      "sublabel": "최소(자산 20%, 위험 0.25%, 한도, 현금)",
       "type": "backend",
-      "label": "주문 접수 ≠ 체결",
-      "sublabel": "주문번호·누적체결·잔고 확인 / 매수 미체결30초·후보제외→취소 후 체결 재확인",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 384.4
+      "tag": "비용 포함 · 소수점 버림 · 1주 미만 제외",
+      "icon": "active",
+      "width": 240
     },
     {
-      "id": "detail-s1n1",
-      "lane": "s1r0",
+      "id": "buy6no",
+      "lane": "buy6",
       "col": 1,
+      "label": "주문하지 않음",
+      "sublabel": "계산 수량이 1주 미만",
       "type": "security",
-      "label": "부분체결 / 미체결 / 결과 불명?",
-      "sublabel": "확인 수량만 포지션·체결 반영 / 결과불명→추가 주문 잠금·동일 주문 재전송 금지",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 389.2
+      "icon": "decision",
+      "width": 240
     },
     {
-      "id": "detail-s1n2",
-      "lane": "s1r1",
-      "col": 1,
-      "type": "security",
-      "label": "① 사용자 종료 중 → 미체결 정리·전량 청산",
-      "sublabel": "취소 응답 후 체결/잔고 재확인",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 303.5
-    },
-    {
-      "id": "detail-s1n3",
-      "lane": "s1r1",
+      "id": "buy7",
+      "lane": "buy7",
       "col": 0,
-      "type": "security",
-      "label": "② 일일 자산 −2% → 청산·매수 잠금",
-      "sublabel": "처음 기록한 계좌자산 기준",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 258
-    },
-    {
-      "id": "detail-s1n4",
-      "lane": "s1r2",
-      "col": 0,
-      "type": "security",
-      "label": "③ 15:20 이후 → 청산·운용 중지",
-      "sublabel": "KST · 거래 가능한 상태에서만 전송",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 232
-    },
-    {
-      "id": "detail-s1n5",
-      "lane": "s1r2",
-      "col": 1,
-      "type": "security",
-      "label": "④ 매수가 대비 −1% → 손절",
-      "sublabel": "손절 가격 보장 없음",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 220
-    },
-    {
-      "id": "detail-s1n6",
-      "lane": "s1r3",
-      "col": 1,
-      "type": "security",
-      "label": "⑤ 매수가 대비 +2% → 익절",
-      "sublabel": "해당 없음 → 보유·다음 점검",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 220
-    },
-    {
-      "id": "detail-s1n7",
-      "lane": "s1r3",
-      "col": 0,
+      "label": "지정가 매수 주문",
+      "sublabel": "주문 의도를 파일에 기록한 뒤 전송",
       "type": "backend",
-      "label": "시장가 매도 → 체결량·잔고 확인",
-      "sublabel": "잔여 수량만 처리 · 가격 보장 없음 · 중복 매도 금지",
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
       ],
-      "width": 259.6
-    },
-    {
-      "id": "detail-s2n0",
-      "lane": "s2r0",
-      "col": 0,
-      "type": "backend",
-      "label": "미체결 취소·부분체결 대사 → 잔여 보유 청산",
-      "sublabel": "요청 성공만으로 종료 완료 처리하지 않음",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 310
-    },
-    {
-      "id": "detail-s2n1",
-      "lane": "s2r0",
-      "col": 1,
-      "type": "security",
-      "label": "미체결 0 · 보유 0 · 최신 잔고 대사 성공?",
-      "sublabel": "통신실패·결과불명·입출금/외부거래 차이→미확정 / 실패→다음 점검 대사·자동 재전송 금지",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 437.2
-    },
-    {
-      "id": "detail-s2n2",
-      "lane": "s2r1",
-      "col": 1,
-      "type": "backend",
-      "label": "계좌 전 자산 → 후 자산 · 수익률 확정",
-      "sublabel": "입출금·수동매매가 있으면 계좌 수익률에 영향",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 271
-    },
-    {
-      "id": "detail-s2n3",
-      "lane": "s2r1",
-      "col": 0,
-      "type": "backend",
-      "label": "전체 주문·체결 JSONL → review.json / review.md",
-      "sublabel": "복기 근거·손익·비용·실행규칙 기록",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 336
-    },
-    {
-      "id": "detail-s2n4",
-      "lane": "s2r2",
-      "col": 0,
-      "type": "security",
-      "label": "목표 1% 이상?",
-      "sublabel": "세션 시작 목표와 종료 결과 비교 · 예 → 규칙 유지 · 보완 제안 없음",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 336.4
-    },
-    {
-      "id": "detail-s2n5",
-      "lane": "s2r2",
-      "col": 1,
-      "type": "backend",
-      "label": "미달 원인과 검증 가이드 생성",
-      "sublabel": "자동 코드 변경 없음 · 검토 후 별도 적용",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 220
-    },
-    {
-      "id": "detail-s2n6",
-      "lane": "s2r3",
-      "col": 1,
-      "type": "backend",
-      "label": "리플레이 비용 가정",
-      "sublabel": "편도 슬리피지 0.05% · 수수료 0.015% · 매도세 0.2%",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "width": 254.79999999999998
+      "tag": "매수 1회 한도 이내 · 후보 1개씩 순환 점검",
+      "icon": "active",
+      "width": 240
     }
   ],
   "edges": [
     {
-      "from": "detail-s0n0",
-      "to": "detail-s0n1"
+      "from": "buy0",
+      "to": "buy0no",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s0n1",
-      "to": "detail-s0n2",
-      "label": "예"
+      "from": "buy0",
+      "to": "buy1",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "detail-s0n2",
-      "to": "detail-s0n3",
-      "label": "예"
+      "from": "buy1",
+      "to": "buy1no",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s0n3",
-      "to": "detail-s0n4",
-      "label": "예"
+      "from": "buy1",
+      "to": "buy2",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "detail-s0n4",
-      "to": "detail-s0n5",
-      "label": "예"
+      "from": "buy2",
+      "to": "buy2no",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s0n5",
-      "to": "detail-s0n6",
-      "label": "예"
+      "from": "buy2",
+      "to": "buy3",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "detail-s0n6",
-      "to": "detail-s0n7"
+      "from": "buy3",
+      "to": "buy3no",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s1n0",
-      "to": "detail-s1n1"
+      "from": "buy3",
+      "to": "buy4",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "detail-s1n1",
-      "to": "detail-s1n2"
+      "from": "buy4",
+      "to": "buy4no",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s1n2",
-      "to": "detail-s1n3",
-      "label": "해당 없으면"
+      "from": "buy4",
+      "to": "buy5",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "detail-s1n3",
-      "to": "detail-s1n4",
-      "label": "해당 없으면"
+      "from": "buy5",
+      "to": "buy5no",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s1n4",
-      "to": "detail-s1n5",
-      "label": "해당 없으면"
+      "from": "buy5",
+      "to": "buy6",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
-      "from": "detail-s1n5",
-      "to": "detail-s1n6",
-      "label": "해당 없으면"
+      "from": "buy6",
+      "to": "buy6no",
+      "label": "1주 미만",
+      "role": "branch",
+      "variant": "security"
     },
     {
-      "from": "detail-s1n6",
-      "to": "detail-s1n7"
-    },
-    {
-      "from": "detail-s0n7",
-      "to": "detail-s1n0"
-    },
-    {
-      "from": "detail-s2n0",
-      "to": "detail-s2n1"
-    },
-    {
-      "from": "detail-s2n1",
-      "to": "detail-s2n2",
-      "label": "예"
-    },
-    {
-      "from": "detail-s2n2",
-      "to": "detail-s2n3"
-    },
-    {
-      "from": "detail-s2n3",
-      "to": "detail-s2n4"
-    },
-    {
-      "from": "detail-s2n4",
-      "to": "detail-s2n5",
-      "label": "아니오"
-    },
-    {
-      "from": "detail-s2n5",
-      "to": "detail-s2n6"
-    },
-    {
-      "from": "detail-s1n7",
-      "to": "detail-s2n0"
+      "from": "buy6",
+      "to": "buy7",
+      "label": "1주 이상",
+      "fromSide": "bottom",
+      "toSide": "top"
     }
   ],
   "mainPath": [
-    "detail-s0n0",
-    "detail-s0n1"
+    "buy0",
+    "buy1",
+    "buy2",
+    "buy3",
+    "buy4",
+    "buy5",
+    "buy6",
+    "buy7"
   ]
 }

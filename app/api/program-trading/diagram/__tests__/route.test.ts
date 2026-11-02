@@ -37,6 +37,12 @@ describe("자동매매 다이어그램", () => {
     expect(bridge).toContain('program-trading:diagram-close');
     expect(response.headers.get("Content-Security-Policy")).toContain(`'sha256-${createHash("sha256").update(bridge!).digest("base64")}'`);
   });
+  it.each(["buy", "sell", "settlement"])("%s 목적별 도식을 제공한다", async view => {
+    file.mockResolvedValue("<html>diagram</html>");
+    const response = await GET(new NextRequest(`http://localhost/api/program-trading/diagram?view=${view}`));
+    expect(response.status).toBe(200);
+    expect(file).toHaveBeenCalledWith(expect.stringContaining(`/docs/program-trading/${view}.html`), "utf8");
+  });
   it("생성 파일이 없으면 재생성 안내를 준다", async () => {
     file.mockRejectedValue(new Error("ENOENT"));
     expect((await GET(new NextRequest("http://localhost/api/program-trading/diagram?view=summary"))).status).toBe(503);

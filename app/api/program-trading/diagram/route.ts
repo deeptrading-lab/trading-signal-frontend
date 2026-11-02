@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const view = request.nextUrl.searchParams.get("view");
-  if (view !== "summary" && view !== "detail") return NextResponse.json({ error: "다이어그램을 선택해 주세요." }, { status: 400 });
+  if (!view || !["summary", "detail", "buy", "sell", "settlement"].includes(view)) return NextResponse.json({ error: "다이어그램을 선택해 주세요." }, { status: 400 });
   try {
     const source = await readFile(`${process.cwd()}/docs/program-trading/${view}.html`, "utf8");
     // Escape in the sandboxed viewer cannot bubble to the modal document.

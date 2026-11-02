@@ -97,3 +97,9 @@
 - `deliver`의 showcase 검사를 통과해야 HTML을 반영한다. 별도 전체 검증은 `ARCHIFY_UPDATE_CHECK_DISABLED=1 node ~/.codex/skills/archify/bin/archify.mjs finalize workflow .archify/program-rules/summary.json .archify/program-rules/summary.html --quality showcase --repo-root . --out-dir .archify/program-rules/summary-review --json`으로 수행하며 detail도 같은 방식이다. 재검수 시 새 out-dir을 사용한다.
 - 생성 중 업데이트 확인 네트워크 요청은 끈다. 외부 스크립트·폰트·API를 로드하지 않는다. 브라우저에는 artifact 내 스크립트의 SHA-256 CSP만 허용한다. iframe은 allow-scripts·allow-downloads만 허용하고 allow-same-origin은 부여하지 않는다.
 - 확대/이동/노드 포커스·테마·경로 탐색은 뷰어에서 제공한다. 모바일에서는 확대·이동 또는 크게 보기 링크를 사용한다. 표시 도구만 바꾸며 매매 규칙이나 실제 주문은 변경하지 않는다.
+
+### 목적별 도식 후속 (2026-11-02)
+- 모달 보기: summary(전체 흐름), buy(매수 조건), sell(매도 우선순위), settlement(종료·정산). detail은 buy의 호환 별칭이다.
+- 생성 로직은 `scripts/programTradingWorkflow.ts`에 분리했다. 원본 템플릿의 단계/메모를 읽고 표현용 질문·결과·경로로 재구성한다. 규칙을 바꾸면 rules.template.html과 이 모듈의 의미 요약도 함께 검토한다. 수치 토큰은 RULES에서 사용한다.
+- `program:rules`와 `program:rules:check`는 정적 통합본과 목적별 HTML/JSON 다섯 쌍을 함께 관리한다. 생성 파일 직접 수정 금지.
+- `scripts/__tests__/programTradingWorkflow.test.ts`는 매수 미충족 차단, 매도 최초 해당 조건, 종료 조건 미충족 대기, 목표 달성/미달 분기를 보호한다.

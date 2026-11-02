@@ -1,0 +1,386 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "자동매매 · 매도 우선순위",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "backend": {
+          "label": "실행·결과"
+        },
+        "security": {
+          "label": "확인·대기"
+        },
+        "database": {
+          "label": "비용 가정"
+        }
+      }
+    },
+    "output": ".archify/program-rules/sell.html",
+    "repository": {
+      "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
+      "revision": "7bcc7bce6ebc452713309fa4581f33e42767a509",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "orders",
+      "label": "주문·잔고 확인"
+    },
+    {
+      "id": "unknown",
+      "label": "주문 불명 차단"
+    },
+    {
+      "id": "sell0",
+      "label": "우선순위 1"
+    },
+    {
+      "id": "sell1",
+      "label": "우선순위 2"
+    },
+    {
+      "id": "sell2",
+      "label": "우선순위 3"
+    },
+    {
+      "id": "sell3",
+      "label": "우선순위 4"
+    },
+    {
+      "id": "sell4",
+      "label": "우선순위 5"
+    },
+    {
+      "id": "hold",
+      "label": "조건 미해당"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "orders",
+      "lane": "orders",
+      "col": 0,
+      "label": "주문·체결을 먼저 대사",
+      "sublabel": "접수 ≠ 체결 · 확인된 수량만 반영",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "미체결 매수 30초·후보 제외 → 취소 후 재확인",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "unknown",
+      "lane": "unknown",
+      "col": 0,
+      "label": "주문 결과가 확인됐나요?",
+      "sublabel": "부분체결·미체결은 실제 수량으로 추적",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "lock",
+      "lane": "unknown",
+      "col": 1,
+      "label": "신규 주문 잠금",
+      "sublabel": "주문 결과 확인 전 자동 재전송 금지",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell0",
+      "lane": "sell0",
+      "col": 0,
+      "label": "사용자가 종료를 요청했나요?",
+      "sublabel": "취소 응답 후 체결/잔고 재확인",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell0yes",
+      "lane": "sell0",
+      "col": 1,
+      "label": "취소 확인 → 잔여분 청산",
+      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell1",
+      "lane": "sell1",
+      "col": 0,
+      "label": "일일 자산이 −2%에 도달했나요?",
+      "sublabel": "처음 기록한 계좌자산 기준",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell1yes",
+      "lane": "sell1",
+      "col": 1,
+      "label": "청산 · 신규 매수 잠금",
+      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell2",
+      "lane": "sell2",
+      "col": 0,
+      "label": "15:20 이후인가요?",
+      "sublabel": "KST · 거래 가능한 상태에서만 전송",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell2yes",
+      "lane": "sell2",
+      "col": 1,
+      "label": "청산 · 운용 중지",
+      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell3",
+      "lane": "sell3",
+      "col": 0,
+      "label": "매수가 대비 −1% 이하인가요?",
+      "sublabel": "손절 가격 보장 없음",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell3yes",
+      "lane": "sell3",
+      "col": 1,
+      "label": "시장가 손절",
+      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell4",
+      "lane": "sell4",
+      "col": 0,
+      "label": "매수가 대비 +2% 이상인가요?",
+      "sublabel": "해당 없음 → 보유·다음 점검",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell4yes",
+      "lane": "sell4",
+      "col": 1,
+      "label": "시장가 익절",
+      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "hold",
+      "lane": "hold",
+      "col": 0,
+      "label": "보유 · 다음 점검",
+      "sublabel": "상위 조건부터 다시 확인",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "active",
+      "width": 240
+    }
+  ],
+  "edges": [
+    {
+      "from": "orders",
+      "to": "unknown",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "unknown",
+      "to": "lock",
+      "label": "불명",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "sell0",
+      "to": "sell0yes",
+      "label": "해당"
+    },
+    {
+      "from": "unknown",
+      "to": "sell0",
+      "label": "확인",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell1",
+      "to": "sell1yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell0",
+      "to": "sell1",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell2",
+      "to": "sell2yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell1",
+      "to": "sell2",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell3",
+      "to": "sell3yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell2",
+      "to": "sell3",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell4",
+      "to": "sell4yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell3",
+      "to": "sell4",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell4",
+      "to": "hold",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "mainPath": [
+    "orders",
+    "unknown",
+    "sell0",
+    "sell1",
+    "sell2",
+    "sell3",
+    "sell4",
+    "hold"
+  ]
+}

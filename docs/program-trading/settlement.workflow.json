@@ -1,0 +1,261 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "자동매매 · 종료와 정산",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "backend": {
+          "label": "실행·결과"
+        },
+        "security": {
+          "label": "확인·대기"
+        },
+        "database": {
+          "label": "비용 가정"
+        }
+      }
+    },
+    "output": ".archify/program-rules/settlement.html",
+    "repository": {
+      "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
+      "revision": "7bcc7bce6ebc452713309fa4581f33e42767a509",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "clean",
+      "label": "청산"
+    },
+    {
+      "id": "settled",
+      "label": "종료 조건"
+    },
+    {
+      "id": "balance",
+      "label": "손익 확정"
+    },
+    {
+      "id": "ledger",
+      "label": "기록"
+    },
+    {
+      "id": "target",
+      "label": "목표 판단"
+    },
+    {
+      "id": "proposal",
+      "label": "미달 시 검토"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "clean",
+      "lane": "clean",
+      "col": 0,
+      "label": "미체결 정리 → 잔여분 청산",
+      "sublabel": "요청 성공만으로 종료 완료 처리하지 않음",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "settled",
+      "lane": "settled",
+      "col": 0,
+      "label": "모든 종료 조건을 충족했나요?",
+      "sublabel": "미체결 0 · 보유 0 · 최신 잔고 대사 성공",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "balance",
+      "lane": "balance",
+      "col": 0,
+      "label": "전·후 자산과 수익률 확정",
+      "sublabel": "입출금·수동매매가 있으면 계좌 수익률에 영향",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "ledger",
+      "lane": "ledger",
+      "col": 0,
+      "label": "전체 주문·체결 원장 보존",
+      "sublabel": "복기 근거·손익·비용·실행규칙 기록",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "target",
+      "lane": "target",
+      "col": 0,
+      "label": "목표 1% 이상인가요?",
+      "sublabel": "세션 시작 목표와 종료 결과 비교",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "proposal",
+      "lane": "proposal",
+      "col": 0,
+      "label": "원인·검증 가이드 생성",
+      "sublabel": "자동 코드 변경 없음 · 검토 후 별도 적용",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "wait",
+      "lane": "settled",
+      "col": 1,
+      "label": "정산 미확정 · 다음 점검 대사",
+      "sublabel": "통신 실패·주문 불명·입출금/외부 거래 차이",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "불명 주문 자동 재전송 금지",
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "costs",
+      "lane": "ledger",
+      "col": 1,
+      "label": "리플레이 비용 가정",
+      "sublabel": "슬리피지 0.05% · 수수료 0.015% · 매도세 0.2%",
+      "type": "database",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "실계좌 비용과 구분",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "keep",
+      "lane": "target",
+      "col": 1,
+      "label": "규칙 유지",
+      "sublabel": "목표 달성 · 보완 제안 없음",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "active",
+      "width": 240
+    }
+  ],
+  "edges": [
+    {
+      "from": "clean",
+      "to": "settled",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "settled",
+      "to": "balance",
+      "label": "충족",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "balance",
+      "to": "ledger",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "ledger",
+      "to": "target",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "target",
+      "to": "proposal",
+      "label": "아니오",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "settled",
+      "to": "wait",
+      "label": "미충족",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "ledger",
+      "to": "costs",
+      "label": "리플레이"
+    },
+    {
+      "from": "target",
+      "to": "keep",
+      "label": "예"
+    }
+  ],
+  "mainPath": [
+    "clean",
+    "settled",
+    "balance",
+    "ledger",
+    "target",
+    "proposal"
+  ]
+}
