@@ -1,14 +1,11 @@
 /**
- * `/api/cron/flow-snapshot` — 매 영업일 장마감 후 **단일 디스패처** cron.
+ * `/api/cron/flow-snapshot` — 수급(외국인·기관 순매수) 스냅샷 적립 cron.
  *
- * PRD `investor-flow-cumulative` §4.A / §6 + `signal-scorecard` §3-2 / §9 D4 +
- * `scorecard-backfill-decisions`(결정 원장 → 채점 원장 멱등 backfill).
+ * PRD `investor-flow-cumulative` §4.A / §6.
  *
  * - 장 마감 뒤 자동 호출 중지 정책으로 Vercel/GitHub 예약 스케줄은 제거했다. 필요할 때
- *   GitHub `workflow_dispatch` 또는 인증된 수동 호출로만 ①수급 스냅샷 적립 → ②결정 원장 backfill
- *   → ③AI 판정 채점(relativeRunScoring) → ④목표·무효화 터치 스캔(runTouchScan)을 **순차 실행**한다.
- *   각 단계는 **독립 try/catch** —
- *   한 단계 실패가 다른 단계를 막지 않는다.
+ *   GitHub `workflow_dispatch` 또는 인증된 수동 호출로 수급 스냅샷만 적립한다.
+ *   (옛 AI 판정 채점·backfill·터치 스캔 단계는 그 파이프라인 삭제와 함께 없앴다 — swing-judgment PR-5.)
  * - **인증**: `Authorization: Bearer ${CRON_SECRET}` 필수(Vercel Cron 자동 부착). 미일치 401.
  * - 외국인·기관 각각 `fetchForeignInstitutionTotal` → **전 행** 저장(top10 slice 안 함, 누적 커버리지).
  * - transient(EGW00201/네트워크) 1회 재시도(`fetchWithTransientRetry`). 2콜 간 delay 로 한도 회피.
@@ -25,12 +22,6 @@ import {
 } from "@/lib/api/kis";
 import { saveFlowSnapshot, saveFlowCronMeta } from "@/lib/server/flowSnapshotStore";
 import { delay, fetchWithTransientRetry } from "@/lib/server/bffUtils";
-import { relativeRunScoring } from "@/lib/server/scorecard/relativeRunScoring";
-import { runTouchScan, type TouchScanResult } from "@/lib/server/scorecard/runTouchScan";
-import { runBackfillDecisions } from "@/lib/server/scorecard/runBackfillDecisions";
-import { saveScorecardCronMeta } from "@/lib/server/scorecard/scorecardCronMeta";
-import type { RelativeScoreResult } from "@/lib/server/scorecard/relativeScoreDecisions";
-import type { BackfillDecisionsResult } from "@/lib/server/scorecard/backfillDecisions";
 
 const SUBJECT_DELAY_MS = 200; // 주체 2콜 간 지연 — EGW00201 회피.
 const RETRY_BACKOFF_MS = 250;
@@ -45,16 +36,15 @@ export async function GET(request: NextRequest) {
 
   const env = resolveKisEnv();
 
-  // KIS 미설정/비-prod → 적립·채점 모두 skip(랭킹·일봉 TR 은 prod 전용 가능성). 재시도 폭주 막으려 200.
+  // KIS 미설정/비-prod → 적립 skip(랭킹 TR 은 prod 전용 가능성). 재시도 폭주 막으려 200.
   if (!isKisConfigured() || env !== "prod") {
     // 헬스 마커 — 로그 없이도 cron 건강 확인용(/api/flow/cron-status).
     await saveFlowCronMeta({ at: new Date().toISOString(), ok: false, reason: "kis-not-prod", env });
-    await saveScorecardCronMeta({ at: new Date().toISOString(), ok: false, reason: "kis-not-prod", env });
     return NextResponse.json({ ok: false, reason: "kis-not-prod", env }, { status: 200 });
   }
 
-  // ── 단계 ① 수급 스냅샷 적립 (독립 try/catch) ─────────────────────────────────
   const saved: Record<string, number> = {};
+  let ok = true;
   try {
     for (const subject of SUBJECTS) {
       const rows = await fetchWithTransientRetry(
@@ -73,54 +63,10 @@ export async function GET(request: NextRequest) {
     // 헬스 마커 — 마지막 실행 시각/저장 결과. saved 가 비면 휴장/빈응답.
     await saveFlowCronMeta({ at: new Date().toISOString(), ok: true, env, saved });
   } catch (error) {
-    console.warn("[flow-snapshot] 수급 적립 단계 실패 — 채점 단계는 계속", error);
+    ok = false;
+    console.warn("[flow-snapshot] 수급 적립 실패", error);
     await saveFlowCronMeta({ at: new Date().toISOString(), ok: false, reason: "flow-error", env });
   }
 
-  // ── 단계 ② 결정 원장 → 채점 원장 backfill (독립 try/catch) ────────────────────
-  // PRD `scorecard-backfill-decisions` — 채점 원장 append(#140) 이전 분석은 결정 원장에만
-  // 있어 채점 불가. asOf 있는 결정의 봉 종가로 entry 복원해 멱등 append. **채점(단계③) 앞**에
-  // 둬 새로 들어온 행이 같은 패스 채점에서 잡히게 한다. 멱등 — 재실행해도 중복 insert 0.
-  let backfill: BackfillDecisionsResult | null = null;
-  try {
-    backfill = await runBackfillDecisions();
-    console.info(
-      `[flow-snapshot] backfill candidates=${backfill.candidates} inserted=${backfill.inserted} ` +
-        `skippedNoAsOf=${backfill.skippedNoAsOf} skippedExists=${backfill.skippedExists} ` +
-        `skippedNoEntry=${backfill.skippedNoEntry} errors=${backfill.errors}`,
-    );
-  } catch (error) {
-    console.warn("[flow-snapshot] backfill 단계 실패 — 채점 단계는 계속", error);
-  }
-
-  // ── 단계 ③ AI 판정 채점 (독립 try/catch — 수급·backfill 실패와 무관하게 실행) ──
-  let scoring: RelativeScoreResult | null = null;
-  try {
-    scoring = await relativeRunScoring();
-    console.info(
-      `[flow-snapshot] scoring candidates=${scoring.candidates} scored=${scoring.scored} ` +
-        `hit=${scoring.hit} miss=${scoring.miss} flat=${scoring.flat} ` +
-        `skipped=${scoring.skipped} backfilled=${scoring.backfilled}`,
-    );
-    await saveScorecardCronMeta({ at: new Date().toISOString(), ok: true, env, result: scoring });
-  } catch (error) {
-    console.warn("[flow-snapshot] 채점 단계 실패 — 디스패처는 200", error);
-    await saveScorecardCronMeta({ at: new Date().toISOString(), ok: false, reason: "scoring-error", env });
-  }
-
-  // ── 단계 ④ 목표·무효화 터치 스캔 (phase-2, 독립 try/catch) ──
-  //    판정이 스스로 내건 라인이 실제로 닿았는지 기록한다. 방향 채점(③)과 달리 "판정 자신의 약속"을 본다.
-  let touch: TouchScanResult | null = null;
-  try {
-    touch = await runTouchScan();
-    console.info(
-      `[flow-snapshot] touch candidates=${touch.candidates} scanned=${touch.scanned} ` +
-        `targetHits=${touch.targetHits} stopHits=${touch.stopHits} ` +
-        `completed=${touch.completed} errors=${touch.errors}`,
-    );
-  } catch (error) {
-    console.warn("[flow-snapshot] 터치 스캔 실패 — 디스패처는 200", error);
-  }
-
-  return NextResponse.json({ ok: true, saved, backfill, scoring, touch }, { status: 200 });
+  return NextResponse.json({ ok, saved }, { status: 200 });
 }

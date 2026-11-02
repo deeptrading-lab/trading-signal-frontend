@@ -9,7 +9,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { SegmentedTabs } from "@/components/analyze/SegmentedTabs";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingScreener } from "@/hooks/swing/useQuerySwingScreener";
 import type { SwingMarket } from "@/lib/swing/rulebook";

@@ -19,7 +19,7 @@ for (const line of fs.readFileSync(`${ROOT}.env.local`, "utf8").split("\n")) {
 const DAILY = fileURLToPath(new URL("./__daily__/", import.meta.url));
 const FLOW = fileURLToPath(new URL("./__flow__/", import.meta.url));
 const { evaluateSignal } = await import("@/lib/signal/engine");
-const { spearman, mean, median, neweyWestT } = await import("@/lib/server/scorecard/directionDiagnosis");
+const { spearman, mean, median, neweyWestT } = await import("@/lib/utils/stats");
 
 // ── 사전 등록 상수 (§1·§4) ───────────────────────────────────────────────────
 const H = 10;
@@ -57,7 +57,7 @@ function classifyReport(name: string): Array<"F5a" | "F5b" | "F5c" | "F5d"> {
   return out;
 }
 
-// neweyWestT 는 lib/server/scorecard/directionDiagnosis.ts 로 이동(스윙 규칙서 감사와 공용, 수식 동일).
+// neweyWestT 는 lib/utils/stats.ts 로 이동(스윙 규칙서 감사와 공용, 수식 동일).
 function naiveT(xs: number[]): number {
   const n = xs.length, m = mean(xs) ?? 0;
   const sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));

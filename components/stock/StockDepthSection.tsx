@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils/cn";
 import { DURATION, EASE } from "@/lib/motion/tokens";
 import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
-import { SegmentedTabs } from "@/components/analyze/SegmentedTabs";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { OrderbookPanel } from "@/components/stock/OrderbookPanel";
 import { TradeStrengthPanel } from "@/components/stock/TradeStrengthPanel";
 import { ORDERBOOK_COPY } from "@/lib/copy/stock/orderbook";

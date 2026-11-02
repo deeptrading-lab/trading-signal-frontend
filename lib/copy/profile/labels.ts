@@ -14,17 +14,6 @@ export const PROFILE_JOINED_SUFFIX = " 가입";
 /** 승인 대기 상태 배지(status=pending). approved 는 배지 없음(정상이 기본). */
 export const PROFILE_STATUS_PENDING = "승인 대기";
 
-/* "내 분석" 요약 — 로그인 계정이 분석한 종목(analyze-owner-cards). */
-export const MY_ANALYSIS_TITLE = "내 분석";
-/**
- * 목록 BFF 가 최근 20건만 내려주므로(CARD_LIST_LIMIT) 총계가 아니라 "최근 N개"로 표기한다.
- * 총 분석 종목 수를 쓰려면 별도 count 조회가 필요 — 요약 지면에 그만한 값어치는 없다.
- */
-export const MY_ANALYSIS_COUNT = (n: number) => `최근 ${n}개 종목`;
-export const MY_ANALYSIS_EMPTY = "아직 분석한 종목이 없어요.";
-export const MY_ANALYSIS_MORE = "전체 보기";
-export const MY_ANALYSIS_ERROR = "분석 이력을 불러오지 못했어요.";
-
 /* "내 종목" 요약 — 관심종목·최근 본 종목(둘 다 이 기기에 저장). */
 export const MY_STOCKS_TITLE = "내 종목";
 export const MY_STOCKS_WATCHLIST = "관심종목";
@@ -38,8 +27,6 @@ export const MY_STOCKS_LOCAL_HINT = "이 기기에만 저장돼요.";
 /* 설정 메뉴 라벨 (`lib/types/profile/menuItems.ts` 의 `ProfileMenuKey` 정합). */
 export const SETTINGS_SECTION_TITLE = "설정";
 export const MENU_THEME = "화면 테마 설정 (다크모드)";
-/* scorecard-nav-link — `/dashboard/scorecard`(판정 적중률 자가점검) 도달성 보조 메뉴 라벨. */
-export const MENU_SCORECARD = "신호 성적표 (적중률 자가점검)";
 export const MENU_PAPER_TRADING = "AI 모의투자";
 /* user-login-auth Phase 2 — admin 이상 "관리자 메뉴" 섹션의 유저 관리 진입점(→/admin). */
 export const MENU_ADMIN = "유저 관리";

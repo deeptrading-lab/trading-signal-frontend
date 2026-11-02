@@ -40,7 +40,6 @@
 
 import type { Config } from "tailwindcss";
 import themeJson from "./tailwind.theme.json";
-import typography from "@tailwindcss/typography";
 
 // DESIGN.md 의 typography 토큰을 직접 옮겨둔다 (export 도구가 lineHeight / fontFeature 를 누락하므로 보완).
 // v4 신규 키 `nav-brand`, `sidebar-section` 도 함께 등록.
@@ -177,7 +176,7 @@ const config: Config = {
   theme: {
     extend: adaptDesignTokens(themeJson),
   },
-  plugins: [typography],
+  plugins: [],
 };
 
 export default config;

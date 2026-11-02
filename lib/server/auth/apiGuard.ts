@@ -52,7 +52,7 @@ async function hasRequestPrivilege(
   return hasLivePrivilege(await liveIdentityOf(request), required);
 }
 
-/** admin 미만이면 403, 아니면 null(통과). **환경 무관 admin+ 전용**(예: 성적표·A/B 리포트). */
+/** admin 미만이면 403, 아니면 null(통과). **환경 무관 admin+ 전용**(예: 유저 관리). */
 export async function requireAdminApi(
   request: NextRequest,
 ): Promise<NextResponse | null> {
@@ -62,7 +62,7 @@ export async function requireAdminApi(
 /**
  * **prod(Vercel)에서만** admin+ 요구, 로컬은 통과. `/intraday` 페이지 게이트 규칙과 정합
  * (로컬 dev 무마찰 유지 — 로컬은 세션 없이도/일반 등급도 사용, prod 만 admin 제한).
- * (`/analyze` 는 analyze-open-access 로 개방 — decisions 목록은 가드 없음, usage 만 본 가드 유지.)
+ * (옛 `/analyze` AI 분석 경로는 swing-judgment PR-5 에서 삭제.)
  */
 export async function requireProdAdminApi(
   request: NextRequest,

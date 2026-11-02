@@ -14,7 +14,6 @@
  *   4. TrendingSectorsSection — 지금 뜨는 산업(업종 등락 랭킹, client)
  *   5. InvestorFlowTop10Card — 외국인·기관 수급 플랫 2열(client)
  *   6. 2열: FearGreedContainer(라이트 카드) · DisclosureFeedContainer(플랫 피드)
- *   7. AiAnalysisCtaBand — AI 종합분석 강조 밴드(→ /analyze)
  *
  * 화이트 배경은 **홈 라우트에만** 한정 — `(main)/layout.tsx` 가 pathname==="/" 일 때만 main 에
  * `bg-surface`(흰색)를 덮는다. 전역 main-area/surface-muted 토큰 무변경(점진 롤아웃, 다른 화면은
@@ -24,7 +23,6 @@
 import { StockSearchContainer } from "./StockSearchContainer";
 import { RealtimeRankingSection } from "./RealtimeRankingSection";
 import { TrendingSectorsSection } from "./TrendingSectorsSection";
-import { AiAnalysisCtaBand } from "./AiAnalysisCtaBand";
 import { IndicesCardContainer } from "@/components/market/IndicesCardContainer";
 import { InvestorFlowTop10Card } from "@/components/flow/InvestorFlowTop10Card";
 import { FearGreedContainer } from "./FearGreedContainer";
@@ -57,9 +55,6 @@ export function MarketOverviewPage() {
         <FearGreedContainer />
         <DisclosureFeedContainer />
       </div>
-
-      {/* AI 종합분석 — 유일한 강조 밴드 */}
-      <AiAnalysisCtaBand />
     </div>
   );
 }

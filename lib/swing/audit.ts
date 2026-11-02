@@ -7,7 +7,7 @@
 
 import type { StockDailyCandle } from "@/lib/api/kis/types";
 import type { InvestorTradeDay } from "@/lib/api/kis/investor-flow";
-import { mean, median, mulberry32, neweyWestT, quantile, toPp } from "@/lib/server/scorecard/directionDiagnosis";
+import { mean, median, mulberry32, neweyWestT, quantile, toPp } from "@/lib/utils/stats";
 import type { Rulebook } from "./rulebook";
 
 /** 사전 등록 §3 상수. */

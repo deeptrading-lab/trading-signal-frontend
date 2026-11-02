@@ -7,7 +7,6 @@
 
 import { describe, it, expect } from "vitest";
 import { computePriceLevels } from "@/lib/signal/levels/priceLevels";
-import { formatPriceLevelsForPrompt } from "@/lib/signal/levels/formatPriceLevels";
 import type { StockDailyCandle } from "@/lib/api/kis/types";
 
 /** 지정 종가 배열 → 일봉(고저는 종가 ±0.5%, 거래량 균일). 날짜는 순증(정렬 안정). */
@@ -92,25 +91,6 @@ describe("computePriceLevels — 피보나치 되돌림", () => {
     const half = f.levels.find((l) => l.ratio === 0.5)!;
     expect(Math.abs(half.price - (f.waveHigh - (f.waveHigh - f.waveLow) * 0.5))).toBeLessThanOrEqual(1);
     expect(f.retracedRatio).toBeGreaterThan(0);
-  });
-});
-
-describe("formatPriceLevelsForPrompt", () => {
-  const closes = Array.from({ length: 200 }, (_, i) => (i % 2 === 0 ? 95 : 108));
-  const volumes = closes.map((c) => (c === 95 ? 9000 : 500));
-
-  it("실측값과 해석 규칙이 문구에 포함된다", () => {
-    const lv = computePriceLevels(series(closes, volumes), 108);
-    const text = formatPriceLevelsForPrompt(lv, 108);
-    expect(text).toContain("가격 레벨 — 실측값(추정 금지)");
-    expect(text).toContain("이동평균:");
-    expect(text).toContain("볼린저(20,2)");
-    expect(text).toContain("현재가 아래(지지 후보)");
-    expect(text).toContain("추가 하락 여지");
-  });
-
-  it("데이터가 없으면 빈 문자열(프롬프트 무회귀)", () => {
-    expect(formatPriceLevelsForPrompt(computePriceLevels([], 0), 0)).toBe("");
   });
 });
 

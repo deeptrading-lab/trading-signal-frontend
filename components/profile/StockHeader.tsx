@@ -2,7 +2,7 @@
  * StockHeader — `/stock/[ticker]` 토스톤 가격 헤더(T4 "항시", 카드리스).
  *
  * stock-detail-reskin — 노스스타 `.phead` 정합:
- *   ① 이름행: 로고닷 + 종목명(**코드 미표시**) + 관심 별 + 매수 유의 경고칩 · (우) AI 종합분석 버튼.
+ *   ① 이름행: 로고닷 + 종목명(**코드 미표시**) + 관심 별 + 매수 유의 경고칩.
  *   ② 가격행: 큰 현재가(font-display) + 등락률/등락액(한국식 상승 빨강·하락 파랑).
  *   ※ 업종 칩은 기업개황 '업종' 필드와 중복이라 제거(chart-minute-interval). 거래소·시총은 payload 부재로 미표시.
  *
@@ -15,7 +15,7 @@
 
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, Minus, Sparkles } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { isUsTicker } from "@/lib/utils/isUsTicker";
@@ -35,12 +35,9 @@ import {
   STOCK_DETAIL_LOAD_ERROR,
   STOCK_DETAIL_NOT_FOUND,
 } from "@/lib/copy/profile/stockDetail";
-import { COPY } from "@/lib/copy/stock/aiAnalysis";
 
 export interface StockHeaderProps {
   ticker: string;
-  /** AI 종합분석 패널 열기. 공급자 선택은 패널 진입 화면에서 한다. */
-  onAIAnalysis?: () => void;
 }
 
 /**
@@ -55,7 +52,7 @@ function formatKrwApprox(won: number, compact: boolean): string {
   return `${formatNumber(won, { digits: 0 })}원`;
 }
 
-export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
+export function StockHeader({ ticker }: StockHeaderProps) {
   const { data, isLoading, isError } = useQueryStockPrice(ticker);
   // 미국 종목은 달러 — 통화 라벨을 USD 로 + 원화 환산가 병기(us-stock-support). 환율은 미국 종목일
   // 때만 조회(enabled=isUs), 실패·null 은 미표시로 수렴(부가 정보).
@@ -124,16 +121,6 @@ export function StockHeader({ ticker, onAIAnalysis }: StockHeaderProps) {
         <h1 className="text-h1 text-text-strong">{displayName}</h1>
         <WatchlistStarButton added={added} onToggle={toggleWatch} />
         <StockWarningBadges warnings={warningsData?.warnings} />
-        {onAIAnalysis && (
-          <button
-            type="button"
-            onClick={onAIAnalysis}
-            className="ml-auto inline-flex shrink-0 items-center gap-xs rounded-pill bg-gradient-ai-soft px-md py-xs text-button-sm text-gradient-ai-from transition-[filter] duration-base hover:brightness-105"
-          >
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
-            {COPY.trigger}
-          </button>
-        )}
       </div>
 
       {/* ② 가격행 */}

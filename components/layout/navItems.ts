@@ -59,7 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/watchlist", label: NAV_MENU_WATCHLIST, shortLabel: NAV_MENU_WATCHLIST_SHORT, icon: Star },
   { path: "/stock", label: NAV_MENU_STOCK, shortLabel: NAV_MENU_STOCK_SHORT, icon: BarChart2 },
   // 스윙 체크 — 규칙서 swing-v1 결정론 판정 스크리너(PRD swing-judgment PR-3). 기존 "AI 분석"(/analyze)
-  // 자리를 대체한다. /analyze 는 PR-5(레거시 정리)까지 URL 로만 접근 가능.
+  // 자리를 대체한다. 옛 /analyze 는 PR-5 에서 /swing 으로 리다이렉트.
   { path: "/swing", label: NAV_MENU_SWING, shortLabel: NAV_MENU_SWING_SHORT, icon: ListChecks },
   // 단타 워치 — 로컬은 전체, prod 는 admin 이상만(localOnly). 마이페이지 바로 위 고정.
   { path: "/intraday", label: NAV_MENU_INTRADAY, shortLabel: NAV_MENU_INTRADAY_SHORT, icon: Zap, localOnly: true },

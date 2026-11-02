@@ -36,7 +36,7 @@ import {
   type CohortStats,
   type Period,
 } from "@/lib/swing/audit";
-import { isoWeekKey, mean, median, neweyWestT, quantile, spearman } from "@/lib/server/scorecard/directionDiagnosis";
+import { isoWeekKey, mean, median, neweyWestT, quantile, spearman } from "@/lib/utils/stats";
 
 // SWING_CACHE / SWING_STATS_OUT — 합성 데이터 스모크 테스트용 경로 덮어쓰기(실제 감사는 기본값).
 const CACHE = process.env.SWING_CACHE ?? fileURLToPath(new URL("./__cache__/", import.meta.url));

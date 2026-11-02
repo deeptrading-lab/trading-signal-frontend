@@ -1,7 +1,7 @@
 /**
  * 사용자 프로필 저장소 — Supabase REST(service-role) 기반 서버 전용 유틸.
  *
- * PRD user-login-auth §3.1. `lib/server/ai/decisionStore.ts` 의 `supabaseConfig()`(url+service-role)
+ * PRD user-login-auth §3.1. (옛 `lib/server/ai/decisionStore.ts` 의) `supabaseConfig()`(url+service-role)
  * 연결 패턴을 계승하되, **인증 경로라 fail-soft 가 아니다**:
  *   - Supabase 미설정/오류를 조용히 "통과"로 처리하면 승인 게이트가 붕괴한다(fail-open 금지, §8.4).
  *   - 따라서 미설정·네트워크·REST 오류는 전부 `ProfileStoreError` 로 **throw** 한다.

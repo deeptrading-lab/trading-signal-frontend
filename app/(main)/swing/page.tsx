@@ -17,7 +17,7 @@ export default function SwingPage() {
       <header className="sr-only">
         <h1 className="text-h1 text-text-strong">{SWING_PAGE_TITLE}</h1>
       </header>
-      {/* useSearchParams(탭 상태)가 Suspense 경계를 요구 — /analyze 패턴과 동일. */}
+      {/* useSearchParams(탭 상태)가 Suspense 경계를 요구한다. */}
       <Suspense fallback={null}>
         <SwingScreenerContainer />
       </Suspense>

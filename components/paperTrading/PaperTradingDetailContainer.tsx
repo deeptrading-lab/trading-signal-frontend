@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { fmtCost, fmtTokensApprox } from "@/components/analyze/format";
 import {
   ACTION_LABEL,
   PAPER_TRADING_ANALYST_PREFIX,
@@ -68,7 +67,7 @@ import {
   PAPER_TRADING_TIMELINE_TITLE,
   STATUS_LABEL,
 } from "@/lib/copy/paperTrading/labels";
-import { formatNumber, formatPct } from "./format";
+import { fmtCost, fmtTokensApprox, formatNumber, formatPct } from "./format";
 import type { PaperTradingOrder } from "@/lib/types/paperTrading/paperTrading";
 
 /**

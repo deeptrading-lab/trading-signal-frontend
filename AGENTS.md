@@ -80,7 +80,7 @@ main 반영 + 브랜치 정리
 
 ## 호출 구조 (도메인 공통 패턴)
 
-라우트는 `app/(main)/` 그룹 아래 도메인별로 나뉜다 (`home`·`market`·`stock`·`profile`·`watchlist`·`dashboard`·`analyze`). 각 도메인은 아래 동일 계층을 따른다.
+라우트는 `app/(main)/` 그룹 아래 도메인별로 나뉜다 (`home`·`market`·`stock`·`profile`·`watchlist`·`swing`·`intraday`). 각 도메인은 아래 동일 계층을 따른다.
 
 ```text
 Browser
@@ -95,15 +95,15 @@ Next.js route handler (app/api/**/route.ts) ← BFF 계층
 trading-signal-engine FastAPI / 외부 데이터 소스
 ```
 
-- 예: `workbench` 도메인은 `app/(main)/analyze/page.tsx` → `hooks/workbench/*` → `lib/api/workbench/*` → `app/api/workbench/analyze/route.ts` → FastAPI `analyze_workbench()`.
+- 예: `swing` 도메인은 `app/(main)/swing/page.tsx` → `hooks/swing/*` → `lib/api/swing/*` → `app/api/swing/screener/route.ts` → Supabase `swing_judgments`(크론이 저장한 결정론 판정).
 - 시세·공시 도메인(`market`·`stock`·`disclosure`)은 FastAPI 대신 외부 API(KIS·OpenDART·CoinGecko)를 route handler 가 프록시한다.
 
 ## 도메인·폴더 표준
 
 ```text
 app/                  Next.js App Router 진입 (layout/providers + api/ BFF + login 등)
-app/(main)/<route>/   라우트 그룹 + 도메인별 page (home·market·stock·profile·watchlist·dashboard·analyze)
-components/<domain>/   화면별 컴포넌트 (home·market·profile·watchlist·dashboard·workbench 등)
+app/(main)/<route>/   라우트 그룹 + 도메인별 page (home·market·stock·profile·watchlist·swing·intraday)
+components/<domain>/   화면별 컴포넌트 (home·market·profile·watchlist·swing·intraday·workbench 등)
 components/layout/     재사용 layout 컴포넌트 (Sidebar·BottomNav·HeaderMarketTicker 등)
 components/ui/         (예정) 도메인 무관 원자 컴포넌트
 hooks/<domain>/        도메인 커스텀훅 (auth·disclosure·market·profile·stock·watchlist·workbench)

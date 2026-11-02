@@ -3,7 +3,7 @@
  *
  * profile-real-data — 동작하지 않던 항목(알림·보안·결제)을 제거했다. 화면에 있는데 눌러도
  * 아무 일이 없는 행은 mock 데이터와 같은 종류의 거짓말이라, 실제 기능이 생길 때 다시 넣는다.
- * 남은 항목은 전부 실제로 동작한다 — 테마 토글(client), 성적표·유저관리 이동(href), 로그아웃.
+ * 남은 항목은 전부 실제로 동작한다 — 테마 토글(client), 유저관리 이동(href), 로그아웃.
  *
  * 카피는 `lib/copy/profile/labels.ts` 의 키 매핑.
  */
@@ -15,14 +15,6 @@ export const PROFILE_MENU_ITEMS: ProfileMenuItems = [
   { key: "THEME", iconName: "Moon", variant: "default" },
   { key: "LOGOUT", iconName: "LogOut", variant: "danger" },
 ];
-
-/** 관리자 메뉴(admin 이상) — 신호 성적표. 운영 도구라 일반 유저 미노출. */
-export const PROFILE_SCORECARD_MENU_ITEM: ProfileMenuItem = {
-  key: "SCORECARD",
-  iconName: "Target",
-  variant: "default",
-  href: "/dashboard/scorecard",
-};
 
 /**
  * 관리자 전용 진입점 — 프로필 페이지(서버)가 세션 role==admin 일 때만 주입한다.

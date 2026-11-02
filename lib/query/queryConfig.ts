@@ -94,30 +94,6 @@ export const queryConfig = {
       staleTime: 1 * DAY,
       gcTime: 1 * HOUR,
     },
-    /**
-     * AI 분석 토큰 사용량 집계 — 로컬 분석 실행 시에만 누적되는 이력. 수동 새로고침 + 짧은 stale.
-     * 자주 바뀌지 않으나 분석 1회 후 바로 반영되도록 60s.
-     */
-    agentUsage: {
-      staleTime: 60 * SECOND,
-      gcTime: 5 * MINUTE,
-    },
-    /**
-     * A/B 토큰 최적화 리포트 — 실험 실행 후 수동 새로고침으로 확인하는 운영자 뷰.
-     * usage 와 동일하게 짧은 stale 을 둬 방금 끝난 run 이 빠르게 반영되게 한다.
-     */
-    abHarnessReport: {
-      staleTime: 60 * SECOND,
-      gcTime: 5 * MINUTE,
-    },
-    /**
-     * AI 분석 결론 카드 목록 — 로컬 분석 실행 시에만 갱신되는 공유 결론. 실시간성 낮아 staleTime 60s,
-     * 분석 1회 후 재진입 시 바로 반영. agentUsage 와 동일 정책.
-     */
-    aiDecisions: {
-      staleTime: 60 * SECOND,
-      gcTime: 5 * MINUTE,
-    },
   },
   /**
    * 수급(외국인/기관 순매수) 도메인 TTL.
@@ -258,28 +234,10 @@ export const queryConfig = {
       pollMs: 10 * SECOND,
     },
   },
-  scorecard: {
-    /**
-     * AI 판정 적중률 집계 — cron 이 하루 1회 채점하므로 장중 재호출 무의미. 내부 운영자 뷰라
-     * 실시간성 낮음 → staleTime 5분 + 수동 새로고침(PRD `signal-scorecard` §3-3-B).
-     */
-    summary: {
-      staleTime: 5 * MINUTE,
-      gcTime: 30 * MINUTE,
-    },
-    /**
-     * 신뢰도 캘리브레이션 — 채점 누적 통계라 변동 느림. 판정 카드에 곁들이는 보조 정보라
-     * 실시간성 불요 → summary 와 동일 정책(staleTime 5분). PRD `scorecard-feedback` §(가).
-     */
-    calibration: {
-      staleTime: 5 * MINUTE,
-      gcTime: 30 * MINUTE,
-    },
-  },
   intraday: {
     /**
      * 틱 자가채점 라벨 집계 — 라벨링 실행/세션 완료 시에만 변한다. 실행 후 invalidate 가
-     * 갱신을 담당하므로 staleTime 은 넉넉히(scorecard summary 와 동일 정책).
+     * 갱신을 담당하므로 staleTime 은 넉넉히(5분).
      */
     tickLabelSummary: {
       staleTime: 5 * MINUTE,

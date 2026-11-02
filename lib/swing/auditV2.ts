@@ -9,7 +9,7 @@
  * - 탐색(Part B): 새 데이터 피처 F1~F8 — 발견 구간 IC 판정(E-2 와 같은 틀) → 통과분만 홀드아웃.
  */
 
-import { mean, neweyWestT, spearman } from "@/lib/server/scorecard/directionDiagnosis";
+import { mean, neweyWestT, spearman } from "@/lib/utils/stats";
 import type { Check, DatedValue, Verdict } from "./audit";
 
 export const V2 = {

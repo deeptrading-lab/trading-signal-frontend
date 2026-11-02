@@ -1,14 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getAbRunConfigsBySession } from "@/lib/server/ai/abRunConfigStore";
-import { getAgentUsageRows } from "@/lib/server/ai/agentUsageStore";
-import { getLatestAIDecision } from "@/lib/server/ai/decisionStore";
-import { claimNextPending } from "@/lib/server/ai/queueStore";
 import { isProfileStoreConfigured } from "@/lib/server/auth/profileStore";
 import { summarizeLabels } from "@/lib/server/intraday/tickLabels";
 import { getLatestMarketAnalysis } from "@/lib/server/marketAnalysisStore";
 import { loadPersistedAutopilotRuns } from "@/lib/server/paperTrading/autopilot/persistence";
 import { loadPersistedPaperTrading } from "@/lib/server/paperTrading/persistence";
-import { getAllScorecardRows } from "@/lib/server/scorecard/scorecardStore";
+import { isSwingNoteStoreConfigured } from "@/lib/server/swing/noteStore";
+import { isSwingStoreConfigured } from "@/lib/server/swing/store";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -23,17 +20,14 @@ describe("Supabase egress guard integration", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
-    await expect(getAbRunConfigsBySession("session")).resolves.toBeNull();
-    await expect(getAgentUsageRows()).resolves.toBeNull();
-    await expect(getLatestAIDecision("005930")).resolves.toBeNull();
-    await expect(claimNextPending("worker")).resolves.toBeNull();
     expect(isProfileStoreConfigured()).toBe(false);
+    expect(isSwingStoreConfigured()).toBe(false);
+    expect(isSwingNoteStoreConfigured()).toBe(false);
     await expect(getLatestMarketAnalysis()).resolves.toBeNull();
     await expect(loadPersistedAutopilotRuns("operator")).resolves.toEqual({
       status: "disabled",
     });
     await expect(loadPersistedPaperTrading()).resolves.toEqual({ status: "disabled" });
-    await expect(getAllScorecardRows()).resolves.toEqual([]);
     await expect(summarizeLabels()).resolves.toMatchObject({
       configured: false,
       total: 0,

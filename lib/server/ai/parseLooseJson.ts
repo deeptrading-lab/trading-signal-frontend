@@ -1,8 +1,7 @@
 /**
  * LLM JSON 응답 느슨한 파싱 — prose 혼입·코드펜스·trailing comma 에 강하다.
  *
- * `app/api/stock/ai-analysis/route.ts`(12-에이전트 PM 파서)와 동일 전략을 공유 유틸로 추출.
- * (heavy 경로는 자체 사본을 유지 — 무회귀. 신규 단타 provider 가 본 유틸을 사용.)
+ * 옛 12-에이전트 PM 파서와 같은 전략(그 경로는 swing-judgment PR-5 에서 삭제). 단타 provider·스윙 AI 노트가 쓴다.
  */
 
 /** 문자열 리터럴 내부 brace 를 무시하고 첫 완결 `{...}` 객체를 추출(prose 가 앞뒤로 섞여도). */
