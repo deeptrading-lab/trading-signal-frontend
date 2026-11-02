@@ -67,6 +67,8 @@ export type SwingScreenerResponse = {
   items: SwingScreenerItem[];
   /** 마지막 크론 실행 요약. */
   run: { at: string; ok: boolean; tradeDate: string | null } | null;
+  /** 상단 요약 — 이 거래일·시장의 저장 종목 수, 수급 조건 충족, 주의 종목. 집계 실패면 null. */
+  counts: { all: number; flow: number; excluded: number } | null;
 };
 
 /** AI 노트(뉴스·공시 정리) — `/api/swing/note/[ticker]` (PR-4). 판정과 무관한 별도 저장소. */

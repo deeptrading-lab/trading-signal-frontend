@@ -3,7 +3,8 @@
  * 필요한 열만(PRD `swing-judgment` PR-2 설계). 상세는 같은 엔진으로 즉시 계산한다.
  */
 
-import { itemBits, metCount } from "@/lib/swing/itemBits";
+import { adverseBits, itemBits, metCount } from "@/lib/swing/itemBits";
+import { RULEBOOK } from "@/lib/swing/rulebook";
 import type { SwingJudgment } from "@/lib/swing/judge";
 
 export type SwingJudgmentRow = {
@@ -45,7 +46,8 @@ export function toSwingRow(
     met_count: metCount(j.items),
     flow_pass: j.items.A.pass === true && j.exclusions.length === 0,
     exclusions: [...j.exclusions],
-    items: itemBits(j.items),
+    // 충족 비트(0~) + 불리한 신호 비트(16~, 표시 전용) — 한 정수에.
+    items: itemBits(j.items) | adverseBits(j.features, RULEBOOK),
     stage: j.stage,
     close: j.close,
     adv20: j.features.adv20 === null ? null : Math.round(j.features.adv20),

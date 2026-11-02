@@ -31,8 +31,10 @@ import {
   SWING_TABS_ARIA,
   swingBasisLabel,
   swingCountLabel,
+  swingSummaryLabel,
+  SWING_SUMMARY_VOLATILE,
 } from "@/lib/copy/swing/labels";
-import { SwingScreenerRow } from "./SwingScreenerRow";
+import { SwingScreenerTable } from "./SwingScreenerTable";
 import { swingFilterFromParam, swingMarketFromParam, swingTabHref } from "./swingTab";
 
 const FILTER_OPTIONS = (["flow", "excluded", "all"] as const).map((key) => ({ key, label: SWING_TAB_LABEL[key] }));
@@ -61,6 +63,14 @@ export function SwingScreenerContainer() {
       <div className="flex flex-col gap-xs">
         {data?.tradeDate ? (
           <p className="text-body-sm-strong text-text-strong">{swingBasisLabel(data.tradeDate)}</p>
+        ) : null}
+        {data?.counts ? (
+          <p className="text-body-sm text-text-strong">
+            {swingSummaryLabel(data.counts)}
+            {data.counts.all > 0 && data.counts.excluded / data.counts.all >= 0.6 ? (
+              <span className="text-text-muted"> — {SWING_SUMMARY_VOLATILE}</span>
+            ) : null}
+          </p>
         ) : null}
         <p className="text-caption text-text-muted">{SWING_PAGE_SUBTITLE}</p>
         {/* 보이는 거래일의 집계가 끝까지(ok) 돌았다는 마커가 없으면 목록이 일부일 수 있다(집계 중·실패). */}
@@ -136,11 +146,7 @@ function ScreenerBody({
   return (
     <div className={cn("flex flex-col gap-xs transition-opacity", isStale && "opacity-60")} aria-busy={isStale}>
       <p className="text-caption text-text-muted">{swingCountLabel(data.items.length)}</p>
-      <ul aria-label={SWING_TAB_LABEL[filter]}>
-        {data.items.map((item) => (
-          <SwingScreenerRow key={item.ticker} item={item} />
-        ))}
-      </ul>
+      <SwingScreenerTable items={data.items} showReasons={filter !== "flow"} />
     </div>
   );
 }

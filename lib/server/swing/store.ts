@@ -83,6 +83,41 @@ export async function listSwingRows(opts: {
   return get<SwingListRow>(q);
 }
 
+/** 행 수만 센다(PostgREST count=exact, 본문 없음). 실패면 null. */
+async function count(query: string): Promise<number | null> {
+  const config = getSupabaseServiceConfig();
+  if (!config) return null;
+  const res = await fetch(`${config.url}/rest/v1/${TABLE}?${query}`, {
+    method: "HEAD",
+    headers: { ...headers(config.key), Prefer: "count=exact" },
+    cache: "no-store",
+  }).catch(() => null);
+  const total = res?.ok ? res.headers.get("content-range")?.split("/")[1] : undefined;
+  return total && /^\d+$/.test(total) ? Number(total) : null;
+}
+
+/** 목록 상단 요약 — 저장 종목 수·수급 조건 충족·주의 종목 수. 하나라도 실패하면 null. */
+export async function countSwingRows(opts: {
+  tradeDate: string;
+  version: string;
+  market: "KOSPI" | "KOSDAQ" | null;
+}): Promise<{ all: number; flow: number; excluded: number } | null> {
+  const base = [
+    `trade_date=eq.${opts.tradeDate}`,
+    `rulebook_version=eq.${encodeURIComponent(opts.version)}`,
+    "source=eq.screener",
+    opts.market ? `market=eq.${opts.market}` : null,
+  ]
+    .filter(Boolean)
+    .join("&");
+  const [all, flow, excluded] = await Promise.all([
+    count(base),
+    count(`${base}&flow_pass=is.true`),
+    count(`${base}&grade=eq.excluded`),
+  ]);
+  return all === null || flow === null || excluded === null ? null : { all, flow, excluded };
+}
+
 /** (거래일, 종목, 버전) 저장 행의 해시·등급 — 즉시 판정과의 일치 확인용. */
 export async function getStoredSwingRow(
   tradeDate: string,
