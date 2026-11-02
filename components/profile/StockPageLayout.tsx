@@ -24,7 +24,7 @@ import { CompanyOverview } from "./CompanyOverview";
 import { DisclosureList } from "./DisclosureList";
 import { StockInvestorTrend } from "./StockInvestorTrend";
 import { StockDepthSection } from "@/components/stock/StockDepthSection";
-import { SwingJudgmentCard } from "@/components/swing/SwingJudgmentCard";
+import { SwingSummaryCard } from "@/components/swing/SwingSummaryCard";
 import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
@@ -170,7 +170,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
         {isUs ? (
           <SignalSummary ticker={ticker} />
         ) : (
-          <SwingJudgmentCard ticker={ticker} fallback={<SignalSummary ticker={ticker} />} />
+          <SwingSummaryCard ticker={ticker} fallback={<SignalSummary ticker={ticker} />} />
         )}
       </div>
 

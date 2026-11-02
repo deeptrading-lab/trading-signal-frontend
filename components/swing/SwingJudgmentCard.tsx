@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
 import { SwingNoteSection } from "./SwingNoteSection";
-import { adverseBits, hasAdverseBit, hasItemBit, metCount } from "@/lib/swing/itemBits";
+import { adverseBits, hasAdverseBit, hasItemBit, metCount, type SwingItemKey } from "@/lib/swing/itemBits";
 import type { SwingJudgment } from "@/lib/swing/judge";
 import { RULEBOOK } from "@/lib/swing/rulebook";
 import { cn } from "@/lib/utils/cn";
@@ -45,9 +45,19 @@ import {
   swingExclusionLabel,
   swingMetChip,
   swingMetChipSr,
-  swingStatsSentence,
   SWING_STORED_NOTE,
   swingStageLabel,
+  SWING_SECTION_CHECK,
+  SWING_SECTION_LEVELS,
+  SWING_SECTION_STATS,
+  SWING_STATS_N,
+  SWING_STATS_UP,
+  SWING_STATS_BASE,
+  SWING_STATS_EXCESS,
+  SWING_STATS_COHORT,
+  SWING_CHECK_GROUPS,
+  SWING_MATRIX_COLUMNS,
+  swingPpLabel,
 } from "@/lib/copy/swing/labels";
 
 
@@ -155,17 +165,18 @@ function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
   const j = data.judgment;
   // 불리한 신호(표시 전용) — 목록 매트릭스와 같은 정의.
   const adverse = adverseBits(j.features, RULEBOOK);
-  const statsLine = swingStatsSentence(data.stats.grade, SWING_GRADE_COHORT_LABEL[j.grade]);
+  const met = metCount(j.items);
+  const cell = data.stats.grade;
   return (
-    <section aria-labelledby={titleId} className="flex flex-col gap-lg">
+    <section aria-labelledby={titleId} className="flex flex-col gap-xl">
       <header className="flex flex-col gap-xs">
         <div className="flex flex-wrap items-center justify-between gap-sm">
           <h2 id={titleId} className="text-h2 text-text-strong">
             {SWING_CARD_TITLE}
           </h2>
           <Badge variant="accent">
-            <span aria-hidden="true">{swingMetChip(metCount(j.items))}</span>
-            <span className="sr-only">{swingMetChipSr(metCount(j.items))}</span>
+            <span aria-hidden="true">{swingMetChip(met)}</span>
+            <span className="sr-only">{swingMetChipSr(met)}</span>
           </Badge>
         </div>
         <p className="text-caption text-text-muted">
@@ -173,66 +184,100 @@ function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
         </p>
       </header>
 
-      {j.exclusions.length > 0 ? <CautionCallout j={j} statsLine={statsLine} /> : null}
+      {j.exclusions.length > 0 ? <CautionCallout j={j} /> : null}
 
-      <ul className="flex flex-col">
-        {SWING_CHECK_ROWS.map((key) => {
-          const pass = j.items[key].pass;
-          const bad = pass !== true && hasAdverseBit(adverse, key);
-          return (
-            <li key={key} className="flex items-start justify-between gap-md border-b border-border-line py-sm last:border-b-0">
-              <div className="flex min-w-0 flex-col gap-xs">
-                <span className="text-body-sm-strong text-text-strong">{SWING_ITEM_LABEL[key]}</span>
-                <span className="text-caption text-text-muted">{describeItem(key, j, RULEBOOK)}</span>
-              </div>
-              <span
-                className={cn(
-                  "shrink-0 text-label-sm",
-                  pass === true ? "text-outcome-hit" : bad ? "text-warn" : "text-text-muted",
-                )}
-              >
-                {pass === true ? (
-                  SWING_CHECK_PASS
-                ) : bad ? (
-                  `▲ ${SWING_HINT_ADVERSE}`
-                ) : pass === false ? (
-                  <>
-                    <span aria-hidden="true">{SWING_CHECK_MISS}</span>
-                    <span className="sr-only">{SWING_CHECK_MISS_SR}</span>
-                  </>
-                ) : (
-                  SWING_CHECK_UNKNOWN
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      {/* ① 조건 체크 — 수급·가격추세 두 묶음, 결과는 색 칩 */}
+      <div className="flex flex-col gap-sm">
+        <SectionTitle>{SWING_SECTION_CHECK}</SectionTitle>
+        {SWING_CHECK_GROUPS.map((g) => (
+          <div key={g.title} className="overflow-hidden rounded-md border border-border-line">
+            <p className="bg-surface-muted px-md py-xs text-caption text-text-muted">{g.title}</p>
+            <ul className="divide-y divide-border-line">
+              {g.keys.map((key) => {
+                const pass = j.items[key].pass;
+                const state: CheckState =
+                  pass === true ? "met" : hasAdverseBit(adverse, key) ? "adverse" : pass === false ? "miss" : "unknown";
+                return (
+                  <li key={key} className="flex items-center justify-between gap-md px-md py-sm">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-body-sm-strong text-text-strong">{checkLabel(key)}</span>
+                      <span className="text-caption tabular-nums text-text-muted">{describeItem(key, j, RULEBOOK)}</span>
+                    </div>
+                    <StatusChip state={state} />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
 
+      {/* ② 참고 가격대 — 차트 점선과 같은 색 점 */}
       {j.plan ? (
-        <dl className="grid grid-cols-3 gap-md">
-          <Level label={SWING_LEVEL_SUPPORT} value={price(j.plan.support)} />
-          <Level label={SWING_LEVEL_RESISTANCE} value={price(j.plan.resistance)} />
-          <Level
-            label={SWING_LEVEL_RANGE}
-            value={j.plan.typicalMove10Pct === null ? "—" : `±${j.plan.typicalMove10Pct.toFixed(1)}%`}
-          />
-        </dl>
+        <div className="flex flex-col gap-sm">
+          <SectionTitle>{SWING_SECTION_LEVELS}</SectionTitle>
+          <dl className="grid grid-cols-3 gap-sm">
+            <Tile label={SWING_LEVEL_SUPPORT} dot="bg-chart-hist-up" value={price(j.plan.support)} />
+            <Tile label={SWING_LEVEL_RESISTANCE} dot="bg-chart-signal" value={price(j.plan.resistance)} />
+            <Tile
+              label={SWING_LEVEL_RANGE}
+              value={j.plan.typicalMove10Pct === null ? "—" : `±${j.plan.typicalMove10Pct.toFixed(1)}%`}
+            />
+          </dl>
+        </div>
       ) : null}
 
-      {j.exclusions.length === 0 && statsLine ? <p className="text-caption text-text-muted">{statsLine}</p> : null}
+      {/* ③ 과거 통계 — 문장 대신 숫자 3칸 */}
+      {cell && !cell.hidden && cell.upRate !== null && cell.baseUpRate !== null && cell.meanExcess10 !== null ? (
+        <div className="flex flex-col gap-sm">
+          <SectionTitle>{SWING_SECTION_STATS}</SectionTitle>
+          <dl className="grid grid-cols-3 gap-sm">
+            <Tile label={SWING_STATS_N} value={`${cell.n.toLocaleString("ko-KR")}건`} />
+            <Tile
+              label={SWING_STATS_UP}
+              value={`${Math.round(cell.upRate * 100)}%`}
+              sub={`${SWING_STATS_BASE} ${Math.round(cell.baseUpRate * 100)}%`}
+            />
+            <Tile label={SWING_STATS_EXCESS} value={swingPpLabel(cell.meanExcess10)} />
+          </dl>
+          <p className="text-caption text-text-muted">
+            {SWING_STATS_COHORT(SWING_GRADE_COHORT_LABEL[j.grade])}
+          </p>
+        </div>
+      ) : null}
 
-      {/* AI 노트(PR-4) — 판정과 별개 섹션. 사용자가 요청할 때만 만든다. */}
-      <div className="border-t border-border-line pt-lg">
-        <SwingNoteSection ticker={j.ticker} />
-      </div>
+      {/* ④ AI 노트 — 판정과 별개 섹션. 사용자가 요청할 때만 만든다. */}
+      <SwingNoteSection ticker={j.ticker} />
 
       <p className="text-caption text-text-muted">{SWING_DISCLAIMER}</p>
     </section>
   );
 }
 
-function CautionCallout({ j, statsLine }: { j: SwingJudgment; statsLine: string | null }) {
+type CheckState = "met" | "adverse" | "miss" | "unknown";
+
+/** 목록 매트릭스와 같은 쉬운 이름(개인 매도·지지선 …). */
+function checkLabel(key: SwingItemKey): string {
+  return SWING_MATRIX_COLUMNS.find((c) => c.key === key)?.label ?? SWING_ITEM_LABEL[key];
+}
+
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <h3 className="text-body-strong font-bold text-text-strong">{children}</h3>;
+}
+
+function StatusChip({ state }: { state: CheckState }) {
+  const [text, cls] =
+    state === "met"
+      ? [SWING_CHECK_PASS, "bg-signal-done-soft text-outcome-hit"]
+      : state === "adverse"
+        ? [`▲ ${SWING_HINT_ADVERSE}`, "bg-warn-soft text-warn"]
+        : state === "miss"
+          ? [SWING_CHECK_MISS_SR, "bg-surface-muted text-text-muted"]
+          : [SWING_CHECK_UNKNOWN, "bg-surface-muted text-text-muted"];
+  return <span className={cn("shrink-0 rounded-pill px-sm py-xs text-caption font-bold", cls)}>{text}</span>;
+}
+
+function CautionCallout({ j }: { j: SwingJudgment }) {
   return (
     <div className="flex flex-col gap-sm rounded-md bg-warn-soft p-lg text-warn">
       <h3 className="text-body-sm-strong">{SWING_CAUTION_TITLE}</h3>
@@ -243,16 +288,19 @@ function CautionCallout({ j, statsLine }: { j: SwingJudgment; statsLine: string 
           </li>
         ))}
       </ul>
-      {statsLine ? <p className="text-caption">{statsLine}</p> : null}
     </div>
   );
 }
 
-function Level({ label, value }: { label: string; value: string }) {
+function Tile({ label, value, sub, dot }: { label: string; value: string; sub?: string; dot?: string }) {
   return (
-    <div className="flex flex-col gap-xs">
-      <dt className="text-caption text-text-muted">{label}</dt>
+    <div className="flex flex-col gap-xs rounded-md bg-surface-muted p-md">
+      <dt className="flex items-center gap-xs text-caption text-text-muted">
+        {dot ? <span aria-hidden="true" className={cn("h-2 w-2 rounded-pill", dot)} /> : null}
+        {label}
+      </dt>
       <dd className="text-body-sm-strong tabular-nums text-text-strong">{value}</dd>
+      {sub ? <dd className="text-caption text-text-muted">{sub}</dd> : null}
     </div>
   );
 }

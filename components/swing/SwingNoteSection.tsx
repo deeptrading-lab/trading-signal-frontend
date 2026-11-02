@@ -10,6 +10,7 @@
 
 import { useId } from "react";
 import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils/cn";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useMutationSwingNote } from "@/hooks/swing/useMutationSwingNote";
 import { isSwingNoteActive, useQuerySwingNote } from "@/hooks/swing/useQuerySwingNote";
@@ -33,6 +34,13 @@ import {
 } from "@/lib/copy/swing/note";
 
 
+/** 기사 방향 칩 색 — 주가 등락색(빨강·파랑)과 섞이지 않게 초록·앰버·회색. */
+const DIRECTION_CLASS = {
+  positive: "bg-signal-done-soft text-outcome-hit",
+  negative: "bg-warn-soft text-warn",
+  neutral: "bg-surface-muted text-text-muted",
+} as const;
+
 export function SwingNoteSection({ ticker }: { ticker: string }) {
   const titleId = useId();
   const { data, isLoading } = useQuerySwingNote(ticker);
@@ -43,7 +51,7 @@ export function SwingNoteSection({ ticker }: { ticker: string }) {
   return (
     <section aria-labelledby={titleId} className="flex flex-col gap-sm">
       <div className="flex flex-wrap items-center justify-between gap-sm">
-        <h3 id={titleId} className="text-body-sm-strong text-text-strong">
+        <h3 id={titleId} className="text-body-strong font-bold text-text-strong">
           {SWING_NOTE_TITLE}
         </h3>
         {/* 처리 중에도 버튼을 남겨(비활성) 키보드 포커스가 사라지지 않게 한다. */}
@@ -84,9 +92,19 @@ function NoteBody({ data, active }: { data: SwingNote | null | undefined; active
       {items.length === 0 ? (
         <p className="text-caption text-text-muted">{SWING_NOTE_EMPTY}</p>
       ) : (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col gap-sm">
           {items.map((it) => (
-            <li key={`${it.url}|${it.title}`} className="flex flex-col gap-xs border-b border-border-line py-sm last:border-b-0">
+            <li key={`${it.url}|${it.title}`} className="flex flex-col gap-xs rounded-md border border-border-line p-md">
+              <div className="flex flex-wrap items-center gap-xs">
+                <span className={cn("rounded-pill px-sm py-xs text-caption font-bold", DIRECTION_CLASS[it.direction])}>
+                  {SWING_NOTE_DIRECTION_LABEL[it.direction]}
+                </span>
+                <span className="rounded-pill bg-surface-muted px-sm py-xs text-caption text-text-muted">
+                  {SWING_NOTE_CATEGORY_LABEL[it.category]}
+                </span>
+                {it.materiality === "high" ? <Badge variant="accent">{SWING_NOTE_HIGH}</Badge> : null}
+                <span className="ml-auto text-caption tabular-nums text-text-muted">{swingNoteDateLabel(it.date)}</span>
+              </div>
               <a
                 href={it.url}
                 target="_blank"
@@ -95,13 +113,9 @@ function NoteBody({ data, active }: { data: SwingNote | null | undefined; active
               >
                 {it.title}
               </a>
-              <p className="text-caption text-text-muted">{it.summary}</p>
-              <p className="flex flex-wrap items-center gap-xs text-caption text-text-muted">
-                <span>
-                  {swingNoteDateLabel(it.date)} · {it.source}({swingNoteHost(it.url)}) ·{" "}
-                  {SWING_NOTE_CATEGORY_LABEL[it.category]} · {SWING_NOTE_DIRECTION_LABEL[it.direction]}
-                </span>
-                {it.materiality === "high" ? <Badge variant="accent">{SWING_NOTE_HIGH}</Badge> : null}
+              <p className="text-body-sm text-text-muted">{it.summary}</p>
+              <p className="text-caption text-text-muted">
+                {it.source} · {swingNoteHost(it.url)}
               </p>
             </li>
           ))}
