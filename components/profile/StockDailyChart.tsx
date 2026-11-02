@@ -36,11 +36,9 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
-  ReferenceArea,
   ResponsiveContainer,
   DefaultZIndexes,
 } from "recharts";
-import type { ReactElement } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useChartData } from "@/hooks/stock/useChartData";
 import {
@@ -64,14 +62,12 @@ import {
   type MaPeriod,
 } from "./stockChartConfig";
 import type { ChartOptions } from "@/lib/store/chart/chartOptions";
-import type { AiVerdictLevels } from "@/lib/utils/aiVerdictLevels";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
 import { isUsTicker } from "@/lib/utils/isUsTicker";
 import { CandleTooltip } from "./chart/CandleTooltip";
 import { LastPriceTag, lastPriceTagWidth } from "./chart/LastPriceTag";
-import { AiLevelAxisLabels, aiLabelMaxWidth } from "./chart/AiLevelAxisLabels";
 import { PriceAxisTick } from "./chart/PriceAxisTick";
 import { ChartShell } from "./chart/ChartShell";
 import { SubLabel } from "./chart/SubLabel";
@@ -124,10 +120,6 @@ export interface StockDailyChartProps {
   onMinutePriorDaysChange: (d: number) => void;
   onChartTypeChange: (t: ChartType) => void;
   onToggleOverlay: (key: keyof ChartOptions) => void;
-  /** AI 판정 가격 레벨(목표/재진입·손절) — 저장 판정에서 파생. null=미표시. */
-  aiLevels?: AiVerdictLevels | null;
-  /** AI 레벨 오버레이 표시 여부(배너 토글). aiLevels 있을 때만 유효. */
-  showAiLevels?: boolean;
   /** 분봉 선택 허용 — 미국 종목은 분봉 미지원이라 false 로 분봉 탭 숨김(us-stock-support). */
   allowMinute?: boolean;
 }
@@ -149,8 +141,6 @@ export function StockDailyChart({
   onMinutePriorDaysChange,
   onChartTypeChange,
   onToggleOverlay,
-  aiLevels,
-  showAiLevels,
   allowMinute,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
@@ -313,84 +303,11 @@ export function StockDailyChart({
     : true;
   const lastPriceColor = lastUp ? C.stroke : C.down;
 
-  // ── AI 판정 레벨 오버레이 — 저장 판정 있고 토글 ON 일 때만. 존(뒤, 채색)·선(앞)으로 분리.
-  //    정확한 숫자 라벨은 차트 밖 배너 레전드에 두어(y축 태그 겹침 회피) 차트는 시각만 깔끔하게.
-  //    ifOverflow="extendDomain" 로 목표/손절이 보이는 범위 밖이면 y도메인이 자동 확장된다.
-  const ai = showAiLevels && aiLevels ? aiLevels : null;
-  // AI 오버레이 모드일 때만 현재가 알약에 "현재가" 접두 — AI 레벨(목표/재진입/손절)과 나란히 놓여 구분 필요.
-  const lastPriceLabel = ai ? "현재가" : undefined;
-  const aiZoneEls: ReactElement[] = [];
-  const aiLineEls: ReactElement[] = [];
-  if (ai) {
-    // stop_loss_pct 부호로 방향이 갈림: 음수=하방 손절(강세), 양수=상방 무효화(약세).
-    const stopIsInvalidation = ai.stop.role === "invalidation";
-    // 존: 강세 target=리워드(현재가↔목표, 상승색)+리스크(손절↔현재가, 하락색).
-    //     약세 무효화=리스크존(현재가↔무효화, 상방, 보라) · SELL=리스크존만.
-    //     재진입 단독(무효화 없는 legacy 약세 관망)=존 없이 선만.
-    if (lastClose != null && (ai.target?.role !== "reentry" || stopIsInvalidation)) {
-      if (ai.target?.role === "target") {
-        aiZoneEls.push(
-          <ReferenceArea
-            key="ai-reward"
-            y1={Math.min(lastClose, ai.target.price)}
-            y2={Math.max(lastClose, ai.target.price)}
-            fill={C.stroke}
-            fillOpacity={0.11}
-            stroke="none"
-            ifOverflow="extendDomain"
-          />,
-        );
-      }
-      aiZoneEls.push(
-        <ReferenceArea
-          key="ai-risk"
-          y1={Math.min(lastClose, ai.stop.price)}
-          y2={Math.max(lastClose, ai.stop.price)}
-          fill={stopIsInvalidation ? C.rsiLine : C.down}
-          fillOpacity={0.11}
-          stroke="none"
-          ifOverflow="extendDomain"
-        />,
-      );
-    }
-    // 선(라벨 없음). 목표=상승색 / 재진입=중립 / 손절=하락색 / 무효화=보라. 라벨(가격 알약)은
-    // 우측 축에 커스텀 레이어(aiAxisLabelsEl)가 충돌 해소해 그린다.
-    if (ai.target) {
-      aiLineEls.push(
-        <ReferenceLine
-          key="ai-target"
-          y={ai.target.price}
-          stroke={ai.target.role === "target" ? C.stroke : C.refMid}
-          strokeWidth={1.5}
-          strokeDasharray="6 3"
-          ifOverflow="extendDomain"
-        />,
-      );
-    }
-    aiLineEls.push(
-      <ReferenceLine
-        key="ai-stop"
-        y={ai.stop.price}
-        stroke={stopIsInvalidation ? C.rsiLine : C.down}
-        strokeWidth={1.5}
-        strokeDasharray="6 3"
-        ifOverflow="extendDomain"
-      />,
-    );
-  }
-  // 우측 축 라벨(y축서 시작해 오른쪽 확장) — 라벨이 축 폭보다 길면 그 넘침분만큼 margin.right 예약해
-  //  잘리지 않게. AI 레벨 라벨과 현재가 알약 둘 다 좌정렬·우확장이라 각자 넘침분의 최댓값을 예약한다.
-  const aiOverflow = ai ? Math.max(0, aiLabelMaxWidth(ai) - axisWidth + 4) : 0;
+  // 우측 축 현재가 알약(y축서 시작해 오른쪽 확장) — 축 폭보다 길면 그 넘침분만큼 margin.right 예약해 잘리지 않게.
   const lastPriceOverflow =
-    lastClose != null
-      ? Math.max(0, lastPriceTagWidth(lastClose, lastPriceLabel) - axisWidth + 4)
-      : 0;
-  const rightReserve = Math.max(aiOverflow, lastPriceOverflow);
-  const priceMargin = { top: 5, right: 4 + rightReserve, left: 0, bottom: 0 };
-  const subMargin = { top: 0, right: 4 + rightReserve, left: 0, bottom: 0 };
-  const aiAxisLabelsEl = ai ? (
-    <AiLevelAxisLabels key="ai-axis-labels" levels={ai} lastClose={lastClose} />
-  ) : null;
+    lastClose != null ? Math.max(0, lastPriceTagWidth(lastClose) - axisWidth + 4) : 0;
+  const priceMargin = { top: 5, right: 4 + lastPriceOverflow, left: 0, bottom: 0 };
+  const subMargin = { top: 0, right: 4 + lastPriceOverflow, left: 0, bottom: 0 };
 
   // 최신가 알약과 겹치는 가장 가까운 y축 눈금을 숨길 가격 임계값 — 보이는 가격 폭의 ~10%.
   // 기본 눈금 수(≈5개, 간격 ~20%)에서는 항상 최신가에 제일 가까운 눈금 하나만 숨겨진다.
@@ -400,10 +317,8 @@ export function StockDailyChart({
       : priceSeries.map((p) => p.price);
   const priceSpan = plotVals.length ? Math.max(...plotVals) - Math.min(...plotVals) : 0;
   const tickHideThreshold = priceSpan > 0 ? priceSpan * 0.1 : 0;
-  // 알약이 박히는 가격들(최신가 + AI 목표/재진입·손절)의 근처 y축 눈금을 숨겨 겹침 제거.
-  const hidePrices = [lastClose, ai?.target?.price, ai?.stop?.price].filter(
-    (v): v is number => v != null,
-  );
+  // 최신가 알약 근처 y축 눈금을 숨겨 겹침 제거.
+  const hidePrices = lastClose != null ? [lastClose] : [];
   const priceTick = (
     <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} isUs={isUs} />
   );
@@ -419,8 +334,6 @@ export function StockDailyChart({
           {chartType === "candle" ? (
             <ComposedChart data={candleSeries} onClick={handleChartClick} margin={priceMargin}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
-              {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
-              {aiZoneEls}
               {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               {/* 볼린저 음영 밴드 — 캔들 뒤(먼저 선언). [하단,상단] 범위 Area. */}
               {showBB && (
@@ -449,13 +362,9 @@ export function StockDailyChart({
                   strokeDasharray="4 3"
                   strokeOpacity={0.55}
                   zIndex={DefaultZIndexes.axis + 1}
-                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} label={lastPriceLabel} />}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
                 />
               )}
-              {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
-              {aiLineEls}
-              {/* 우측 축 라벨(충돌 해소) — 최상단. */}
-              {aiAxisLabelsEl}
             </ComposedChart>
           ) : (
             <AreaChart data={priceSeries} onClick={handleChartClick} margin={priceMargin}>
@@ -466,8 +375,6 @@ export function StockDailyChart({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
-              {/* AI 판정 리워드/리스크 존 — 가격 뒤(배경). */}
-              {aiZoneEls}
               {showVolumeProfile && <VolumeProfileLayer profile={volumeProfile} />}
               {/* 볼린저 음영 밴드 — 가격 라인 뒤(먼저 선언). [하단,상단] 범위 Area. */}
               {showBB && (
@@ -496,13 +403,9 @@ export function StockDailyChart({
                   strokeDasharray="4 3"
                   strokeOpacity={0.55}
                   zIndex={DefaultZIndexes.axis + 1}
-                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} label={lastPriceLabel} />}
+                  label={<LastPriceTag price={lastClose} color={lastPriceColor} bgColor={C.surface} />}
                 />
               )}
-              {/* AI 판정 목표/재진입·손절 레벨선 — 최상단(현재가선 위). */}
-              {aiLineEls}
-              {/* 우측 축 라벨(충돌 해소) — 최상단. */}
-              {aiAxisLabelsEl}
             </AreaChart>
           )}
         </ResponsiveContainer>

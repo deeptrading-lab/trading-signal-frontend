@@ -18,7 +18,6 @@
  */
 
 import { ProfileCard } from "./ProfileCard";
-import { MyAnalysisSummary } from "./MyAnalysisSummary";
 import { MyStocksSummary } from "./MyStocksSummary";
 import { SettingsMenuCard } from "./SettingsMenuCard";
 import type { ProfileMenuItem } from "@/lib/types/profile/menuItems";
@@ -44,7 +43,6 @@ export function ProfilePage({ profile, menuItems, adminItems }: ProfilePageProps
       <ProfileCard profile={profile} />
       <div className="grid grid-cols-1 gap-2xl md:grid-cols-2">
         <div className="flex flex-col gap-2xl">
-          <MyAnalysisSummary />
           <MyStocksSummary />
         </div>
         {/* 우측 열 — 설정 + (admin 이상) 관리자 메뉴 스택. */}

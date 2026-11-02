@@ -31,8 +31,6 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MobilePullToRefresh } from "@/components/layout/MobilePullToRefresh";
 import { WorkbenchSessionProvider } from "@/hooks/workbench/useWorkbenchSession";
-import { AIAnalysisProvider } from "@/hooks/stock/aiAnalysisProvider";
-import { GlobalAIAnalysis } from "@/components/stock/GlobalAIAnalysis";
 import { StockPeekProvider } from "@/hooks/stock/peekProvider";
 import { GlobalStockPeek } from "@/components/stock/GlobalStockPeek";
 import { cn } from "@/lib/utils/cn";
@@ -45,13 +43,12 @@ import { cn } from "@/lib/utils/cn";
  *   - `/`            홈(home-reskin)
  *   - `/stock*`      종목 상세·검색(`/stock`, `/stock/[ticker]`) — stock-detail-reskin
  *   - `/watchlist`   관심종목(watchlist-reskin) — 카드리스 플랫 표(home 랭킹 정합)
- *   - `/analyze`     AI 분석(analyze-reskin) — 카드리스 플랫 결과 목록 + 플랫 토큰 대시보드
+ *   - `/swing`       스윙 체크(swing-judgment PR-3) — 카드리스 플랫 목록
  *   - `/profile`     마이페이지(profile-reskin) — 카드리스 플랫(자산 히어로만 라이트 카드)
  *   - `/intraday*`   단타 워치(intraday-reskin) — 목록(`/intraday`) + 세션 상세(`/intraday/[sessionId]`),
  *                    카드리스 플랫(요약 KPI·자산곡선·포지션·체결·타임라인 모두 플랫).
- *   - `/dashboard/scorecard`  판정 적중률(scorecard-reskin) — 카드리스 플랫 표(단일 라우트, exact match).
  * `startsWith("/stock")` 는 `/stockfoo` 같은 유령 경로가 없어(라우트 트리상 `/stock` 세그먼트뿐) 새지 않고,
- * `/watchlist`·`/analyze`·`/profile`·`/dashboard/scorecard` 은 하위 라우트가 없어 exact match 로 좁힌다.
+ * `/watchlist`·`/swing`·`/profile` 은 하위 라우트가 없어 exact match 로 좁힌다.
  * `/intraday` 만 목록(exact)+세션 상세(`/[sessionId]`) 두 라우트라 `startsWith` 로 함께 덮되, `/intradayX`
  * 같은 유령 경로가 없어 새지 않는다. `/dashboard` 자체는 `/profile` 로 영구 redirect 되므로 별도 guard 불필요.
  * 나머지 도메인(`/market`)은 기존 회색+카드 유지. */
@@ -60,11 +57,9 @@ function isWhiteSurfaceRoute(pathname: string): boolean {
     pathname === "/" ||
     pathname.startsWith("/stock") ||
     pathname === "/watchlist" ||
-    pathname === "/analyze" ||
     pathname === "/swing" ||
     pathname === "/profile" ||
-    pathname.startsWith("/intraday") ||
-    pathname === "/dashboard/scorecard"
+    pathname.startsWith("/intraday")
   );
 }
 
@@ -80,7 +75,6 @@ export default function MainLayout({
   const mainRef = useRef<HTMLElement>(null);
   return (
     <WorkbenchSessionProvider>
-      <AIAnalysisProvider>
       <StockPeekProvider>
       <div className="flex h-screen overflow-hidden bg-surface-muted">
         {/* 좌측 Sidebar — viewport 전체 높이 점유 (데스크탑 한정, `< lg` 에선 sidebar 합성
@@ -109,13 +103,10 @@ export default function MainLayout({
         {/* 모바일 위→아래 드래그 새로고침(셸 공통) — 페이지별 새로고침 버튼을 모바일에서 대체. */}
         <MobilePullToRefresh scrollElRef={mainRef} />
         <BottomNav />
-        {/* AI 분석 패널·재열기 탭 — 셸에 두어 페이지 이동에도 백그라운드 분석이 끊기지 않게 한다. */}
-        <GlobalAIAnalysis />
         {/* 글로벌 Peek(차트 미리보기) — 종목 참조 행 hover/롱프레스 시 단일 오버레이로 소환. */}
         <GlobalStockPeek />
       </div>
       </StockPeekProvider>
-      </AIAnalysisProvider>
     </WorkbenchSessionProvider>
   );
 }

@@ -27,7 +27,6 @@ import {
 } from "@/lib/server/auth/profileStore";
 import {
   PROFILE_MENU_ITEMS,
-  PROFILE_SCORECARD_MENU_ITEM,
   PROFILE_ADMIN_MENU_ITEM,
 } from "@/lib/types/profile/menuItemsConfig";
 import type { ProfileMenuItem } from "@/lib/types/profile/menuItems";
@@ -73,7 +72,7 @@ export default async function ProfileRoutePage() {
     : !isProfileStoreConfigured() && isAtLeast(identity?.role, "admin");
 
   const adminItems: ProfileMenuItem[] | undefined = isAdminOrAbove
-    ? [PROFILE_SCORECARD_MENU_ITEM, PROFILE_ADMIN_MENU_ITEM]
+    ? [PROFILE_ADMIN_MENU_ITEM]
     : undefined;
 
   return (

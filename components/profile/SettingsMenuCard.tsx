@@ -16,7 +16,7 @@
  */
 
 import Link from "next/link";
-import { Bot, ChevronRight, LogOut, Moon, Target, UserCheck } from "lucide-react";
+import { Bot, ChevronRight, LogOut, Moon, UserCheck } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 import { LogoutMenuButton } from "@/components/profile/LogoutMenuButton";
 import { ThemeMenuButton } from "@/components/theme/ThemeMenuButton";
@@ -27,7 +27,6 @@ import type {
 import {
   SETTINGS_SECTION_TITLE,
   MENU_THEME,
-  MENU_SCORECARD,
   MENU_PAPER_TRADING,
   MENU_ADMIN,
   MENU_LOGOUT,
@@ -41,7 +40,6 @@ export interface SettingsMenuCardProps {
 
 const MENU_LABEL: Record<ProfileMenuKey, string> = {
   THEME: MENU_THEME,
-  SCORECARD: MENU_SCORECARD,
   PAPER_TRADING: MENU_PAPER_TRADING,
   ADMIN: MENU_ADMIN,
   LOGOUT: MENU_LOGOUT,
@@ -49,7 +47,6 @@ const MENU_LABEL: Record<ProfileMenuKey, string> = {
 
 const ICON_MAP = {
   Moon,
-  Target,
   Bot,
   UserCheck,
   LogOut,

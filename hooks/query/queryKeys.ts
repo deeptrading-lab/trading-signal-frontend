@@ -55,18 +55,8 @@ export const queryKeys = {
     investors: (ticker: string) => ["stock", "investors", ticker] as const,
     /** 종목 "회사 소개"(자유 텍스트, 외부 출처) — 거의 변하지 않는 정적 정보. */
     description: (ticker: string) => ["stock", "description", ticker] as const,
-    /** 로컬 AI CLI(claude·codex) 가용성 — AI 분석 진입 화면이 참조. 종목 무관 단일 키. */
+    /** 로컬 AI CLI(claude·codex) 가용성 — 단타 AI 판단이 참조. 종목 무관 단일 키. */
     aiProviders: ["stock", "ai-providers"] as const,
-    /** 종목별 저장된 최신 AI 분석 결론 — Supabase 공유 저장소 BFF. */
-    aiDecision: (ticker: string) => ["stock", "ai-decision", ticker] as const,
-    /** 저장된 AI 분석 결론 전체 목록(최신순) + 카드별 토큰 — 분석 결과 화면. 종목 무관 단일 키. */
-    aiDecisions: ["stock", "ai-decisions"] as const,
-    /** AI 분석 에이전트별 토큰 사용량 집계 — Supabase 이력 BFF. 종목 무관 단일 키. */
-    agentUsage: ["stock", "ai-agent-usage"] as const,
-    /** A/B 토큰 최적화 리포트 — session 단위 비교. */
-    abHarnessReport: (session: string) => ["stock", "ab-harness-report", session] as const,
-    /** 로컬 분석 워커 온라인/처리 상태 — prod 처리 중 뱃지(S7) 폴링. 종목 무관 단일 키. */
-    workerStatus: ["stock", "ai-worker-status"] as const,
   },
   flow: {
     /** 시장 전체 외국인/기관 순매수 Top10(수급 표면 A) — 당일/7일누적 모드별 분리 캐시. */
@@ -118,12 +108,6 @@ export const queryKeys = {
     judgment: (ticker: string) => ["swing", "judgment", ticker] as const,
     /** 종목 AI 노트(뉴스·공시 정리) — 판정과 별개. */
     note: (ticker: string) => ["swing", "note", ticker] as const,
-  },
-  scorecard: {
-    /** AI 판정 적중률 집계 — Supabase signal_scorecard BFF. 인자 없는 단일 키. */
-    summary: ["scorecard", "summary"] as const,
-    /** confidence 버킷별 실측 보정값(scorecard-feedback (가)). 인자 없는 단일 키. */
-    calibration: ["scorecard", "calibration"] as const,
   },
   intraday: {
     /** 틱 자가채점 라벨 집계(캘리브레이션 패널) — 인자 없는 단일 키. */

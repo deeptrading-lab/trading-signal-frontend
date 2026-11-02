@@ -2,7 +2,7 @@
  * `/swing` 필터·시장 탭의 URL(쿼리) 매핑 — 순수 로직.
  *
  * 기본값(수급 조건 충족·전체 시장)은 쿼리 없이, 나머지만 `?tab=`·`?market=` 으로 표기한다.
- * 종목 상세로 갔다가 뒤로 와도 보던 탭이 유지된다(analyzeTab 과 같은 패턴).
+ * 종목 상세로 갔다가 뒤로 와도 보던 탭이 유지된다.
  */
 
 import type { SwingMarket } from "@/lib/swing/rulebook";

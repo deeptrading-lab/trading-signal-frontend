@@ -12,7 +12,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "analyze:worker": "node --env-file=.env.local --import tsx scripts/analysisWorker.ts",
-    "backfill:decision-names": "node --env-file=.env.local --import tsx scripts/backfillDecisionNames.ts",
     "intraday:notes:review": "node --env-file=.env.local --import tsx packages/intraday-mistake-note/src/cli.ts review",
     "intraday:notes:dry": "node --env-file=.env.local --import tsx packages/intraday-mistake-note/src/cli.ts dry",
     "intraday:notes:merge": "node --import tsx packages/intraday-mistake-note/src/cli.ts merge",
@@ -23,7 +22,6 @@
     "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs && node scripts/inject-shadows.mjs && node scripts/inject-motion.mjs"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.20",
     "@tanstack/react-query": "^5.100.11",
     "@upstash/redis": "^1.38.0",
     "axios": "^1.16.1",
@@ -33,9 +31,7 @@
     "next": "^16.2.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
-    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },

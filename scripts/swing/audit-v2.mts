@@ -19,7 +19,7 @@ import { RULEBOOK, type SwingMarket } from "@/lib/swing/rulebook";
 import { AUDIT, applyCooldown, dailyMeans, forwardReturn, isUniverseMember, periodOf, type Period } from "@/lib/swing/audit";
 import { CANDIDATES, computeCandidateSeries, type CandidateKey, type CreditTuple, type FlowxTuple, type Opinion, type ProgramTuple } from "@/lib/swing/candidates";
 import { featureDateStats, judgeConfirm, judgeFeatureDiscovery, judgeFeatureHoldout, summarizeFeature } from "@/lib/swing/auditV2";
-import { quantile } from "@/lib/server/scorecard/directionDiagnosis";
+import { quantile } from "@/lib/utils/stats";
 
 const CACHE = process.env.SWING_CACHE ?? fileURLToPath(new URL("./__cache__/", import.meta.url));
 const readJson = <T,>(f: string): T => JSON.parse(fs.readFileSync(f, "utf8")) as T;

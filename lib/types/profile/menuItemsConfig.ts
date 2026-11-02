@@ -16,14 +16,6 @@ export const PROFILE_MENU_ITEMS: ProfileMenuItems = [
   { key: "LOGOUT", iconName: "LogOut", variant: "danger" },
 ];
 
-/** 관리자 메뉴(admin 이상) — 신호 성적표. 운영 도구라 일반 유저 미노출. */
-export const PROFILE_SCORECARD_MENU_ITEM: ProfileMenuItem = {
-  key: "SCORECARD",
-  iconName: "Target",
-  variant: "default",
-  href: "/dashboard/scorecard",
-};
-
 /**
  * 관리자 전용 진입점 — 프로필 페이지(서버)가 세션 role==admin 일 때만 주입한다.
  * (user-login-auth §3.7 — nav/설정은 client 라 role 노출 불가 → 서버 조건부 주입으로 플래시 0.

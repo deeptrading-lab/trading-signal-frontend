@@ -52,7 +52,3 @@ export const RANK_RISK_HIDE_LABEL = "위험종목 숨기기";
 /** 위험숨기기 on 으로 리스트가 전부 필터된 빈 상태(크래시 없음, off 로 복원). */
 export const RANK_RISK_ALL_HIDDEN = "숨긴 종목뿐이에요.";
 
-/* ── AI 종합분석 밴드 ─────────────────────────────── */
-export const HOME_AI_TITLE = "AI 종합분석";
-export const HOME_AI_DESC = "기술·수급·공시를 종합해 매수·매도 판단을 보조해요";
-export const HOME_AI_ACTION = "분석 보러 가기";
