@@ -1,0 +1,245 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "자동매매 요약 흐름",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "backend": {
+          "label": "운용 단계"
+        },
+        "security": {
+          "label": "매매 조건"
+        }
+      }
+    },
+    "output": ".archify/program-rules/summary.html",
+    "repository": {
+      "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
+      "revision": "7bcc7bce6ebc452713309fa4581f33e42767a509",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "s0r0",
+      "label": "01 · 계좌 연결 → 거래"
+    },
+    {
+      "id": "s0r1",
+      "label": "01 · 계좌 연결 → 거래 · 계속"
+    },
+    {
+      "id": "s0r2",
+      "label": "01 · 계좌 연결 → 거래 · 계속"
+    },
+    {
+      "id": "s1r0",
+      "label": "02 · 종료 → 복기"
+    },
+    {
+      "id": "s1r1",
+      "label": "02 · 종료 → 복기 · 계속"
+    },
+    {
+      "id": "s1r2",
+      "label": "02 · 종료 → 복기 · 계속"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "summary-s0n0",
+      "lane": "s0r0",
+      "col": 0,
+      "type": "backend",
+      "label": "한투 계좌 연결 · 운용 유형 확인",
+      "sublabel": "실전 / 한투 모의 · 키는 서버에만 저장",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 232
+    },
+    {
+      "id": "summary-s0n1",
+      "lane": "s0r0",
+      "col": 1,
+      "type": "backend",
+      "label": "후보 조회 · 기존 잔고/미체결 확인",
+      "sublabel": "거래량 10 + 외국인 10 + 기관 10 · 중복 제거",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 256.4
+    },
+    {
+      "id": "summary-s0n2",
+      "lane": "s0r1",
+      "col": 1,
+      "type": "backend",
+      "label": "사용자가 매매 시작",
+      "sublabel": "시작 전 계좌자산 · 목표 1% · 규칙 고정",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 236
+    },
+    {
+      "id": "summary-s0n3",
+      "lane": "s0r1",
+      "col": 0,
+      "type": "security",
+      "label": "매도 위험관리 → 조건 충족 매수",
+      "sublabel": "한국 장 시간 · 시세/호가/분봉 확인",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 225.5
+    },
+    {
+      "id": "summary-s0n4",
+      "lane": "s0r2",
+      "col": 0,
+      "type": "backend",
+      "label": "주문 접수 → 체결·잔고 대사",
+      "sublabel": "최대 2종목 · 종목당 20% · 주문기록 누적",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 241.1
+    },
+    {
+      "id": "summary-s1n0",
+      "lane": "s1r0",
+      "col": 0,
+      "type": "backend",
+      "label": "종료 버튼 / 일일 손실 / 15:20",
+      "sublabel": "신규 매수 차단",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 220
+    },
+    {
+      "id": "summary-s1n1",
+      "lane": "s1r0",
+      "col": 1,
+      "type": "security",
+      "label": "미체결 취소 확인 → 보유분 청산",
+      "sublabel": "부분체결·취소 중에는 종료 처리 중 · 주문 결과 불명 → 추가 주문 잠금 · 자동 재전송 금지 · 대사 필요",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 557.3
+    },
+    {
+      "id": "summary-s1n2",
+      "lane": "s1r1",
+      "col": 1,
+      "type": "backend",
+      "label": "미체결 0 + 보유 0 + 계좌 재확인",
+      "sublabel": "모든 조건 충족 후 종료 자산·수익률 확정",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 236
+    },
+    {
+      "id": "summary-s1n3",
+      "lane": "s1r1",
+      "col": 0,
+      "type": "backend",
+      "label": "누적 주문·체결 JSONL → 종료 복기",
+      "sublabel": "",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 245
+    },
+    {
+      "id": "summary-s1n4",
+      "lane": "s1r2",
+      "col": 0,
+      "type": "backend",
+      "label": "목표 달성 → 규칙 유지",
+      "sublabel": "미달 → 검토 가이드 · 사람 검토 후 별도 적용",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "width": 261.5
+    }
+  ],
+  "edges": [
+    {
+      "from": "summary-s0n0",
+      "to": "summary-s0n1"
+    },
+    {
+      "from": "summary-s0n1",
+      "to": "summary-s0n2"
+    },
+    {
+      "from": "summary-s0n2",
+      "to": "summary-s0n3"
+    },
+    {
+      "from": "summary-s0n3",
+      "to": "summary-s0n4"
+    },
+    {
+      "from": "summary-s1n0",
+      "to": "summary-s1n1"
+    },
+    {
+      "from": "summary-s1n1",
+      "to": "summary-s1n2"
+    },
+    {
+      "from": "summary-s1n2",
+      "to": "summary-s1n3"
+    },
+    {
+      "from": "summary-s1n3",
+      "to": "summary-s1n4"
+    },
+    {
+      "from": "summary-s0n4",
+      "to": "summary-s1n0"
+    }
+  ],
+  "mainPath": [
+    "summary-s0n0",
+    "summary-s0n1"
+  ]
+}

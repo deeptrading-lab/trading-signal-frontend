@@ -82,3 +82,18 @@
 - 로컬 워커 `/logs`는 전체 JSONL, `/review`는 완료 복기 JSON을 제공한다. 브라우저는 BFF만 호출.
 - 요약(summary.html)·상세(detail.html)·통합(rules.html)은 rules.template.html에서 생성한다. 실제 구현을 표시하고 인쇄시 A4 가로 구획을 유지한다.
 - 단일 일자 replay 완료 세션은 재시작하지 않는다. 다른 날짜 실험은 워커 종료→`.local/program-trading` 전체 별도 보관→새 워커 시작. 실계좌 자동매매 확장 요구는 위 표와 같다.
+
+## Archify 다이어그램 (2026-11-02)
+
+자동매매 메뉴의 요약·상세는 [Archify](https://github.com/tt-a1i/archify) 3.2.0의 한국어 Workflow 뷰어를 사용한다. Codex 개인 스킬 경로 `~/.codex/skills/archify`에 설치했다. 다른 설치 위치는 `ARCHIFY_HOME`으로 지정한다. 앱 실행·배포에는 Archify 설치가 필요 없으며, 생성된 단일 HTML을 제공한다. 생성/일치 검사 환경에는 Archify가 필요하다.
+
+- 공식 설치 예: `npx -y skills@latest add https://archify.si --skill archify --agent codex --global --copy --yes`
+- 설치 확인: `node ~/.codex/skills/archify/bin/archify.mjs doctor`
+- 생성: `npm run program:rules`
+- 일치 검사: `npm run program:rules:check`
+- 입력: `rules.template.html`의 node/arrow/branch와 엔진 `RULES`. 세 개의 긴 조건 문구는 의미를 보존한 축약문을 사용하며, 원문이 달라지면 축약 매핑도 재검토해야 한다.
+- 결과: `summary.html`, `detail.html`, 각 `*.workflow.json`. 통합 정적 인쇄용 `rules.html`도 계속 생성한다. 생성 파일은 직접 수정하지 않는다.
+- 중간 산출물·검증 영수증: Git 제외 `.archify/program-rules/`. 규칙 문구 근거는 `rules.template.html`의 최근 커밋으로 고정한다. 미커밋 원본을 바꿨다면 해당 원본 커밋 후 다시 생성하여 소스 근거를 갱신한다.
+- `deliver`의 showcase 검사를 통과해야 HTML을 반영한다. 별도 전체 검증은 `ARCHIFY_UPDATE_CHECK_DISABLED=1 node ~/.codex/skills/archify/bin/archify.mjs finalize workflow .archify/program-rules/summary.json .archify/program-rules/summary.html --quality showcase --repo-root . --out-dir .archify/program-rules/summary-review --json`으로 수행하며 detail도 같은 방식이다. 재검수 시 새 out-dir을 사용한다.
+- 생성 중 업데이트 확인 네트워크 요청은 끈다. 외부 스크립트·폰트·API를 로드하지 않는다. 브라우저에는 artifact 내 스크립트의 SHA-256 CSP만 허용한다. iframe은 allow-scripts·allow-downloads만 허용하고 allow-same-origin은 부여하지 않는다.
+- 확대/이동/노드 포커스·테마·경로 탐색은 뷰어에서 제공한다. 모바일에서는 확대·이동 또는 크게 보기 링크를 사용한다. 표시 도구만 바꾸며 매매 규칙이나 실제 주문은 변경하지 않는다.

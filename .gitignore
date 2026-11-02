@@ -58,3 +58,6 @@ next-env.d.ts
 
 # Local program trading replay account
 .local/program-trading/
+
+# Archify local candidates and verification receipts
+.archify/

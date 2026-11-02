@@ -11,7 +11,7 @@ export const PROGRAM_MENU_COPY = {
   completedHint: "새 실험은 워커를 종료하고 기존 운용 파일 전체를 보관한 뒤 다시 시작해 주세요.", target: "목표 수익률", targetPolicy: "달성 시 규칙 유지 · 미달 시 복기 가이드 생성",
   linkedEquity: "한투 조회 자산", linkedCash: "현금", checkedAt: "조회 시각",
   initial: "매매 전 자산", current: "현재 평가자산", final: "매매 후 자산", profit: "비용 후 손익", returns: "수익률", balanceHint: "시작 시점과 현재의 비용 후 평가자산을 비교해요. 종료 전에는 평가 수익률이에요.",
-  summary: "요약 다이어그램", detail: "상세 다이어그램", diagramHint: "매수·매도 기준과 거래 후 복기 흐름", openDiagram: "크게 보기 · 인쇄", diagramLoading: "매매 기준 다이어그램", diagramUnavailable: "다이어그램을 불러오지 못했어요.",
+  showDiagram: "매매 기준 보기", diagramTitle: "자동매매 기준", closeDiagram: "다이어그램 닫기", summary: "요약 다이어그램", detail: "상세 다이어그램", diagramHint: "매수·매도 기준과 거래 후 복기 흐름", openDiagram: "크게 보기 · 인쇄", diagramMobileHint: "좌우로 밀어 전체 흐름을 확인하거나, 크게 보기를 눌러 확대해 주세요.", diagramLoading: "매매 기준 다이어그램", diagramUnavailable: "다이어그램을 불러오지 못했어요.",
   logs: "거래 로그", realtime: "2초마다 자동 갱신", empty: "아직 거래 내역이 없어요.", logUpdated: "마지막 수신", logHint: "매매 판단과 체결 결과를 파일에 계속 기록해요.", noBalance: "—",
   simulation: "합성 시세 · 가상 체결", simulationHint: "계좌 연결과 별개로 현재 엔진은 합성 시세로 모의 운용해요. 실계좌 주문은 실행하지 않아요.",
   pending: "처리 중…", errors: "연결 상태를 확인해 주세요.",

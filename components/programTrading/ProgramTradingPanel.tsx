@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUpRight, ChevronDown, Play, Square } from "lucide-react";
+import { ArrowDown, ChevronDown, GitBranch, Play, Square } from "lucide-react";
+import { ProgramTradingDiagramModal } from "@/components/programTrading/ProgramTradingDiagramModal";
 import { useProgramTrading } from "@/hooks/programTrading/useProgramTrading";
 import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_LIVE_COPY as L } from "@/lib/copy/programTrading/programTrading";
 import type { AccountInput } from "@/lib/types/programTrading/programTrading";
@@ -12,7 +13,7 @@ const time = (minute: number) => `${Math.floor(minute / 60).toString().padStart(
 
 export function ProgramTradingPanel() {
   const { state: s, loading, pending, error, connected, canStart, send, account, accountLoading, accountPending, accountError, connectAccount } = useProgramTrading();
-  const [diagram, setDiagram] = useState<"summary" | "detail">("summary");
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const mode = s?.executionMode ?? account?.executionMode ?? "replay";
   const isLive = mode !== "replay";
@@ -58,7 +59,10 @@ export function ProgramTradingPanel() {
   return <div className="mx-auto flex min-w-0 w-full max-w-main-max-w flex-col gap-xl">
     <header className="flex flex-wrap items-start justify-between gap-md">
       <div><h1 className="text-h1 font-bold text-text-strong">{M.title}</h1><p className="mt-xs text-body-sm text-text-muted">{M.subtitle}</p></div>
-      <span className={cn("badge-info", mode === "prod" && "bg-warn-soft text-warn")}>{L.modes[mode]}</span>
+      <div className="flex flex-wrap items-center gap-sm">
+        <span className={cn("badge-info", mode === "prod" && "bg-warn-soft text-warn")}>{L.modes[mode]}</span>
+        <button type="button" className="button-secondary program-trading-action" aria-haspopup="dialog" aria-expanded={diagramOpen} onClick={() => setDiagramOpen(true)}><GitBranch className="h-4 w-4 shrink-0" aria-hidden="true" />{M.showDiagram}</button>
+      </div>
     </header>
 
     <section className="rounded-lg border border-border-line p-lg" aria-label={M.accountTitle}>
@@ -106,14 +110,6 @@ export function ProgramTradingPanel() {
       {!loading && connected && !canStart && !finished && !stopping && <p className="text-caption text-text-muted">{s?.live?.startBlockReason ?? C.noCandidates}</p>}
     </section>
 
-    <section className="rounded-lg border border-border-line p-lg" aria-label={M.diagramHint}>
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <div className="grid w-full grid-cols-2 gap-xs sm:w-auto" role="group" aria-label={M.diagramHint}>{(["summary", "detail"] as const).map(view => <button key={view} type="button" aria-pressed={diagram === view} onClick={() => setDiagram(view)} className={cn("min-h-hit-area-min rounded-md px-sm py-sm text-body-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-md", diagram === view ? "bg-primary text-surface" : "bg-surface-muted text-text-muted")}>{view === "summary" ? M.summary : M.detail}</button>)}</div>
-        <a href={`/api/program-trading/diagram?view=${diagram}`} target="_blank" rel="noreferrer" className="inline-flex min-h-hit-area-min items-center gap-xs text-body-sm text-link">{M.openDiagram}<ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /></a>
-      </div>
-      <iframe key={diagram} src={`/api/program-trading/diagram?view=${diagram}`} title={diagram === "summary" ? M.summary : M.detail} sandbox="" className="mt-md h-screen min-h-96 w-full rounded-lg border border-border-line bg-surface" />
-    </section>
-
     <section className="space-y-md" aria-label={M.logs}>
       <div className="flex flex-wrap items-center justify-between gap-sm"><h2 className="text-h2 font-bold text-text-strong">{M.logs}</h2><span className="flex items-center gap-xs text-caption text-text-muted"><ArrowDown className="h-4 w-4 shrink-0" aria-hidden="true" />{M.realtime}</span></div>
       <p className="text-caption text-text-muted">{s?.updatedAt ? `${M.logUpdated} · ${new Date(s.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul" })}` : M.empty}</p>
@@ -125,5 +121,6 @@ export function ProgramTradingPanel() {
       {isLive && <p className="text-caption text-text-muted">{L.estimatedFees}</p>}
       <p className="text-caption text-text-muted">{M.logHint} <a href="/api/program-trading/logs" target="_blank" rel="noreferrer" className="text-link">{M.downloadLogs}</a></p>
     </section>
+    {diagramOpen && <ProgramTradingDiagramModal onClose={() => setDiagramOpen(false)} />}
   </div>;
 }

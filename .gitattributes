@@ -1,0 +1,3 @@
+# Preserve Archify renderer bytes for provenance; review the generated JSON and source template.
+docs/program-trading/summary.html linguist-generated=true -whitespace
+docs/program-trading/detail.html linguist-generated=true -whitespace

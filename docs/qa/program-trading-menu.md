@@ -48,3 +48,35 @@
 - 테스트 서버는 실제 계좌·키 없이 GET 응답만 제공하고 POST를 405로 거부했으며 검사 후 종료했다. 실제 계좌 연결·매매 시작·종료는 실행하지 않았다.
 - 기존 작업 브랜치의 진행 중 변경을 보존했다. 이번 변경은 ProgramTradingPanel, app/components.css, 디자인/QA 문서에 한정한다. 매매 규칙·BFF·워커 변경 없음.
 - 이번 UI 보정에서는 프로덕션 빌드와 실계좌 매매를 검증하지 않았다.
+
+## Archify 적용 검증 (2026-11-02)
+
+|항목|기대|실측|판정|
+|---|---|---|---|
+|설치|Codex에서 생성 가능|Archify 3.2.0 개인 스킬 설치·doctor 전 항목 정상|통과|
+|원본 보존|매매 조건·분기·우선순위 유지|rules.template.html node/arrow/branch에서 Workflow 생성. 엔진 상수 자동 치환. 긴 조건3개만 동등 문구로 축약|통과|
+|생성 일치|명령 재실행 시 동일 HTML/JSON|program:rules 및 program:rules:check 통과|통과|
+|Archify 전체 검사|요약·상세 모두 validate/deliver/check/browser-check 성공|각 finalize 결과 ok=true, 네 gate pass, diagnostics 없음. 영수증은 .archify/program-rules/{summary,detail}-final|통과|
+|메뉴 상호작용|요약/상세 전환·확대·노드 선택|실제 iframe에서 한국어 툴바 로딩, 확대125%, 별도 보기에서 후보 노드 포커스·입출향 관계 표시 확인|통과|
+|모바일|뷰어 조작 영역이 찌그러지지 않고 내부 스크롤|390 viewport/main scrollWidth390, iframe768·컨테이너330/scrollWidth768. md 토큰 최소 너비로 내부 가로 스크롤, 안내 카피 제공|통과|
+|CSP|생성 파일 내 스크립트만 실행|스크립트 SHA-256, 외부 로드 차단·sandbox same-origin 미허용. 보기 제한/정확한 해시/무스크립트/파일없음 회귀 테스트4개 통과|통과|
+
+- 타입검사·수정 파일 ESLint·diff whitespace 검사 통과. 실제 화면의 데스크톱 도식·모바일 컨테이너를 확인했다.
+- 앱 화면은 생성된 파일만 읽고 Archify 런타임 설치를 요구하지 않는다. 생성·일치 검사에는 개인 설치 또는 ARCHIFY_HOME이 필요하다.
+- npm program:rules는 artifact 검증을 수행하고, 위 finalize는 별도로 실제 Chrome까지 검사했다. Chrome 검사는 샌드박스 파이프 제한 때문에 권한 확장 실행으로 확인했다.
+- 실제 주문·계좌 설정 변경·배포는 실행하지 않았다.
+
+## 모달 전환 후속 검증 (2026-11-02)
+
+|항목|기대|실측|판정|
+|---|---|---|---|
+|기본 화면|도식 없이 계좌·운용·로그 표시|iframe0, 상단 매매 기준 보기 버튼 존재|통과|
+|데스크톱 열기|중앙 모달·초기 포커스|1280 화면에서1152×600, :modal=true, 닫기 버튼 포커스|통과|
+|보기 전환|모달 내부 요약↔상세|상세 선택 후 iframe view=detail 확인|통과|
+|Esc 닫기|호스트·뷰어 양쪽 포커스에서 닫기|닫기 버튼 Esc 및 iframe 확대 버튼 포커스 후 Esc 모두 닫힘|통과|
+|다른 닫기|배경·닫기 버튼 동작|배경좌표 클릭 후 dialog0, 모바일 닫기 후 iframe0|통과|
+|모바일|내비게이션에 가리지 않는 전체 화면|390×844 modal, width390/height844 및 헤더/탭/닫기 표시|통과|
+|복원|닫힌 후 트리거 포커스·배경 스크롤 복원|activeElement 매매 기준 보기, main overflow 원래 값 복원|통과|
+
+- native dialog로 배경 상호작용·포커스 이탈을 막는다. iframe은 모달이 열린 동안만 마운트한다.
+- 스크립트 브리지는 키 이름만 부모에 보내고, 부모는 현재 iframe의 contentWindow 출처만 수락한다. 기존 sandbox/CSP 제한 유지.
