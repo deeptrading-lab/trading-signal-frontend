@@ -8,6 +8,7 @@
 
 "use client";
 
+import { useId } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useMutationSwingNote } from "@/hooks/swing/useMutationSwingNote";
@@ -31,18 +32,18 @@ import {
   swingNoteTimeLabel,
 } from "@/lib/copy/swing/note";
 
-const TITLE_ID = "swing-note-title";
 
 export function SwingNoteSection({ ticker }: { ticker: string }) {
+  const titleId = useId();
   const { data, isLoading } = useQuerySwingNote(ticker);
   const request = useMutationSwingNote(ticker);
   const note = data?.note ?? null;
   const active = isSwingNoteActive(data);
 
   return (
-    <section aria-labelledby={TITLE_ID} className="flex flex-col gap-sm">
+    <section aria-labelledby={titleId} className="flex flex-col gap-sm">
       <div className="flex flex-wrap items-center justify-between gap-sm">
-        <h3 id={TITLE_ID} className="text-body-sm-strong text-text-strong">
+        <h3 id={titleId} className="text-body-sm-strong text-text-strong">
           {SWING_NOTE_TITLE}
         </h3>
         {/* 처리 중에도 버튼을 남겨(비활성) 키보드 포커스가 사라지지 않게 한다. */}
