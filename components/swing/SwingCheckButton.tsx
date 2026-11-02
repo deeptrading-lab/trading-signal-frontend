@@ -9,7 +9,7 @@
 "use client";
 
 import { useState } from "react";
-import { ListChecks } from "lucide-react";
+import { ChevronRight, ListChecks } from "lucide-react";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
 import { metCount } from "@/lib/swing/itemBits";
 import { cn } from "@/lib/utils/cn";
@@ -29,7 +29,7 @@ export function SwingCheckButton({ ticker, name }: { ticker: string; name: strin
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="ml-auto inline-flex shrink-0 items-center gap-xs rounded-pill bg-accent-soft px-md py-xs text-button-sm text-primary transition-[filter] duration-base hover:brightness-95"
+        className="ml-auto inline-flex h-button-sm-h shrink-0 items-center gap-xs rounded-pill bg-accent-vivid pl-md pr-sm text-button-sm text-surface shadow-sm transition-colors hover:bg-accent-vivid/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-vivid/40"
       >
         <ListChecks className="h-4 w-4" aria-hidden="true" />
         {SWING_PANEL_BUTTON}
@@ -37,12 +37,13 @@ export function SwingCheckButton({ ticker, name }: { ticker: string; name: strin
           <span
             className={cn(
               "rounded-pill px-sm text-caption font-bold",
-              caution ? "bg-warn-soft text-warn" : "bg-surface text-primary",
+              caution ? "bg-warn-soft text-warn" : "bg-surface text-accent-vivid",
             )}
           >
             {caution ? SWING_PANEL_CAUTION : `${metCount(j.items)}/7`}
           </span>
         ) : null}
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
       </button>
       {open ? <SwingCheckPanel ticker={ticker} name={name} onClose={() => setOpen(false)} /> : null}
     </>
