@@ -42,6 +42,25 @@ export const SWING_FLOW_HINT =
 export const SWING_DISCLAIMER = "투자 권유가 아니에요. 과거 통계는 미래 수익을 보장하지 않아요.";
 export const SWING_RUN_PARTIAL = "집계가 진행 중이거나 일부만 끝났어요. 목록이 빠졌을 수 있어요.";
 export const SWING_CAUTION_TITLE = "주의 사유";
+/** 종목 카드 구간 제목·과거 통계 타일. */
+export const SWING_SECTION_CHECK = "조건 체크";
+export const SWING_SECTION_LEVELS = "참고 가격대";
+export const SWING_SECTION_STATS = "과거 비슷한 조건의 10일 뒤";
+export const SWING_STATS_N = "표본";
+export const SWING_STATS_UP = "오른 비율";
+export const SWING_STATS_BASE = "전체";
+export const SWING_STATS_EXCESS = "전체 대비 평균";
+export const SWING_STATS_COHORT = (label: string) => `기준 집단: ${label} · 같은 날 전체 종목과 비교`;
+/** 카드 조건 체크 묶음. */
+export const SWING_CHECK_GROUPS: ReadonlyArray<{ title: string; keys: readonly SwingItemKey[] }> = [
+  { title: "수급 (최근 5일)", keys: ["A1", "A2", "A3", "Aplus"] },
+  { title: "가격·추세", keys: ["B", "C", "D", "E"] },
+];
+/** 0.0019 → "+0.19%p". */
+export function swingPpLabel(x: number): string {
+  const v = x * 100;
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}%p`;
+}
 /** 종목 헤더 "스윙 체크" 버튼·사이드 패널. */
 export const SWING_PANEL_BUTTON = "스윙 체크";
 export const SWING_PANEL_CAUTION = "주의";
