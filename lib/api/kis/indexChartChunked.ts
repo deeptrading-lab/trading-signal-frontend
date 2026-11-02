@@ -7,7 +7,7 @@
  * 50봉을 넘으므로, CHUNK_DAYS(50봉 안에 드는 캘린더일) 분할 패턴으로 여러 번 호출 후
  * 중복 제거·오름차순 정렬한다.
  *
- * 사용처: lib/server/scorecard/relativeRunScoring.ts(지수 history 취득).
+ * 사용처: scripts/swing/collect.mts(CHUNK_DAYS). 옛 채점 크론 사용처는 swing-judgment PR-5 에서 삭제.
  */
 
 import { fetchIndexDailyChart } from "@/lib/api/kis/index-chart";

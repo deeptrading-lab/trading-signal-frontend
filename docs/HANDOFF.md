@@ -9326,7 +9326,9 @@
   > - Slack 봇: 다시 쓰게 되면 봇 레포에서 `GET /api/swing/judgment/{ticker}` + `SWING_BOT_TOKEN` 으로 전환(프론트 토큰 경로는 준비됨).
   > 
 - **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
-  - 머지 뒤: `ai_analysis_decisions`·`signal_scorecard` 행 수 불변(67·130) 확인.
-  - **스크리너 예약 실행 지연**: GitHub Actions 예약이 이 저장소에서 5~7시간 늦게 도는 것을 확인(`score-decisions` 08:10 UTC 예약 → 13:21~15:33 UTC 실행). 07:20 KST 스크리너도 같은 지연이면 장 시작 전에 목록이 없다 — 트리거 방식 결정 필요(외부 스케줄러 또는 라우트 자체 이어달리기 + Vercel Cron).
+  - **(최우선) 스크리너 예약 실행 지연**: GitHub Actions 예약이 이 저장소에서 5~7시간 늦게 돈다(`score-decisions` 08:10 UTC 예약 → 13:21~15:33 UTC 실행). 2026-11-02(월) 09:54 KST 기준 오늘 `swing-screener` 예약 3회(22:20·23:20·00:20 UTC)가 하나도 시작되지 않았다(기록은 11-01 수동 1회뿐) — 같은 지연이면 장 시작 전에 목록이 없다. 트리거 방식 결정 필요.
+  - 머지 뒤: `ai_analysis_decisions`·`signal_scorecard`·`ai_analysis_queue` 행 수 불변(67·130·117) 확인.
+  - 로컬: main 을 받은 뒤 `npm run all` 을 재기동(옛 워커 프로세스는 재시작 전까지 옛 큐를 계속 폴링한다).
   - 오픈베타 조건: 스크리너 기록 8주(≈2026-12 말) 뒤 스윙 기준으로 재제안.
+  - 사이트 설명 문구(`lib/copy/site.ts` "AI 기반 매수·매도 판단 보조 서비스")가 이제 사실과 다르다 — OQ-3(유사투자자문 문구)과 함께 정리.
   - Slack 봇: 다시 쓰게 되면 봇 레포에서 `GET /api/swing/judgment/{ticker}` + `SWING_BOT_TOKEN` 으로 전환(프론트 토큰 경로는 준비됨).

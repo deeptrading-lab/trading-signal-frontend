@@ -25,7 +25,7 @@ const DOCK_HIDE_GRACE_MS = 300;
  * 글로벌 Peek — 전역 컨텍스트("차트 어디서든" T3).
  *
  * 종목 참조 행(랭킹·관심·검색)의 hover/롱프레스 의도를 받아 **미니 차트 미리보기**를 셸 한 곳에서
- * 소환한다. `aiAnalysisProvider` 와 동형 — 상태를 `(main)` 레이아웃이 소유하고 호스트
+ * 소환한다. 상태를 `(main)` 레이아웃이 소유하고 호스트
  * (`GlobalStockPeek`)가 단일 오버레이를 렌더한다.
  *
  * ## 단일 활성 Peek(rate-limit 안전 설계)
@@ -123,7 +123,7 @@ export function StockPeekProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 라우트 이동 시 즉시 해제(팝오버·시트 모두) — hover→클릭/Enter 내비게이션 후 pointer-events-none
-  //   팝오버가 목적지 화면에 떠 있는 채로 남는 것을 방지(aiAnalysisProvider 의 collapse 와 동형).
+  //   팝오버가 목적지 화면에 떠 있는 채로 남는 것을 방지.
   const pathname = usePathname();
   const prevPath = useRef(pathname);
   useEffect(() => {

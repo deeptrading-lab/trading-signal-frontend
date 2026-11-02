@@ -100,7 +100,7 @@ function MenuButton({ item }: { item: ProfileMenuItem }) {
   );
 }
 
-// 다른 라우트로 이동하는 항목(href 보유) — 예: 신호 성적표 → /dashboard/scorecard.
+// 다른 라우트로 이동하는 항목(href 보유) — 예: 유저 관리 → /admin.
 function MenuLink({ item }: { item: ProfileMenuItem }) {
   const Icon = ICON_MAP[item.iconName];
   return (

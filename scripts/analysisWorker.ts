@@ -11,7 +11,7 @@
 
 import { randomUUID } from "node:crypto";
 import { detectProviders } from "@/lib/server/ai/detectCli";
-import { claimNextSwingNote, failStuckSwingNotes } from "@/lib/server/swing/noteStore";
+import { claimNextSwingNote, failStuckSwingNotes, isSwingNoteStoreConfigured } from "@/lib/server/swing/noteStore";
 import { NOTE_TIMEOUT_MS, runSwingNote } from "@/lib/server/swing/noteRunner";
 
 const POLL_INTERVAL_MS = 12_000;
@@ -36,6 +36,9 @@ function pickProvider(): "claude" | "codex" | null {
 }
 
 async function loop(): Promise<void> {
+  if (!isSwingNoteStoreConfigured()) {
+    log("⚠ Supabase 미설정 — 노트 요청을 읽을 수 없어요. .env.local 의 SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 확인 후 재기동하세요.");
+  }
   log(`기동 ${WORKER_ID} poll=${POLL_INTERVAL_MS}ms`);
   while (running) {
     try {

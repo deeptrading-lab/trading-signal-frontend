@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
   }
 
   const saved: Record<string, number> = {};
+  let ok = true;
   try {
     for (const subject of SUBJECTS) {
       const rows = await fetchWithTransientRetry(
@@ -62,9 +63,10 @@ export async function GET(request: NextRequest) {
     // 헬스 마커 — 마지막 실행 시각/저장 결과. saved 가 비면 휴장/빈응답.
     await saveFlowCronMeta({ at: new Date().toISOString(), ok: true, env, saved });
   } catch (error) {
+    ok = false;
     console.warn("[flow-snapshot] 수급 적립 실패", error);
     await saveFlowCronMeta({ at: new Date().toISOString(), ok: false, reason: "flow-error", env });
   }
 
-  return NextResponse.json({ ok: true, saved }, { status: 200 });
+  return NextResponse.json({ ok, saved }, { status: 200 });
 }

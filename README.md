@@ -47,7 +47,7 @@ AI 는 종목 뉴스·공시를 모아 요약만 한다(판정에 쓰지 않음)
 로컬 워커가 Claude/Codex CLI 로 처리한다.
 
 ```bash
-cp .env.local.example .env.local   # KIS·Supabase 키 설정
+cp .env.local.example .env.local   # KIS 키 — Supabase 키 항목은 .env.example 참고
 npm run all                        # next dev + 워커(scripts/analysisWorker.ts)
 ```
 

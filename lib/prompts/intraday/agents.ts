@@ -8,7 +8,7 @@
  *     분리(PRD intraday-decision-overhaul PR-3a: "모호하면 HOLD" 편향이 942회 전량 HOLD 를 만듦).
  * (③ 리스크 게이트는 순수 룰로 provider 가 처리 — 환각 진입 차단, 비용·지연 절감.)
  *
- * 톤·패턴은 `lib/prompts/stock/aiAnalysis.ts`(12-에이전트) 미러.
+ * 톤·패턴은 옛 12-에이전트 프롬프트(swing-judgment PR-5 에서 삭제) 미러.
  */
 
 import type { IntradayContext } from "@/lib/types/intraday/intradayDecision";
