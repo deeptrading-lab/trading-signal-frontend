@@ -2,14 +2,16 @@ name: swing-screener
 
 # 스윙 스크리너 — 매 영업일 아침 전 거래일 확정 데이터로 전 종목 판정·저장(PRD swing-judgment PR-2).
 # LLM 호출 없음(#371 "장 마감 후 자동 호출 중지"의 예외, PRD §9 OQ-1).
-# 07:20 KST 실행 + 08:20·09:20 재시도 — 이미 끝난 거래일이면 route 가 skip:"done" 을 돌려준다.
+# GitHub 예약은 이 저장소에서 5~7시간 늦게 시작한다(2026-11 실측: score-decisions 08:10 UTC 예약 → 13~15시 UTC
+# 시작, 11-02 07:20 KST 예약은 09:54 KST 까지 미시작). 그래서 자정 이후 매시 트리거를 걸고, 처음 끝까지 돈
+# 1회만 실제로 처리한다 — 나머지는 route 가 skip:"done". 입력은 전 거래일 확정 데이터라 몇 시에 돌든 같다.
+# 새벽(07시 전 KST)에 KIS 가 막혀 실패하면 실패로 끝내지 않고 다음 예약에 맡긴다(매일 실패 메일 방지).
 # 사전 설정: Actions secret CRON_SECRET(Vercel Production 과 같은 값, flow-snapshot 과 공용).
 
 on:
   schedule:
-    - cron: "20 22 * * 0-4" # 07:20 KST 월~금
-    - cron: "20 23 * * 0-4" # 08:20 KST 재시도
-    - cron: "20 0 * * 1-5" # 09:20 KST 재시도
+    - cron: "20 16-23 * * 0-4" # 01:20~08:20 KST 월~금(매시)
+    - cron: "20 0 * * 1-5" # 09:20 KST 마지막 재시도
   workflow_dispatch: {}
 
 concurrency:
@@ -34,7 +36,11 @@ jobs:
               if resp=$(curl -fsS -m 295 -H "Authorization: Bearer $CRON_SECRET" "$BASE?offset=$offset&limit=400"); then break; fi
               echo "offset=$offset 시도 $attempt 실패 — 10초 뒤 재시도"; resp=""; sleep 10
             done
-            [ -n "$resp" ] || { echo "offset=$offset 3회 실패"; exit 1; }
+            if [ -z "$resp" ]; then
+              h=$(TZ=Asia/Seoul date +%H)
+              if [ "$((10#$h))" -lt 7 ]; then echo "offset=$offset 3회 실패 — 새벽(KST ${h}시)이라 다음 예약에서 재시도"; exit 0; fi
+              echo "offset=$offset 3회 실패"; exit 1
+            fi
             echo "$resp"
             # route 는 게이트 사유(kis-not-prod 등)를 ok:false 로 돌려준다 → job 실패로 조용한 정지를 드러낸다.
             echo "$resp" | jq -e '.ok == true' > /dev/null
