@@ -9291,3 +9291,42 @@
   - (리뷰 보강) 사용자: Supabase SQL `docs/sql/swing-ai-notes.sql` 1회 실행 — 그 전엔 카드의 노트 섹션만 "불러오지 못했어요".
   - (리뷰 보강) PR-5 주의: 노트 처리는 `scripts/analysisWorker.ts` 루프 안에 있다 — 분석 파이프라인을 걷어내도 워커 루프·노트 경로는 남겨야 한다.
   - (리뷰 보강) CLI 하드닝: 노트·분석가 CLI 는 이 PR 에서 로컬 도구 차단(`--disallowedTools`)·임시 폴더 실행으로 막았다. 워크벤치 어댑터(`app/api/workbench/_adapters/claudeCli.ts`)는 웹 도구가 없어 그대로 — 필요하면 같은 규칙 적용. 자식 프로세스 env 에 `.env.local` 비밀이 그대로 들어가는 점은 도구 차단으로 막혀 있지만, env 걸러 넘기기는 후속 검토.
+
+### 2026-11-02 — refactor(swing): 기존 AI 종합분석 파이프라인 삭제 [PR-5/5] (#401)
+
+- **slug**: `swing-retire-legacy` · **author**: @HY0118
+- **PR**: https://github.com/deeptrading-lab/trading-signal-frontend/pull/401
+- **요약**: refactor(swing): 기존 AI 종합분석 파이프라인 삭제 [PR-5/5]
+- **현재 상태**: QA 통과 · 리뷰·머지 대기 (이 항목은 QA 통과 시점에 자동 기록됨)
+- **PR 본문 발췌**:
+  > ## 요약
+  > 스윙 판정 재구축의 마지막 단계 — **기존 AI 종합분석(12에이전트 토론·PM 판정) 파이프라인을 걷어낸다.** 사용자 결정(2026-11-02): 마지막 판정이 9월 2일, 채점 대기 0건이라 지금 삭제. Slack 봇 전환(PR-2b)은 하지 않고(당분간 봇 미사용), 오픈베타 조건은 스크리너 기록이 8주쯤 쌓이면 스윙 기준으로 다시 제안한다.
+  > 
+  > 삭제 경계는 탐색 에이전트로 import·`vi.mock`·동적 import·문자열 경로를 끝까지 추적해 정했다 — 단타·시황 분석·스윙 AI 노트가 같이 쓰는 모듈은 남겼다.
+  > 
+  > ## 변경
+  > - **삭제(188파일)**: 분석 SSE·저장 결론·enqueue·usage·worker-status 라우트, A/B 하니스, 채점 크론·`/api/scorecard/*`·`score-decisions.yml`, `/dashboard/scorecard`, 분석 패널·`/analyze` 카드·토큰 대시보드, 종목 화면 AI 판정 스트립·차트 AI 레벨 오버레이·헤더 "AI 종합분석" 버튼, 홈 AI 밴드, 마이페이지 "내 분석", 12에이전트 프롬프트, 결정·채점·큐·하트비트·동시성 게이트·사용량 저장소, 판정 보조(thesisBreach·decisionStaleness·validateReentry 등).
+  > - **유지**: `/api/stock/ai-analysis/providers`(단타 AI 판단이 씀), `agentCli`·`claudeAgent`·`detectCli`·`cliPaths`·`parseLooseJson`, 로컬 워커(스윙 AI 노트 전용으로 축소), `lib/signal`(미국 종목 요약·단타).
+  > - **옮김**: 감사 통계 함수 → `lib/utils/stats.ts`(스윙·신호 감사가 씀, 테스트 동반), `SegmentedTabs` → `components/ui/`, 비용·토큰 포맷 → `components/paperTrading/format.ts`.
+  > - `/analyze` → `/swing` 리다이렉트, `/dashboard/scorecard` → 404. 수급 크론(`flow-snapshot`)은 채점 단계를 빼고 적립만. 프록시의 옛 SSE matcher 예외 제거.
+  > - 의존성 정리: react-markdown·remark-gfm·@tailwindcss/typography(101 패키지 감소), 안 쓰는 CSS 80줄, `lib/types/stock/aiAnalysis.ts` 는 남은 5개 타입만.
+  > - README·AGENTS.md·`.env.example` 갱신.
+  > 
+  > ## 검증
+  > - `vitest` 1,249 통과(옛 파이프라인 테스트는 코드와 함께 삭제) · `tsc` 0 · `lint` 에러 0 · `next build` 통과
+  > - dev 서버: `POST /api/stock/ai-analysis` 404 · providers 200 · `/analyze` → `/swing` · `/dashboard/scorecard` 404
+  > - Playwright 390×844: 홈·종목(KR·US)·마이페이지·관심종목·단타·`/swing` 모두 정상, "AI 종합분석" 진입점 0, 페이지 오류 0
+  > - 워커(노트 전용) 기동·폴링 확인
+  > - QA `docs/qa/swing-retire-legacy.md` — 동결 테이블 행 수(67·130)는 머지 뒤 확인
+  > 
+  > ## 다음 작업
+  > - 머지 뒤: `ai_analysis_decisions`·`signal_scorecard` 행 수 불변(67·130) 확인.
+  > - **스크리너 예약 실행 지연**: GitHub Actions 예약이 이 저장소에서 5~7시간 늦게 도는 것을 확인(`score-decisions` 08:10 UTC 예약 → 13:21~15:33 UTC 실행). 07:20 KST 스크리너도 같은 지연이면 장 시작 전에 목록이 없다 — 트리거 방식 결정 필요(외부 스케줄러 또는 라우트 자체 이어달리기 + Vercel Cron).
+  > - 오픈베타 조건: 스크리너 기록 8주(≈2026-12 말) 뒤 스윙 기준으로 재제안.
+  > - Slack 봇: 다시 쓰게 되면 봇 레포에서 `GET /api/swing/judgment/{ticker}` + `SWING_BOT_TOKEN` 으로 전환(프론트 토큰 경로는 준비됨).
+  > 
+- **다음 작업 후보** (PR 본문 기반, 절대적 지시 아님):
+  - 머지 뒤: `ai_analysis_decisions`·`signal_scorecard` 행 수 불변(67·130) 확인.
+  - **스크리너 예약 실행 지연**: GitHub Actions 예약이 이 저장소에서 5~7시간 늦게 도는 것을 확인(`score-decisions` 08:10 UTC 예약 → 13:21~15:33 UTC 실행). 07:20 KST 스크리너도 같은 지연이면 장 시작 전에 목록이 없다 — 트리거 방식 결정 필요(외부 스케줄러 또는 라우트 자체 이어달리기 + Vercel Cron).
+  - 오픈베타 조건: 스크리너 기록 8주(≈2026-12 말) 뒤 스윙 기준으로 재제안.
+  - Slack 봇: 다시 쓰게 되면 봇 레포에서 `GET /api/swing/judgment/{ticker}` + `SWING_BOT_TOKEN` 으로 전환(프론트 토큰 경로는 준비됨).
