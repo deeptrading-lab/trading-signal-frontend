@@ -15,7 +15,7 @@
 | AC-5.3 단타 무회귀 | `GET /api/stock/ai-analysis/providers` · `/intraday` | 200 · 정상 | 200(`claude`·`codex` 감지) · 페이지 오류 0 | 통과 |
 | AC-5.4 화면 | Playwright 390×844 — `/`·`/stock/005930`·`/stock/AAPL`·`/profile`·`/watchlist`·`/swing` | 정상 로드, "AI 종합분석" 없음 | 6개 모두 200·페이지 오류 0·"AI 종합분석" 문구 0. 삼성전자 = 헤더에 AI 버튼 없음·차트(현재가 알약) 정상·스윙 체크 카드 있음. AAPL = 스윙 카드 없음(기존 요약). 마이페이지 = "내 분석" 없이 내 종목·설정 | 통과 |
 | AC-5.5 워커 | `node --env-file=.env.local --import tsx scripts/analysisWorker.ts` | 기동·폴링 | `[ai-worker] 기동 worker-… poll=12000ms` — 분석 큐·하트비트 없이 노트만 | 통과 |
-| AC-5.6 동결 테이블 | 머지 전 행 수 기록 → 머지 뒤 재조회 | 불변 | 머지 전 `ai_analysis_decisions` 67 · `signal_scorecard` 130 · `ai_analysis_queue` 117. 머지 뒤 확인 | 머지 뒤 확인 |
+| AC-5.6 동결 테이블 | 머지 전 행 수 기록 → 머지 뒤 재조회 | 불변 | 머지 전 `ai_analysis_decisions` 67 · `signal_scorecard` 130 · `ai_analysis_queue` 117 → 머지·prod 배포(ee238ef) 뒤 67 · 130 · 117 그대로 | 통과 |
 
 ## 정리한 것
 
