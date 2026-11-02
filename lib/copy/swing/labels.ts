@@ -67,6 +67,9 @@ export const SWING_PANEL_CAUTION = "주의";
 export const SWING_PANEL_CLOSE = "스윙 체크 닫기";
 export const SWING_PANEL_ARIA = (name: string) => `${name} 스윙 체크`;
 export const SWING_PANEL_SUBTITLE = "조건별 체크 결과와 최근 뉴스·공시(AI 정리)";
+/** 종목 페이지 아래 요약 카드. */
+export const SWING_DETAIL_OPEN = "자세히 보기";
+export const SWING_SUMMARY_NONE = "충족한 조건이 아직 없어요";
 export const SWING_STORED_NOTE =
   "지금은 증권사 시세 점검 시간이라 아침 집계 요약만 보여 줘요. 조건별 수치는 점검이 끝나면 다시 계산돼요.";
 export const SWING_LOADING = "스윙 체크를 불러오고 있어요";
