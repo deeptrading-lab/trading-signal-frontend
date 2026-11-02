@@ -42,6 +42,9 @@ export const CHART_VOLUME_MA_LABEL = "거래량 이평";
 /** VWAP(거래량 가중 평균가) 오버레이 토글 라벨 — 약어라 원문 유지(MACD·RSI 동일). */
 export const CHART_VWAP_LABEL = "VWAP";
 
+/** 스윙 체크 참고 지지·저항선 토글 라벨(국내 종목). */
+export const CHART_SWING_LEVELS_LABEL = "스윙 지지·저항";
+
 /** 차트 오버레이 옵션 드롭다운 트리거 라벨. */
 export const CHART_OPTIONS_LABEL = "옵션";
 
@@ -61,7 +64,7 @@ export const VMA_PERIOD = 20;
  * 순서: 가격 서브플롯 오버레이(이평선·볼린저·VWAP·매물대) → 거래량 서브플롯(거래량 이평).
  */
 export const CHART_OVERLAY_OPTIONS: {
-  key: "movingAverage" | "volumeProfile" | "bollinger" | "volumeMA" | "vwap";
+  key: "movingAverage" | "volumeProfile" | "bollinger" | "volumeMA" | "vwap" | "swingLevels";
   label: string;
 }[] = [
   { key: "movingAverage", label: CHART_MA_LABEL },
@@ -69,6 +72,7 @@ export const CHART_OVERLAY_OPTIONS: {
   { key: "vwap", label: CHART_VWAP_LABEL },
   { key: "volumeProfile", label: CHART_VOLUME_PROFILE_LABEL },
   { key: "volumeMA", label: CHART_VOLUME_MA_LABEL },
+  { key: "swingLevels", label: CHART_SWING_LEVELS_LABEL },
 ];
 
 // ── 봉·기간 설정 ────────────────────────────────────────

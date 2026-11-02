@@ -6,14 +6,15 @@
 
 import { httpClient } from "@/lib/api/client";
 import type { SwingMarket } from "@/lib/swing/rulebook";
-import type { SwingScreenerFilter, SwingScreenerResponse } from "@/lib/types/swing/api";
+import type { SwingScreenerFilter, SwingScreenerResponse, SwingScreenerSort } from "@/lib/types/swing/api";
 
 export async function fetchSwingScreener(
   filter: SwingScreenerFilter,
   market: SwingMarket | null,
+  sort: SwingScreenerSort = "adv",
 ): Promise<SwingScreenerResponse> {
   const response = await httpClient.get<SwingScreenerResponse>("/swing/screener", {
-    params: { filter, ...(market ? { market } : {}) },
+    params: { filter, ...(market ? { market } : {}), ...(sort !== "adv" ? { sort } : {}) },
   });
   return response.data;
 }

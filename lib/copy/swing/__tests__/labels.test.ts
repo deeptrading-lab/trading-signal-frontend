@@ -117,8 +117,13 @@ describe("날짜·개수", () => {
     expect(swingDateLabel("2026-11-02")).toBe("11월 2일(월)");
   });
   it("swingCountLabel — 상한 도달 시 상위 n개", () => {
-    expect(swingCountLabel(3)).toBe("3개 · 거래대금 순");
-    expect(swingCountLabel(50)).toBe("거래대금 상위 50개");
+    expect(swingCountLabel(3)).toBe("3개");
+    expect(swingCountLabel(50)).toBe("상위 50개");
+  });
+  it("swingEokLabel — 부호·천 단위·1 미만 소수", () => {
+    expect(copy.swingEokLabel(22.4)).toBe("+22억");
+    expect(copy.swingEokLabel(-9070)).toBe("−9,070억");
+    expect(copy.swingEokLabel(0.4)).toBe("+0.4억");
   });
 });
 

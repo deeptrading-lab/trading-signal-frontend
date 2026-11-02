@@ -36,3 +36,6 @@ create index if not exists swing_judgments_ticker_idx
   on public.swing_judgments (ticker, trade_date desc);
 
 alter table public.swing_judgments enable row level security;
+
+-- 2026-11-02 swing-ui-followups: 최근 5일 주체별 순매수(억 원) — 목록 매트릭스 표시용. 기존 행은 null.
+alter table public.swing_judgments add column if not exists flow jsonb;

@@ -20,6 +20,8 @@ export type ChartOptions = {
   volumeMA: boolean;
   /** VWAP(거래량 가중 평균가) — 가격 서브플롯 기준선. */
   vwap: boolean;
+  /** 스윙 체크 참고 지지·저항선(국내 종목, swing-judgment). 기본 ON. */
+  swingLevels: boolean;
 };
 
 /** 기본값 — 이동평균선만 on(관례), 나머지 off. SSR/미설정 폴백. */
@@ -29,6 +31,7 @@ export const DEFAULT_CHART_OPTIONS: ChartOptions = {
   bollinger: false,
   volumeMA: false,
   vwap: false,
+  swingLevels: true,
 };
 
 /** 본 모듈·useChartOptions 훅이 공유하는 단일 키. */
@@ -50,6 +53,8 @@ function normalize(value: unknown): ChartOptions {
     bollinger: typeof v.bollinger === "boolean" ? v.bollinger : false,
     volumeMA: typeof v.volumeMA === "boolean" ? v.volumeMA : false,
     vwap: typeof v.vwap === "boolean" ? v.vwap : false,
+    // 구버전 저장값엔 키가 없다 — 기본 ON.
+    swingLevels: typeof v.swingLevels === "boolean" ? v.swingLevels : true,
   };
 }
 

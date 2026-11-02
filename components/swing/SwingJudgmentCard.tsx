@@ -13,13 +13,13 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
 import { SwingNoteSection } from "./SwingNoteSection";
-import { adverseBits, hasAdverseBit, metCount } from "@/lib/swing/itemBits";
+import { adverseBits, hasAdverseBit, hasItemBit, metCount } from "@/lib/swing/itemBits";
 import type { SwingJudgment } from "@/lib/swing/judge";
 import { RULEBOOK } from "@/lib/swing/rulebook";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { roundToKrxTick } from "@/lib/utils/krxTick";
-import type { SwingJudgmentResponse } from "@/lib/types/swing/api";
+import type { SwingJudgmentResponse, SwingJudgmentUnavailable, SwingScreenerItem } from "@/lib/types/swing/api";
 import {
   SWING_CARD_HELP,
   SWING_CARD_TITLE,
@@ -46,6 +46,8 @@ import {
   swingMetChip,
   swingMetChipSr,
   swingStatsSentence,
+  SWING_STORED_NOTE,
+  swingStageLabel,
 } from "@/lib/copy/swing/labels";
 
 const TITLE_ID = "swing-judgment-card-title";
@@ -71,6 +73,11 @@ export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallba
       </div>
     );
   }
+  // 야간 점검 등으로 즉시 계산이 막히면 서버가 그 거래일 스크리너 저장 행을 함께 준다 — 축약 표시.
+  const unavailable = error?.detail as SwingJudgmentUnavailable | undefined;
+  if (unavailable?.stored && unavailable.tradeDate) {
+    return <StoredSummary item={unavailable.stored} tradeDate={unavailable.tradeDate} onRetry={() => refetch()} />;
+  }
   // 페이지 진입 때 자동으로 뜨는 카드라 role="alert" 로 알리지 않는다(지원 안 함 404 는 예상된 상태).
   // 404 = 지원하지 않는 종목 — 다시 시도해도 같다.
   return (
@@ -84,6 +91,59 @@ export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallba
           {SWING_RETRY}
         </button>
       )}
+    </section>
+  );
+}
+
+/** 저장된 스크리너 행으로 그리는 축약 카드 — 충족·불리 여부와 주의 사유만(수치는 즉시 계산이 돌아오면). */
+function StoredSummary({ item, tradeDate, onRetry }: { item: SwingScreenerItem; tradeDate: string; onRetry: () => void }) {
+  return (
+    <section aria-labelledby={TITLE_ID} className="flex flex-col gap-lg">
+      <header className="flex flex-col gap-xs">
+        <div className="flex flex-wrap items-center justify-between gap-sm">
+          <h2 id={TITLE_ID} className="text-h2 text-text-strong">
+            {SWING_CARD_TITLE}
+          </h2>
+          <Badge variant="accent">
+            <span aria-hidden="true">{swingMetChip(item.metCount)}</span>
+            <span className="sr-only">{swingMetChipSr(item.metCount)}</span>
+          </Badge>
+        </div>
+        <p className="text-caption text-text-muted">
+          {swingBasisLabel(tradeDate)} · {swingStageLabel(item.stage)}
+        </p>
+        <p className="text-caption text-warn">{SWING_STORED_NOTE}</p>
+      </header>
+      {item.exclusions.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-xs">
+          <span className="text-body-sm-strong text-warn">{SWING_CAUTION_TITLE}</span>
+          {item.exclusions.map((code) => (
+            <Badge key={code} variant="warn">
+              {swingExclusionLabel(code)}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+      <ul className="flex flex-col">
+        {SWING_CHECK_ROWS.map((key) => {
+          const met = hasItemBit(item.items, key);
+          const bad =
+            !met &&
+            (hasAdverseBit(item.items, key) || (key === "C" && (item.stage === "overheated" || item.stage === "downtrend")));
+          return (
+            <li key={key} className="flex items-center justify-between gap-md border-b border-border-line py-sm last:border-b-0">
+              <span className="text-body-sm-strong text-text-strong">{SWING_ITEM_LABEL[key]}</span>
+              <span className={cn("shrink-0 text-label-sm", met ? "text-outcome-hit" : bad ? "text-warn" : "text-text-muted")}>
+                {met ? SWING_CHECK_PASS : bad ? `▲ ${SWING_HINT_ADVERSE}` : SWING_CHECK_MISS}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <button type="button" className="button-secondary self-start" onClick={onRetry}>
+        {SWING_RETRY}
+      </button>
+      <p className="text-caption text-text-muted">{SWING_DISCLAIMER}</p>
     </section>
   );
 }

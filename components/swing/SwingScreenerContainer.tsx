@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingScreener } from "@/hooks/swing/useQuerySwingScreener";
 import type { SwingMarket } from "@/lib/swing/rulebook";
 import { cn } from "@/lib/utils/cn";
-import type { SwingScreenerFilter, SwingScreenerResponse } from "@/lib/types/swing/api";
+import type { SwingScreenerFilter, SwingScreenerResponse, SwingScreenerSort } from "@/lib/types/swing/api";
 import {
   SWING_DISCLAIMER,
   SWING_EMPTY,
@@ -31,11 +31,15 @@ import {
   SWING_TABS_ARIA,
   swingBasisLabel,
   swingCountLabel,
+  SWING_SORT_ARIA,
+  SWING_SORT_LABEL,
   swingSummaryLabel,
   SWING_SUMMARY_VOLATILE,
 } from "@/lib/copy/swing/labels";
 import { SwingScreenerTable } from "./SwingScreenerTable";
-import { swingFilterFromParam, swingMarketFromParam, swingTabHref } from "./swingTab";
+import { swingFilterFromParam, swingMarketFromParam, swingSortFromParam, swingTabHref } from "./swingTab";
+
+const SORT_OPTIONS = (["adv", "met"] as const).map((key) => ({ key, label: SWING_SORT_LABEL[key] }));
 
 const FILTER_OPTIONS = (["flow", "excluded", "all"] as const).map((key) => ({ key, label: SWING_TAB_LABEL[key] }));
 type MarketKey = "ALL" | SwingMarket;
@@ -51,12 +55,13 @@ export function SwingScreenerContainer() {
   const searchParams = useSearchParams();
   const filter = swingFilterFromParam(searchParams.get("tab"));
   const market = swingMarketFromParam(searchParams.get("market"));
-  const query = useQuerySwingScreener(filter, market);
+  const sort = swingSortFromParam(searchParams.get("sort"));
+  const query = useQuerySwingScreener(filter, market, sort);
   const data = query.data;
 
   // scroll:false — 탭 전환 시 스크롤 점프 방지(같은 라우트 쿼리만 교체).
-  const go = (f: SwingScreenerFilter, m: MarketKey) =>
-    router.replace(swingTabHref(pathname, f, m === "ALL" ? null : m), { scroll: false });
+  const go = (f: SwingScreenerFilter, m: MarketKey, s: SwingScreenerSort = sort) =>
+    router.replace(swingTabHref(pathname, f, m === "ALL" ? null : m, s), { scroll: false });
 
   return (
     <div className="flex flex-col gap-lg">
@@ -86,6 +91,8 @@ export function SwingScreenerContainer() {
 
       <ScreenerBody
         filter={filter}
+        sort={sort}
+        onSort={(s) => go(filter, market ?? "ALL", s)}
         data={data}
         isLoading={query.isLoading}
         isStale={query.isPlaceholderData}
@@ -99,12 +106,16 @@ export function SwingScreenerContainer() {
 
 function ScreenerBody({
   filter,
+  sort,
+  onSort,
   data,
   isLoading,
   isStale,
   onRetry,
 }: {
   filter: SwingScreenerFilter;
+  sort: SwingScreenerSort;
+  onSort: (s: SwingScreenerSort) => void;
   data: SwingScreenerResponse | undefined;
   isLoading: boolean;
   isStale: boolean;
@@ -145,7 +156,10 @@ function ScreenerBody({
   }
   return (
     <div className={cn("flex flex-col gap-xs transition-opacity", isStale && "opacity-60")} aria-busy={isStale}>
-      <p className="text-caption text-text-muted">{swingCountLabel(data.items.length)}</p>
+      <div className="flex flex-wrap items-center justify-between gap-sm">
+        <p className="text-caption text-text-muted">{swingCountLabel(data.items.length)}</p>
+        <SegmentedTabs options={SORT_OPTIONS} value={sort} onChange={onSort} ariaLabel={SWING_SORT_ARIA} />
+      </div>
       <SwingScreenerTable items={data.items} showReasons={filter !== "flow"} />
     </div>
   );

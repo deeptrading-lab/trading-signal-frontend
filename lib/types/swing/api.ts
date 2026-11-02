@@ -35,6 +35,11 @@ export type SwingStatsCell = {
 };
 
 export type SwingScreenerFilter = "flow" | "excluded" | "all";
+/** 목록 정렬 — 거래대금 순(기본) / 충족 많은 순. */
+export type SwingScreenerSort = "adv" | "met";
+
+/** 최근 N일 주체별 순매수(억 원). */
+export type SwingFlowAmounts = { person: number; foreign: number; institution: number; pension: number };
 
 /** 스크리너 응답 최대 행 수(거래대금 상위) — BFF 와 화면 문구가 같은 값을 쓴다. */
 export const SWING_SCREENER_LIMIT = 50;
@@ -56,6 +61,8 @@ export type SwingScreenerItem = {
   planStop: number | null;
   planTarget: number | null;
   planRr: number | null;
+  /** 최근 5일 순매수(억 원) — 기능 도입 전 저장 행은 null. */
+  flow: SwingFlowAmounts | null;
 };
 
 export type SwingScreenerResponse = {
@@ -85,6 +92,13 @@ export type SwingNoteResponse = {
   note: SwingNote | null;
   /** 새로 정리를 요청할 수 있나 — 진행 중이거나 6시간 안에 만든 노트가 있으면 false(서버가 판단). */
   canRequest: boolean;
+};
+
+/** 즉시 판정 실패(503) 본문 — 저장된 스크리너 행이 있으면 카드가 축약 표시(야간 점검 대비). */
+export type SwingJudgmentUnavailable = {
+  error: string;
+  tradeDate: string | null;
+  stored: SwingScreenerItem | null;
 };
 
 export type SwingJudgmentResponse = {

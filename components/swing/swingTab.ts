@@ -6,7 +6,7 @@
  */
 
 import type { SwingMarket } from "@/lib/swing/rulebook";
-import type { SwingScreenerFilter } from "@/lib/types/swing/api";
+import type { SwingScreenerFilter, SwingScreenerSort } from "@/lib/types/swing/api";
 
 export type SwingMarketFilter = SwingMarket | null;
 
@@ -18,10 +18,20 @@ export function swingMarketFromParam(v: string | null | undefined): SwingMarketF
   return v === "KOSPI" || v === "KOSDAQ" ? v : null;
 }
 
-export function swingTabHref(pathname: string, filter: SwingScreenerFilter, market: SwingMarketFilter): string {
+export function swingSortFromParam(v: string | null | undefined): SwingScreenerSort {
+  return v === "met" ? "met" : "adv";
+}
+
+export function swingTabHref(
+  pathname: string,
+  filter: SwingScreenerFilter,
+  market: SwingMarketFilter,
+  sort: SwingScreenerSort = "adv",
+): string {
   const q = new URLSearchParams();
   if (filter !== "flow") q.set("tab", filter);
   if (market) q.set("market", market);
+  if (sort !== "adv") q.set("sort", sort);
   const s = q.toString();
   return s ? `${pathname}?${s}` : pathname;
 }

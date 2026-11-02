@@ -29,6 +29,8 @@ import { useMediaQuery } from "@/hooks/utils/useMediaQuery";
 import { PEEK_DOCK_QUERY } from "@/hooks/stock/peekProvider";
 import { useChartOptions } from "@/hooks/stock/useChartOptions";
 import { isUsTicker } from "@/lib/utils/isUsTicker";
+import { roundToKrxTick } from "@/lib/utils/krxTick";
+import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
 import { STOCK_DETAIL_TIERING_NOTE } from "@/lib/copy/profile/stockDetail";
 import {
   DEFAULT_CHART_TYPE,
@@ -93,6 +95,15 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
   // 미국 종목 — 회사개요·공시·수급은 KR 전용 소스(DART·KIS)라 데이터가 없다. 해당 섹션을 숨긴다
   // (us-stock-support Q6: 뱃지·"미지원" 안내 없이 완전 숨김). 시세·차트·호가·체결·시그널은 Toss 로 동작.
   const isUs = isUsTicker(ticker);
+  // 스윙 체크 참고 지지·저항 — 카드와 같은 쿼리(캐시 공유). 미국 종목은 미지원이라 요청 안 함.
+  const { data: swing } = useQuerySwingJudgment(ticker, !isUs);
+  const swingPlan = swing?.judgment.plan ?? null;
+  const swingLevels = swingPlan
+    ? {
+        support: swingPlan.support === null ? null : roundToKrxTick(swingPlan.support),
+        resistance: swingPlan.resistance === null ? null : roundToKrxTick(swingPlan.resistance),
+      }
+    : null;
 
   // 초광폭(콘텐츠 우측 여백이 큼) — 호가·체결강도를 차트 우측에 도크로 띄운다(그 미만은 차트 아래 2단).
   const isUltraWide = useMediaQuery(PEEK_DOCK_QUERY);
@@ -133,7 +144,7 @@ export function StockPageLayout({ ticker }: { ticker: string }) {
 
       {/* ── 항시: 가격 차트 — 초광폭이면 우측 여백에 호가·체결강도 도크를 절대배치로 띄운다. ── */}
       <div className="relative mt-lg border-t border-border-line pt-lg">
-        <StockDailyChart ticker={ticker} {...chartControls} allowMinute={!isUs} />
+        <StockDailyChart ticker={ticker} {...chartControls} allowMinute={!isUs} swingLevels={swingLevels} />
         {isUltraWide ? (
           // 콘텐츠 우측 끝(left-full) + gap 앵커, 폭은 실측(우측 여백에 맞춤). 차트와 함께 스크롤.
           <aside

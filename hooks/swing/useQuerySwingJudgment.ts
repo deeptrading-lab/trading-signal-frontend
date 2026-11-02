@@ -15,10 +15,12 @@ import { queryKeys } from "@/hooks/query/queryKeys";
 import { queryConfig } from "@/lib/query/queryConfig";
 import type { ApiError } from "@/lib/api/errors";
 
-export function useQuerySwingJudgment(ticker: string): UseQueryResult<SwingJudgmentResponse, ApiError> {
+/** @param enabled false 면 요청하지 않는다(미국 종목 등 — 스윙 체크 미지원). */
+export function useQuerySwingJudgment(ticker: string, enabled = true): UseQueryResult<SwingJudgmentResponse, ApiError> {
   return useQuery<SwingJudgmentResponse, ApiError>({
     queryKey: queryKeys.swing.judgment(ticker),
     queryFn: () => fetchSwingJudgment(ticker),
+    enabled,
     staleTime: queryConfig.swing.judgment.staleTime,
     gcTime: queryConfig.swing.judgment.gcTime,
     retry: (count, error) => error.status !== 404 && count < 1,

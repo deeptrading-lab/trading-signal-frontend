@@ -17,6 +17,7 @@ import {
   isSwingStoreConfigured,
   latestSwingTradeDate,
   listSwingRows,
+  toSwingScreenerItem,
   type SwingListFilter,
 } from "@/lib/server/swing/store";
 import { SWING_SCREENER_LIMIT, type SwingScreenerResponse } from "@/lib/types/swing/api";
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
   const filter = (FILTERS.includes(sp.get("filter") as SwingListFilter) ? sp.get("filter") : "flow") as SwingListFilter;
   const marketParam = sp.get("market");
   const market = marketParam === "KOSPI" || marketParam === "KOSDAQ" ? marketParam : null;
+  const sort = sp.get("sort") === "met" ? "met" : "adv";
   const dateParam = sp.get("date");
   if (dateParam !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
     return NextResponse.json({ error: "날짜 형식이 올바르지 않아요(YYYY-MM-DD)." }, { status: 400 });
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
   const tradeDate = dateParam ?? screenerListDate(meta, latest, RULEBOOK.version);
   const [rows, counts] = tradeDate
     ? await Promise.all([
-        listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: SWING_SCREENER_LIMIT }),
+        listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: SWING_SCREENER_LIMIT, sort }),
         countSwingRows({ tradeDate, version: RULEBOOK.version, market }),
       ])
     : [[], null];
@@ -57,22 +59,7 @@ export async function GET(request: NextRequest) {
     rulebookVersion: RULEBOOK.version,
     release: SWING_RELEASE,
     filter,
-    items: rows.map((r) => ({
-      ticker: r.ticker,
-      name: getSymbolName(r.ticker) ?? r.ticker,
-      market: r.market,
-      grade: r.grade,
-      metCount: r.met_count,
-      flowPass: r.flow_pass,
-      exclusions: r.exclusions,
-      items: r.items,
-      stage: r.stage,
-      close: Number(r.close),
-      adv20: r.adv20 === null ? null : Number(r.adv20),
-      planStop: r.plan_stop === null ? null : Number(r.plan_stop),
-      planTarget: r.plan_target === null ? null : Number(r.plan_target),
-      planRr: r.plan_rr === null ? null : Number(r.plan_rr),
-    })),
+    items: rows.map((r) => toSwingScreenerItem(r, getSymbolName(r.ticker) ?? r.ticker)),
     run: meta ? { at: meta.at, ok: meta.ok, tradeDate: meta.tradeDate ?? null } : null,
     counts,
   };

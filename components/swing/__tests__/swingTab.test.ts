@@ -1,7 +1,7 @@
 /** /swing 탭·시장 URL 매핑 회귀 차단. */
 
 import { describe, expect, it } from "vitest";
-import { swingFilterFromParam, swingMarketFromParam, swingTabHref } from "../swingTab";
+import { swingFilterFromParam, swingMarketFromParam, swingSortFromParam, swingTabHref } from "../swingTab";
 
 describe("swingTab", () => {
   it("모르는 값은 기본(수급 조건 충족·전체 시장)", () => {
@@ -17,5 +17,8 @@ describe("swingTab", () => {
     expect(swingTabHref("/swing", "excluded", null)).toBe("/swing?tab=excluded");
     expect(swingTabHref("/swing", "all", "KOSPI")).toBe("/swing?tab=all&market=KOSPI");
     expect(swingTabHref("/swing", "flow", "KOSDAQ")).toBe("/swing?market=KOSDAQ");
+    expect(swingTabHref("/swing", "all", null, "met")).toBe("/swing?tab=all&sort=met");
+    expect(swingSortFromParam("met")).toBe("met");
+    expect(swingSortFromParam("x")).toBe("adv");
   });
 });
