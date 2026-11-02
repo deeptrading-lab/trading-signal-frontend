@@ -12,7 +12,13 @@ import { getSymbolName } from "@/lib/api/kis/search";
 import { RULEBOOK } from "@/lib/swing/rulebook";
 import { readSwingScreenerMeta, screenerListDate } from "@/lib/server/swing/screener";
 import { SWING_RELEASE } from "@/lib/server/swing/stats";
-import { isSwingStoreConfigured, latestSwingTradeDate, listSwingRows, type SwingListFilter } from "@/lib/server/swing/store";
+import {
+  countSwingRows,
+  isSwingStoreConfigured,
+  latestSwingTradeDate,
+  listSwingRows,
+  type SwingListFilter,
+} from "@/lib/server/swing/store";
 import { SWING_SCREENER_LIMIT, type SwingScreenerResponse } from "@/lib/types/swing/api";
 
 const FILTERS: SwingListFilter[] = ["flow", "excluded", "all"];
@@ -36,9 +42,12 @@ export async function GET(request: NextRequest) {
   ]);
   // 날짜 지정이 없으면 집계 도중의 일부 목록 대신 마지막으로 끝까지 돈 거래일(screenerListDate).
   const tradeDate = dateParam ?? screenerListDate(meta, latest, RULEBOOK.version);
-  const rows = tradeDate
-    ? await listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: SWING_SCREENER_LIMIT })
-    : [];
+  const [rows, counts] = tradeDate
+    ? await Promise.all([
+        listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: SWING_SCREENER_LIMIT }),
+        countSwingRows({ tradeDate, version: RULEBOOK.version, market }),
+      ])
+    : [[], null];
   if (rows === null) {
     return NextResponse.json({ error: "스윙 판정 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." }, { status: 502 });
   }
@@ -65,6 +74,7 @@ export async function GET(request: NextRequest) {
       planRr: r.plan_rr === null ? null : Number(r.plan_rr),
     })),
     run: meta ? { at: meta.at, ok: meta.ok, tradeDate: meta.tradeDate ?? null } : null,
+    counts,
   };
   return NextResponse.json(body, { headers: { "Cache-Control": "private, max-age=60" } });
 }

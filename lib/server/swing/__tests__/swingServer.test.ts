@@ -3,7 +3,8 @@ import { judgeSwing } from "@/lib/swing/judge";
 import { flatCloses, makeInput, ramp } from "@/lib/swing/__tests__/_swingFixtures";
 import { passesPrefilter, swingInputHash } from "../compute";
 import { createKisPacer, isTransientKisError } from "../pace";
-import { hasItemBit, itemBits, metCount } from "@/lib/swing/itemBits";
+import { adverseBits, hasAdverseBit, hasItemBit, itemBits, metCount } from "@/lib/swing/itemBits";
+import { RULEBOOK } from "@/lib/swing/rulebook";
 import { toSwingRow } from "../row";
 import { isScreenerRunOk, screenerListDate, swingUniverse } from "../screener";
 import { kstToday, pickTradeDate } from "../tradeDate";
@@ -27,7 +28,20 @@ describe("toSwingRow — 압축 행", () => {
     expect(hasItemBit(row.items, "A")).toBe(j.items.A.pass === true);
     expect(row.met_count).toBe(metCount(j.items));
     expect(row.flow_pass).toBe(j.items.A.pass === true && j.exclusions.length === 0);
-    expect(itemBits(j.items)).toBe(row.items);
+    // 아래 16비트 = 충족 비트, 위쪽 = 불리한 신호(표시 전용).
+    expect(row.items & 0xffff).toBe(itemBits(j.items));
+    expect(row.items).toBe(itemBits(j.items) | adverseBits(j.features, RULEBOOK));
+  });
+
+  it("불리한 신호 — 반대 방향 수급·과열/하락추세·RSI 과매수만, 충족 비트와 안 겹친다", () => {
+    const flow = { person: 0.2, foreign: -0.2, institution: 0.2, pension: -0.05, privateEquity: 0.15 };
+    const bits = adverseBits({ flow, stage: "downtrend", rsi: 75 }, RULEBOOK);
+    for (const k of ["A1", "A2", "A3", "Aplus", "C", "D"] as const) expect(hasAdverseBit(bits, k)).toBe(true);
+    expect(hasAdverseBit(bits, "B")).toBe(false);
+    expect(hasAdverseBit(bits, "E")).toBe(false);
+    expect(bits & 0xffff).toBe(0);
+    const calm = adverseBits({ flow: { person: -0.2, foreign: 0.2, institution: 0.2, pension: 0, privateEquity: 0 }, stage: "range", rsi: 55 }, RULEBOOK);
+    expect(calm).toBe(0);
   });
 
   it("충족 수는 연기금(가점)·A(묶음)를 세지 않는다", () => {

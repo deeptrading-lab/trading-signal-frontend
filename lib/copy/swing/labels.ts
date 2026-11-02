@@ -96,6 +96,85 @@ export const SWING_ITEM_LABEL = {
   E: "쌍바닥 + MACD 상승",
 } satisfies Record<SwingItemKey, string>;
 
+/**
+ * 목록 조건 매트릭스 열 — 짧은 머리글 + 마우스를 올리면 보이는 기준(규칙서 값에서 계산).
+ * 수급 4열(개인·외국인·기관·연기금) / 차트 4열(지지·국면·전환·쌍바닥).
+ */
+const flowPct = Math.round(RULEBOOK.flow.thresholdPerDay * RULEBOOK.flow.days * 100);
+const pensionPct = Math.round(RULEBOOK.flow.pensionBonusPerDay * RULEBOOK.flow.days * 1000) / 10;
+export const SWING_MATRIX_COLUMNS: ReadonlyArray<{
+  key: SwingItemKey;
+  label: string;
+  group: "flow" | "chart";
+  /** 충족 기준(쉬운 말). */
+  hint: string;
+  /** ▲ 불리한 신호의 뜻 — 없으면 이 열은 불리 표시를 하지 않는다. */
+  adverse?: string;
+}> = [
+  {
+    key: "A1", label: "개인 매도", group: "flow",
+    hint: `최근 ${RULEBOOK.flow.days}일 개인이 판 금액이 하루 평균 거래대금의 ${flowPct}% 이상 — 개인 물량이 빠지는 중`,
+    adverse: `개인이 오히려 ${flowPct}% 이상 사는 중`,
+  },
+  {
+    key: "A2", label: "외국인 매수", group: "flow",
+    hint: `최근 ${RULEBOOK.flow.days}일 외국인이 산 금액이 하루 평균 거래대금의 ${flowPct}% 이상`,
+    adverse: `외국인이 ${flowPct}% 이상 파는 중`,
+  },
+  {
+    key: "A3", label: "기관 매수", group: "flow",
+    hint: `최근 ${RULEBOOK.flow.days}일 기관이 ${flowPct}% 이상 순매수, 그중 사모펀드 비중이 ${RULEBOOK.flow.peMaxShareOfInstitution * 100}% 미만`,
+    adverse: `기관이 ${flowPct}% 이상 파는 중이거나, 기관 매수가 사모펀드 주도`,
+  },
+  {
+    key: "Aplus", label: "연기금 매수", group: "flow",
+    hint: `최근 ${RULEBOOK.flow.days}일 연기금이 거래대금의 ${pensionPct}% 이상 순매수(가점 — 충족 수에는 안 셈)`,
+    adverse: `연기금이 ${pensionPct}% 이상 파는 중`,
+  },
+  {
+    key: "B", label: "지지선", group: "chart",
+    hint: `현재가 아래에 거래가 몰린 가격대(매물대)나 쌍바닥 저점이 있고, 거기까지의 하락폭 대비 위쪽 여유(손익비)가 ${RULEBOOK.plan.minRr}배 이상`,
+  },
+  {
+    key: "C", label: "추세", group: "chart",
+    hint: "1년 평균선·최근 60일 흐름으로 본 국면이 과열이나 하락추세가 아님",
+    adverse: "과열(단기 급등) 또는 하락추세 국면",
+  },
+  {
+    key: "D", label: "골든크로스", group: "chart",
+    hint: `최근 ${RULEBOOK.momentum.crossLookbackBars}일 안에 MACD나 5·20일 이동평균이 위로 교차했고, RSI가 ${RULEBOOK.momentum.rsiMin}~${RULEBOOK.momentum.rsiMax}(과열 전)`,
+    adverse: `RSI ${RULEBOOK.momentum.rsiMax} 초과 — 단기 과매수`,
+  },
+  {
+    key: "E", label: "쌍바닥", group: "chart",
+    hint: "비슷한 가격에서 두 번 바닥을 찍었고, 두 번째 바닥에서 MACD가 더 높음(하락 힘이 약해짐)",
+  },
+];
+export const SWING_MATRIX_GROUP_FLOW = "수급 (최근 5일)";
+export const SWING_MATRIX_GROUP_CHART = "가격·추세";
+export const SWING_COL_STOCK = "종목";
+export const SWING_COL_CLOSE = "종가";
+export const SWING_COL_MET = "충족";
+export const SWING_COL_CAUTION = "주의 사유";
+export const SWING_DOT_MET = "충족";
+export const SWING_DOT_MISS = "미충족";
+export const SWING_DOT_ADVERSE = "불리한 신호";
+export const SWING_HINT_MET = "충족";
+export const SWING_HINT_ADVERSE = "불리";
+export const SWING_LEGEND_MET = "충족";
+export const SWING_LEGEND_MISS = "해당 없음";
+export const SWING_LEGEND_ADVERSE = "불리한 신호";
+export const SWING_LEGEND_HELP = "조건 이름을 누르면 기준이 보여요";
+export const SWING_LEGEND_DETAILS = "조건 기준 보기";
+
+/** 상단 요약 — "625종목 중 수급 조건 충족 3 · 주의 497(80%)". */
+export function swingSummaryLabel(c: { all: number; flow: number; excluded: number }): string {
+  const pct = c.all > 0 ? Math.round((c.excluded / c.all) * 100) : 0;
+  return `${c.all.toLocaleString("ko-KR")}종목 중 수급 조건 충족 ${c.flow.toLocaleString("ko-KR")} · 주의 ${c.excluded.toLocaleString("ko-KR")}(${pct}%)`;
+}
+/** 주의 비중이 높으면 덧붙이는 한 줄(변동성 큰 장). */
+export const SWING_SUMMARY_VOLATILE = "변동성이 큰 장이라 대부분 종목이 주의로 분류됐어요.";
+
 /** 카드 체크리스트 표 순서(A 묶음은 표시하지 않는다). */
 export const SWING_CHECK_ROWS: readonly SwingItemKey[] = ["A1", "A2", "A3", "Aplus", "B", "C", "D", "E"];
 
@@ -114,7 +193,6 @@ export const SWING_LEVEL_SUPPORT = "참고 지지";
 export const SWING_LEVEL_RESISTANCE = "참고 저항";
 export const SWING_LEVEL_RANGE = "2주 통상 변동폭";
 
-export const SWING_PENSION_CHIP = "연기금 순매수";
 
 export function swingMetChip(n: number, total = 7): string {
   return `충족 ${n}/${total}`;

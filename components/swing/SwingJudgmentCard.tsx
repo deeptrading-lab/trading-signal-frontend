@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
 import { SwingNoteSection } from "./SwingNoteSection";
-import { metCount } from "@/lib/swing/itemBits";
+import { adverseBits, hasAdverseBit, metCount } from "@/lib/swing/itemBits";
 import type { SwingJudgment } from "@/lib/swing/judge";
 import { RULEBOOK } from "@/lib/swing/rulebook";
 import { cn } from "@/lib/utils/cn";
@@ -31,6 +31,7 @@ import {
   SWING_CHECK_UNKNOWN,
   SWING_DISCLAIMER,
   SWING_GRADE_COHORT_LABEL,
+  SWING_HINT_ADVERSE,
   SWING_ITEM_LABEL,
   SWING_LEVEL_RANGE,
   SWING_LEVEL_RESISTANCE,
@@ -89,6 +90,8 @@ export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallba
 
 function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
   const j = data.judgment;
+  // 불리한 신호(표시 전용) — 목록 매트릭스와 같은 정의.
+  const adverse = adverseBits(j.features, RULEBOOK);
   const statsLine = swingStatsSentence(data.stats.grade, SWING_GRADE_COHORT_LABEL[j.grade]);
   return (
     <section aria-labelledby={TITLE_ID} className="flex flex-col gap-lg">
@@ -112,15 +115,23 @@ function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
       <ul className="flex flex-col">
         {SWING_CHECK_ROWS.map((key) => {
           const pass = j.items[key].pass;
+          const bad = pass !== true && hasAdverseBit(adverse, key);
           return (
             <li key={key} className="flex items-start justify-between gap-md border-b border-border-line py-sm last:border-b-0">
               <div className="flex min-w-0 flex-col gap-xs">
                 <span className="text-body-sm-strong text-text-strong">{SWING_ITEM_LABEL[key]}</span>
                 <span className="text-caption text-text-muted">{describeItem(key, j, RULEBOOK)}</span>
               </div>
-              <span className={cn("shrink-0 text-label-sm", pass === true ? "text-outcome-hit" : "text-text-muted")}>
+              <span
+                className={cn(
+                  "shrink-0 text-label-sm",
+                  pass === true ? "text-outcome-hit" : bad ? "text-warn" : "text-text-muted",
+                )}
+              >
                 {pass === true ? (
                   SWING_CHECK_PASS
+                ) : bad ? (
+                  `▲ ${SWING_HINT_ADVERSE}`
                 ) : pass === false ? (
                   <>
                     <span aria-hidden="true">{SWING_CHECK_MISS}</span>
