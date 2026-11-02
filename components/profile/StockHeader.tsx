@@ -19,6 +19,7 @@ import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/formatMoney";
 import { isUsTicker } from "@/lib/utils/isUsTicker";
+import { SwingCheckButton } from "@/components/swing/SwingCheckButton";
 import { formatPct } from "@/lib/utils/formatPct";
 import { useQueryStockPrice } from "@/hooks/stock/useQueryStockPrice";
 import { useQueryExchangeRate } from "@/hooks/query/useQueryExchangeRate";
@@ -121,6 +122,8 @@ export function StockHeader({ ticker }: StockHeaderProps) {
         <h1 className="text-h1 text-text-strong">{displayName}</h1>
         <WatchlistStarButton added={added} onToggle={toggleWatch} />
         <StockWarningBadges warnings={warningsData?.warnings} />
+        {/* 스윙 체크(국내 종목) — 누르면 사이드 패널. 옛 "AI 종합분석" 버튼 자리. */}
+        {!isUs ? <SwingCheckButton ticker={ticker} name={displayName} /> : null}
       </div>
 
       {/* ② 가격행 */}

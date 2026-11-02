@@ -8,7 +8,7 @@
 
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingJudgment } from "@/hooks/swing/useQuerySwingJudgment";
@@ -50,7 +50,6 @@ import {
   swingStageLabel,
 } from "@/lib/copy/swing/labels";
 
-const TITLE_ID = "swing-judgment-card-title";
 
 /**
  * @param fallback 스윙 체크를 지원하지 않는 종목(404 — ETF·ETN 등)에서 대신 보여 줄 노드. 미국 종목처럼
@@ -58,6 +57,8 @@ const TITLE_ID = "swing-judgment-card-title";
  */
 export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallback?: ReactNode }) {
   const { data, isLoading, error, refetch } = useQuerySwingJudgment(ticker);
+  // 같은 카드가 페이지와 사이드 패널에 동시에 있을 수 있어 제목 id 는 인스턴스마다 따로.
+  const titleId = useId();
 
   // 백그라운드 재요청이 실패해도 이미 받은 판정이 있으면 그대로 보여 준다.
   if (data) return <JudgmentBody data={data} />;
@@ -81,8 +82,8 @@ export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallba
   // 페이지 진입 때 자동으로 뜨는 카드라 role="alert" 로 알리지 않는다(지원 안 함 404 는 예상된 상태).
   // 404 = 지원하지 않는 종목 — 다시 시도해도 같다.
   return (
-    <section aria-labelledby={TITLE_ID} className="flex flex-col items-start gap-md">
-      <h2 id={TITLE_ID} className="text-h2 text-text-strong">
+    <section aria-labelledby={titleId} className="flex flex-col items-start gap-md">
+      <h2 id={titleId} className="text-h2 text-text-strong">
         {SWING_CARD_TITLE}
       </h2>
       <p className="text-body-sm text-text-muted">{error?.message ?? SWING_STATE_ERROR}</p>
@@ -97,11 +98,12 @@ export function SwingJudgmentCard({ ticker, fallback }: { ticker: string; fallba
 
 /** 저장된 스크리너 행으로 그리는 축약 카드 — 충족·불리 여부와 주의 사유만(수치는 즉시 계산이 돌아오면). */
 function StoredSummary({ item, tradeDate, onRetry }: { item: SwingScreenerItem; tradeDate: string; onRetry: () => void }) {
+  const titleId = useId();
   return (
-    <section aria-labelledby={TITLE_ID} className="flex flex-col gap-lg">
+    <section aria-labelledby={titleId} className="flex flex-col gap-lg">
       <header className="flex flex-col gap-xs">
         <div className="flex flex-wrap items-center justify-between gap-sm">
-          <h2 id={TITLE_ID} className="text-h2 text-text-strong">
+          <h2 id={titleId} className="text-h2 text-text-strong">
             {SWING_CARD_TITLE}
           </h2>
           <Badge variant="accent">
@@ -149,15 +151,16 @@ function StoredSummary({ item, tradeDate, onRetry }: { item: SwingScreenerItem; 
 }
 
 function JudgmentBody({ data }: { data: SwingJudgmentResponse }) {
+  const titleId = useId();
   const j = data.judgment;
   // 불리한 신호(표시 전용) — 목록 매트릭스와 같은 정의.
   const adverse = adverseBits(j.features, RULEBOOK);
   const statsLine = swingStatsSentence(data.stats.grade, SWING_GRADE_COHORT_LABEL[j.grade]);
   return (
-    <section aria-labelledby={TITLE_ID} className="flex flex-col gap-lg">
+    <section aria-labelledby={titleId} className="flex flex-col gap-lg">
       <header className="flex flex-col gap-xs">
         <div className="flex flex-wrap items-center justify-between gap-sm">
-          <h2 id={TITLE_ID} className="text-h2 text-text-strong">
+          <h2 id={titleId} className="text-h2 text-text-strong">
             {SWING_CARD_TITLE}
           </h2>
           <Badge variant="accent">
