@@ -62,6 +62,7 @@ import {
   type MaPeriod,
 } from "./stockChartConfig";
 import type { ChartOptions } from "@/lib/store/chart/chartOptions";
+import { formatNumber } from "@/lib/utils/formatMoney";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { ChartThemeProvider } from "./chart/ChartThemeContext";
 import { CandleBar } from "./chart/CandleBar";
@@ -122,6 +123,8 @@ export interface StockDailyChartProps {
   onToggleOverlay: (key: keyof ChartOptions) => void;
   /** 분봉 선택 허용 — 미국 종목은 분봉 미지원이라 false 로 분봉 탭 숨김(us-stock-support). */
   allowMinute?: boolean;
+  /** 스윙 체크 참고 지지·저항(국내 종목, 호가 단위). 옵션 '스윙 지지·저항'이 켜져 있을 때만 그린다. */
+  swingLevels?: { support: number | null; resistance: number | null } | null;
 }
 
 export function StockDailyChart({
@@ -142,6 +145,7 @@ export function StockDailyChart({
   onChartTypeChange,
   onToggleOverlay,
   allowMinute,
+  swingLevels,
 }: StockDailyChartProps) {
   const { isLoading, isError, error, priceSeries, candleSeries, volSeries, macdSeries, rsiSeries, xTicks } =
     useChartData(ticker, interval, days, timeframe, minutePriorDays);
@@ -319,6 +323,29 @@ export function StockDailyChart({
   const tickHideThreshold = priceSpan > 0 ? priceSpan * 0.1 : 0;
   // 최신가 알약 근처 y축 눈금을 숨겨 겹침 제거.
   const hidePrices = lastClose != null ? [lastClose] : [];
+
+  // 스윙 체크 참고 지지(초록)·저항(앰버) — 점선 + 플롯 왼쪽 안쪽 라벨(우측 축 현재가 알약과 안 겹치게).
+  const swingLineEls =
+    overlays.swingLevels && swingLevels
+      ? (
+          [
+            ["support", swingLevels.support, C.histUp, "참고 지지"],
+            ["resistance", swingLevels.resistance, C.signalLine, "참고 저항"],
+          ] as const
+        )
+          .filter(([, price]) => price != null)
+          .map(([key, price, color, name]) => (
+            <ReferenceLine
+              key={`swing-${key}`}
+              y={price!}
+              stroke={color}
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              ifOverflow="extendDomain"
+              label={{ value: `${name} ${formatNumber(price!, { digits: 0 })}`, position: "insideTopLeft", fill: color, fontSize: 11 }}
+            />
+          ))
+      : null;
   const priceTick = (
     <PriceAxisTick tickFill={C.axisTick} hidePrices={hidePrices} hideThreshold={tickHideThreshold} isUs={isUs} />
   );
@@ -355,6 +382,7 @@ export function StockDailyChart({
               )}
               {/* 이동평균선(MA 5/20/60/120)·VWAP — 캔들/라인 위에 표시(topmost). 기본 ON=MA */}
               {priceOverlayLines}
+              {swingLineEls}
               {lastClose != null && (
                 <ReferenceLine
                   y={lastClose}
@@ -396,6 +424,7 @@ export function StockDailyChart({
               )}
               {/* 이동평균선(MA 5/20/60/120)·VWAP — 캔들/라인 위에 표시(topmost). 기본 ON=MA */}
               {priceOverlayLines}
+              {swingLineEls}
               {lastClose != null && (
                 <ReferenceLine
                   y={lastClose}

@@ -17,9 +17,9 @@ import { RULEBOOK } from "@/lib/swing/rulebook";
 import { computeSwingJudgment, getMajorReportEvents } from "@/lib/server/swing/compute";
 import { createKisPacer } from "@/lib/server/swing/pace";
 import { SWING_RELEASE, swingStatsFor } from "@/lib/server/swing/stats";
-import { getStoredSwingRow, latestSwingTradeDate } from "@/lib/server/swing/store";
+import { getStoredSwingRow, getSwingListRow, latestSwingTradeDate, toSwingScreenerItem } from "@/lib/server/swing/store";
 import { kstToday, resolveTradeDate } from "@/lib/server/swing/tradeDate";
-import type { SwingJudgmentResponse } from "@/lib/types/swing/api";
+import type { SwingJudgmentResponse, SwingJudgmentUnavailable } from "@/lib/types/swing/api";
 import { createLogger } from "@/lib/server/logTag";
 
 export const preferredRegion = "icn1";
@@ -43,6 +43,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ ticker
 
   const store = getKisStore();
   const call = createKisPacer();
+  let resolvedDate: string | null = null;
   try {
     // 거래일 — 오늘(KST) 단위로 캐시해 요청마다 지수를 다시 부르지 않는다.
     const tdKey = `swing:td:${kstToday()}`;
@@ -55,6 +56,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ ticker
       tradeDate = resolved ?? (await latestSwingTradeDate(RULEBOOK.version));
       if (!tradeDate) throw new Error("거래일을 정하지 못했어요");
     }
+    resolvedDate = tradeDate;
 
     const key = `swing:judgment:${RULEBOOK.version}:${tradeDate}:${ticker}`;
     let cached = await store.get<Cached>(key);
@@ -87,6 +89,13 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ ticker
     return NextResponse.json(body, { headers: { "Cache-Control": "private, max-age=60" } });
   } catch (error) {
     log.warn(`판정 실패 ${ticker}`, error);
-    return NextResponse.json({ error: "스윙 판정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." }, { status: 503 });
+    // 즉시 계산이 막히면(KIS 야간 점검 등) 그 거래일 스크리너 저장 행을 함께 보낸다 — 카드가 축약 표시.
+    const row = resolvedDate ? await getSwingListRow(resolvedDate, ticker, RULEBOOK.version).catch(() => null) : null;
+    const body: SwingJudgmentUnavailable = {
+      error: "스윙 판정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+      tradeDate: resolvedDate,
+      stored: row ? toSwingScreenerItem(row, getSymbolName(ticker) ?? ticker) : null,
+    };
+    return NextResponse.json(body, { status: 503 });
   }
 }

@@ -35,6 +35,7 @@ import {
   SWING_MATRIX_COLUMNS,
   SWING_MATRIX_GROUP_CHART,
   SWING_MATRIX_GROUP_FLOW,
+  swingEokLabel,
   swingExclusionLabel,
   swingStageLabel,
 } from "@/lib/copy/swing/labels";
@@ -44,6 +45,13 @@ type MarkState = "met" | "adverse" | "none";
 
 const FLOW_COLS = SWING_MATRIX_COLUMNS.filter((c) => c.group === "flow");
 const CHART_COLS = SWING_MATRIX_COLUMNS.filter((c) => c.group === "chart");
+
+/** 수급 열의 최근 5일 순매수(억 원) — 저장 행에 금액이 있을 때만. */
+function flowAmount(item: SwingScreenerItem, c: Column): number | null {
+  const f = item.flow;
+  if (!f) return null;
+  return c.key === "A1" ? f.person : c.key === "A2" ? f.foreign : c.key === "A3" ? f.institution : c.key === "Aplus" ? f.pension : null;
+}
 
 function stateOf(item: SwingScreenerItem, c: Column): MarkState {
   if (hasItemBit(item.items, c.key)) return "met";
@@ -230,6 +238,11 @@ export function SwingScreenerTable({ items, showReasons }: { items: SwingScreene
                     className={cn("px-sm py-md text-center", (i === 0 || i === FLOW_COLS.length) && "border-l border-border-line")}
                   >
                     <Mark state={stateOf(item, c)} dim={excluded} />
+                    {flowAmount(item, c) !== null ? (
+                      <span className="mt-xs block text-caption tabular-nums text-text-muted">
+                        {swingEokLabel(flowAmount(item, c)!)}
+                      </span>
+                    ) : null}
                   </td>
                 ))}
                 <td className="border-l border-border-line px-sm py-md text-center text-body-sm-strong tabular-nums text-text-strong">
@@ -277,6 +290,9 @@ export function SwingScreenerTable({ items, showReasons }: { items: SwingScreene
                       >
                         <Mark state={st} dim={excluded} />
                         {c.label}
+                        {flowAmount(item, c) !== null ? (
+                          <span className="tabular-nums text-text-muted">{swingEokLabel(flowAmount(item, c)!)}</span>
+                        ) : null}
                       </span>
                     );
                   })}

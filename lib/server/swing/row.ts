@@ -6,6 +6,7 @@
 import { adverseBits, itemBits, metCount } from "@/lib/swing/itemBits";
 import { RULEBOOK } from "@/lib/swing/rulebook";
 import type { SwingJudgment } from "@/lib/swing/judge";
+import type { SwingFlowAmounts } from "@/lib/types/swing/api";
 
 export type SwingJudgmentRow = {
   trade_date: string;
@@ -25,11 +26,22 @@ export type SwingJudgmentRow = {
   plan_stop: number | null;
   plan_target: number | null;
   plan_rr: number | null;
+  /** 최근 N일 주체별 순매수(억 원, 소수 1자리) — 목록 매트릭스 표시용. 수급 결측이면 null. */
+  flow: SwingFlowAmounts | null;
   input_hash: string;
 };
 
 const round = (x: number | null | undefined, d: number) =>
   x === null || x === undefined || !Number.isFinite(x) ? null : Number(x.toFixed(d));
+
+/** 수급 강도 S(= N일 순매수 ÷ ADV20) × ADV20 → 억 원. */
+export function flowAmounts(j: SwingJudgment): SwingFlowAmounts | null {
+  const f = j.features.flow;
+  const adv = j.features.adv20;
+  if (!f || adv === null) return null;
+  const eok = (s: number) => Math.round((s * adv) / 1e7) / 10;
+  return { person: eok(f.person), foreign: eok(f.foreign), institution: eok(f.institution), pension: eok(f.pension) };
+}
 
 export function toSwingRow(
   j: SwingJudgment,
@@ -54,6 +66,7 @@ export function toSwingRow(
     plan_stop: j.plan?.stop ?? null,
     plan_target: j.plan?.target ?? null,
     plan_rr: round(j.plan?.rr, 3),
+    flow: flowAmounts(j),
     input_hash: inputHash,
   };
 }

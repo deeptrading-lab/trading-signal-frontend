@@ -33,6 +33,13 @@ describe("toSwingRow — 압축 행", () => {
     expect(row.items).toBe(itemBits(j.items) | adverseBits(j.features, RULEBOOK));
   });
 
+  it("순매수 금액(억 원) = 강도 × ADV20", () => {
+    const row = toSwingRow(j, "screener", "abc");
+    const f = j.features.flow!;
+    const adv = j.features.adv20!;
+    expect(row.flow?.foreign).toBeCloseTo((f.foreign * adv) / 1e8, 1);
+  });
+
   it("불리한 신호 — 반대 방향 수급·과열/하락추세·RSI 과매수만, 충족 비트와 안 겹친다", () => {
     const flow = { person: 0.2, foreign: -0.2, institution: 0.2, pension: -0.05, privateEquity: 0.15 };
     const bits = adverseBits({ flow, stage: "downtrend", rsi: 75 }, RULEBOOK);

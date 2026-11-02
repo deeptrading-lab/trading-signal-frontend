@@ -6,12 +6,13 @@
  */
 
 import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
+import type { SwingScreenerItem } from "@/lib/types/swing/api";
 import type { SwingJudgmentRow } from "./row";
 
 const TABLE = "swing_judgments";
 
 export const SWING_LIST_COLUMNS =
-  "ticker,market,grade,met_count,flow_pass,exclusions,items,stage,close,adv20,plan_stop,plan_target,plan_rr";
+  "ticker,market,grade,met_count,flow_pass,exclusions,items,stage,close,adv20,plan_stop,plan_target,plan_rr,flow";
 
 function headers(key: string): HeadersInit {
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
@@ -57,7 +58,7 @@ export async function latestSwingTradeDate(version: string): Promise<string | nu
 export type SwingListFilter = "flow" | "excluded" | "all";
 export type SwingListRow = Pick<
   SwingJudgmentRow,
-  "ticker" | "market" | "grade" | "met_count" | "flow_pass" | "exclusions" | "items" | "stage" | "close" | "adv20" | "plan_stop" | "plan_target" | "plan_rr"
+  "ticker" | "market" | "grade" | "met_count" | "flow_pass" | "exclusions" | "items" | "stage" | "close" | "adv20" | "plan_stop" | "plan_target" | "plan_rr" | "flow"
 >;
 
 /** 스크리너 목록 — 거래대금(ADV20) 내림차순, 같으면 종목코드(안정 정렬). */
@@ -67,6 +68,8 @@ export async function listSwingRows(opts: {
   filter: SwingListFilter;
   market: "KOSPI" | "KOSDAQ" | null;
   limit: number;
+  /** met = 충족 많은 순(동률은 거래대금 순). 기본 거래대금 순. */
+  sort?: "adv" | "met";
 }): Promise<SwingListRow[] | null> {
   const q = [
     `select=${SWING_LIST_COLUMNS}`,
@@ -75,12 +78,41 @@ export async function listSwingRows(opts: {
     `source=eq.screener`,
     opts.filter === "flow" ? "flow_pass=is.true" : opts.filter === "excluded" ? "grade=eq.excluded" : null,
     opts.market ? `market=eq.${opts.market}` : null,
-    "order=adv20.desc.nullslast,ticker.asc",
+    opts.sort === "met" ? "order=met_count.desc,adv20.desc.nullslast,ticker.asc" : "order=adv20.desc.nullslast,ticker.asc",
     `limit=${opts.limit}`,
   ]
     .filter(Boolean)
     .join("&");
   return get<SwingListRow>(q);
+}
+
+/** 목록 행 → 화면 아이템(목록 API·종목 카드 축약 응답 공용). */
+export function toSwingScreenerItem(r: SwingListRow, name: string): SwingScreenerItem {
+  return {
+    ticker: r.ticker,
+    name,
+    market: r.market,
+    grade: r.grade,
+    metCount: r.met_count,
+    flowPass: r.flow_pass,
+    exclusions: r.exclusions,
+    items: r.items,
+    stage: r.stage,
+    close: Number(r.close),
+    adv20: r.adv20 === null ? null : Number(r.adv20),
+    planStop: r.plan_stop === null ? null : Number(r.plan_stop),
+    planTarget: r.plan_target === null ? null : Number(r.plan_target),
+    planRr: r.plan_rr === null ? null : Number(r.plan_rr),
+    flow: r.flow ?? null,
+  };
+}
+
+/** (거래일, 종목, 버전) 저장된 목록 행 1개 — 즉시 계산이 안 될 때(야간 점검) 축약 표시용. */
+export async function getSwingListRow(tradeDate: string, ticker: string, version: string): Promise<SwingListRow | null> {
+  const rows = await get<SwingListRow>(
+    `select=${SWING_LIST_COLUMNS}&trade_date=eq.${tradeDate}&ticker=eq.${encodeURIComponent(ticker)}&rulebook_version=eq.${encodeURIComponent(version)}&limit=1`,
+  );
+  return rows?.[0] ?? null;
 }
 
 /** 행 수만 센다(PostgREST count=exact, 본문 없음). 실패면 null. */

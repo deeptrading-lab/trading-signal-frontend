@@ -42,6 +42,8 @@ export const SWING_FLOW_HINT =
 export const SWING_DISCLAIMER = "투자 권유가 아니에요. 과거 통계는 미래 수익을 보장하지 않아요.";
 export const SWING_RUN_PARTIAL = "집계가 진행 중이거나 일부만 끝났어요. 목록이 빠졌을 수 있어요.";
 export const SWING_CAUTION_TITLE = "주의 사유";
+export const SWING_STORED_NOTE =
+  "지금은 증권사 시세 점검 시간이라 아침 집계 요약만 보여 줘요. 조건별 수치는 점검이 끝나면 다시 계산돼요.";
 export const SWING_LOADING = "스윙 체크를 불러오고 있어요";
 
 /**
@@ -186,7 +188,15 @@ export const SWING_CHECK_UNKNOWN = "확인 불가";
 
 /** 목록 개수 — BFF 가 거래대금 상위 limit 개까지만 준다. */
 export function swingCountLabel(n: number, limit = SWING_SCREENER_LIMIT): string {
-  return n >= limit ? `거래대금 상위 ${limit}개` : `${n}개 · 거래대금 순`;
+  return n >= limit ? `상위 ${limit}개` : `${n}개`;
+}
+export const SWING_SORT_ARIA = "정렬";
+export const SWING_SORT_LABEL = { adv: "거래대금 순", met: "충족 많은 순" } as const;
+/** 순매수 금액(억 원) — "+22억" / "−9,070억" / "+0.4억". */
+export function swingEokLabel(v: number): string {
+  const a = Math.abs(v);
+  const num = a >= 10 ? Math.round(a).toLocaleString("en-US") : a.toFixed(1);
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${num}억`;
 }
 
 export const SWING_LEVEL_SUPPORT = "참고 지지";
