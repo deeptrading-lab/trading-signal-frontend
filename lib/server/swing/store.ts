@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseServiceConfig } from "@/lib/server/supabase/egressGuard";
+import type { ForwardRow } from "@/lib/swing/forward";
 import type { SwingScreenerItem } from "@/lib/types/swing/api";
 import type { SwingJudgmentRow } from "./row";
 
@@ -148,6 +149,31 @@ export async function countSwingRows(opts: {
     count(`${base}&grade=eq.excluded`),
   ]);
   return all === null || flow === null || excluded === null ? null : { all, flow, excluded };
+}
+
+/**
+ * 전진 관찰용 행 — 기준일 이후 스크리너 저장 행 전부(필요한 열만). 1,000행씩 나눠 읽는다.
+ * 하루 약 600행 × 수십 거래일이라 관리자 화면에서만 쓰고 결과는 호출부가 캐시한다. 실패면 null.
+ */
+export async function listSwingForwardRows(sinceDate: string, version: string): Promise<ForwardRow[] | null> {
+  const PAGE = 1_000;
+  const out: ForwardRow[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const page = await get<ForwardRow>(
+      [
+        "select=trade_date,ticker,market,grade,met_count,flow_pass,exclusions,close",
+        `trade_date=gte.${sinceDate}`,
+        `rulebook_version=eq.${encodeURIComponent(version)}`,
+        "source=eq.screener",
+        "order=trade_date.asc,ticker.asc",
+        `limit=${PAGE}`,
+        `offset=${offset}`,
+      ].join("&"),
+    );
+    if (page === null) return null;
+    out.push(...page);
+    if (page.length < PAGE) return out;
+  }
 }
 
 /** (거래일, 종목, 버전) 저장 행의 해시·등급 — 즉시 판정과의 일치 확인용. */

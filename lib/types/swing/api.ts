@@ -2,7 +2,9 @@
  * 스윙 판정 BFF 응답 타입 — `/api/swing/screener`, `/api/swing/judgment/[ticker]` (PRD `swing-judgment` PR-2).
  */
 
+import type { ForwardHorizon } from "@/lib/swing/forward";
 import type { SwingJudgment } from "@/lib/swing/judge";
+import type { MarketTrendResult } from "@/lib/swing/marketTrend";
 import type { SwingNoteItem } from "@/lib/swing/note";
 import type { SwingMarket } from "@/lib/swing/rulebook";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
@@ -76,6 +78,18 @@ export type SwingScreenerResponse = {
   run: { at: string; ok: boolean; tradeDate: string | null } | null;
   /** 상단 요약 — 이 거래일·시장의 저장 종목 수, 수급 조건 충족, 주의 종목. 집계 실패면 null. */
   counts: { all: number; flow: number; excluded: number } | null;
+  /** 시장 추세(지수 EMA5 vs EMA60, 표시 전용). 아직 계산 전이거나 실패면 null. */
+  trend: SwingMarketTrend[] | null;
+};
+
+export type SwingMarketTrend = MarketTrendResult & { market: SwingMarket };
+
+/** 운영자 전진 관찰 — `/api/swing/forward` (admin). */
+export type SwingForwardResponse = {
+  /** 마지막 저장 거래일. */
+  latest: string | null;
+  computedAt: string;
+  horizons: ForwardHorizon[];
 };
 
 /** AI 노트(뉴스·공시 정리) — `/api/swing/note/[ticker]` (PR-4). 판정과 무관한 별도 저장소. */

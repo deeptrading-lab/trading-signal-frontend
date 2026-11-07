@@ -7,6 +7,7 @@
  */
 
 import type { SwingStage } from "@/lib/swing/features";
+import type { ForwardGroup } from "@/lib/swing/forward";
 import type { SwingItemKey } from "@/lib/swing/itemBits";
 import type { SwingExclusion, SwingGrade, SwingJudgment } from "@/lib/swing/judge";
 import { RULEBOOK, type Rulebook } from "@/lib/swing/rulebook";
@@ -347,4 +348,43 @@ export function swingStatsSentence(cell: SwingStatsCell | null, label: string): 
   const ex = cell.meanExcess10 * 100;
   const exText = `${ex > 0 ? "+" : ex < 0 ? "−" : ""}${Math.abs(ex).toFixed(2)}%p`;
   return `과거 '${label}' ${cell.n.toLocaleString("ko-KR")}건 — 10일 뒤 오른 비율 ${up}%(같은 날 전체 ${base}%), 같은 날 전체 대비 평균 ${exText}`;
+}
+
+// ── 시장 추세(지수 5·60, 표시 전용) ─────────────────────────────────────────────
+export const SWING_TREND_TITLE = "시장 추세";
+export const SWING_TREND_UP = "상승 추세";
+export const SWING_TREND_DOWN = "하락 추세";
+/** "10/14부터" — since(YYYY-MM-DD). */
+export function swingTrendSince(since: string): string {
+  return `${Number(since.slice(5, 7))}/${Number(since.slice(8, 10))}부터`;
+}
+export const SWING_TREND_HINT_TOGGLE = "기준";
+export const SWING_TREND_HINT =
+  "지수의 5일 평균선이 60일 평균선 위면 상승, 아래면 하락 추세예요. 2021~2026년 지수에서 하락 추세 구간을 피하면 최대 낙폭이 줄었어요(KOSPI −40% → −28%). 개별 종목 판정에는 쓰지 않아요.";
+
+// ── 운영자 전진 관찰(사후 성적) ─────────────────────────────────────────────────
+export const SWING_FORWARD_TITLE = "스윙 체크 사후 성적";
+export const SWING_FORWARD_DESC =
+  "스크리너가 저장한 종가끼리 비교해요(종가→종가). 같은 날·같은 시장 저장 종목 평균 대비이고, 하루를 한 표로 평균해요. 10거래일 미만 관찰은 참고만 하세요.";
+export const SWING_FORWARD_LOADING = "사후 성적을 계산하는 중…";
+export const SWING_FORWARD_ERROR = "사후 성적을 불러오지 못했어요.";
+export const SWING_FORWARD_GROUP = "묶음";
+export const swingForwardHorizon = (h: number) => `${h}거래일 뒤`;
+export const swingForwardBasis = (latest: string | null, first: string | null, last: string | null) =>
+  first && last ? `기준일 ${first} ~ ${last} · 마지막 저장 ${latest ?? "—"}` : `아직 비교할 기간이 없어요 · 마지막 저장 ${latest ?? "—"}`;
+export const SWING_FORWARD_GROUP_LABEL: Record<ForwardGroup, string> = {
+  all: "전체(기준선)",
+  candidate: "최상위 등급(candidate)",
+  interest: "관심",
+  flow: "수급 조건 충족 · 주의 없음",
+  met5: "5개 이상 충족 · 주의 없음",
+  noCaution: "주의 없음",
+  caution: "주의",
+  highVol: "주의 · 고변동",
+  overheated: "주의 · 과열",
+};
+/** 셀 — "+1.20%p" / 보조 "이긴 58% · 120건". */
+export function swingForwardCell(meanExcess: number | null, winRate: number | null, n: number): { main: string; sub: string } {
+  if (meanExcess === null || winRate === null) return { main: "—", sub: "표본 없음" };
+  return { main: swingPpLabel(meanExcess), sub: `이긴 ${Math.round(winRate * 100)}% · ${n.toLocaleString("ko-KR")}건` };
 }

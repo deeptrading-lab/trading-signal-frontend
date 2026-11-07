@@ -108,6 +108,8 @@ export const queryKeys = {
     judgment: (ticker: string) => ["swing", "judgment", ticker] as const,
     /** 종목 AI 노트(뉴스·공시 정리) — 판정과 별개. */
     note: (ticker: string) => ["swing", "note", ticker] as const,
+    /** 운영자 전진 관찰(사후 성적) — 인자 없는 단일 키. */
+    forward: ["swing", "forward"] as const,
   },
   intraday: {
     /** 틱 자가채점 라벨 집계(캘리브레이션 패널) — 인자 없는 단일 키. */

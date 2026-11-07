@@ -7,9 +7,10 @@
  * - 판정은 크론이 저장한 행을 그대로 쓴다(여기서 계산하지 않는다).
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { RULEBOOK } from "@/lib/swing/rulebook";
+import { ensureSwingMarketTrend, readSwingMarketTrend } from "@/lib/server/swing/marketTrend";
 import { readSwingScreenerMeta, screenerListDate } from "@/lib/server/swing/screener";
 import { SWING_RELEASE } from "@/lib/server/swing/stats";
 import {
@@ -44,12 +45,15 @@ export async function GET(request: NextRequest) {
   ]);
   // 날짜 지정이 없으면 집계 도중의 일부 목록 대신 마지막으로 끝까지 돈 거래일(screenerListDate).
   const tradeDate = dateParam ?? screenerListDate(meta, latest, RULEBOOK.version);
-  const [rows, counts] = tradeDate
+  const [rows, counts, trend] = tradeDate
     ? await Promise.all([
         listSwingRows({ tradeDate, version: RULEBOOK.version, filter, market, limit: SWING_SCREENER_LIMIT, sort }),
         countSwingRows({ tradeDate, version: RULEBOOK.version, market }),
+        readSwingMarketTrend(tradeDate),
       ])
-    : [[], null];
+    : [[], null, null];
+  // 시장 추세가 아직 없으면 응답 뒤에 채운다(KIS 지수 12콜 — 사용자 응답을 기다리게 하지 않는다).
+  if (tradeDate && !trend) after(() => ensureSwingMarketTrend(tradeDate));
   if (rows === null) {
     return NextResponse.json({ error: "스윙 판정 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." }, { status: 502 });
   }
@@ -62,6 +66,7 @@ export async function GET(request: NextRequest) {
     items: rows.map((r) => toSwingScreenerItem(r, getSymbolName(r.ticker) ?? r.ticker)),
     run: meta ? { at: meta.at, ok: meta.ok, tradeDate: meta.tradeDate ?? null } : null,
     counts,
+    trend,
   };
   return NextResponse.json(body, { headers: { "Cache-Control": "private, max-age=60" } });
 }

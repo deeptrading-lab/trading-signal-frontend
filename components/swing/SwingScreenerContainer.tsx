@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useQuerySwingScreener } from "@/hooks/swing/useQuerySwingScreener";
 import type { SwingMarket } from "@/lib/swing/rulebook";
 import { cn } from "@/lib/utils/cn";
-import type { SwingScreenerFilter, SwingScreenerResponse, SwingScreenerSort } from "@/lib/types/swing/api";
+import type { SwingMarketTrend, SwingScreenerFilter, SwingScreenerResponse, SwingScreenerSort } from "@/lib/types/swing/api";
 import {
   SWING_DISCLAIMER,
   SWING_EMPTY,
@@ -35,6 +35,12 @@ import {
   SWING_SORT_LABEL,
   swingSummaryLabel,
   SWING_SUMMARY_VOLATILE,
+  SWING_TREND_DOWN,
+  SWING_TREND_HINT,
+  SWING_TREND_HINT_TOGGLE,
+  SWING_TREND_TITLE,
+  SWING_TREND_UP,
+  swingTrendSince,
 } from "@/lib/copy/swing/labels";
 import { SwingScreenerTable } from "./SwingScreenerTable";
 import { swingFilterFromParam, swingMarketFromParam, swingSortFromParam, swingTabHref } from "./swingTab";
@@ -48,6 +54,30 @@ const MARKET_OPTIONS: ReadonlyArray<{ key: MarketKey; label: string }> = [
   { key: "KOSPI", label: "KOSPI" },
   { key: "KOSDAQ", label: "KOSDAQ" },
 ];
+
+/** 시장 추세 한 줄 — KOSPI·KOSDAQ 5·60 상태 칩 + 기준 펼침(표시 전용, 판정에 안 씀). */
+function MarketTrendLine({ trend }: { trend: SwingMarketTrend[] }) {
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-xs text-body-sm">
+        <span className="text-body-sm-strong text-text-strong">{SWING_TREND_TITLE}</span>
+        {trend.map((t) => (
+          <span
+            key={t.market}
+            className={cn(
+              "rounded-pill px-sm py-xs text-caption font-bold",
+              t.state === "up" ? "bg-signal-done-soft text-outcome-hit" : "bg-warn-soft text-warn",
+            )}
+          >
+            {t.market} {t.state === "up" ? `▲ ${SWING_TREND_UP}` : `▼ ${SWING_TREND_DOWN}`} · {swingTrendSince(t.since)}
+          </span>
+        ))}
+        <span className="text-caption text-text-muted underline">{SWING_TREND_HINT_TOGGLE}</span>
+      </summary>
+      <p className="mt-xs text-caption text-text-muted">{SWING_TREND_HINT}</p>
+    </details>
+  );
+}
 
 export function SwingScreenerContainer() {
   const router = useRouter();
@@ -77,6 +107,7 @@ export function SwingScreenerContainer() {
             ) : null}
           </p>
         ) : null}
+        {data?.trend ? <MarketTrendLine trend={data.trend} /> : null}
         <p className="text-caption text-text-muted">{SWING_PAGE_SUBTITLE}</p>
         {/* 보이는 거래일의 집계가 끝까지(ok) 돌았다는 마커가 없으면 목록이 일부일 수 있다(집계 중·실패). */}
         {data?.tradeDate && (!data.run?.ok || data.run.tradeDate !== data.tradeDate) ? (

@@ -20,6 +20,7 @@ import {
   runScreenerSlice,
   saveSwingScreenerMeta,
 } from "@/lib/server/swing/screener";
+import { ensureSwingMarketTrend } from "@/lib/server/swing/marketTrend";
 import { isSwingStoreConfigured } from "@/lib/server/swing/store";
 import { resolveTradeDate } from "@/lib/server/swing/tradeDate";
 import { createLogger } from "@/lib/server/logTag";
@@ -63,7 +64,9 @@ export async function GET(request: NextRequest) {
     const failed = int(sp.get("failed"), 0);
     const ok = isScreenerRunOk(processed, failed);
     await saveSwingScreenerMeta({ at: new Date().toISOString(), ok, tradeDate, version: RULEBOOK.version, processed, failed });
-    log(`finalize t=${tradeDate} processed=${processed} failed=${failed} ok=${ok}`);
+    // 시장 추세(표시 전용)를 미리 채운다 — 실패해도 마무리 결과와 무관(목록 조회 때 다시 시도).
+    const trend = await ensureSwingMarketTrend(tradeDate);
+    log(`finalize t=${tradeDate} processed=${processed} failed=${failed} ok=${ok} trend=${trend ? "ok" : "skip"}`);
     return NextResponse.json({ ok, tradeDate, processed, failed });
   }
 
