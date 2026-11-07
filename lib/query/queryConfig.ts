@@ -233,6 +233,11 @@ export const queryConfig = {
       gcTime: 30 * MINUTE,
       pollMs: 10 * SECOND,
     },
+    /** 운영자 전진 관찰 — 하루 1회 바뀐다(서버 KV 12시간 캐시). */
+    forward: {
+      staleTime: 30 * MINUTE,
+      gcTime: 60 * MINUTE,
+    },
   },
   intraday: {
     /**

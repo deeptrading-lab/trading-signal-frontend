@@ -16,6 +16,7 @@
 import { readServerPrivileges } from "@/lib/auth/serverGuard";
 import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
 import { AdminUsersPanel } from "@/components/admin/AdminUsersPanel";
+import { SwingForwardPanel } from "@/components/swing/SwingForwardPanel";
 
 export default async function AdminPage() {
   // 두 등급을 한 번의 DB 조회로 판정한다(등급별로 따로 물으면 왕복 2회).
@@ -27,5 +28,11 @@ export default async function AdminPage() {
   }
 
   // 등급 변경(드롭다운)은 superadmin 만 — admin 은 승인/취소·등급 읽기 전용.
-  return <AdminUsersPanel canChangeRole={can.superadmin} />;
+  return (
+    <>
+      <AdminUsersPanel canChangeRole={can.superadmin} />
+      {/* 스윙 체크 사후 성적(전진 관찰) — 오픈베타 기준 재제안 근거. */}
+      <SwingForwardPanel />
+    </>
+  );
 }
