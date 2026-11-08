@@ -1,5 +1,7 @@
 # 프로그램 자동매매 전용 메뉴
 
+> 이전 화면 기록. 현재 범위는 [로컬 토스 모의매매 PRD](../prd/local-program-trading.md)에 있다.
+
 2026-11-01 실거래 후속 스펙: [stock-order-integration.md](stock-order-integration.md). 아래 최초 구현의 합성 전용 제한은 후속 스펙으로 대체한다.
 
 > 이 문서는 1차 메뉴·리플레이 범위다. 후속 실계좌 실행의 최신 계약은 [실계좌 실행 PRD](stock-order-integration.md)를 따른다. 아래의 실주문 미구현 표기는 1차 산출물 당시 경계이며 후속 구현 검증은 별도 실계좌 QA에서 추적한다.

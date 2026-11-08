@@ -14,7 +14,7 @@ const checking = process.argv.includes('--check');
 
 
 async function main() {
-  const sources = ['lib/server/programTrading/engine.ts', 'lib/server/programTrading/candidateRefresh.ts', 'lib/server/programTrading/candidates.ts', 'lib/validation/programTrading/candidateGate.ts', 'lib/mock/programTrading/quotes.ts', 'scripts/programTradingWorker.ts', 'lib/server/programTrading/journal.ts', 'lib/server/programTrading/liveEngine.ts', 'lib/server/programTrading/liveStore.ts', 'lib/server/programTrading/liveTypes.ts', 'lib/server/programTrading/liveQuotes.ts', 'lib/server/programTrading/kisTransport.ts', 'lib/server/programTrading/kisBroker.ts'];
+  const sources = ['lib/server/programTrading/engine.ts', 'lib/server/programTrading/candidateRefresh.ts', 'lib/validation/programTrading/candidateGate.ts', 'lib/server/programTrading/journal.ts', 'lib/server/programTrading/localPaperRuntime.ts', 'lib/server/programTrading/tossPaper.ts', 'lib/server/programTrading/recommendationCandidates.ts', 'lib/server/intraday/recommendationRankings.ts', 'lib/validation/intraday/recommendations.ts'];
   const sourceText = await Promise.all(sources.map(path => readFile(path, 'utf8')));
   const fingerprint = createHash('sha256').update(sourceText.join('\n')).digest('hex').slice(0, 12);
   const theme = JSON.parse(await readFile('tailwind.theme.json', 'utf8')).theme.extend;

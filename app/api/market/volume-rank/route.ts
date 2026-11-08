@@ -12,11 +12,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { isKisConfigured, resolveKisEnv } from "@/lib/api/kis";
-import { fetchVolumeRank } from "@/lib/api/kis/volume-rank";
+import { loadIntradayVolumeRankings } from "@/lib/server/intraday/recommendationRankings";
 import { enrichRankingRows } from "@/lib/api/kis/rankingEnrich";
 import { isApiError } from "@/lib/api/errors";
 import { getMockVolumeRank } from "@/lib/mock/market/volumeRank";
-import { isRegularStock } from "@/lib/server/rankingFilter";
 import type {
   VolumeRankBy,
   VolumeRankResponse,
@@ -24,13 +23,10 @@ import type {
 import {
   withTimeout,
   jsonWithDataSource,
-  fetchWithTransientRetryOrThrow,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
 const BFF_TIMEOUT_MS = 8_000;
-const RETRY_BACKOFF_MS = 250;
-const TOP_N = 14;
 
 const FALLBACK_TIMEOUT_MESSAGE = "KIS 서버 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 const FALLBACK_SERVER_MESSAGE = "거래량 순위를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
@@ -53,11 +49,10 @@ export async function GET(request: NextRequest) {
   try {
     // throw 전파 변형 사용(리뷰 #8) — 빈 배열 폴백은 KIS 비즈니스 오류(토큰 만료·레이트리밋)를
     // 삼켜 아래 isApiError 분기를 죽은 코드로 만들고 원인 없는 generic 502 만 남긴다.
-    const fetched = await withTimeout(
-      fetchWithTransientRetryOrThrow(() => fetchVolumeRank(by), RETRY_BACKOFF_MS),
+    const rows = await withTimeout(
+      loadIntradayVolumeRankings(by),
       BFF_TIMEOUT_MS,
     );
-    const rows = fetched.filter(isRegularStock);
     if (rows.length === 0) {
       return NextResponse.json(
         { error: FALLBACK_SERVER_MESSAGE },
@@ -65,7 +60,7 @@ export async function GET(request: NextRequest) {
       );
     }
     // 시총(토스)·산업(KIS) best-effort enrich — never-block(실패·예산초과 시 컬럼만 빈값, 랭킹 무붕괴).
-    const enriched = await enrichRankingRows(rows.slice(0, TOP_N));
+    const enriched = await enrichRankingRows(rows);
     const result: VolumeRankResponse = {
       rows: enriched,
       asOf: new Date().toISOString(),

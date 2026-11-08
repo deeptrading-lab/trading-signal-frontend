@@ -2,6 +2,8 @@
 
 Next.js 기반 TradingSignalEngine 프론트엔드입니다.
 
+토스 시세 모의투자 설정은 [순서별 시작 가이드](docs/program-trading/getting-started.md)를 참고하세요. 설정은 `.env.local`에 입력합니다.
+
 ## 구조
 
 ```text

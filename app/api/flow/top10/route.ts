@@ -16,29 +16,24 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  fetchForeignInstitutionTotal,
   isKisConfigured,
   resolveKisEnv,
 } from "@/lib/api/kis";
 import { isApiError } from "@/lib/api/errors";
 import { getMockInvestorFlowTop10 } from "@/lib/mock/flow/top10";
 import { getMockInvestorFlowCumulative } from "@/lib/mock/flow/cumulative";
+import { loadIntradayFlowRankings } from "@/lib/server/intraday/recommendationRankings";
 import { readCumulativeSnapshots } from "@/lib/server/flowSnapshotStore";
 import type {
-  InvestorFlowRow,
   InvestorFlowTop10,
 } from "@/lib/types/flow/top10";
 import {
   withTimeout,
-  delay,
   jsonWithDataSource,
-  fetchWithTransientRetry,
   BFF_TIMEOUT_SENTINEL,
 } from "@/lib/server/bffUtils";
 
 const BFF_TIMEOUT_MS = 8_000; // 주체 2콜(+재시도) 순차 + 지연 여유.
-const SUBJECT_DELAY_MS = 150; // 주체 간 짧은 지연 — EGW00201 회피(ticker route 정합).
-const RETRY_BACKOFF_MS = 250; // transient(EGW00201/네트워크) 1회 재시도 backoff.
 const TOP_N = 10;
 
 const FALLBACK_TIMEOUT_MESSAGE =
@@ -70,7 +65,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await withTimeout(fetchTop10(), BFF_TIMEOUT_MS);
+    const result = await withTimeout(loadIntradayFlowRankings(), BFF_TIMEOUT_MS);
     // 양 주체 전부 비면 비즈니스/네트워크 실패로 간주.
     if (result.foreign.length === 0 && result.institution.length === 0) {
       return mapErrorToResponse(new Error("__ALL_FAILED__"));
@@ -81,37 +76,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return mapErrorToResponse(error);
   }
-}
-
-/**
- * 외국인·기관 주체별 1콜씩 순차 호출(delay 로 EGW00201 회피) → 각 상위 10 slice 후 합성.
- * 한 주체 실패는 빈 배열로 degrade(부분 성공 — 다른 주체는 노출).
- */
-async function fetchTop10(): Promise<InvestorFlowTop10> {
-  const foreign = await safeFetch("frgn");
-  await delay(SUBJECT_DELAY_MS);
-  const institution = await safeFetch("orgn");
-
-  return {
-    foreign: foreign.slice(0, TOP_N),
-    institution: institution.slice(0, TOP_N),
-    asOf: new Date().toISOString(),
-  };
-}
-
-/**
- * 단일 주체 호출 — transient(EGW00201/네트워크) 시 backoff 후 1회 재시도, 실패 시 빈 배열 degrade.
- * 홈 진입 시 다른 KIS 위젯과 동시 호출이 겹쳐 초당 한도에 걸려 빈 컬럼이 되던 문제 방어(#90).
- * BFF 타임아웃 sentinel 은 상위로 전파(mock-timeout 분기). 공통 헬퍼 `fetchWithTransientRetry` 사용.
- */
-async function safeFetch(
-  subject: "frgn" | "orgn",
-): Promise<InvestorFlowRow[]> {
-  return fetchWithTransientRetry(
-    () => fetchForeignInstitutionTotal(subject),
-    [],
-    RETRY_BACKOFF_MS,
-  );
 }
 
 /**

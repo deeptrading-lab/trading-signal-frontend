@@ -9,6 +9,8 @@
 
 "use client";
 
+import { INTRADAY_RECOMMENDATION_LIMIT, selectIntradayFlowCandidates } from "@/lib/validation/intraday/recommendations";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils/cn";
@@ -36,7 +38,6 @@ import {
   INTRADAY_PAPER_COPY as P,
   INTRADAY_WATCH_COPY as W,
 } from "@/lib/copy/stock/intradayRead";
-import type { InvestorFlowRow } from "@/lib/types/flow/top10";
 import type { PaperTradingSession } from "@/lib/types/paperTrading/paperTrading";
 import type { StockWarningItem } from "@/lib/types/stock/warnings";
 
@@ -47,20 +48,6 @@ type WarningsByTicker = Record<string, StockWarningItem[]>;
 
 /** 추천 칩 1개 데이터 — 수급·거래량 소스 공통 최소 형태. */
 type Candidate = { ticker: string; name: string; changePercent: number };
-
-const MAX_CANDIDATES = 14;
-
-function dedupCandidates(rows: InvestorFlowRow[]): InvestorFlowRow[] {
-  const seen = new Set<string>();
-  const out: InvestorFlowRow[] = [];
-  for (const r of rows) {
-    if (seen.has(r.ticker)) continue;
-    seen.add(r.ticker);
-    out.push(r);
-    if (out.length >= MAX_CANDIDATES) break;
-  }
-  return out;
-}
 
 /** 워치 로컬 목록 localStorage 키 prefix — 날짜별로 분리해 매일 새 목록에서 시작한다. */
 const WATCH_STORAGE_KEY_PREFIX = "finsight:intraday-watch";
@@ -297,8 +284,8 @@ export function IntradayWatchWorkspace() {
     );
   }, [rowTickers]);
 
-  const flowCandidates = dedupCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
-  const volumeCandidates = (volumeRank?.rows ?? []).slice(0, MAX_CANDIDATES);
+  const flowCandidates = selectIntradayFlowCandidates([...(flow?.foreign ?? []), ...(flow?.institution ?? [])]);
+  const volumeCandidates = (volumeRank?.rows ?? []).slice(0, INTRADAY_RECOMMENDATION_LIMIT);
   const watching = new Set(rowTickers);
 
   // 가시 티커(오늘 행 + 펼친 과거 그룹 + 추천 후보) union 으로 경보를 1회 배치 조회 — 티커별 칩에 내려준다.

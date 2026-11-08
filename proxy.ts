@@ -22,6 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth/session";
+import { allowsLocalProgram } from "@/lib/server/programTrading/localRequest";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 
 /**
@@ -141,6 +142,11 @@ export async function proxy(request: NextRequest) {
   }
 
   const { pathname, search } = request.nextUrl;
+  const localPaperRoute = ["/program-trading", "/api/program-trading", "/api/program-trading/logs", "/api/program-trading/review"].includes(pathname);
+  if (localPaperRoute && allowsLocalProgram(request, request.method === "POST")) {
+    return NextResponse.next();
+  }
+
 
   // 예외 화이트리스트 — 항상 통과(루프 가드 포함: /login·/api/auth/* 는 여기서 통과).
   if (isPublicPath(pathname)) {

@@ -25,7 +25,6 @@ function normalizeTickers(tickers: readonly string[]): string {
 }
 
 export const queryKeys = {
-  programTradingAccount: ["programTrading", "account"] as const,
   programTrading: ["programTrading", "state"] as const,
   whitelist: (q: string) => ["whitelist", "search", q] as const,
   analyze: ["workbench", "analyze"] as const,

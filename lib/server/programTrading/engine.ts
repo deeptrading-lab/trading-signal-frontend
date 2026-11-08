@@ -13,7 +13,7 @@ export function finishSession(s: TradingState) {
 }
 function mark(s: TradingState) { s.equity = s.cash + s.positions.reduce((v,p) => v + p.quantity * p.mark * (1-RULES.slippage) * (1-RULES.fee-RULES.sellTax), 0); }
 function validQuote(q: Quote | undefined): q is Quote { return !!q && !q.halted && Number.isFinite(q.ageMs) && q.ageMs>=0 && q.ageMs<=5000 && Number.isFinite(q.price) && q.price>0; }
-function sell(s: TradingState, ticker: string, reason: Reason) {
+function sell(s: TradingState, ticker: string, reason: Reason, cooldownClock = s.tick) {
   const q=s.quotes.find(q=>q.ticker===ticker);
   if(!validQuote(q)) return;
   const p = s.positions.find(p => p.ticker === ticker)!;
@@ -24,7 +24,7 @@ function sell(s: TradingState, ticker: string, reason: Reason) {
   const net = gross-fee-p.entry*p.quantity-Math.ceil(p.entry*p.quantity*RULES.fee);
   s.cash += gross-fee; s.realized += net;
   s.positions = s.positions.filter(p => p.ticker !== ticker);
-  s.cooldown[ticker] = s.tick + RULES.cooldown;
+  s.cooldown[ticker] = cooldownClock + RULES.cooldown;
   s.trades.push({ id: `${s.tick}-${ticker}-sell`, minute: s.minute, ticker, side: "sell", quantity: p.quantity, price, fee, reason, net });
 }
 export function command(s: TradingState, action: Command) {
@@ -41,7 +41,7 @@ export function command(s: TradingState, action: Command) {
   mark(s);
   finishSession(s);
 }
-export function step(s: TradingState, quotes: Quote[], minute: number) {
+export function step(s: TradingState, quotes: Quote[], minute: number, cooldownClock = s.tick + 1) {
   s.tick++; s.minute = minute; s.quotes = quotes; s.updatedAt = new Date().toISOString();
   for (const p of s.positions) { const q = quotes.find(q => q.ticker === p.ticker); if (validQuote(q)) p.mark=q.price; }
   mark(s);
@@ -49,13 +49,13 @@ export function step(s: TradingState, quotes: Quote[], minute: number) {
   for (const p of [...s.positions]) {
     const change=p.mark/p.entry-1;
     const reason: Reason | null = s.lifecycle?.status === "stopping" ? "manual" : s.killed ? "kill" : minute>=920 ? "close" : change<=-RULES.stop ? "stop" : change>=RULES.target ? "target" : null;
-    if (reason) sell(s,p.ticker,reason);
+    if (reason) sell(s,p.ticker,reason,cooldownClock);
   }
   if (minute>=920) s.running=false;
   if (!hasCandidates(s.candidates)) s.running=false;
   if (s.running && !s.killed && minute>=550 && minute<900) for (const q of quotes) {
     if (s.positions.length>=RULES.maxPositions) break;
-    if (!s.candidates.rows.some(c=>c.ticker===q.ticker) || s.positions.some(p=>p.ticker===q.ticker) || (s.cooldown[q.ticker]??0)>s.tick || !validQuote(q) || ![q.price,q.previousHigh,q.volumeRatio,q.spreadBps].every(Number.isFinite) || q.price<=0 || q.previousHigh<=0 || q.spreadBps<0 || q.spreadBps>15 || q.volumeRatio<1.5 || q.price<=q.previousHigh*1.001) continue;
+    if (!s.candidates.rows.some(c=>c.ticker===q.ticker) || s.positions.some(p=>p.ticker===q.ticker) || (s.cooldown[q.ticker]??0)>cooldownClock || !validQuote(q) || ![q.price,q.previousHigh,q.volumeRatio,q.spreadBps].every(Number.isFinite) || q.price<=0 || q.previousHigh<=0 || q.spreadBps<0 || q.spreadBps>15 || q.volumeRatio<1.5 || q.price<=q.previousHigh*1.001) continue;
     const price=Math.ceil(q.price*(1+RULES.slippage));
     const quantity=Math.floor(Math.min(s.equity*RULES.allocation/price,s.equity*RULES.risk/(price*(RULES.stop+RULES.fee*2+RULES.sellTax+RULES.slippage)),s.cash/(price*(1+RULES.fee))));
     if (quantity<1) continue;

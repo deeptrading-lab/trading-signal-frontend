@@ -1,9 +1,8 @@
 import { ProgramTradingPanel } from "@/components/programTrading/ProgramTradingPanel";
 import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
-import { hasServerRole } from "@/lib/auth/serverGuard";
 import { isVercelRuntime } from "@/lib/utils/runtimeEnv";
 
-export default async function ProgramTradingPage() {
-  if (isVercelRuntime() && !(await hasServerRole("admin"))) return <AccessDeniedView />;
+export default function ProgramTradingPage() {
+  if (isVercelRuntime() || process.env.NODE_ENV !== "development") return <AccessDeniedView />;
   return <ProgramTradingPanel />;
 }
