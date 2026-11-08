@@ -21,18 +21,18 @@
     "output": ".archify/program-rules/sell.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "7bcc7bce6ebc452713309fa4581f33e42767a509",
+      "revision": "a9f2cca25e8eb31506718fe72e38230fcb6d6a17",
       "link_mode": "local-only"
     }
   },
   "lanes": [
     {
       "id": "orders",
-      "label": "주문·잔고 확인"
+      "label": "보유 시세 확인"
     },
     {
       "id": "unknown",
-      "label": "주문 불명 차단"
+      "label": "시세 유효성"
     },
     {
       "id": "sell0",
@@ -64,8 +64,8 @@
       "id": "orders",
       "lane": "orders",
       "col": 0,
-      "label": "주문·체결을 먼저 대사",
-      "sublabel": "접수 ≠ 체결 · 확인된 수량만 반영",
+      "label": "보유 종목부터 시세 점검",
+      "sublabel": "토스 최근 체결과 호가 확인",
       "type": "backend",
       "sources": [
         {
@@ -73,7 +73,7 @@
           "line": 1
         }
       ],
-      "tag": "미체결 매수 30초·후보 제외 → 취소 후 재확인",
+      "tag": "시세 유효 여부 확인",
       "icon": "active",
       "width": 240
     },
@@ -81,8 +81,8 @@
       "id": "unknown",
       "lane": "unknown",
       "col": 0,
-      "label": "주문 결과가 확인됐나요?",
-      "sublabel": "부분체결·미체결은 실제 수량으로 추적",
+      "label": "가상 매도에 유효한 시세인가요?",
+      "sublabel": "정규장 · 5초 이내 체결과 호가",
       "type": "security",
       "sources": [
         {
@@ -97,8 +97,8 @@
       "id": "lock",
       "lane": "unknown",
       "col": 1,
-      "label": "신규 주문 잠금",
-      "sublabel": "주문 결과 확인 전 자동 재전송 금지",
+      "label": "가상 청산 대기",
+      "sublabel": "유효한 시세까지 보유 유지",
       "type": "security",
       "sources": [
         {
@@ -114,7 +114,7 @@
       "lane": "sell0",
       "col": 0,
       "label": "사용자가 종료를 요청했나요?",
-      "sublabel": "취소 응답 후 체결/잔고 재확인",
+      "sublabel": "유효한 시세에서 가상 청산",
       "type": "security",
       "sources": [
         {
@@ -129,8 +129,8 @@
       "id": "sell0yes",
       "lane": "sell0",
       "col": 1,
-      "label": "취소 확인 → 잔여분 청산",
-      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "label": "가상 보유 전량 청산",
+      "sublabel": "가상 매도 후 보유·현금 반영",
       "type": "backend",
       "sources": [
         {
@@ -138,7 +138,7 @@
           "line": 1
         }
       ],
-      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "tag": "슬리피지와 비용을 반영",
       "icon": "active",
       "width": 240
     },
@@ -147,7 +147,7 @@
       "lane": "sell1",
       "col": 0,
       "label": "일일 자산이 −2%에 도달했나요?",
-      "sublabel": "처음 기록한 계좌자산 기준",
+      "sublabel": "세션 시작 가상 자산 기준",
       "type": "security",
       "sources": [
         {
@@ -163,7 +163,7 @@
       "lane": "sell1",
       "col": 1,
       "label": "청산 · 신규 매수 잠금",
-      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "sublabel": "가상 매도 후 보유·현금 반영",
       "type": "backend",
       "sources": [
         {
@@ -171,7 +171,7 @@
           "line": 1
         }
       ],
-      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "tag": "슬리피지와 비용을 반영",
       "icon": "active",
       "width": 240
     },
@@ -179,8 +179,8 @@
       "id": "sell2",
       "lane": "sell2",
       "col": 0,
-      "label": "15:20 이후인가요?",
-      "sublabel": "KST · 거래 가능한 상태에서만 전송",
+      "label": "마감 청산 시각인가요?",
+      "sublabel": "정규장 중 유효한 시세에서 처리",
       "type": "security",
       "sources": [
         {
@@ -196,7 +196,7 @@
       "lane": "sell2",
       "col": 1,
       "label": "청산 · 운용 중지",
-      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "sublabel": "가상 매도 후 보유·현금 반영",
       "type": "backend",
       "sources": [
         {
@@ -204,7 +204,7 @@
           "line": 1
         }
       ],
-      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "tag": "슬리피지와 비용을 반영",
       "icon": "active",
       "width": 240
     },
@@ -228,8 +228,8 @@
       "id": "sell3yes",
       "lane": "sell3",
       "col": 1,
-      "label": "시장가 손절",
-      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "label": "가상 손절",
+      "sublabel": "가상 매도 후 보유·현금 반영",
       "type": "backend",
       "sources": [
         {
@@ -237,7 +237,7 @@
           "line": 1
         }
       ],
-      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "tag": "슬리피지와 비용을 반영",
       "icon": "active",
       "width": 240
     },
@@ -261,8 +261,8 @@
       "id": "sell4yes",
       "lane": "sell4",
       "col": 1,
-      "label": "시장가 익절",
-      "sublabel": "시장가 매도 후 체결량·잔고 확인",
+      "label": "가상 익절",
+      "sublabel": "가상 매도 후 보유·현금 반영",
       "type": "backend",
       "sources": [
         {
@@ -270,7 +270,7 @@
           "line": 1
         }
       ],
-      "tag": "잔여 수량만 처리 · 체결 가격 보장 없음",
+      "tag": "슬리피지와 비용을 반영",
       "icon": "active",
       "width": 240
     },
@@ -301,7 +301,7 @@
     {
       "from": "unknown",
       "to": "lock",
-      "label": "불명",
+      "label": "미충족",
       "role": "branch",
       "variant": "security"
     },

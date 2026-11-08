@@ -21,7 +21,7 @@
     "output": ".archify/program-rules/settlement.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "7bcc7bce6ebc452713309fa4581f33e42767a509",
+      "revision": "a9f2cca25e8eb31506718fe72e38230fcb6d6a17",
       "link_mode": "local-only"
     }
   },
@@ -56,8 +56,8 @@
       "id": "clean",
       "lane": "clean",
       "col": 0,
-      "label": "미체결 정리 → 잔여분 청산",
-      "sublabel": "요청 성공만으로 종료 완료 처리하지 않음",
+      "label": "잔여 보유 가상 청산",
+      "sublabel": "최근 시세로 가상 청산 확인",
       "type": "backend",
       "sources": [
         {
@@ -73,7 +73,7 @@
       "lane": "settled",
       "col": 0,
       "label": "모든 종료 조건을 충족했나요?",
-      "sublabel": "미체결 0 · 보유 0 · 최신 잔고 대사 성공",
+      "sublabel": "가상 보유 0",
       "type": "security",
       "sources": [
         {
@@ -89,7 +89,7 @@
       "lane": "balance",
       "col": 0,
       "label": "전·후 자산과 수익률 확정",
-      "sublabel": "입출금·수동매매가 있으면 계좌 수익률에 영향",
+      "sublabel": "가상 체결 비용을 반영한 결과",
       "type": "backend",
       "sources": [
         {
@@ -104,7 +104,7 @@
       "id": "ledger",
       "lane": "ledger",
       "col": 0,
-      "label": "전체 주문·체결 원장 보존",
+      "label": "전체 가상 체결 원장 보존",
       "sublabel": "복기 근거·손익·비용·실행규칙 기록",
       "type": "backend",
       "sources": [
@@ -152,8 +152,8 @@
       "id": "wait",
       "lane": "settled",
       "col": 1,
-      "label": "정산 미확정 · 다음 점검 대사",
-      "sublabel": "통신 실패·주문 불명·입출금/외부 거래 차이",
+      "label": "종료 대기",
+      "sublabel": "최근 체결과 호가 확인",
       "type": "security",
       "sources": [
         {
@@ -161,7 +161,7 @@
           "line": 1
         }
       ],
-      "tag": "불명 주문 자동 재전송 금지",
+      "tag": "시세가 유효하면 다시 점검",
       "icon": "decision",
       "width": 240
     },
@@ -169,7 +169,7 @@
       "id": "costs",
       "lane": "ledger",
       "col": 1,
-      "label": "리플레이 비용 가정",
+      "label": "가상 체결 비용 가정",
       "sublabel": "슬리피지 0.05% · 수수료 0.015% · 매도세 0.2%",
       "type": "database",
       "sources": [
@@ -178,7 +178,7 @@
           "line": 1
         }
       ],
-      "tag": "실계좌 비용과 구분",
+      "tag": "가상 체결 시 반영",
       "icon": "active",
       "width": 240
     },
@@ -242,7 +242,7 @@
     {
       "from": "ledger",
       "to": "costs",
-      "label": "리플레이"
+      "label": "비용"
     },
     {
       "from": "target",

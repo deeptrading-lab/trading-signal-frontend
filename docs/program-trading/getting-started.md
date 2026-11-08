@@ -20,8 +20,8 @@ KIS_ENV=prod
 | --- | --- | --- |
 | 1 | 작업 브랜치를 pull하고 저장소 루트에서 `npm ci`를 실행한다. | 의존성 설치가 끝났다. |
 | 2 | 위의 토스 키와 **한투 실전 조회 키**를 `.env.local`에 입력한다. 다른 네트워크를 쓴다면 토스증권 PC 웹 **설정 → Open API → 허용 IP 관리**에서 새 네트워크의 공인 IP를 확인한다. [토스 인증 문서](https://developers.tossinvest.com/docs/auth) | 키 4개와 `KIS_ENV=prod`가 설정됐다. |
-| 3 | 서버 시작 전에 `npm run program:check`를 실행한다. | `candidatesReady`, `calendarReady`가 모두 `true`다. 장외에는 `canStartNow: false`가 정상이다. |
-| 4 | 저장소에서 `npm run program:dev`를 실행하고 [자동매매 화면](http://127.0.0.1:3000/program-trading)을 연다. | **토스 시세 · 모의투자**와 AI 단타 추천 종목이 표시된다. |
+| 3 | 저장소에서 `npm run program:dev`를 실행하고 [자동매매 화면](http://127.0.0.1:3000/program-trading)을 연다. | **토스 시세 · 모의투자**와 AI 단타 추천 종목이 표시된다. |
+| 4 | 추천 조회가 계속 실패할 때만 서버를 끄고 `npm run program:check`를 실행한다. 점검 후 1분 정도 지나 서버를 다시 켠다. 같은 키로 서버와 점검 CLI를 동시에 실행하면 토큰 발급이 겹칠 수 있다. [토스 인증 문서](https://developers.tossinvest.com/docs/auth) · [한투 토큰 안내](https://github.com/koreainvestment/open-trading-api#5-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0-%EA%B0%80%EC%9D%B4%EB%93%9C) | `candidatesReady`, `calendarReady`가 모두 `true`다. 장외에는 `canStartNow: false`가 정상이다. |
 | 5 | 한국 거래일 09:10~15:00 미만에 **토스 모의 시작**을 누른다. | **자동매매 중**이 표시된다. 유효한 시세가 매수 조건을 충족할 때 가상 체결이 기록된다. |
 | 6 | **매매 종료**를 누른 뒤 가상 보유 잔량이 정리될 때까지 기다린다. | **거래 종료**가 표시된다. 시세가 오래됐거나 없으면 유효한 시세가 들어올 때까지 청산이 대기한다. |
 | 7 | 새 실험을 열려면 종료를 확인하고 웹 서버를 끈 뒤 `.local/program-trading/toss-paper/` 폴더를 다른 위치에 보관하고 다시 실행한다. | 새 가상 세션이 준비됐다. |
