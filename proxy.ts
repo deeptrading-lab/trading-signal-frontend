@@ -142,7 +142,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const { pathname, search } = request.nextUrl;
-  const localPaperRoute = ["/program-trading", "/api/program-trading", "/api/program-trading/logs", "/api/program-trading/review"].includes(pathname);
+  const localPaperRoute = ["/program-trading", "/program-trading/review", "/api/program-trading", "/api/program-trading/logs", "/api/program-trading/review"].includes(pathname);
   if (localPaperRoute && allowsLocalProgram(request, request.method === "POST")) {
     return NextResponse.next();
   }

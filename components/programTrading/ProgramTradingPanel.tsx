@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowDown, Play, Square } from "lucide-react";
+import { ArrowDown, ClipboardList, Play, RefreshCw, Square } from "lucide-react";
+import Link from "next/link";
 import { useProgramTrading } from "@/hooks/programTrading/useProgramTrading";
-import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_PAPER_COPY as P } from "@/lib/copy/programTrading/programTrading";
+import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_PAPER_COPY as P, PROGRAM_REVIEW_COPY as R } from "@/lib/copy/programTrading/programTrading";
 import { cn } from "@/lib/utils/cn";
 
 const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
@@ -22,13 +23,19 @@ export function ProgramTradingPanel() {
     [M.returns, returns == null ? M.noBalance : `${returns > 0 ? "+" : ""}${returns.toFixed(2)}%`],
   ];
 
-  return <div className="mx-auto flex min-w-0 w-full max-w-main-max-w flex-col gap-xl">
-    <header className="flex flex-wrap items-start justify-between gap-md">
+  return <div className="mx-auto flex min-w-0 w-full max-w-main-max-w flex-col gap-xl font-(family-name:--font-pretendard)">
+    <header className="flex flex-wrap items-center justify-between gap-md">
       <div>
         <h1 className="text-h1 font-bold text-text-strong">{M.title}</h1>
         <p className="mt-xs text-body-sm text-text-muted">{P.subtitle}</p>
       </div>
-      <span className="badge-info">{P.mode}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-sm">
+        <span className="badge-info">{P.mode}</span>
+        <Link href="/program-trading/review" className="button-secondary program-trading-action whitespace-nowrap no-underline" prefetch={false}>
+          <ClipboardList className="size-4 shrink-0" aria-hidden="true" />
+          {R.open}
+        </Link>
+      </div>
     </header>
 
     <section className="rounded-lg border border-border-line p-lg" aria-label={P.mode}>
@@ -41,7 +48,7 @@ export function ProgramTradingPanel() {
           </li>)}
         </ul>
       ) : <p className="mt-xs text-caption text-text-muted">{M.noBalance}</p>}
-      <p className="mt-xs text-caption text-text-muted">{P.limits}</p>
+      <p className="mt-xs break-keep text-caption text-text-muted">{P.limits}</p>
     </section>
 
     <section aria-label={M.returns} className="space-y-md">
@@ -53,10 +60,20 @@ export function ProgramTradingPanel() {
       </div>
       <p className="text-caption text-text-muted">{M.target} {state?.lifecycle?.targetReturnPct ?? 1}% · {M.targetPolicy}</p>
       <div className="flex flex-wrap items-center justify-between gap-md">
-        <p role="status" className={cn("text-body-sm font-semibold", connected ? "text-primary" : "text-signal-down")}>
-          {loading ? C.loading : !connected ? M.stale : stopping ? M.stopping : finished ? M.finished : state?.killed ? C.killed : state?.running ? M.running : M.stopped}
+        <p role="status" className={cn("inline-flex items-center gap-xs text-body-sm font-semibold", connected ? "text-primary" : "text-signal-down")}>
+          {loading ? C.loading : !connected ? M.stale : stopping ? M.stopping : finished ? M.finished : state?.killed ? C.killed : state?.running ? (
+            <>
+              {M.running}
+              <RefreshCw className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+            </>
+          ) : M.stopped}
         </p>
-        <div className="flex w-full gap-sm sm:w-auto">
+        {finished ? (
+          <button type="button" className="button-primary program-trading-action w-full sm:w-auto"
+            disabled={!connected || pending} onClick={() => send("new-session")}>
+            {pending ? M.pending : M.newSession}
+          </button>
+        ) : <div className="flex w-full gap-sm sm:w-auto">
           <button type="button" className="button-primary program-trading-action min-w-0 flex-1 sm:flex-none"
             disabled={!state || !connected || pending || !canStart || !!state.lastError || state.running || stopping || finished || state.killed}
             onClick={() => send("start")}>
@@ -67,7 +84,7 @@ export function ProgramTradingPanel() {
             onClick={() => send("flatten")}>
             <Square className="h-4 w-4 shrink-0" aria-hidden="true" />{M.stop}
           </button>
-        </div>
+        </div>}
       </div>
       {finished && <p className="text-caption text-text-muted">{M.completedHint}</p>}
       {error && <p role="alert" className="rounded-lg bg-surface-muted p-md text-body-sm">{error}</p>}
@@ -79,7 +96,7 @@ export function ProgramTradingPanel() {
       {!state?.positions.length ? <p className="mt-xs text-caption text-text-muted">{P.positionEmpty}</p> :
         <ul className="mt-sm space-y-xs">
           {state.positions.map(position => <li key={position.ticker} className="flex items-center justify-between gap-sm text-body-sm">
-            <span>{position.ticker}</span><span className="tabular-nums">{position.quantity}{C.quantity}</span>
+            <span>{position.name ?? position.ticker}</span><span className="tabular-nums">{position.quantity}{C.quantity}</span>
           </li>)}
         </ul>}
     </section>
@@ -102,7 +119,7 @@ export function ProgramTradingPanel() {
             </tr></thead>
             <tbody>{state.trades.slice().reverse().map(trade => <tr key={trade.id} className="border-t border-border-line">
               <td className="p-md tabular-nums">{time(trade.minute)}</td>
-              <td className="p-md font-semibold">{trade.ticker} · {trade.side === "buy" ? C.buy : C.sell}</td>
+              <td className="p-md font-semibold">{trade.name ?? trade.ticker} · {trade.side === "buy" ? C.buy : C.sell}</td>
               <td className="p-md tabular-nums">{trade.quantity}</td>
               <td className="p-md tabular-nums">{money(trade.price)}</td>
               <td className="p-md">{C.reasons[trade.reason]}</td>

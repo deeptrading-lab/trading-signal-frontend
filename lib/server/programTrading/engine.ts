@@ -25,7 +25,7 @@ function sell(s: TradingState, ticker: string, reason: Reason, cooldownClock = s
   s.cash += gross-fee; s.realized += net;
   s.positions = s.positions.filter(p => p.ticker !== ticker);
   s.cooldown[ticker] = cooldownClock + RULES.cooldown;
-  s.trades.push({ id: `${s.tick}-${ticker}-sell`, minute: s.minute, ticker, side: "sell", quantity: p.quantity, price, fee, reason, net });
+  s.trades.push({ id: `${s.tick}-${ticker}-sell`, minute: s.minute, ticker, name: p.name, side: "sell", quantity: p.quantity, price, fee, reason, net });
 }
 export function command(s: TradingState, action: Command) {
   if (s.lifecycle?.status === "completed") return;
@@ -55,14 +55,15 @@ export function step(s: TradingState, quotes: Quote[], minute: number, cooldownC
   if (!hasCandidates(s.candidates)) s.running=false;
   if (s.running && !s.killed && minute>=550 && minute<900) for (const q of quotes) {
     if (s.positions.length>=RULES.maxPositions) break;
-    if (!s.candidates.rows.some(c=>c.ticker===q.ticker) || s.positions.some(p=>p.ticker===q.ticker) || (s.cooldown[q.ticker]??0)>cooldownClock || !validQuote(q) || ![q.price,q.previousHigh,q.volumeRatio,q.spreadBps].every(Number.isFinite) || q.price<=0 || q.previousHigh<=0 || q.spreadBps<0 || q.spreadBps>15 || q.volumeRatio<1.5 || q.price<=q.previousHigh*1.001) continue;
+    const candidate = s.candidates.rows.find(row => row.ticker === q.ticker);
+    if (!candidate || s.positions.some(p=>p.ticker===q.ticker) || (s.cooldown[q.ticker]??0)>cooldownClock || !validQuote(q) || ![q.price,q.previousHigh,q.volumeRatio,q.spreadBps].every(Number.isFinite) || q.price<=0 || q.previousHigh<=0 || q.spreadBps<0 || q.spreadBps>15 || q.volumeRatio<1.5 || q.price<=q.previousHigh*1.001) continue;
     const price=Math.ceil(q.price*(1+RULES.slippage));
     const quantity=Math.floor(Math.min(s.equity*RULES.allocation/price,s.equity*RULES.risk/(price*(RULES.stop+RULES.fee*2+RULES.sellTax+RULES.slippage)),s.cash/(price*(1+RULES.fee))));
     if (quantity<1) continue;
     const fee=Math.ceil(quantity*price*RULES.fee);
     s.cash-=quantity*price+fee;
-    s.positions.push({ticker:q.ticker,quantity,entry:price,mark:q.price});
-    s.trades.push({id:`${s.tick}-${q.ticker}-buy`,minute, ticker:q.ticker,side:"buy",quantity,price,fee,reason:"breakout",net:null});
+    s.positions.push({ ticker: q.ticker, name: candidate.name, quantity, entry: price, mark: q.price });
+    s.trades.push({ id: `${s.tick}-${q.ticker}-buy`, minute, ticker: q.ticker, name: candidate.name, side: "buy", quantity, price, fee, reason: "breakout", net: null });
   }
   mark(s);
   finishSession(s);

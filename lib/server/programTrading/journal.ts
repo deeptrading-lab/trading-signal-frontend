@@ -1,7 +1,11 @@
 import { appendFile, readFile, writeFile } from "node:fs/promises";
-import type { Trade, TradingState } from "@/lib/types/programTrading/programTrading";
+import type { TradingState } from "@/lib/types/programTrading/programTrading";
+import { auditPaperSession, type JournalEvent } from "./reviewAudit";
+import { writePaperReview } from "./sessionStorage";
 
-type JournalEvent = { id: string; at: string; kind: "trade" | "session"; trade?: Trade; lifecycle?: TradingState["lifecycle"]; rulesVersion: string; mode: "simulation" | "toss-paper" };
+export function parseJournal(source: string): JournalEvent[] {
+  return source.split("\n").filter(Boolean).map(line => JSON.parse(line));
+}
 // Restart-safe idempotency. Only a truncated final line from an interrupted write is recoverable.
 export async function openJournal(dir: string) {
   const path = `${dir}/trades.jsonl`;
@@ -12,7 +16,7 @@ export async function openJournal(dir: string) {
     source = source.slice(0, cut);
     await writeFile(path, source);
   }
-  const events: JournalEvent[] = source.split("\n").filter(Boolean).map(line => JSON.parse(line));
+  const events = parseJournal(source);
   const ids = new Set(events.map(event => event.id));
   async function append(event: JournalEvent) {
     if (ids.has(event.id)) return;
@@ -44,7 +48,8 @@ export async function openJournal(dir: string) {
       const mode = state.executionMode === "toss-paper" ? "toss-paper" : "simulation";
       const source = mode === "toss-paper" ? "토스증권 시세" : "합성 시세";
       const review = { ledgerNet, balanceChange: (lifecycle.afterBalance ?? lifecycle.beforeBalance) - lifecycle.beforeBalance, rulesVersion: "program-v2", source: "trades.jsonl", mode, lifecycle, closedTrades: exits.length, realized: state.realized, decision: lifecycle.reviewDecision, proposals, autoApply: false };
-      await writeFile(`${dir}/review.json`, JSON.stringify(review, null, 2));
+      const audit = mode === "toss-paper" ? auditPaperSession(review, events, "program-v2 · engine.ts / tossPaper.ts") : undefined;
+      await writePaperReview(dir, { ...review, audit });
       await writeFile(`${dir}/review.md`, `# 자동매매 종료 복기\n\n${source} · 가상 체결.\n\n- 전 자산: ${lifecycle.beforeBalance}원\n- 후 자산: ${lifecycle.afterBalance}원\n- 비용 후 수익률: ${lifecycle.returnPct?.toFixed(3)}%\n- 목표: ${lifecycle.targetReturnPct}%\n- 판정: ${keep ? "목표 달성 · 규칙 유지 · 개선 제안 생략" : "목표 미달 · 검토 후보 생성"}\n- 원장: trades.jsonl 전체 (${trades.length}건)\n\n|거래|사유|비용 후 손익|\n|---|---|---|\n${exits.map(t => `|${t.id}|${t.reason}|${t.net}|`).join("\n")}\n\n${proposals.length ? `## 검토 가이드\n${proposals.map(p => `- ${p}`).join("\n")}\n\n규칙은 자동 변경하지 않음. 검토→수정→테스트→다이어그램 갱신 후 별도 적용.\n` : ""}`);
     },
   };

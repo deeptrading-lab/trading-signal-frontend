@@ -24,4 +24,4 @@ KIS_ENV=prod
 | 4 | 추천 조회가 계속 실패할 때만 서버를 끄고 `npm run program:check`를 실행한다. 점검 후 1분 정도 지나 서버를 다시 켠다. 같은 키로 서버와 점검 CLI를 동시에 실행하면 토큰 발급이 겹칠 수 있다. [토스 인증 문서](https://developers.tossinvest.com/docs/auth) · [한투 토큰 안내](https://github.com/koreainvestment/open-trading-api#5-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0-%EA%B0%80%EC%9D%B4%EB%93%9C) | `candidatesReady`, `calendarReady`가 모두 `true`다. 장외에는 `canStartNow: false`가 정상이다. |
 | 5 | 한국 거래일 09:10~15:00 미만에 **토스 모의 시작**을 누른다. | **자동매매 중**이 표시된다. 유효한 시세가 매수 조건을 충족할 때 가상 체결이 기록된다. |
 | 6 | **매매 종료**를 누른 뒤 가상 보유 잔량이 정리될 때까지 기다린다. | **거래 종료**가 표시된다. 시세가 오래됐거나 없으면 유효한 시세가 들어올 때까지 청산이 대기한다. |
-| 7 | 새 실험을 열려면 종료를 확인하고 웹 서버를 끈 뒤 `.local/program-trading/toss-paper/` 폴더를 다른 위치에 보관하고 다시 실행한다. | 새 가상 세션이 준비됐다. |
+| 7 | **거래 종료**가 표시되면 **새 세션 열기**를 누른다. | 기존 원장과 복기는 `.local/program-trading/toss-paper-archive/`에 보관된다. 새 세션은 가상 자금 1,000만 원으로 대기하며, **토스 모의 시작**을 누르면 운용을 시작한다. |

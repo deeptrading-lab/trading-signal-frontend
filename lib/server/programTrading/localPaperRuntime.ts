@@ -1,14 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { isoToKstDate } from "@/lib/api/toss/kst";
-import type { Command, TradingState } from "@/lib/types/programTrading/programTrading";
+import type { ProgramTradingAction, TradingState } from "@/lib/types/programTrading/programTrading";
 import { emptyCandidateSnapshot, hasCandidates } from "@/lib/validation/programTrading/candidateGate";
 import { createCandidateRefresh } from "./candidateRefresh";
 import { command, initialState } from "./engine";
 import { openJournal } from "./journal";
 import { loadRecommendationCandidates } from "./recommendationCandidates";
+import { paperArchiveDirectory as archiveDirectory, paperSessionDirectory as directory, trimPaperReviews } from "./sessionStorage";
 import { requireTossPaperConfig, stepTossPaper, tossPaperSession } from "./tossPaper";
 
-const directory = ".local/program-trading/toss-paper";
+const checkingSession = "토스 시세와 장 운영 시간을 확인하고 있어요.";
 const registry = globalThis as typeof globalThis & {
   localTossPaperRuntime?: ReturnType<typeof createRuntime>;
 };
@@ -33,9 +35,9 @@ async function createRuntime() {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
-  const journal = await openJournal(directory);
+  let journal: Awaited<ReturnType<typeof openJournal>> | undefined = await openJournal(directory);
   journal.reconcile(state);
-  state.startBlockReason = "토스 시세와 장 운영 시간을 확인하고 있어요.";
+  state.startBlockReason = checkingSession;
 
   let queue = Promise.resolve();
   let commandVersion = 0;
@@ -49,10 +51,35 @@ async function createRuntime() {
   }
 
   async function persist() {
+    if (!journal) {
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      journal = await openJournal(directory);
+    }
     await journal.record(state);
     await writeFile(`${directory}/state.tmp`, JSON.stringify(state, null, 2), { mode: 0o600 });
     await rename(`${directory}/state.tmp`, `${directory}/state.json`);
     await journal.report(state);
+    if (state.lifecycle?.status === "completed") await trimPaperReviews(true);
+  }
+
+  async function openNewSession() {
+    if (state.lifecycle?.status !== "completed" || state.positions.length) {
+      return { error: "보유 종목의 청산과 거래 종료를 확인한 뒤 새 세션을 열어 주세요." };
+    }
+
+    await persist();
+    await mkdir(archiveDirectory, { recursive: true, mode: 0o700 });
+    const archiveName = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
+    // Move the entire session at once. If the process stops after the move, startup sees a fresh session.
+    await rename(directory, `${archiveDirectory}/${archiveName}`);
+    state = {
+      ...initialState(),
+      executionMode: "toss-paper",
+      candidates: state.candidates,
+      startBlockReason: checkingSession,
+    };
+    journal = undefined;
+    return { state: structuredClone(state) };
   }
 
   async function updateSession() {
@@ -99,12 +126,13 @@ async function createRuntime() {
       }
       return structuredClone(state);
     },
-    async run(action: Command) {
+    async run(action: ProgramTradingAction) {
       const version = ++commandVersion;
       if (action === "start") await refreshCandidates();
-      else state.running = false;
+      else if (action === "pause" || action === "flatten") state.running = false;
 
       return serial(async () => {
+        if (action === "new-session") return openNewSession();
         if (action === "start") {
           await updateSession();
           if (version !== commandVersion) return { error: "더 최근 운용 명령이 있어 시작을 취소했어요." };
