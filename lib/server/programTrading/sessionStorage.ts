@@ -1,6 +1,6 @@
 import { readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { PaperSessionReview } from "@/lib/types/programTrading/programTrading";
+import type { PaperPerformancePoint, PaperSessionReview } from "@/lib/types/programTrading/programTrading";
 
 export const paperSessionDirectory = ".local/program-trading/toss-paper";
 export const paperArchiveDirectory = ".local/program-trading/toss-paper-archive";
@@ -52,7 +52,7 @@ export async function trimPaperReviews(hasCurrentReview: boolean, directory = pa
   }
 }
 
-export async function loadPaperReviews(requestedId?: string) {
+export async function loadPaperReviews(requestedId?: string, { includePerformance = false } = {}) {
   const [currentReview, archives] = await Promise.all([readReview(paperSessionDirectory), listPaperReviewArchives()]);
   const sessions: { id: string; archivedAt: string | null }[] = archives.flatMap(id => {
     const parts = archiveName.exec(id);
@@ -69,5 +69,16 @@ export async function loadPaperReviews(requestedId?: string) {
     json = selected.id === "current" ? currentReview : await readReview(join(paperArchiveDirectory, selected.id));
   }
   const review: PaperSessionReview | null = json === null ? null : JSON.parse(json);
-  return { sessions, selectedId: selected?.id, review };
+  const performance = includePerformance ? (await Promise.all(sessions.map(async ({ id }) => {
+    const report = id === selected?.id ? review : await (async () => {
+      const saved = id === "current" ? currentReview : await readReview(join(paperArchiveDirectory, id));
+      return saved === null ? null : JSON.parse(saved) as PaperSessionReview;
+    })().catch(() => null);
+    const { finishedAt, returnPct } = report?.lifecycle ?? {};
+    if (!finishedAt || !Number.isFinite(Date.parse(finishedAt)) || returnPct == null
+      || !Number.isFinite(returnPct) || !report || !Number.isFinite(report.balanceChange)) return null;
+    return { id, finishedAt, returnPct, balanceChange: report.balanceChange };
+  }))).filter((point): point is PaperPerformancePoint => point !== null)
+    .sort((a, b) => Date.parse(a.finishedAt) - Date.parse(b.finishedAt)) : [];
+  return { sessions, selectedId: selected?.id, review, performance };
 }

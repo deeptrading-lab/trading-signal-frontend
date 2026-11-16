@@ -147,7 +147,7 @@
       "lane": "buy2",
       "col": 1,
       "label": "신규 매수 중지",
-      "sublabel": "목록 회복 후 직접 시작",
+      "sublabel": "유효 후보 복구 시 자동 재개",
       "type": "security",
       "sources": [
         {

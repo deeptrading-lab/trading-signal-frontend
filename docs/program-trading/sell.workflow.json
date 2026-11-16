@@ -98,7 +98,7 @@
       "lane": "unknown",
       "col": 1,
       "label": "가상 청산 대기",
-      "sublabel": "유효한 시세까지 보유 유지",
+      "sublabel": "종료 기한은 별도로 진행",
       "type": "security",
       "sources": [
         {
@@ -113,7 +113,7 @@
       "id": "sell0",
       "lane": "sell0",
       "col": 0,
-      "label": "사용자가 종료를 요청했나요?",
+      "label": "종료 처리 중인가요?",
       "sublabel": "유효한 시세에서 가상 청산",
       "type": "security",
       "sources": [

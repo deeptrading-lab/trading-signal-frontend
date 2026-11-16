@@ -85,12 +85,14 @@ export function auditPaperSession(review: PaperSessionReview, events: JournalEve
   if (staleEvents.length) {
     audit.issues.push({ title: "일부 세션 이벤트의 원장 시각이 실제 상태 시각보다 앞섬", evidence: `${staleEvents.length}건에서 trades.jsonl의 at이 lifecycle의 시작·종료 시각보다 앞섭니다. 원장 작성 코드는 마지막 틱의 updatedAt을 사용합니다.` });
   }
-  audit.issues.push({ title: "자동 마감과 수동 종료 사유가 원장에서 구분되지 않음", evidence: "tossPaper.ts의 자동 마감도 flatten 명령으로 전환됩니다. engine.ts는 종료 처리 중인 매도를 manual로 기록하므로 해당 사유만으로 자동 마감 성공 여부를 확인할 수 없습니다." });
+  if (!review.lifecycle.stopCause && events.some(event => event.rulesVersion !== "program-v3")) audit.issues.push({ title: "자동 마감과 수동 종료 사유가 원장에서 구분되지 않음", evidence: "tossPaper.ts의 자동 마감도 flatten 명령으로 전환됩니다. engine.ts는 종료 처리 중인 매도를 manual로 기록하므로 해당 사유만으로 자동 마감 성공 여부를 확인할 수 없습니다." });
 
-  const stoppingAt = events.find(event => event.lifecycle?.status === "stopping")?.at;
+  const forced = trades.filter(trade => trade.reason === "timeout");
+  if (forced.length) audit.unverified.push({ title: "종료 기한 후 마지막 기록 가격으로 가상 정산", evidence: `${forced.length}건의 정산가는 당시 실제 청산 가능 가격을 의미하지 않습니다.` });
+  const stoppingAt = review.lifecycle.stopRequestedAt ?? events.find(event => event.lifecycle?.status === "stopping")?.at;
   const minutes = (Date.parse(review.lifecycle.finishedAt ?? "") - Date.parse(stoppingAt ?? "")) / 60_000;
   const stopLosses = trades.filter(trade => trade.reason === "stop");
-  const recordedExits = trades.filter(trade => trade.side === "sell" && (trade.reason === "manual" || trade.reason === "close"));
+  const recordedExits = trades.filter(trade => trade.side === "sell" && (trade.reason === "manual" || trade.reason === "close" || trade.reason === "timeout"));
   audit.unverified.push(
     { title: "시세 입력과 매수 신호 재현", evidence: buys ? "체결 당시의 호가·체결 원시 시각, 분봉, 거래량 배율, 스프레드, 후보 스냅샷이 원장에 없어 진입 조건을 독립적으로 재현할 수 없습니다." : "체결이 0건입니다. 틱별 후보, 시세 조회 결과와 조건 탈락 사유가 없어 매수가 없었던 이유를 구분할 수 없습니다." },
     { title: "장 운영 시간 조회와 마감 청산", evidence: `${recordedExits.length}건의 종료 청산이 기록됐습니다.${minutes > 0 ? ` 원장의 종료 대기 시각에서 확정까지 약 ${minutes.toFixed(1)}분입니다.` : ""} 당시 토스 장 캘린더 응답과 시세 조회 실패 기록이 없어 자동 마감 시점과 청산 대기 원인을 검증할 수 없습니다.` },

@@ -11,6 +11,7 @@ export function useProgramTrading() {
     loading: query.isLoading,
     pending: mutation.isPending,
     connected: !query.isError,
+    candidatesReady: !!state && hasCandidates(state.candidates),
     canStart: !!state && hasCandidates(state.candidates) && !state.startBlockReason,
     error: state?.lastError ?? mutation.error?.message ?? query.error?.message,
     send: (action: ProgramTradingAction) => mutation.mutate(action),

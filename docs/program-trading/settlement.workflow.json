@@ -153,7 +153,7 @@
       "lane": "settled",
       "col": 1,
       "label": "종료 대기",
-      "sublabel": "최근 체결과 호가 확인",
+      "sublabel": "30초 동안은 유효한 시세로 우선 가상 청산",
       "type": "security",
       "sources": [
         {
@@ -161,7 +161,7 @@
           "line": 1
         }
       ],
-      "tag": "시세가 유효하면 다시 점검",
+      "tag": "기한 후 마지막 기록가로 정산",
       "icon": "decision",
       "width": 240
     },

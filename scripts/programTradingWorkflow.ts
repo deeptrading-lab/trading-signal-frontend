@@ -45,7 +45,7 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     for (const [id, lane, label, note] of steps) { row(id, lane); node(id, id, 0, label, note, ['ready', 'confirm', 'review'].includes(id) ? 'security' : 'backend', id === 'run' ? '가상 체결·보유 반영' : undefined); }
     chain(['connect', 'ready', 'run', 'stop', 'confirm']);
     edge('confirm', 'review', '충족');
-    node('pending', 'confirm', 1, '종료·정산 대기', '유효한 시세까지 가상 청산 대기', 'security', '가상 보유가 남으면 종료 대기'); edge('confirm', 'pending', '미충족', true);
+    node('pending', 'confirm', 1, '종료·정산 대기', finish[1].note, 'security', '기한 후 마지막 기록가로 정산'); edge('confirm', 'pending', '미충족', true);
     node('keep', 'review', 1, '규칙 유지', '목표 달성 · 보완 제안 없음'); edge('review', 'keep', '예');
     row('improve', '07 · 미달 시 검토'); node('improve', 'improve', 0, '검토 가이드 생성', finish[4].note, 'backend', '실행 중 규칙 자동 변경 없음'); edge('review', 'improve', '아니오');
     mainPath = ['connect', 'ready', 'run', 'stop', 'confirm', 'review', 'improve'];
@@ -54,7 +54,7 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     const labels = ['로컬 모의 시작 조건인가요?', '매수 가능한 시간인가요?', '종목이 유효 후보에 포함되나요?', '보유·재진입 조건을 충족하나요?', '시세·호가가 유효한가요?', '돌파·거래량을 함께 충족하나요?', '주문 수량 계산', '가상 매수 체결'];
     const names = ['시세 준비', '거래 시간', '후보 유효성', '보유·재진입', '시세 확인', '진입 신호', '수량·예산', '가상 체결'];
     const failures = ['시작 차단', '신규 매수 대기', '신규 매수 중지', '해당 후보 대기', '해당 후보 보류', '해당 후보 제외', '주문하지 않음'];
-    const failNotes = ['토스 시세 키와 추천 조회 확인', '보유분 위험 관리 유지', '목록 회복 후 직접 시작', '보유 한도·재진입 대기 재확인', '유효한 최신 시세에서 다시 확인', '다음 후보를 점검', '계산 수량이 1주 미만'];
+    const failNotes = ['토스 시세 키와 추천 조회 확인', '보유분 위험 관리 유지', '유효 후보 복구 시 자동 재개', '보유 한도·재진입 대기 재확인', '유효한 최신 시세에서 다시 확인', '다음 후보를 점검', '계산 수량이 1주 미만'];
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index]; const id = `buy${index}`; row(id, `${index + 1}. ${names[index]}`);
       let note = step.note;
@@ -74,11 +74,11 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     const steps = sections[1];
     row('orders', '01 · 보유 시세 확인'); node('orders', 'orders', 0, '보유 종목부터 시세 점검', '토스 최근 체결과 호가 확인', 'backend', '시세 유효 여부 확인');
     row('unknown', '02 · 시세 유효성'); node('unknown', 'unknown', 0, '가상 매도에 유효한 시세인가요?', '정규장 · 5초 이내 체결과 호가', 'security');
-    node('lock', 'unknown', 1, '가상 청산 대기', '유효한 시세까지 보유 유지', 'security'); edge('orders', 'unknown'); edge('unknown', 'lock', '미충족', true);
+    node('lock', 'unknown', 1, '가상 청산 대기', '종료 기한은 별도로 진행', 'security'); edge('orders', 'unknown'); edge('unknown', 'lock', '미충족', true);
     const actions = ['가상 보유 전량 청산', '청산 · 신규 매수 잠금', '청산 · 운용 중지', '가상 손절', '가상 익절'];
     for (let index = 0; index < 5; index++) {
       const id = `sell${index}`; const step = steps[index + 2]; row(id, `우선순위 ${index + 1}`);
-      const labels = ['사용자가 종료를 요청했나요?', `일일 자산이 −${pct(RULES.dailyLoss)}%에 도달했나요?`, '마감 청산 시각인가요?', `매수가 대비 −${pct(RULES.stop)}% 이하인가요?`, `매수가 대비 +${pct(RULES.target)}% 이상인가요?`];
+      const labels = ['종료 처리 중인가요?', `일일 자산이 −${pct(RULES.dailyLoss)}%에 도달했나요?`, '마감 청산 시각인가요?', `매수가 대비 −${pct(RULES.stop)}% 이하인가요?`, `매수가 대비 +${pct(RULES.target)}% 이상인가요?`];
       node(id, id, 0, labels[index], step.note, 'security');
       node(`${id}yes`, id, 1, actions[index], '가상 매도 후 보유·현금 반영', 'backend', '슬리피지와 비용을 반영'); edge(id, `${id}yes`, '해당');
       edge(index === 0 ? 'unknown' : `sell${index - 1}`, id, index === 0 ? '확인' : '해당 없음');
@@ -97,7 +97,7 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     ];
     for (const [id, lane, label, note] of data) { row(id, lane); node(id, id, 0, label, note, ['settled', 'target'].includes(id) ? 'security' : 'backend'); }
     edge('clean', 'settled'); edge('settled', 'balance', '충족'); edge('balance', 'ledger'); edge('ledger', 'target'); edge('target', 'proposal', '아니오');
-    node('wait', 'settled', 1, '종료 대기', '최근 체결과 호가 확인', 'security', '시세가 유효하면 다시 점검'); edge('settled', 'wait', '미충족', true);
+    node('wait', 'settled', 1, '종료 대기', steps[1].note, 'security', '기한 후 마지막 기록가로 정산'); edge('settled', 'wait', '미충족', true);
     node('costs', 'ledger', 1, '가상 체결 비용 가정', `슬리피지 ${pct(RULES.slippage)}% · 수수료 ${pct(RULES.fee)}% · 매도세 ${pct(RULES.sellTax)}%`, 'database', '가상 체결 시 반영'); edge('ledger', 'costs', '비용');
     node('keep', 'target', 1, '규칙 유지', '목표 달성 · 보완 제안 없음'); edge('target', 'keep', '예');
     mainPath = data.map(([id]) => id);

@@ -25,6 +25,11 @@ export async function openJournal(dir: string) {
   }
   return {
     reconcile(state: TradingState) {
+      if (state.lifecycle?.status === "stopping" && !state.lifecycle.stopRequestedAt) {
+        const legacyStop = events.find(event => event.lifecycle?.status === "stopping" &&
+          event.lifecycle.startedAt === state.lifecycle?.startedAt);
+        state.lifecycle.stopRequestedAt = legacyStop?.at ?? state.updatedAt;
+      }
       const recordedTrades = events.flatMap(event => event.trade ? [event.trade] : []);
       const lastTrade = recordedTrades.at(-1);
       const lastLifecycle = events.filter(event => event.kind === "session").at(-1)?.lifecycle;
@@ -33,7 +38,7 @@ export async function openJournal(dir: string) {
     },
     async record(state: TradingState) {
       const mode = state.executionMode === "toss-paper" ? "toss-paper" : "simulation";
-      const base = { at: state.updatedAt, rulesVersion: "program-v2", mode } as const;
+      const base = { at: state.updatedAt, rulesVersion: "program-v3", mode } as const;
       for (const trade of state.trades) await append({ ...base, id: `trade:${trade.id}`, kind: "trade", trade });
       if (state.lifecycle) await append({ ...base, id: `session:${state.lifecycle.startedAt}:${state.lifecycle.status}`, kind: "session", lifecycle: { ...state.lifecycle } });
     },
@@ -47,10 +52,12 @@ export async function openJournal(dir: string) {
       const ledgerNet = exits.reduce((sum, trade) => sum + (trade.net ?? 0), 0);
       const mode = state.executionMode === "toss-paper" ? "toss-paper" : "simulation";
       const source = mode === "toss-paper" ? "토스증권 시세" : "합성 시세";
-      const review = { ledgerNet, balanceChange: (lifecycle.afterBalance ?? lifecycle.beforeBalance) - lifecycle.beforeBalance, rulesVersion: "program-v2", source: "trades.jsonl", mode, lifecycle, closedTrades: exits.length, realized: state.realized, decision: lifecycle.reviewDecision, proposals, autoApply: false };
-      const audit = mode === "toss-paper" ? auditPaperSession(review, events, "program-v2 · engine.ts / tossPaper.ts") : undefined;
-      await writePaperReview(dir, { ...review, audit });
-      await writeFile(`${dir}/review.md`, `# 자동매매 종료 복기\n\n${source} · 가상 체결.\n\n- 전 자산: ${lifecycle.beforeBalance}원\n- 후 자산: ${lifecycle.afterBalance}원\n- 비용 후 수익률: ${lifecycle.returnPct?.toFixed(3)}%\n- 목표: ${lifecycle.targetReturnPct}%\n- 판정: ${keep ? "목표 달성 · 규칙 유지 · 개선 제안 생략" : "목표 미달 · 검토 후보 생성"}\n- 원장: trades.jsonl 전체 (${trades.length}건)\n\n|거래|사유|비용 후 손익|\n|---|---|---|\n${exits.map(t => `|${t.id}|${t.reason}|${t.net}|`).join("\n")}\n\n${proposals.length ? `## 검토 가이드\n${proposals.map(p => `- ${p}`).join("\n")}\n\n규칙은 자동 변경하지 않음. 검토→수정→테스트→다이어그램 갱신 후 별도 적용.\n` : ""}`);
+      const review = { ledgerNet, balanceChange: (lifecycle.afterBalance ?? lifecycle.beforeBalance) - lifecycle.beforeBalance, rulesVersion: events.at(-1)?.rulesVersion ?? "program-v3", source: "trades.jsonl", mode, lifecycle, closedTrades: exits.length, realized: state.realized, decision: lifecycle.reviewDecision, proposals, autoApply: false };
+      const audit = mode === "toss-paper" ? auditPaperSession(review, events, `${review.rulesVersion} · engine.ts / tossPaper.ts`) : undefined;
+      const report = { ...review, audit };
+      await writePaperReview(dir, report);
+      await writeFile(`${dir}/review.md`, `# 자동매매 종료 복기\n\n${source} · 가상 체결.\n\n- 전 자산: ${lifecycle.beforeBalance}원\n- 후 자산: ${lifecycle.afterBalance}원\n${lifecycle.forcedAt ? "- 일부 잔량은 종료 기한 후 마지막 기록 가격으로 가상 정산했어요.\n" : ""}- 비용 후 수익률: ${lifecycle.returnPct?.toFixed(3)}%\n- 목표: ${lifecycle.targetReturnPct}%\n- 판정: ${keep ? "목표 달성 · 규칙 유지 · 개선 제안 생략" : "목표 미달 · 검토 후보 생성"}\n- 원장: trades.jsonl 전체 (${trades.length}건)\n\n|거래|사유|비용 후 손익|\n|---|---|---|\n${exits.map(t => `|${t.id}|${t.reason}|${t.net}|`).join("\n")}\n\n${proposals.length ? `## 검토 가이드\n${proposals.map(p => `- ${p}`).join("\n")}\n\n규칙은 자동 변경하지 않음. 검토→수정→테스트→다이어그램 갱신 후 별도 적용.\n` : ""}`);
+      return report;
     },
   };
 }

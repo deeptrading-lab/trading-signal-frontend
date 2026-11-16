@@ -128,6 +128,7 @@ async function issueToken(creds: { id: string; secret: string }): Promise<CacheE
       {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         timeout: TOKEN_TIMEOUT_MS,
+        signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
         validateStatus: (status) => status < 500,
       },
     );

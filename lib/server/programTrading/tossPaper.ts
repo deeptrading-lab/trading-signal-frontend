@@ -5,24 +5,33 @@ import { fetchMarketCalendar } from "@/lib/api/toss/marketCalendar";
 import { fetchOrderbook } from "@/lib/api/toss/orderbook";
 import { fetchTrades } from "@/lib/api/toss/trades";
 import type { Quote, TradingState } from "@/lib/types/programTrading/programTrading";
-import { command, step } from "./engine";
+import { hasCandidates } from "@/lib/validation/programTrading/candidateGate";
+import { command, settleExpiredPaperStop, step } from "./engine";
+import { logPaperMarket, withinMarketBudget } from "./marketBudget";
 
-function minuteInKorea(now: number) {
+export function minuteInKorea(now: number) {
   const [hours, minutes] = isoToKstHm(new Date(now).toISOString())!.split(":").map(Number);
   return hours * 60 + minutes;
 }
 
-export async function tossPaperSession() {
+export async function tossPaperSession(previous?: Awaited<ReturnType<typeof readSessionCalendar>>) {
+  return readSessionCalendar(previous);
+}
+
+async function readSessionCalendar(previous?: { date: string; start: number; end: number; close: number; holiday: boolean }) {
   const date = todayKstDate();
-  const today = (await fetchMarketCalendar(date))?.today;
+  const today = (await withinMarketBudget(fetchMarketCalendar(date), null, 3_000))?.today;
   const regular = today?.date === date ? today.integrated?.regularMarket : undefined;
-  const start = Date.parse(regular?.startTime ?? "");
-  const end = Date.parse(regular?.endTime ?? "");
+  const reused = !regular && today?.integrated !== null && previous?.date === date && Number.isFinite(previous.start);
+  const start = reused ? previous.start : Date.parse(regular?.startTime ?? "");
+  const end = reused ? previous.end : Date.parse(regular?.endTime ?? "");
   const auction = Date.parse(regular?.singlePriceAuctionStartTime ?? "");
-  const close = Math.min(end, Number.isFinite(auction) && auction > start ? auction : end, Date.parse(`${date}T15:20:00+09:00`));
+  const hardClose = Date.parse(`${date}T15:20:00+09:00`);
+  const close = reused ? previous.close : Math.min(Number.isFinite(end) ? end : hardClose, Number.isFinite(auction) && auction > start ? auction : hardClose, hardClose);
   const now = Date.now();
   const open = Number.isFinite(start) && Number.isFinite(end) && now >= start && now < end;
   const minute = minuteInKorea(now);
+  if (!Number.isFinite(start) && today?.integrated !== null) logPaperMarket("calendar-unavailable", { date });
   return {
     date, start, end, close, open, minute,
     canStart: open && now < close && minute >= 550 && minute < 900,
@@ -30,10 +39,21 @@ export async function tossPaperSession() {
   };
 }
 
-async function loadTossPaperQuote(ticker: string): Promise<Quote | null> {
+const candleRequests = new Map<string, ReturnType<typeof fetchCandlesPage>>();
+
+function readCandles(ticker: string) {
+  let request = candleRequests.get(ticker);
+  if (!request) {
+    request = fetchCandlesPage(ticker, "1m", { count: 5 }).finally(() => candleRequests.delete(ticker));
+    candleRequests.set(ticker, request);
+  }
+  return withinMarketBudget(request.catch(() => null), null, 2_500);
+}
+
+async function loadTossPaperQuote(ticker: string, needCandles: boolean): Promise<Quote | null> {
   try {
     const [page, trades, book] = await Promise.all([
-      fetchCandlesPage(ticker, "1m", { count: 5 }),
+      needCandles ? readCandles(ticker) : null,
       fetchTrades(ticker, 1),
       fetchOrderbook(ticker),
     ]);
@@ -48,7 +68,7 @@ async function loadTossPaperQuote(ticker: string): Promise<Quote | null> {
     if (![tradeAge, bookAge].every(age => Number.isFinite(age) && age >= 0 && age <= 5_000)) return null;
 
     const currentMinute = Math.floor(now / 60_000) * 60_000;
-    const bars = new Map((page.candles ?? []).map(bar => [isoToKstMinuteStamp(bar.timestamp), bar]));
+    const bars = new Map((page?.candles ?? []).map(bar => [isoToKstMinuteStamp(bar.timestamp), bar]));
     const current = bars.get(isoToKstMinuteStamp(new Date(currentMinute).toISOString()));
     const previous = [1, 2, 3].map(offset => bars.get(isoToKstMinuteStamp(new Date(currentMinute - offset * 60_000).toISOString())));
     const highs = previous.map(bar => Number(bar?.highPrice));
@@ -75,21 +95,24 @@ export function requireTossPaperConfig(): void {
 export async function stepTossPaper(state: TradingState, session: Awaited<ReturnType<typeof tossPaperSession>>) {
   if (!state.running && !state.positions.length && state.lifecycle?.status !== "running" && state.lifecycle?.status !== "stopping") return false;
 
+  if (settleExpiredPaperStop(state, minuteInKorea(Date.now()))) return true;
   const priorDay = state.lifecycle && isoToKstDate(state.lifecycle.startedAt ?? undefined) !== session.date;
   if (priorDay || Date.now() >= session.close) requestPaperClose(state);
 
-  const candidate = state.running && session.canStart
+  const candidate = state.running && session.canStart && hasCandidates(state.candidates)
     ? state.candidates.rows[state.tick % state.candidates.rows.length]?.ticker
     : undefined;
   const tickers = new Set(state.positions.map(position => position.ticker));
   if (candidate) tickers.add(candidate);
   const quotes = session.open
-    ? (await Promise.all([...tickers].map(loadTossPaperQuote))).filter(quote => quote !== null)
+    ? (await Promise.all([...tickers].map(ticker => withinMarketBudget(loadTossPaperQuote(ticker, ticker === candidate), null, 3_000)))).filter(quote => quote !== null)
     : [];
 
   // Recheck time and quote age after all ticker requests have settled.
   const now = Date.now();
   if (now >= session.close) requestPaperClose(state);
+  if (settleExpiredPaperStop(state, minuteInKorea(now), now)) return true;
+  if (session.open && tickers.size && !quotes.length) logPaperMarket("no-fresh-quotes", { tickers: [...tickers] });
   const fresh = now < session.end
     ? quotes.map(quote => ({ ...quote, ageMs: quote.ageMs + now - (quote.receivedAt ?? now) }))
     : [];
@@ -100,5 +123,5 @@ export async function stepTossPaper(state: TradingState, session: Awaited<Return
 function requestPaperClose(state: TradingState) {
   if (state.lifecycle?.status === "stopping" || state.lifecycle?.status === "completed") return;
   state.quotes = [];
-  command(state, "flatten");
+  command(state, "flatten", "close");
 }

@@ -1,6 +1,6 @@
 export type Command = "start" | "pause" | "flatten";
 export type ProgramTradingAction = Command | "new-session";
-export type Reason = "breakout" | "stop" | "target" | "close" | "kill" | "manual";
+export type Reason = "breakout" | "stop" | "target" | "close" | "kill" | "manual" | "timeout";
 export type Quote = { receivedAt?: number; ticker: string; name: string; price: number; previousHigh: number; volumeRatio: number; spreadBps: number; ageMs: number; halted: boolean };
 export type Position = { ticker: string; name?: string; quantity: number; entry: number; mark: number };
 export type Trade = { feeEstimated?: boolean; id: string; minute: number; ticker: string; name?: string; side: "buy" | "sell"; quantity: number; price: number; fee: number; reason: Reason; net: number | null };
@@ -19,6 +19,9 @@ export type TradingLifecycle = {
   status: "idle" | "running" | "stopping" | "completed";
   startedAt: string | null;
   finishedAt: string | null;
+  stopRequestedAt?: string;
+  stopCause?: "manual" | "close" | "kill";
+  forcedAt?: string;
   beforeBalance: number;
   afterBalance: number | null;
   returnPct: number | null;
@@ -37,6 +40,13 @@ export type PaperSessionReview = {
   audit?: PaperReviewAudit;
 };
 
+export type PaperPerformancePoint = {
+  id: string;
+  finishedAt: string;
+  returnPct: number;
+  balanceChange: number;
+};
+
 export type PaperReviewFinding = { title: string; evidence: string };
 
 export type PaperReviewAudit = {
@@ -45,4 +55,22 @@ export type PaperReviewAudit = {
   issues: PaperReviewFinding[];
   unverified: PaperReviewFinding[];
   hypotheses: PaperReviewFinding[];
+};
+
+export type PaperReviewEvent = { id: string; created_at: string } & (
+  | { kind: "evaluation"; score: number; details: { summary: string; limitations: string[]; proposals: string[] } }
+  | { kind: "applied"; score: null; details: PaperAppliedChange }
+);
+
+
+export type PaperAppliedChange = { description: string } & (
+  | { revision: string; patchId?: never }
+  | { patchId: string; evaluationId: string; files: string[]; revision?: never }
+);
+
+export type PaperImprovementJob = {
+  sessionId: string;
+  evaluationId: string;
+  stage: "preparing" | "verifying" | "completed" | "failed" | "history-pending";
+  message?: string;
 };

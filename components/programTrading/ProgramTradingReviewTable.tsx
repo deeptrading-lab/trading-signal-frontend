@@ -1,3 +1,6 @@
+import { ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils/cn";
 import { PROGRAM_MENU_COPY as M, PROGRAM_REVIEW_COPY as C } from "@/lib/copy/programTrading/programTrading";
 import type { PaperSessionReview } from "@/lib/types/programTrading/programTrading";
 import { formatNumber } from "@/lib/utils/formatMoney";
@@ -16,6 +19,18 @@ function formatWon(value: number | null) {
   return Number.isFinite(value) ? `${formatNumber(value, { digits: 0 })}원` : M.noBalance;
 }
 
+function ReviewDetails({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details className="group rounded-lg border border-border-line bg-surface">
+      <summary className="flex min-h-hit-area-min cursor-pointer list-none items-center justify-between gap-sm rounded-lg px-md py-sm text-body-sm font-semibold text-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-text-muted group-open:rotate-180" />
+      </summary>
+      <div className="space-y-sm border-t border-border-line p-md">{children}</div>
+    </details>
+  );
+}
+
 export function ProgramTradingReviewTable({ review }: { review: PaperSessionReview }) {
   const { lifecycle, balanceChange, closedTrades, decision, proposals } = review;
   const audit = review.audit;
@@ -30,17 +45,30 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
     [C.finished, formatTime(lifecycle.finishedAt)],
     [M.initial, formatWon(lifecycle.beforeBalance)],
     [M.final, formatWon(lifecycle.afterBalance)],
-    [M.profit, formatWon(balanceChange)],
-    [M.returns, lifecycle.returnPct == null ? M.noBalance : formatPct(lifecycle.returnPct, { digits: 2, sign: true })],
     [M.target, formatPct(lifecycle.targetReturnPct, { digits: 2 })],
-    [C.closedTrades, `${formatNumber(closedTrades, { digits: 0 })}${C.countUnit}`],
     [C.decision, decision === "keep" ? C.achieved : decision === "review" ? C.missed : M.noBalance],
+  ] as const;
+
+  const metrics = [
+    [M.returns, lifecycle.returnPct == null ? M.noBalance : formatPct(lifecycle.returnPct, { digits: 2, sign: true }), lifecycle.returnPct],
+    [M.profit, formatWon(balanceChange), balanceChange],
+    [C.closedTrades, `${formatNumber(closedTrades, { digits: 0 })}${C.countUnit}`, null],
   ] as const;
 
   return (
     <section className="min-w-0 space-y-md" aria-labelledby="session-summary">
       <h2 id="session-summary" className="text-body-md font-semibold text-text-strong">{C.summary}</h2>
-      <div className="overflow-hidden rounded-lg border border-border-line bg-surface">
+      <dl className="grid grid-cols-2 gap-sm sm:grid-cols-3">
+        {metrics.map(([label, value, direction]) => (
+          <div key={label} className="min-w-0 rounded-lg border border-border-line bg-surface p-md last:col-span-2 sm:last:col-span-1">
+            <dt className="text-body-sm text-text-muted">{label}</dt>
+            <dd className={cn("mt-xs wrap-anywhere text-lg font-bold md:text-h2 tabular-nums text-text-strong",
+              direction != null && direction > 0 && "text-signal-up",
+              direction != null && direction < 0 && "text-chart-down")}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <ReviewDetails title={C.resultDetails}>
         <table aria-labelledby="session-summary" className="w-full border-collapse text-body-sm">
           <thead className="bg-surface-muted text-text-muted">
             <tr>
@@ -52,12 +80,12 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
             {rows.map(([label, value]) => (
               <tr key={label} className="border-t border-border-line">
                 <th scope="row" className="w-2/5 px-md py-sm text-left font-medium">{label}</th>
-                <td className="break-keep px-md py-sm text-right tabular-nums">{value}</td>
+                <td className="wrap-anywhere px-md py-sm text-right tabular-nums">{value}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </ReviewDetails>
       {!audit && proposals.length > 0 && (
         <div className="rounded-lg border border-border-line bg-surface p-md">
           <h3 className="text-body-sm font-semibold text-text-strong">{C.proposals}</h3>
@@ -66,8 +94,7 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
           </ul>
         </div>
       )}
-      <div className="space-y-sm" aria-labelledby="session-audit">
-        <h3 id="session-audit" className="text-body-md font-semibold text-text-strong">{C.audit}</h3>
+      <ReviewDetails title={C.audit}>
         {audit ? (
           <>
             <p className="break-keep text-caption text-text-muted">{C.auditCode} · {audit.codeReference}</p>
@@ -86,7 +113,7 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
             ))}
           </>
         ) : <p className="text-body-sm text-text-muted">{C.auditPending}</p>}
-      </div>
+      </ReviewDetails>
     </section>
   );
 }

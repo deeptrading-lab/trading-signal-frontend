@@ -24,7 +24,8 @@
     "program:rules": "node --import tsx scripts/renderProgramTradingRules.ts",
     "program:rules:check": "node --import tsx scripts/renderProgramTradingRules.ts --check",
     "program:dev": "npm run dev -- --hostname 127.0.0.1",
-    "program:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programTradingReadOnlyCheck.ts"
+    "program:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programTradingReadOnlyCheck.ts",
+    "program:review": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programPaperReview.ts"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",

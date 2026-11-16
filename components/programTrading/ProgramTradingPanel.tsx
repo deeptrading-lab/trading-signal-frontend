@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ClipboardList, Play, RefreshCw, Square } from "lucide-react";
+import { ArrowDown, BriefcaseBusiness, ClipboardList, Play, RefreshCw, Square } from "lucide-react";
 import Link from "next/link";
 import { useProgramTrading } from "@/hooks/programTrading/useProgramTrading";
 import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_PAPER_COPY as P, PROGRAM_REVIEW_COPY as R } from "@/lib/copy/programTrading/programTrading";
@@ -10,7 +10,8 @@ const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}ì›
 const time = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, "0")}:${(minute % 60).toString().padStart(2, "0")}`;
 
 export function ProgramTradingPanel() {
-  const { state, loading, pending, error, connected, canStart, send } = useProgramTrading();
+  const { state, loading, pending, error, connected, canStart, candidatesReady, send } = useProgramTrading();
+  const positions = state?.positions ?? [];
   const finished = state?.lifecycle?.status === "completed";
   const stopping = state?.lifecycle?.status === "stopping";
   const before = state?.lifecycle?.beforeBalance;
@@ -63,7 +64,7 @@ export function ProgramTradingPanel() {
         <p role="status" className={cn("inline-flex items-center gap-xs text-body-sm font-semibold", connected ? "text-primary" : "text-signal-down")}>
           {loading ? C.loading : !connected ? M.stale : stopping ? M.stopping : finished ? M.finished : state?.killed ? C.killed : state?.running ? (
             <>
-              {M.running}
+              {candidatesReady ? M.running : M.candidateRetry}
               <RefreshCw className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
             </>
           ) : M.stopped}
@@ -80,25 +81,37 @@ export function ProgramTradingPanel() {
             <Play className="h-4 w-4 shrink-0" aria-hidden="true" />{pending ? M.pending : P.start}
           </button>
           <button type="button" className="button-secondary program-trading-action min-w-0 flex-1 sm:flex-none"
-            disabled={!state || !connected || pending || stopping || finished || !state.lifecycle}
+            disabled={!state || pending || stopping || finished || !state.lifecycle}
             onClick={() => send("flatten")}>
             <Square className="h-4 w-4 shrink-0" aria-hidden="true" />{M.stop}
           </button>
         </div>}
       </div>
-      {finished && <p className="text-caption text-text-muted">{M.completedHint}</p>}
+      {finished && <p className="text-caption text-text-muted">{state?.lifecycle?.forcedAt ? M.forcedSettlement : M.completedHint}</p>}
       {error && <p role="alert" className="rounded-lg bg-surface-muted p-md text-body-sm">{error}</p>}
       {!loading && connected && !canStart && !finished && !stopping && <p className="text-caption text-text-muted">{state?.startBlockReason ?? P.noCandidates}</p>}
     </section>
 
-    <section className="rounded-lg bg-surface-muted p-md" aria-label={P.holdings}>
-      <h2 className="text-body-sm font-semibold text-text-strong">{P.holdings}</h2>
-      {!state?.positions.length ? <p className="mt-xs text-caption text-text-muted">{P.positionEmpty}</p> :
-        <ul className="mt-sm space-y-xs">
-          {state.positions.map(position => <li key={position.ticker} className="flex items-center justify-between gap-sm text-body-sm">
-            <span>{position.name ?? position.ticker}</span><span className="tabular-nums">{position.quantity}{C.quantity}</span>
-          </li>)}
-        </ul>}
+    <section className="space-y-md rounded-lg border border-border-line bg-surface p-md sm:p-lg" aria-labelledby="program-holdings">
+      <div className="flex flex-wrap items-center justify-between gap-sm">
+        <h2 id="program-holdings" className="flex items-center gap-sm text-h2 font-bold text-text-strong">
+          <BriefcaseBusiness className="size-5 shrink-0 text-primary" aria-hidden="true" />
+          {P.holdings}
+        </h2>
+        {state && <span className="badge-info shrink-0 tabular-nums">{positions.length}{P.positionUnit}</span>}
+      </div>
+      {positions.length ? (
+        <ul className={cn("grid gap-sm", positions.length > 1 && "md:grid-cols-2")}>
+          {positions.map(position => (
+            <li key={position.ticker} className="flex min-w-0 items-center justify-between gap-md rounded-md bg-surface-muted px-md py-sm">
+              <span className="min-w-0 wrap-anywhere text-body-md font-semibold text-text-strong">{position.name ?? position.ticker}</span>
+              <span className="shrink-0 whitespace-nowrap text-body-md font-semibold tabular-nums text-text-strong">
+                {position.quantity.toLocaleString("ko-KR")}{P.shareUnit}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="rounded-md bg-surface-muted px-md py-sm text-body-sm text-text-muted">{P.positionEmpty}</p>}
     </section>
 
     <section className="space-y-md" aria-label={M.logs}>

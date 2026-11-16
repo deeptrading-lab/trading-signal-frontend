@@ -10,7 +10,7 @@
  *   - 성공 응답 `{ result }` 언래핑.
  *   - 401 invalid-token/expired-token → 단일 활성 토큰 정책상 외부 재발급으로 내 토큰이 죽은
  *     케이스 → 토큰 폐기 후 1회 재발급·재시도 (`token.ts` 주석 참조).
- *   - 429 → `Retry-After` 헤더만큼 대기 후 재시도(최대 2회, 상한 3s).
+ *   - 429 → 해당 경로에서 Retry-After를 공유하고, 3초 이내인 경우에만 재시도(최대 2회).
  */
 
 import axios, { type AxiosInstance } from "axios";
@@ -23,6 +23,22 @@ export const TOSS_BASE_URL = "https://openapi.tossinvest.com";
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MAX_429_RETRIES = 2;
 const RETRY_AFTER_CAP_SEC = 3;
+const cooldowns = new Map<string, number>();
+const nextDiagnostics = new Map<string, number>();
+
+function diagnose(path: string, kind: string, status?: number, detail?: string, retryMs?: number) {
+  const key = `${path}:${kind}:${status ?? ""}`;
+  if (Date.now() < (nextDiagnostics.get(key) ?? 0)) return;
+  nextDiagnostics.set(key, Date.now() + 30_000);
+  console.warn("[toss-rest]", { at: new Date().toISOString(), path, kind, status, detail, retryMs });
+}
+
+function retryAfterMs(header: unknown) {
+  const seconds = Number(header ?? 1);
+  if (Number.isFinite(seconds)) return Math.max(200, seconds * 1_000);
+  const date = typeof header === "string" ? Date.parse(header) : NaN;
+  return Number.isFinite(date) ? Math.max(200, date - Date.now()) : 1_000;
+}
 /** 5xx/네트워크 transient 1회 재시도 — KIS `withPageRetry` 관례 답습(페이징 중 1회 실패로
  * 수집분 전체를 버리고 KIS 폴백 풀 페이징을 다시 도는 이중 비용 방지). */
 const TRANSIENT_RETRY_BACKOFF_MS = 400;
@@ -42,6 +58,8 @@ export function getTossClient(): AxiosInstance {
 /** 테스트 전용 — 인스턴스 캐시 초기화. */
 export function resetTossClientForTest(): void {
   cachedClient = null;
+  cooldowns.clear();
+  nextDiagnostics.clear();
 }
 
 /**
@@ -69,15 +87,28 @@ export async function tossGet<T>(
   let retriedTransient = false;
 
   for (;;) {
-    const token = await getTossAccessToken();
+    const waitMs = (cooldowns.get(path) ?? 0) - Date.now();
+    if (waitMs > RETRY_AFTER_CAP_SEC * 1_000) throw makeTossBusinessError(429, undefined);
+    if (waitMs > 0) await delay(waitMs);
+
+    let token: string;
+    try {
+      token = await getTossAccessToken();
+    } catch (error) {
+      diagnose(path, "token", (error as { status?: number } | null)?.status);
+      throw error;
+    }
 
     let response;
     try {
       response = await getTossClient().get(path, {
         params,
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (error) {
+      diagnose(path, "transport", axios.isAxiosError(error) ? error.response?.status : undefined,
+        axios.isAxiosError(error) ? error.code : undefined);
       if (!retriedTransient) {
         retriedTransient = true;
         await delay(TRANSIENT_RETRY_BACKOFF_MS);
@@ -112,21 +143,22 @@ export async function tossGet<T>(
       (code === "invalid-token" || code === "expired-token") &&
       !retried401
     ) {
+      diagnose(path, "token-refresh", 401, code);
       retried401 = true;
       await invalidateTossToken(token);
       continue;
     }
 
-    if (response.status === 429 && retries429 < MAX_429_RETRIES) {
-      retries429 += 1;
-      const retryAfterSec = Number(
-        (response.headers as Record<string, unknown> | undefined)?.["retry-after"] ?? "1",
-      );
-      const waitSec = Number.isFinite(retryAfterSec)
-        ? Math.min(Math.max(retryAfterSec, 0.2), RETRY_AFTER_CAP_SEC)
-        : 1;
-      await delay(waitSec * 1_000);
-      continue;
+    if (response.status === 429) {
+      const waitMs = retryAfterMs(response.headers?.["retry-after"]);
+      cooldowns.set(path, Math.max(Date.now() + waitMs, cooldowns.get(path) ?? 0));
+      diagnose(path, "rate-limit", 429, code, waitMs);
+      if (retries429 < MAX_429_RETRIES && waitMs <= RETRY_AFTER_CAP_SEC * 1_000) {
+        retries429 += 1;
+        continue;
+      }
+    } else {
+      diagnose(path, "http", response.status, code);
     }
 
     throw makeTossBusinessError(response.status, errBody);

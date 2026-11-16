@@ -35,13 +35,14 @@ async function main() {
     } else await writeFile(target, html);
   }
   await mkdir(workDir, { recursive: true });
-  const revision = (await exec('git', ['log', '-1', '--format=%H', '--', 'docs/program-trading/rules.template.html'])).stdout.trim();
+  const evidenceRoot = process.env.PROGRAM_RULES_EVIDENCE_ROOT ?? '.';
+  const revision = (await exec('git', ['log', '-1', '--format=%H', '--', 'docs/program-trading/rules.template.html'], { cwd: evidenceRoot })).stdout.trim();
   for (const view of ['summary', 'detail', 'buy', 'sell', 'settlement'] as const) {
     const data = JSON.stringify(createProgramTradingWorkflow(output, view, revision), null, 2) + '\n';
     const candidate = `${workDir}/${view}.json`;
     await writeFile(candidate, data);
     try {
-      await exec(process.execPath, [archify, 'deliver', 'workflow', candidate, `${workDir}/${view}.html`, '--quality', 'showcase', '--repo-root', '.', '--json'], { env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' }, maxBuffer: 4 * 1024 * 1024 });
+      await exec(process.execPath, [archify, 'deliver', 'workflow', candidate, `${workDir}/${view}.html`, '--quality', 'showcase', '--repo-root', evidenceRoot, '--json'], { env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' }, maxBuffer: 4 * 1024 * 1024 });
     } catch (error) {
       const detail = error as Error & { stdout?: string };
       throw new Error(`Archify 생성 실패. 아래 진단을 확인해 주세요. 설치 위치가 다르면 ARCHIFY_HOME을 지정해 주세요.\n${detail.stdout || detail.message}`);

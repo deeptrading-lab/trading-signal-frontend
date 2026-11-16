@@ -83,4 +83,40 @@ describe("Toss market data in local paper trading", () => {
     vi.mocked(fetchMarketCalendar).mockResolvedValueOnce(null);
     expect(await tossPaperSession()).toMatchObject({ canStart: false, holiday: false, open: false });
   });
+  it("uses the same day's known calendar during a brief outage", async () => {
+    const { session } = await startPaper();
+    vi.mocked(fetchMarketCalendar).mockResolvedValueOnce(null);
+    expect(await tossPaperSession(session)).toMatchObject({ open: true, close: session.close });
+    vi.setSystemTime(new Date("2026-11-10T15:21:00+09:00"));
+    vi.mocked(fetchMarketCalendar).mockResolvedValueOnce(null);
+    expect(await tossPaperSession(session)).toMatchObject({
+      open: false, close: Date.parse("2026-11-10T15:20:00+09:00"),
+    });
+  });
+
+  it("pauses new buys while recommendations are unavailable and resumes on recovery", async () => {
+    const { state, session } = await startPaper();
+    const candidates = state.candidates;
+    state.candidates = { ...candidates, status: "unavailable" };
+    await stepTossPaper(state, session);
+    expect(state.running).toBe(true);
+    expect(state.positions).toHaveLength(0);
+    state.candidates = candidates;
+    await stepTossPaper(state, session);
+    expect(state.positions).toHaveLength(1);
+  });
+
+  it("closes normally with fresh held quotes even when candles fail", async () => {
+    const { state, session } = await startPaper();
+    await stepTossPaper(state, session);
+    state.quotes = [];
+    command(state, "flatten");
+    vi.mocked(fetchCandlesPage).mockRejectedValue(new Error("분봉 조회 실패"));
+    await stepTossPaper(state, session);
+    expect(fetchCandlesPage).toHaveBeenCalledTimes(1);
+    expect(state.lifecycle).toMatchObject({ status: "completed" });
+    expect(state.lifecycle?.forcedAt).toBeUndefined();
+    expect(state.trades.at(-1)).toMatchObject({ side: "sell", reason: "manual" });
+  });
+
 });

@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
-import { rename, writeFile } from "node:fs/promises";
+import { appendFile, readFile, rename, writeFile } from "node:fs/promises";
 import { afterEach, expect, it, vi } from "vitest";
+import { tossPaperSession } from "@/lib/server/programTrading/tossPaper";
+import { initialState } from "@/lib/server/programTrading/engine";
 import { GET, POST } from "../route";
 
 vi.mock("@/lib/server/programTrading/tossPaper", () => ({
+  minuteInKorea: () => 560,
   requireTossPaperConfig: vi.fn(),
   stepTossPaper: vi.fn(async () => false),
   tossPaperSession: vi.fn(async () => ({
@@ -30,6 +33,8 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 afterEach(() => {
+  Reflect.deleteProperty(globalThis, "localTossPaperRuntime");
+  vi.clearAllMocks();
   vi.unstubAllEnvs();
   vi.useRealTimers();
 });
@@ -81,4 +86,45 @@ it("archives a completed local session and opens a fresh session ready to start 
   const restart = await send("start");
   expect(restart.status).toBe(200);
   expect(await restart.json()).toMatchObject({ running: true, lifecycle: { status: "running" }, cash: 10_000_000 });
+});
+
+it("ends on schedule with a market request still pending", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-09T09:20:00+09:00"));
+  vi.stubEnv("NODE_ENV", "development");
+  vi.stubEnv("VERCEL", "");
+  vi.stubEnv("VERCEL_ENV", undefined);
+  vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", undefined);
+  vi.stubEnv("TOSS_CLIENT_ID", "fixture");
+  vi.stubEnv("TOSS_CLIENT_SECRET", "fixture");
+  vi.stubEnv("PROGRAM_PAPER_RESULT_SYNC", undefined);
+  vi.mocked(tossPaperSession).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify({
+    ...initialState(),
+    executionMode: "toss-paper",
+    cash: 9_899_985,
+    positions: [{ ticker: "005930", quantity: 1, entry: 100_000, mark: 101_000 }],
+    lifecycle: {
+      status: "running", startedAt: "2026-11-09T00:10:00Z", beforeBalance: 10_000_000,
+      finishedAt: null, afterBalance: null, returnPct: null, targetReturnPct: 1, reviewDecision: "pending",
+    },
+  }));
+  const origin = "http://127.0.0.1:3000";
+  const url = origin + "/api/program-trading";
+  const headers = { host: "127.0.0.1:3000", origin, "content-type": "application/json" };
+  const requestStop = () => POST(new NextRequest(url, { method: "POST", headers, body: '{"action":"flatten"}' }));
+  const first = await requestStop();
+  expect(first.status).toBe(200);
+  expect(await first.json()).toMatchObject({ lifecycle: { status: "stopping" } });
+  await vi.advanceTimersByTimeAsync(29_999);
+  expect((await (await GET(new NextRequest(url, { headers }))).json()).positions).toHaveLength(1);
+  await requestStop(); // repeated stop must not restart the clock
+  await vi.advanceTimersByTimeAsync(1);
+  const completed = await (await GET(new NextRequest(url, { headers }))).json();
+  expect(completed).toMatchObject({
+    lifecycle: { status: "completed", forcedAt: "2026-11-09T00:20:30.000Z" },
+    positions: [],
+    trades: [{ reason: "timeout", price: 100_949, quantity: 1 }],
+  });
+  expect(vi.mocked(appendFile).mock.calls.filter(([, data]) => String(data).includes('"reason":"timeout"'))).toHaveLength(1);
 });

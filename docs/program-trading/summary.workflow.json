@@ -158,7 +158,7 @@
       "lane": "confirm",
       "col": 1,
       "label": "종료·정산 대기",
-      "sublabel": "유효한 시세까지 가상 청산 대기",
+      "sublabel": "유효한 체결·호가를 최대 30초 대기",
       "type": "security",
       "sources": [
         {
@@ -166,7 +166,7 @@
           "line": 1
         }
       ],
-      "tag": "가상 보유가 남으면 종료 대기",
+      "tag": "기한 후 마지막 기록가로 정산",
       "icon": "decision",
       "width": 240
     },
