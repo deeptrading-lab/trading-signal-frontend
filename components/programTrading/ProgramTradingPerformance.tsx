@@ -14,7 +14,7 @@ const sessionDate = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Seoul",
 });
 
-export function ProgramTradingPerformance({ points, selectedId }: { points: PaperPerformancePoint[]; selectedId?: string }) {
+export function ProgramTradingPerformance({ points, selectedId, paginated }: { points: PaperPerformancePoint[]; selectedId?: string; paginated?: boolean }) {
   const theme = useChartTheme();
   const data = points.map(point => ({
     ...point,
@@ -28,7 +28,7 @@ export function ProgramTradingPerformance({ points, selectedId }: { points: Pape
 
   return (
     <section aria-labelledby="program-performance" className="min-w-0 space-y-sm rounded-lg border border-border-line bg-surface p-md">
-      <h2 id="program-performance" className="text-body-md font-semibold text-text-strong">{C.performance}</h2>
+      <h2 id="program-performance" className="text-body-md font-semibold text-text-strong">{paginated ? C.sharedPerformance : C.performance}</h2>
       {data.length === 0 ? (
         <p className="text-body-sm text-text-muted">{C.performanceEmpty}</p>
       ) : (

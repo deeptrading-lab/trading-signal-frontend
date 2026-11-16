@@ -53,6 +53,12 @@ export default async function ProfileRoutePage() {
   const adminItems: ProfileMenuItem[] | undefined = isAdminOrAbove
     ? [
         ...PROFILE_MENU_ITEMS_MOCK.filter((item) => ADMIN_ONLY_KEYS.has(item.key)),
+        {
+          key: "PROGRAM_PAPER_RESULTS",
+          iconName: "Bot",
+          variant: "default",
+          href: "/program-trading/review?source=shared",
+        },
         PROFILE_ADMIN_MENU_ITEM,
       ]
     : undefined;

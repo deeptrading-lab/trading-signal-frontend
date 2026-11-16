@@ -21,6 +21,15 @@ export const PROGRAM_COPY = {
 
 export const PROGRAM_REVIEW_COPY = {
   performance: "전체 세션 실적",
+  sharedPerformance: "이 페이지의 세션 실적",
+  source: "결과 저장 위치",
+  localResults: "이 PC의 결과",
+  sharedResults: "공유 DB 결과",
+  sharedUnavailable: "선택한 모의매매 결과를 불러오지 못했어요.",
+  sharedError: "공유 DB에 연결하지 못했어요. 서버 설정을 확인하거나 잠시 후 다시 시도해 주세요.",
+  backToProfile: "마이페이지로 돌아가기",
+  previousPage: "이전 결과",
+  nextPage: "다음 결과",
   performanceSelected: "선택한 세션",
   performanceDescription: "종료된 세션별 수익률",
   performanceEmpty: "수익률을 확인할 수 있는 종료 세션이 없습니다.",

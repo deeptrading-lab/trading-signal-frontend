@@ -46,10 +46,20 @@ export async function savePaperResult(review: PaperSessionReview) {
   return id;
 }
 
-export function listPaperResults(offset = 0) {
-  return request(results, {
-    select: "id,started_at,finished_at,return_pct:result->lifecycle->returnPct,closed_trades:result->closedTrades",
-    order: "finished_at.desc,id.asc", limit: "20", offset: String(offset),
+type PaperResultSummary = {
+  id: string;
+  finished_at: string;
+  return_pct: number | null;
+  balance_change?: number;
+};
+
+export const paperResultPageSize = 20;
+
+export function listPaperResults(offset = 0, forScreen = false) {
+  const fields = "id,started_at,finished_at,return_pct:result->lifecycle->returnPct,closed_trades:result->closedTrades";
+  return request<PaperResultSummary[]>(results, {
+    select: forScreen ? fields + ",balance_change:result->balanceChange" : fields,
+    order: "finished_at.desc,id.asc", limit: String(paperResultPageSize + Number(forScreen)), offset: String(offset),
   });
 }
 

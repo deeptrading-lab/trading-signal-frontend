@@ -32,7 +32,7 @@ function Findings({ items }: { items: string[] }) {
   return <ul className="list-disc space-y-xs pl-lg">{items.map((item, index) => <li key={index}>{item}</li>)}</ul>;
 }
 
-export async function ProgramTradingEvaluation({ startedAt }: { startedAt: string | null }) {
+export async function ProgramTradingEvaluation({ startedAt, canApply }: { startedAt: string | null; canApply: boolean }) {
   const sessionId = startedAt ? paperResultId(startedAt) : null;
   const history = sessionId ? await listPaperReviewEvents(sessionId).catch(() => null) : [];
   if (history === null) return <ProgramTradingEvaluationStatus message={C.evaluationError} />;
@@ -58,7 +58,7 @@ export async function ProgramTradingEvaluation({ startedAt }: { startedAt: strin
               {latestApplied ? (
                 <>
                   <p className="wrap-anywhere break-keep text-body-sm text-text-strong">{latestApplied.details.description}</p>
-                  <p className="break-keep text-body-sm text-text-muted">{C.improveRestart}</p>
+                  {canApply && <p className="break-keep text-body-sm text-text-muted">{C.improveRestart}</p>}
                   {latest.details.proposals.length > 0 && (
                     <details className="wrap-anywhere text-body-sm text-text-muted">
                       <summary className="min-h-hit-area-min cursor-pointer rounded-md py-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary font-semibold text-text-strong">{C.evaluationProposed}</summary>
@@ -71,7 +71,7 @@ export async function ProgramTradingEvaluation({ startedAt }: { startedAt: strin
                   <div className="wrap-anywhere break-keep text-body-sm text-text-strong">
                     {latest.details.proposals.length ? <Findings items={latest.details.proposals} /> : <p>{C.evaluationNoPlan}</p>}
                   </div>
-                  {sessionId && latest.details.proposals.length > 0 && (
+                  {canApply && sessionId && latest.details.proposals.length > 0 && (
                     <ProgramTradingImproveButton key={latest.id} sessionId={sessionId} evaluationId={latest.id} applied={false} />
                   )}
                 </>

@@ -12,6 +12,7 @@ export type ProfileMenuKey =
   | "BILLING"
   | "THEME"
   | "SCORECARD"
+  | "PROGRAM_PAPER_RESULTS"
   | "PAPER_TRADING"
   | "ADMIN"
   | "LOGOUT";

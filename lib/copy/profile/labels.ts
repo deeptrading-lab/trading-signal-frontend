@@ -74,3 +74,5 @@ export const THEME_OPTION_DARK = "다크";
 export const THEME_OPTION_SYSTEM = "시스템";
 /** 현재 선택 모드를 메뉴 행 우측에 요약 표시할 때의 a11y 라벨 prefix. */
 export const THEME_GROUP_LABEL = "화면 테마";
+
+export const MENU_PROGRAM_PAPER_RESULTS = "자동매매 모의 결과";
