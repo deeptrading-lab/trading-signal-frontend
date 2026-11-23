@@ -21,7 +21,7 @@
     "output": ".archify/program-rules/detail.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "a9f2cca25e8eb31506718fe72e38230fcb6d6a17",
+      "revision": "204fe237ffd4a94c8bac37130f94cfbe54ee6030",
       "link_mode": "local-only"
     }
   },
@@ -64,8 +64,8 @@
       "id": "buy0",
       "lane": "buy0",
       "col": 0,
-      "label": "로컬 모의 시작 조건인가요?",
-      "sublabel": "사용자 시작 · 정규장 · 토스 후보 확인",
+      "label": "로컬 모의 시작 조건 확인",
+      "sublabel": "사용자 시작 · 정규장 · 거래량 상위 상승 후보",
       "type": "security",
       "sources": [
         {
@@ -82,7 +82,7 @@
       "lane": "buy0",
       "col": 1,
       "label": "시작 차단",
-      "sublabel": "토스 시세 키와 추천 조회 확인",
+      "sublabel": "토스 시세 키와 거래량 상위 상승 후보 확인",
       "type": "security",
       "sources": [
         {
@@ -97,8 +97,8 @@
       "id": "buy1",
       "lane": "buy1",
       "col": 0,
-      "label": "매수 가능한 시간인가요?",
-      "sublabel": "KST 09:10~15:00 미만",
+      "label": "09:10~14:30 미만 · 종료 제한 없음?",
+      "sublabel": "KST · 목표·손실·연패·횟수·공백 잠금 확인",
       "type": "security",
       "sources": [
         {
@@ -106,9 +106,9 @@
           "line": 1
         }
       ],
-      "tag": "거래일·장 상태 확인 · 손실 잠금 없음",
+      "tag": "KST · 세션 종료 제한이 없을 때만 진입",
       "icon": "decision",
-      "width": 240
+      "width": 251.5
     },
     {
       "id": "buy1no",
@@ -130,8 +130,8 @@
       "id": "buy2",
       "lane": "buy2",
       "col": 0,
-      "label": "종목이 유효 후보에 포함되나요?",
-      "sublabel": "60초 후보 갱신 · 시작 재검증 · 120초 만료",
+      "label": "거래량 상위 상승 후보 · 현재가도 상승 중?",
+      "sublabel": "상위 14개 중 +종목 · 현재가 > 추정 전일 종가 · 60초 갱신 · 120초 만료",
       "type": "security",
       "sources": [
         {
@@ -140,7 +140,7 @@
         }
       ],
       "icon": "decision",
-      "width": 240
+      "width": 361.59999999999997
     },
     {
       "id": "buy2no",
@@ -162,8 +162,8 @@
       "id": "buy3",
       "lane": "buy3",
       "col": 0,
-      "label": "보유·재진입 조건을 충족하나요?",
-      "sublabel": "가상 보유 2종목 미만",
+      "label": "1종목 미만 · 세션 재진입 제한 충족?",
+      "sublabel": "매도 후 10분 · 손실 종목은 같은 세션 재진입 금지",
       "type": "security",
       "sources": [
         {
@@ -171,9 +171,9 @@
           "line": 1
         }
       ],
-      "tag": "미보유 · 가상 매도 후 10분 대기",
+      "tag": "손실 종목은 같은 세션 재진입 금지",
       "icon": "decision",
-      "width": 240
+      "width": 258
     },
     {
       "id": "buy3no",
@@ -195,8 +195,8 @@
       "id": "buy4",
       "lane": "buy4",
       "col": 0,
-      "label": "시세·호가가 유효한가요?",
-      "sublabel": "시세 5초 이내 · 스프레드 0~15bps",
+      "label": "최근 체결·양방향 호가·예상 비용이 유효한가?",
+      "sublabel": "5초 이내 · 스프레드 ≤7bps · 예상 왕복비용 ≤0.4%",
       "type": "security",
       "sources": [
         {
@@ -204,9 +204,9 @@
           "line": 1
         }
       ],
-      "tag": "유효한 양수 시세 · 양방향 호가",
+      "tag": "유효한 시세 · 양방향 호가 · 비용 게이트",
       "icon": "decision",
-      "width": 240
+      "width": 316.5
     },
     {
       "id": "buy4no",
@@ -228,8 +228,8 @@
       "id": "buy5",
       "lane": "buy5",
       "col": 0,
-      "label": "돌파·거래량을 함께 충족하나요?",
-      "sublabel": "직전 3분 고가 +0.1% 초과 · 거래량 1.5배 이상",
+      "label": "완료 양봉 돌파·거래량·추격 상한 충족?",
+      "sublabel": "직전 완성봉 종가 > 이전 3봉 고가 +0.1% · 거래량 ≥1.5배 · 현재가·매도호가 ≤신호 종가 +0.2%",
       "type": "security",
       "sources": [
         {
@@ -237,9 +237,9 @@
           "line": 1
         }
       ],
-      "tag": "완료 분봉 3개와 진행분 거래량 비교",
+      "tag": "최근 완료 양봉과 그 이전 완료봉 3개 · 현재가 ≥신호 종가",
       "icon": "decision",
-      "width": 240
+      "width": 467.2
     },
     {
       "id": "buy5no",
@@ -261,8 +261,8 @@
       "id": "buy6",
       "lane": "buy6",
       "col": 0,
-      "label": "주문 수량 계산",
-      "sublabel": "최소(자산 20%, 위험 0.25%, 현금)",
+      "label": "수량 = 최소(비중 15%, 위험 0.1%, 가용현금)",
+      "sublabel": "최소(자산 15%, 위험 0.1%, 현금)",
       "type": "backend",
       "sources": [
         {
@@ -272,7 +272,7 @@
       ],
       "tag": "비용 포함 · 소수점 버림 · 1주 미만 제외",
       "icon": "active",
-      "width": 240
+      "width": 297
     },
     {
       "id": "buy6no",
@@ -294,7 +294,7 @@
       "id": "buy7",
       "lane": "buy7",
       "col": 0,
-      "label": "가상 매수 체결",
+      "label": "가상 매수 체결 → 진입근거·원장 기록",
       "sublabel": "가상 매수 후 원장 기록",
       "type": "backend",
       "sources": [
@@ -303,9 +303,9 @@
           "line": 1
         }
       ],
-      "tag": "슬리피지·수수료 반영 · 후보 1개씩 점검",
+      "tag": "매도호가·슬리피지 반영 · 최근 완성봉 1개와 이전 3봉 비교",
       "icon": "active",
-      "width": 240
+      "width": 302.4
     }
   ],
   "edges": [

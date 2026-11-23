@@ -21,7 +21,7 @@
     "output": ".archify/program-rules/sell.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "a9f2cca25e8eb31506718fe72e38230fcb6d6a17",
+      "revision": "204fe237ffd4a94c8bac37130f94cfbe54ee6030",
       "link_mode": "local-only"
     }
   },
@@ -53,6 +53,30 @@
     {
       "id": "sell4",
       "label": "우선순위 5"
+    },
+    {
+      "id": "sell5",
+      "label": "우선순위 6"
+    },
+    {
+      "id": "sell6",
+      "label": "우선순위 7"
+    },
+    {
+      "id": "sell7",
+      "label": "우선순위 8"
+    },
+    {
+      "id": "sell8",
+      "label": "우선순위 9"
+    },
+    {
+      "id": "sell9",
+      "label": "우선순위 10"
+    },
+    {
+      "id": "sell10",
+      "label": "우선순위 11"
     },
     {
       "id": "hold",
@@ -98,7 +122,7 @@
       "lane": "unknown",
       "col": 1,
       "label": "가상 청산 대기",
-      "sublabel": "종료 기한은 별도로 진행",
+      "sublabel": "공백 안전 종료·30초 정산 기한은 별도로 진행",
       "type": "security",
       "sources": [
         {
@@ -113,8 +137,8 @@
       "id": "sell0",
       "lane": "sell0",
       "col": 0,
-      "label": "종료 처리 중인가요?",
-      "sublabel": "유효한 시세에서 가상 청산",
+      "label": "① 종료 처리 중인가?",
+      "sublabel": "기록된 종료 사유로 청산 · 신규 매수 금지",
       "type": "security",
       "sources": [
         {
@@ -129,8 +153,8 @@
       "id": "sell0yes",
       "lane": "sell0",
       "col": 1,
-      "label": "가상 보유 전량 청산",
-      "sublabel": "가상 매도 후 보유·현금 반영",
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
       "type": "backend",
       "sources": [
         {
@@ -138,7 +162,7 @@
           "line": 1
         }
       ],
-      "tag": "슬리피지와 비용을 반영",
+      "tag": "비용 반영 · 종료 사유 보존",
       "icon": "active",
       "width": 240
     },
@@ -146,8 +170,8 @@
       "id": "sell1",
       "lane": "sell1",
       "col": 0,
-      "label": "일일 자산이 −2%에 도달했나요?",
-      "sublabel": "세션 시작 가상 자산 기준",
+      "label": "② 시세·엔진 공백 ≥30초인가?",
+      "sublabel": "data-gap · 세션 종료 · 복구 후 보유 청산 우선",
       "type": "security",
       "sources": [
         {
@@ -156,14 +180,14 @@
         }
       ],
       "icon": "decision",
-      "width": 240
+      "width": 241.6
     },
     {
       "id": "sell1yes",
       "lane": "sell1",
       "col": 1,
-      "label": "청산 · 신규 매수 잠금",
-      "sublabel": "가상 매도 후 보유·현금 반영",
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
       "type": "backend",
       "sources": [
         {
@@ -171,7 +195,7 @@
           "line": 1
         }
       ],
-      "tag": "슬리피지와 비용을 반영",
+      "tag": "비용 반영 · 종료 사유 보존",
       "icon": "active",
       "width": 240
     },
@@ -179,8 +203,8 @@
       "id": "sell2",
       "lane": "sell2",
       "col": 0,
-      "label": "마감 청산 시각인가요?",
-      "sublabel": "정규장 중 유효한 시세에서 처리",
+      "label": "③ 세션 손실 −0.6% 이하인가?",
+      "sublabel": "kill · 세션 시작 자산 기준 · 절대 손실 상한 아님",
       "type": "security",
       "sources": [
         {
@@ -189,14 +213,14 @@
         }
       ],
       "icon": "decision",
-      "width": 240
+      "width": 256
     },
     {
       "id": "sell2yes",
       "lane": "sell2",
       "col": 1,
-      "label": "청산 · 운용 중지",
-      "sublabel": "가상 매도 후 보유·현금 반영",
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
       "type": "backend",
       "sources": [
         {
@@ -204,7 +228,7 @@
           "line": 1
         }
       ],
-      "tag": "슬리피지와 비용을 반영",
+      "tag": "비용 반영 · 종료 사유 보존",
       "icon": "active",
       "width": 240
     },
@@ -212,8 +236,8 @@
       "id": "sell3",
       "lane": "sell3",
       "col": 0,
-      "label": "매수가 대비 −1% 이하인가요?",
-      "sublabel": "손절 가격 보장 없음",
+      "label": "④ 세션 비용 후 목표 +1% 이상인가?",
+      "sublabel": "session-target · 전량 청산 후 종료 · 체결 후 목표 미달 가능",
       "type": "security",
       "sources": [
         {
@@ -222,14 +246,14 @@
         }
       ],
       "icon": "decision",
-      "width": 240
+      "width": 308.8
     },
     {
       "id": "sell3yes",
       "lane": "sell3",
       "col": 1,
-      "label": "가상 손절",
-      "sublabel": "가상 매도 후 보유·현금 반영",
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
       "type": "backend",
       "sources": [
         {
@@ -237,7 +261,7 @@
           "line": 1
         }
       ],
-      "tag": "슬리피지와 비용을 반영",
+      "tag": "비용 반영 · 종료 사유 보존",
       "icon": "active",
       "width": 240
     },
@@ -245,8 +269,8 @@
       "id": "sell4",
       "lane": "sell4",
       "col": 0,
-      "label": "매수가 대비 +2% 이상인가요?",
-      "sublabel": "해당 없음 → 보유·다음 점검",
+      "label": "⑤ 비용 후 손실 2회 연속인가?",
+      "sublabel": "loss-streak · 잔량 청산 후 세션 종료",
       "type": "security",
       "sources": [
         {
@@ -261,8 +285,8 @@
       "id": "sell4yes",
       "lane": "sell4",
       "col": 1,
-      "label": "가상 익절",
-      "sublabel": "가상 매도 후 보유·현금 반영",
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
       "type": "backend",
       "sources": [
         {
@@ -270,7 +294,205 @@
           "line": 1
         }
       ],
-      "tag": "슬리피지와 비용을 반영",
+      "tag": "비용 반영 · 종료 사유 보존",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell5",
+      "lane": "sell5",
+      "col": 0,
+      "label": "⑥ 세션 매수 10회 도달·보유 청산 완료인가?",
+      "sublabel": "trade-limit · 추가 매수 없이 세션 종료",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 303.5
+    },
+    {
+      "id": "sell5yes",
+      "lane": "sell5",
+      "col": 1,
+      "label": "추가 매수 없이 세션 종료",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "비용 반영 · 종료 사유 보존",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell6",
+      "lane": "sell6",
+      "col": 0,
+      "label": "⑦ 15:20 또는 장 종료 기준 도달인가?",
+      "sublabel": "close · 보유 청산 후 운용 종료",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 258
+    },
+    {
+      "id": "sell6yes",
+      "lane": "sell6",
+      "col": 1,
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "비용 반영 · 종료 사유 보존",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell7",
+      "lane": "sell7",
+      "col": 0,
+      "label": "⑧ 종목 비용 후 수익률 ≤−0.8%인가?",
+      "sublabel": "stop · 매수·매도 비용과 슬리피지 포함 · 같은 세션 재진입 금지",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 323.2
+    },
+    {
+      "id": "sell7yes",
+      "lane": "sell7",
+      "col": 1,
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "비용 반영 · 종료 사유 보존",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell8",
+      "lane": "sell8",
+      "col": 0,
+      "label": "⑨ 종목 비용 후 수익률 ≥+1%인가?",
+      "sublabel": "target · 개별 종목 순익이며 계좌 목표와 구분",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 240
+    },
+    {
+      "id": "sell8yes",
+      "lane": "sell8",
+      "col": 1,
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "비용 반영 · 종료 사유 보존",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell9",
+      "lane": "sell9",
+      "col": 0,
+      "label": "⑩ 순익 고점 0.6% 이후 되밀림인가?",
+      "sublabel": "trail · 고점−0.3%p 또는 최소 +0.1% 기준",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 245
+    },
+    {
+      "id": "sell9yes",
+      "lane": "sell9",
+      "col": 1,
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "비용 반영 · 종료 사유 보존",
+      "icon": "active",
+      "width": 240
+    },
+    {
+      "id": "sell10",
+      "lane": "sell10",
+      "col": 0,
+      "label": "⑪ 실제 보유 경과 ≥5분인가?",
+      "sublabel": "time-exit · 수익 여부와 무관하게 유효 시세에서 청산",
+      "type": "security",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "icon": "decision",
+      "width": 265.6
+    },
+    {
+      "id": "sell10yes",
+      "lane": "sell10",
+      "col": 1,
+      "label": "해당 사유로 가상 청산·종료 반영",
+      "sublabel": "가상 매도 후 현금·손익·제한 갱신",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ],
+      "tag": "비용 반영 · 종료 사유 보존",
       "icon": "active",
       "width": 240
     },
@@ -279,7 +501,7 @@
       "lane": "hold",
       "col": 0,
       "label": "보유 · 다음 점검",
-      "sublabel": "상위 조건부터 다시 확인",
+      "sublabel": "상위 종료·청산 조건부터 다시 확인",
       "type": "backend",
       "sources": [
         {
@@ -366,7 +588,79 @@
       "toSide": "top"
     },
     {
+      "from": "sell5",
+      "to": "sell5yes",
+      "label": "해당"
+    },
+    {
       "from": "sell4",
+      "to": "sell5",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell6",
+      "to": "sell6yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell5",
+      "to": "sell6",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell7",
+      "to": "sell7yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell6",
+      "to": "sell7",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell8",
+      "to": "sell8yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell7",
+      "to": "sell8",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell9",
+      "to": "sell9yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell8",
+      "to": "sell9",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell10",
+      "to": "sell10yes",
+      "label": "해당"
+    },
+    {
+      "from": "sell9",
+      "to": "sell10",
+      "label": "해당 없음",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sell10",
       "to": "hold",
       "label": "해당 없음",
       "fromSide": "bottom",
@@ -381,6 +675,12 @@
     "sell2",
     "sell3",
     "sell4",
+    "sell5",
+    "sell6",
+    "sell7",
+    "sell8",
+    "sell9",
+    "sell10",
     "hold"
   ]
 }

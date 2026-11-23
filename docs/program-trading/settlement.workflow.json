@@ -21,7 +21,7 @@
     "output": ".archify/program-rules/settlement.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "a9f2cca25e8eb31506718fe72e38230fcb6d6a17",
+      "revision": "204fe237ffd4a94c8bac37130f94cfbe54ee6030",
       "link_mode": "local-only"
     }
   },
@@ -57,7 +57,7 @@
       "lane": "clean",
       "col": 0,
       "label": "잔여 보유 가상 청산",
-      "sublabel": "최근 시세로 가상 청산 확인",
+      "sublabel": "최신 유효 시세 우선 · 종료 요청 후 30초",
       "type": "backend",
       "sources": [
         {
@@ -89,7 +89,7 @@
       "lane": "balance",
       "col": 0,
       "label": "전·후 자산과 수익률 확정",
-      "sublabel": "가상 체결 비용을 반영한 결과",
+      "sublabel": "실제 매매 성과와 가상 정산 한계 구분",
       "type": "backend",
       "sources": [
         {
@@ -105,7 +105,7 @@
       "lane": "ledger",
       "col": 0,
       "label": "전체 가상 체결 원장 보존",
-      "sublabel": "복기 근거·손익·비용·실행규칙 기록",
+      "sublabel": "진입근거·비용·청산사유·시세공백 기록",
       "type": "backend",
       "sources": [
         {
@@ -137,7 +137,7 @@
       "lane": "proposal",
       "col": 0,
       "label": "원인·검증 가이드 생성",
-      "sublabel": "자동 코드 변경 없음 · 검토 후 별도 적용",
+      "sublabel": "이번 수치는 미검증 가설 · 자동 코드 변경 없음",
       "type": "backend",
       "sources": [
         {
@@ -153,7 +153,7 @@
       "lane": "settled",
       "col": 1,
       "label": "종료 대기",
-      "sublabel": "30초 동안은 유효한 시세로 우선 가상 청산",
+      "sublabel": "시세 없이 과거 가격을 현재 체결로 간주하지 않음",
       "type": "security",
       "sources": [
         {
@@ -163,7 +163,7 @@
       ],
       "tag": "기한 후 마지막 기록가로 정산",
       "icon": "decision",
-      "width": 240
+      "width": 241.6
     },
     {
       "id": "costs",
