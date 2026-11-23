@@ -11,7 +11,7 @@
  * - 반환은 전부 **오름차순**(BFF mock·chart 라우트 계약과 동일. KIS 원 응답과 달리 소비측
  *   정렬이 전제라 어느 쪽이든 안전하지만 계약을 명시 고정한다).
  *
- * 레이트리밋: MARKET_DATA_CHART 5/s — 페이지 간 250ms + `tossGet` 의 429 Retry-After 재시도.
+ * 레이트리밋: MARKET_DATA_CHART 요청은 `tossGet` 공통 발송 간격과 Retry-After를 적용한다.
  */
 
 import { tossGet } from "./client";
@@ -30,11 +30,16 @@ const PAGE_DELAY_MS = 250;
  */
 const MAX_RANGE_PAGES = 15;
 
+const shared = globalThis as typeof globalThis & {
+  tossCandlePagesInFlight?: Map<string, Promise<TossCandlePage>>;
+};
+const candlePagesInFlight = shared.tossCandlePagesInFlight ??= new Map();
+
 /** 캔들 1페이지 — `minute.ts`(분봉 어댑터)도 재사용. */
 export async function fetchCandlesPage(
   symbol: string,
   interval: "1m" | "1d",
-  options?: { before?: string; count?: number },
+  options?: { before?: string; count?: number; source?: "program-paper" },
 ): Promise<TossCandlePage> {
   const params: Record<string, string | number> = {
     symbol,
@@ -42,8 +47,15 @@ export async function fetchCandlesPage(
     count: options?.count ?? PAGE_COUNT,
   };
   if (options?.before) params.before = options.before;
-  const page = await tossGet<TossCandlePage>("/api/v1/candles", params);
-  return page ?? {};
+  const key = JSON.stringify(params);
+  let pending = candlePagesInFlight.get(key);
+  if (!pending) {
+    pending = tossGet<TossCandlePage>("/api/v1/candles", params, options?.source ?? "stock-data")
+      .then(page => page ?? {})
+      .finally(() => candlePagesInFlight.delete(key));
+    candlePagesInFlight.set(key, pending);
+  }
+  return pending;
 }
 
 /** 토스 일봉 1건 → `StockDailyCandle`. timestamp 파싱 실패 봉은 null(호출측 filter). */
@@ -215,7 +227,7 @@ type DailyContext = {
   today: StockDailyCandle | null;
 };
 
-/** 현재가 컨텍스트 30s 캐시 — 현재가 폴링이 CHART 그룹(5/s) 쿼터를 소진하지 않게. */
+/** 현재가 컨텍스트 30s 캐시 — 현재가 폴링이 CHART 그룹 쿼터를 소진하지 않게. */
 const CONTEXT_TTL_MS = 30_000;
 const contextCache = new Map<string, { value: DailyContext; cachedAt: number }>();
 
@@ -223,7 +235,7 @@ const contextCache = new Map<string, { value: DailyContext; cachedAt: number }>(
  * 현재가 합성용 최근 일봉 컨텍스트 — 최신 봉이 오늘(KST)이면 `today`, 직전 봉 종가가 `prevClose`.
  *
  * `/prices` 가 등락률·거래량을 주지 않으므로(PRD §1) 이 컨텍스트와 합성한다.
- * 캔들 호출은 차트 페이징과 같은 MARKET_DATA_CHART(5/s) 그룹이라 30s 캐시로 흡수한다
+ * 캔들 호출은 차트 페이징과 같은 MARKET_DATA_CHART 그룹이라 30s 캐시로 흡수한다
  * (당일 봉 volume/고저가 최대 30s 지연 — 현재가 폴링 주기 대비 허용 오차).
  */
 export async function fetchRecentDailyContext(symbol: string): Promise<DailyContext> {

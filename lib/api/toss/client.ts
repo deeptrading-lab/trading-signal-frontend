@@ -10,7 +10,7 @@
  *   - 성공 응답 `{ result }` 언래핑.
  *   - 401 invalid-token/expired-token → 단일 활성 토큰 정책상 외부 재발급으로 내 토큰이 죽은
  *     케이스 → 토큰 폐기 후 1회 재발급·재시도 (`token.ts` 주석 참조).
- *   - 429 → 해당 경로에서 Retry-After를 공유하고, 3초 이내인 경우에만 재시도(최대 2회).
+ *   - 429 → Retry-After를 공유. 캔들은 이후 호출부터 재개하고, 다른 경로는 3초 이내 최대 2회 재시도.
  */
 
 import axios, { type AxiosInstance } from "axios";
@@ -18,6 +18,13 @@ import { makeTossBusinessError, makeTossTransportError } from "./errors";
 import { getTossAccessToken, invalidateTossToken } from "./token";
 import type { TossErrorBody } from "./types";
 import { delay } from "@/lib/server/bffUtils";
+import {
+  PAPER_CANDLE_ADMISSION_BUDGET_MS,
+  STOCK_CANDLE_ADMISSION_BUDGET_MS,
+  observeCandleResponse,
+  resetCandleRateLimitForTest,
+  waitForCandleSlot,
+} from "./candleRateLimit";
 
 export const TOSS_BASE_URL = "https://openapi.tossinvest.com";
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -26,11 +33,14 @@ const RETRY_AFTER_CAP_SEC = 3;
 const cooldowns = new Map<string, number>();
 const nextDiagnostics = new Map<string, number>();
 
-function diagnose(path: string, kind: string, status?: number, detail?: string, retryMs?: number) {
+function diagnose(
+  path: string, kind: string, status?: number, detail?: string, retryMs?: number,
+  extra?: Record<string, unknown>,
+) {
   const key = `${path}:${kind}:${status ?? ""}`;
   if (Date.now() < (nextDiagnostics.get(key) ?? 0)) return;
   nextDiagnostics.set(key, Date.now() + 30_000);
-  console.warn("[toss-rest]", { at: new Date().toISOString(), path, kind, status, detail, retryMs });
+  console.warn(`[toss-rest] ${JSON.stringify({ at: new Date().toISOString(), path, kind, status, code: detail, retryMs, ...extra })}`);
 }
 
 function retryAfterMs(header: unknown) {
@@ -60,6 +70,7 @@ export function resetTossClientForTest(): void {
   cachedClient = null;
   cooldowns.clear();
   nextDiagnostics.clear();
+  resetCandleRateLimitForTest();
 }
 
 /**
@@ -81,7 +92,13 @@ export function isTossConfigured(): boolean {
 export async function tossGet<T>(
   path: string,
   params?: Record<string, string | number>,
+  source?: string,
 ): Promise<T> {
+  const candle = path === "/api/v1/candles";
+  const startedAt = Date.now();
+  const admissionDeadline = startedAt + (source === "program-paper"
+    ? PAPER_CANDLE_ADMISSION_BUDGET_MS
+    : STOCK_CANDLE_ADMISSION_BUDGET_MS);
   let retried401 = false;
   let retries429 = 0;
   let retriedTransient = false;
@@ -99,13 +116,29 @@ export async function tossGet<T>(
       throw error;
     }
 
+    let releaseCandleSlot: (() => void) | undefined;
+    if (candle) {
+      try {
+        releaseCandleSlot = await waitForCandleSlot(admissionDeadline);
+      } catch (error) {
+        diagnose(path, "local-queue-timeout", 503, undefined, undefined, { source, interval: params?.interval });
+        throw error;
+      }
+    }
+    const sentAt = Date.now();
     let response;
+    let candleRate: ReturnType<typeof observeCandleResponse> | undefined;
     try {
-      response = await getTossClient().get(path, {
-        params,
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      try {
+        response = await getTossClient().get(path, {
+          params,
+          signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (candle) candleRate = observeCandleResponse(response, sentAt);
+      } finally {
+        releaseCandleSlot?.();
+      }
     } catch (error) {
       diagnose(path, "transport", axios.isAxiosError(error) ? error.response?.status : undefined,
         axios.isAxiosError(error) ? error.code : undefined);
@@ -128,7 +161,21 @@ export async function tossGet<T>(
       });
     }
 
+    const candleDiagnostics = candleRate ? {
+      source,
+      interval: params?.interval,
+      count: params?.count,
+      queuedMs: sentAt - startedAt,
+      retryAfterMs: candleRate.retryAfterMs,
+      quota: candleRate.quota,
+      remaining: candleRate.remaining,
+      resetSeconds: candleRate.resetSeconds,
+      intervalMs: candleRate.intervalMs,
+    } : undefined;
     if (response.status === 200) {
+      if (candleRate?.recovered) {
+        diagnose(path, "rate-limit-recovered", 200, undefined, undefined, candleDiagnostics);
+      }
       const body = response.data as { result?: T } | T;
       return body && typeof body === "object" && "result" in (body as object)
         ? ((body as { result?: T }).result as T)
@@ -149,7 +196,14 @@ export async function tossGet<T>(
       continue;
     }
 
-    if (response.status === 429) {
+    if (response.status === 429 && candleRate) {
+      diagnose(path, "rate-limit", 429, code, candleRate.retryMs, {
+        ...candleDiagnostics,
+        requestId: errBody?.error?.requestId,
+        referenceId: response.headers?.["referenceid"],
+        cloudFrontId: response.headers?.["x-amz-cf-id"],
+      });
+    } else if (response.status === 429) {
       const waitMs = retryAfterMs(response.headers?.["retry-after"]);
       cooldowns.set(path, Math.max(Date.now() + waitMs, cooldowns.get(path) ?? 0));
       diagnose(path, "rate-limit", 429, code, waitMs);

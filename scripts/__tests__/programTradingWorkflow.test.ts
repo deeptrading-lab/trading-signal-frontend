@@ -24,11 +24,11 @@ describe('자동매매 도식의 판단 경로', () => {
   });
   it('매도는 먼저 해당하는 한 조건만 실행하고 미해당일 때 다음 우선순위를 본다', () => {
     const diagram = make('sell');
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < 11; index++) {
       expect(diagram.edges).toContainEqual(expect.objectContaining({ from: `sell${index}`, to: `sell${index}yes`, label: '해당' }));
       expect(diagram.edges.filter(edge => edge.from === `sell${index}yes`)).toHaveLength(0);
     }
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'sell4', to: 'hold', label: '해당 없음' }));
+    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'sell10', to: 'hold', label: '해당 없음' }));
     expect(diagram.edges.filter(edge => edge.from === 'lock')).toHaveLength(0);
   });
   it('정산 대기·목표 달성·미달을 서로 다른 결과로 표시한다', () => {

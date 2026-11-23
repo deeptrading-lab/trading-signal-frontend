@@ -2,6 +2,8 @@
 
 import { ArrowDown, BriefcaseBusiness, ClipboardList, Play, RefreshCw, Square } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { ProgramTradingDiagramModal } from "@/components/programTrading/ProgramTradingDiagramModal";
 import { useProgramTrading } from "@/hooks/programTrading/useProgramTrading";
 import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_PAPER_COPY as P, PROGRAM_REVIEW_COPY as R } from "@/lib/copy/programTrading/programTrading";
 import { cn } from "@/lib/utils/cn";
@@ -10,6 +12,7 @@ const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}ì›
 const time = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, "0")}:${(minute % 60).toString().padStart(2, "0")}`;
 
 export function ProgramTradingPanel() {
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const { state, loading, pending, error, connected, canStart, candidatesReady, send } = useProgramTrading();
   const positions = state?.positions ?? [];
   const finished = state?.lifecycle?.status === "completed";
@@ -32,6 +35,9 @@ export function ProgramTradingPanel() {
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-sm">
         <span className="badge-info">{P.mode}</span>
+        <button type="button" className="button-secondary program-trading-action whitespace-nowrap" aria-haspopup="dialog" onClick={() => setDiagramOpen(true)}>
+          {M.showDiagram}
+        </button>
         <Link href="/program-trading/review" className="button-secondary program-trading-action whitespace-nowrap no-underline" prefetch={false}>
           <ClipboardList className="size-4 shrink-0" aria-hidden="true" />
           {R.open}
@@ -142,5 +148,6 @@ export function ProgramTradingPanel() {
         </div>}
       <p className="text-caption text-text-muted">{M.logHint} <a href="/api/program-trading/logs" target="_blank" rel="noreferrer" className="text-link">{M.downloadLogs}</a></p>
     </section>
+    {diagramOpen && <ProgramTradingDiagramModal onClose={() => setDiagramOpen(false)} />}
   </div>;
 }

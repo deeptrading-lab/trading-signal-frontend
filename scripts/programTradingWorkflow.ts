@@ -13,7 +13,7 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     const steps: Step[] = [];
     for (const [, kind, body] of section[1].matchAll(/<div class="(node[^"]*|branch)">([\s\S]*?)<\/div>/g)) {
       if (kind === 'branch') { steps.at(-1)!.branch = body.replace('↳ ', ''); continue; }
-      steps.push({ label: body.replace(/<small>[\s\S]*?<\/small>/, '').trim(), note: body.match(/<small>([\s\S]*?)<\/small>/)?.[1] ?? '', branch: '' });
+      steps.push({ label: body.replace(/<small>[\s\S]*?<\/small>/, '').trim(), note: (body.match(/<small>([\s\S]*?)<\/small>/)?.[1] ?? '').replaceAll('&gt;', '>'), branch: '' });
     }
     return steps;
   });
@@ -36,9 +36,9 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     const [start, finish] = sections;
     const steps = [
       ['connect', '01 · 시세 준비', '토스 시세 연결', start[0].note],
-      ['ready', '02 · 시작 전 확인', '시작 준비 확인', '토스 시세 · 정규장 · AI 단타 후보'],
+      ['ready', '02 · 시작 전 확인', '시작 준비 확인', '거래량 상위 14개 중 전일 대비 +종목'],
       ['run', '03 · 운용', '사용자가 시작 → 자동매매', '매도 위험 관리 우선 · 조건 충족 매수'],
-      ['stop', '04 · 종료', '종료 요청', `종료 버튼 · 일일 손실 ${pct(RULES.dailyLoss)}% · 15:20`],
+      ['stop', '04 · 종료', '종료 요청', `목표 +${pct(RULES.sessionTarget)}% · 손실 −${pct(RULES.dailyLoss)}% · 연패/횟수/공백/마감`],
       ['confirm', '05 · 완료 확인', '종료 조건을 모두 충족했나요?', '가상 보유 0'],
       ['review', '06 · 결과 판단', `수익률이 목표 ${pct(RULES.sessionTarget)}% 이상인가요?`, '전체 가상 체결 원장으로 종료 복기'],
     ];
@@ -51,19 +51,19 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     mainPath = ['connect', 'ready', 'run', 'stop', 'confirm', 'review', 'improve'];
   } else if (view === 'buy' || view === 'detail') {
     const steps = sections[0];
-    const labels = ['로컬 모의 시작 조건인가요?', '매수 가능한 시간인가요?', '종목이 유효 후보에 포함되나요?', '보유·재진입 조건을 충족하나요?', '시세·호가가 유효한가요?', '돌파·거래량을 함께 충족하나요?', '주문 수량 계산', '가상 매수 체결'];
+    const labels = steps.map(step => step.label);
     const names = ['시세 준비', '거래 시간', '후보 유효성', '보유·재진입', '시세 확인', '진입 신호', '수량·예산', '가상 체결'];
     const failures = ['시작 차단', '신규 매수 대기', '신규 매수 중지', '해당 후보 대기', '해당 후보 보류', '해당 후보 제외', '주문하지 않음'];
-    const failNotes = ['토스 시세 키와 추천 조회 확인', '보유분 위험 관리 유지', '유효 후보 복구 시 자동 재개', '보유 한도·재진입 대기 재확인', '유효한 최신 시세에서 다시 확인', '다음 후보를 점검', '계산 수량이 1주 미만'];
+    const failNotes = ['토스 시세 키와 거래량 상위 상승 후보 확인', '보유분 위험 관리 유지', '유효 후보 복구 시 자동 재개', '보유 한도·재진입 대기 재확인', '유효한 최신 시세에서 다시 확인', '다음 후보를 점검', '계산 수량이 1주 미만'];
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index]; const id = `buy${index}`; row(id, `${index + 1}. ${names[index]}`);
       let note = step.note;
       let tag: string | undefined;
       if (index === 0) tag = '사용자 시작 요청';
-      if (index === 1) { note = 'KST 09:10~15:00 미만'; tag = '거래일·장 상태 확인 · 손실 잠금 없음'; }
-      if (index === 3) { note = `가상 보유 ${RULES.maxPositions}종목 미만`; tag = `미보유 · 가상 매도 후 ${RULES.cooldown}분 대기`; }
-      if (index === 4) tag = '유효한 양수 시세 · 양방향 호가';
-      if (index === 5) { note = '직전 3분 고가 +0.1% 초과 · 거래량 1.5배 이상'; tag = '완료 분봉 3개와 진행분 거래량 비교'; }
+      if (index === 1) tag = 'KST · 세션 종료 제한이 없을 때만 진입';
+      if (index === 3) tag = '손실 종목은 같은 세션 재진입 금지';
+      if (index === 4) tag = '유효한 시세 · 양방향 호가 · 비용 게이트';
+      if (index === 5) tag = '최근 완료 양봉과 그 이전 완료봉 3개 · 현재가 ≥신호 종가';
       if (index === 6) { note = `최소(자산 ${pct(RULES.allocation)}%, 위험 ${pct(RULES.risk)}%, 현금)`; tag = step.note; }
       if (index === 7) { note = '가상 매수 후 원장 기록'; tag = step.note; }
       node(id, id, 0, labels[index], note, index < 6 ? 'security' : 'backend', tag);
@@ -74,17 +74,20 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
     const steps = sections[1];
     row('orders', '01 · 보유 시세 확인'); node('orders', 'orders', 0, '보유 종목부터 시세 점검', '토스 최근 체결과 호가 확인', 'backend', '시세 유효 여부 확인');
     row('unknown', '02 · 시세 유효성'); node('unknown', 'unknown', 0, '가상 매도에 유효한 시세인가요?', '정규장 · 5초 이내 체결과 호가', 'security');
-    node('lock', 'unknown', 1, '가상 청산 대기', '종료 기한은 별도로 진행', 'security'); edge('orders', 'unknown'); edge('unknown', 'lock', '미충족', true);
-    const actions = ['가상 보유 전량 청산', '청산 · 신규 매수 잠금', '청산 · 운용 중지', '가상 손절', '가상 익절'];
-    for (let index = 0; index < 5; index++) {
-      const id = `sell${index}`; const step = steps[index + 2]; row(id, `우선순위 ${index + 1}`);
-      const labels = ['종료 처리 중인가요?', `일일 자산이 −${pct(RULES.dailyLoss)}%에 도달했나요?`, '마감 청산 시각인가요?', `매수가 대비 −${pct(RULES.stop)}% 이하인가요?`, `매수가 대비 +${pct(RULES.target)}% 이상인가요?`];
-      node(id, id, 0, labels[index], step.note, 'security');
-      node(`${id}yes`, id, 1, actions[index], '가상 매도 후 보유·현금 반영', 'backend', '슬리피지와 비용을 반영'); edge(id, `${id}yes`, '해당');
+    node('lock', 'unknown', 1, '가상 청산 대기', '공백 안전 종료·30초 정산 기한은 별도로 진행', 'security'); edge('orders', 'unknown'); edge('unknown', 'lock', '미충족', true);
+    // Every priority is read from the template; adding a rule cannot silently hide it.
+    const priorities = steps.slice(2, -1);
+    for (const [index, step] of priorities.entries()) {
+      const id = `sell${index}`; row(id, `우선순위 ${index + 1}`);
+      node(id, id, 0, step.label, step.note, 'security');
+      const action = step.note.startsWith('trade-limit') ? '추가 매수 없이 세션 종료' : '해당 사유로 가상 청산·종료 반영';
+      node(`${id}yes`, id, 1, action, '가상 매도 후 현금·손익·제한 갱신', 'backend', '비용 반영 · 종료 사유 보존');
+      edge(id, `${id}yes`, '해당');
       edge(index === 0 ? 'unknown' : `sell${index - 1}`, id, index === 0 ? '확인' : '해당 없음');
     }
-    row('hold', '조건 미해당'); node('hold', 'hold', 0, '보유 · 다음 점검', '상위 조건부터 다시 확인'); edge('sell4', 'hold', '해당 없음');
-    mainPath = ['orders', 'unknown', ...actions.map((_, index) => `sell${index}`), 'hold'];
+    row('hold', '조건 미해당'); node('hold', 'hold', 0, '보유 · 다음 점검', '상위 종료·청산 조건부터 다시 확인');
+    edge(`sell${priorities.length - 1}`, 'hold', '해당 없음');
+    mainPath = ['orders', 'unknown', ...priorities.map((_, index) => `sell${index}`), 'hold'];
   } else {
     const steps = sections[2];
     const data = [

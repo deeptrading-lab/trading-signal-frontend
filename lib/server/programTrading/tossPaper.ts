@@ -1,3 +1,4 @@
+import { isApiError } from "@/lib/api/errors";
 import { fetchCandlesPage } from "@/lib/api/toss/candles";
 import { isTossConfigured } from "@/lib/api/toss/client";
 import { isoToKstDate, isoToKstHm, isoToKstMinuteStamp, todayKstDate } from "@/lib/api/toss/kst";
@@ -6,7 +7,7 @@ import { fetchOrderbook } from "@/lib/api/toss/orderbook";
 import { fetchTrades } from "@/lib/api/toss/trades";
 import type { Quote, TradingState } from "@/lib/types/programTrading/programTrading";
 import { hasCandidates } from "@/lib/validation/programTrading/candidateGate";
-import { command, settleExpiredPaperStop, step } from "./engine";
+import { command, RULES, settleExpiredPaperStop, step } from "./engine";
 import { logPaperMarket, withinMarketBudget } from "./marketBudget";
 
 export function minuteInKorea(now: number) {
@@ -34,25 +35,81 @@ async function readSessionCalendar(previous?: { date: string; start: number; end
   if (!Number.isFinite(start) && today?.integrated !== null) logPaperMarket("calendar-unavailable", { date });
   return {
     date, start, end, close, open, minute,
-    canStart: open && now < close && minute >= 550 && minute < 900,
+    canStart: open && now < close && minute >= RULES.entryStart && minute < RULES.entryEnd,
     holiday: today?.date === date && today.integrated === null,
   };
 }
 
-const candleRequests = new Map<string, ReturnType<typeof fetchCandlesPage>>();
+type CandlePage = Awaited<ReturnType<typeof fetchCandlesPage>>;
+
+function completedCandleSignal(page: CandlePage, currentMinute: number): Quote["signal"] {
+  const bars = new Map((page?.candles ?? []).map(bar => [isoToKstMinuteStamp(bar.timestamp), bar]));
+  // Compare the last complete minute with three complete preceding minutes.
+  // The in-progress bar is deliberately ignored to avoid minute-age bias.
+  const completed = [1, 2, 3, 4].map(offset => {
+    const expectedAt = currentMinute - offset * 60_000;
+    const bar = bars.get(isoToKstMinuteStamp(new Date(expectedAt).toISOString()));
+    const values = {
+      open: Number(bar?.openPrice), high: Number(bar?.highPrice),
+      low: Number(bar?.lowPrice), close: Number(bar?.closePrice), volume: Number(bar?.volume),
+    };
+    const valid = Date.parse(bar?.timestamp ?? "") === expectedAt
+      && Object.values(values).every(value => Number.isFinite(value) && value > 0)
+      && values.high >= Math.max(values.open, values.close)
+      && values.low <= Math.min(values.open, values.close) && values.low <= values.high;
+    return { ...values, valid };
+  });
+  const [last, ...prior] = completed;
+  const complete = completed.every(bar => bar.valid);
+  const previousHigh = complete ? Math.max(...prior.map(bar => bar.high)) : 0;
+  const volumeRatio = complete ? last.volume / (prior.reduce((total, bar) => total + bar.volume, 0) / 3) : 0;
+  return complete ? {
+    closedAt: currentMinute, open: last.open, high: last.high, low: last.low, close: last.close,
+    previousHigh, volumeRatio,
+  } : undefined;
+}
+
+const CANDLE_RECHECK_MS = 30_000;
+const PAPER_CANDLE_RATE_LIMIT_PAUSE_MS = 60_000;
+let candleMinute = -1;
+let paperCandlesPausedUntil = 0;
+const candleRequests = new Map<string, { pending: Promise<Quote["signal"]>; retryAt: number }>();
 
 function readCandles(ticker: string) {
-  let request = candleRequests.get(ticker);
-  if (!request) {
-    request = fetchCandlesPage(ticker, "1m", { count: 5 }).finally(() => candleRequests.delete(ticker));
-    candleRequests.set(ticker, request);
+  const minute = Math.floor(Date.now() / 60_000) * 60_000;
+  if (candleMinute !== minute) {
+    candleMinute = minute;
+    candleRequests.clear();
   }
-  return withinMarketBudget(request.catch(() => null), null, 2_500);
+
+  const existing = candleRequests.get(ticker);
+  if (existing && Date.now() < existing.retryAt) {
+    return withinMarketBudget(existing.pending, undefined, 2_500);
+  }
+  if (Date.now() < paperCandlesPausedUntil) return undefined;
+
+  // Ask for the four completed minutes, excluding the bar at the current boundary.
+  const before = new Date(minute - 1).toISOString();
+  const pending = fetchCandlesPage(ticker, "1m", { before, count: 4, source: "program-paper" })
+    .then(page => completedCandleSignal(page, minute))
+    .catch(error => {
+      if (isApiError(error) && error.status === 429) {
+        paperCandlesPausedUntil = Date.now() + PAPER_CANDLE_RATE_LIMIT_PAUSE_MS;
+      }
+      return undefined;
+    })
+    .then(signal => {
+      if (!signal && candleRequests.get(ticker) === entry) entry.retryAt = Date.now() + CANDLE_RECHECK_MS;
+      return signal;
+    });
+  const entry = { pending, retryAt: Infinity };
+  candleRequests.set(ticker, entry);
+  return withinMarketBudget(pending, undefined, 2_500);
 }
 
 async function loadTossPaperQuote(ticker: string, needCandles: boolean): Promise<Quote | null> {
   try {
-    const [page, trades, book] = await Promise.all([
+    const [candleSignal, trades, book] = await Promise.all([
       needCandles ? readCandles(ticker) : null,
       fetchTrades(ticker, 1),
       fetchOrderbook(ticker),
@@ -61,25 +118,19 @@ async function loadTossPaperQuote(ticker: string, needCandles: boolean): Promise
     const latest = trades[0];
     const bid = book.bids[0];
     const ask = book.asks[0];
-    if (!latest || !bid || !ask || bid.qty <= 0 || ask.qty <= 0 || ask.price < bid.price) return null;
+    if (!latest || !bid || !ask || ![latest.price, bid.price, ask.price, bid.qty, ask.qty].every(Number.isFinite)
+      || latest.price <= 0 || bid.price <= 0 || ask.price <= 0 || bid.qty <= 0 || ask.qty <= 0 || ask.price < bid.price) return null;
 
     const tradeAge = now - Date.parse(latest.timestamp);
     const bookAge = now - Date.parse(book.updatedAt ?? "");
     if (![tradeAge, bookAge].every(age => Number.isFinite(age) && age >= 0 && age <= 5_000)) return null;
 
     const currentMinute = Math.floor(now / 60_000) * 60_000;
-    const bars = new Map((page?.candles ?? []).map(bar => [isoToKstMinuteStamp(bar.timestamp), bar]));
-    const current = bars.get(isoToKstMinuteStamp(new Date(currentMinute).toISOString()));
-    const previous = [1, 2, 3].map(offset => bars.get(isoToKstMinuteStamp(new Date(currentMinute - offset * 60_000).toISOString())));
-    const highs = previous.map(bar => Number(bar?.highPrice));
-    const volumes = previous.map(bar => Number(bar?.volume));
-    const complete = highs.every(high => Number.isFinite(high) && high > 0) && volumes.every(volume => Number.isFinite(volume) && volume > 0);
-    const activeVolume = Number(current?.volume);
+    const signal = candleSignal?.closedAt === currentMinute ? candleSignal : undefined;
     return {
       ticker, name: ticker, price: latest.price,
-      previousHigh: complete ? Math.max(...highs) : 0,
-      volumeRatio: complete && Number.isFinite(activeVolume) && activeVolume > 0
-        ? activeVolume / (volumes.reduce((total, volume) => total + volume, 0) / 3) : 0,
+      bid: bid.price, ask: ask.price, bidQty: bid.qty, askQty: ask.qty,
+      previousHigh: signal?.previousHigh ?? 0, volumeRatio: signal?.volumeRatio ?? 0, signal,
       spreadBps: (ask.price - bid.price) / ((ask.price + bid.price) / 2) * 10_000,
       ageMs: Math.max(tradeAge, bookAge), receivedAt: now, halted: false,
     };
@@ -99,9 +150,15 @@ export async function stepTossPaper(state: TradingState, session: Awaited<Return
   const priorDay = state.lifecycle && isoToKstDate(state.lifecycle.startedAt ?? undefined) !== session.date;
   if (priorDay || Date.now() >= session.close) requestPaperClose(state);
 
-  const candidate = state.running && session.canStart && hasCandidates(state.candidates)
+  const nowBeforeQuotes = Date.now();
+  const minuteBoundary = Math.floor(nowBeforeQuotes / 60_000) * 60_000;
+  const nextTicker = state.running && !state.positions.length && !state.killed
+    && (state.entryCount ?? 0) < RULES.maxEntries && session.canStart && hasCandidates(state.candidates, nowBeforeQuotes)
     ? state.candidates.rows[state.tick % state.candidates.rows.length]?.ticker
     : undefined;
+  const candidate = nextTicker && !state.blockedTickers?.includes(nextTicker)
+    && (state.cooldown[nextTicker] ?? 0) <= minuteBoundary / 60_000
+    && (state.signalTimes?.[nextTicker] ?? 0) < minuteBoundary ? nextTicker : undefined;
   const tickers = new Set(state.positions.map(position => position.ticker));
   if (candidate) tickers.add(candidate);
   const quotes = session.open

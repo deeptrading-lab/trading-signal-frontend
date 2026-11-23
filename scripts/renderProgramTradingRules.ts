@@ -25,7 +25,10 @@ async function main() {
     .replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
       if (!(key in RULES)) throw new Error(`알 수 없는 규칙: ${key}`);
       const value = RULES[key as keyof typeof RULES];
-      return ['maxPositions', 'cooldown'].includes(key) ? String(value) : String(Number((value * 100).toFixed(4)));
+      if (['entryStart', 'entryEnd', 'closeMinute'].includes(key)) return `${Math.floor(value / 60).toString().padStart(2, '0')}:${(value % 60).toString().padStart(2, '0')}`;
+      if (key === 'marketGapMs') return String(value / 1_000);
+      const unitless = ['maxPositions', 'cooldown', 'maxHoldMinutes', 'maxLossStreak', 'maxEntries', 'maxSpreadBps', 'minVolumeRatio'];
+      return unitless.includes(key) ? String(value) : String(Number((value * 100).toFixed(4)));
     }).replaceAll('__FINGERPRINT__', fingerprint);
   const outputs = [["rules.html", output]];
   for (const [name, html] of outputs) {

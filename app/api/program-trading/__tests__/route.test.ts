@@ -19,7 +19,7 @@ vi.mock("@/lib/server/programTrading/recommendationCandidates", () => ({
     status: "ready",
     checkedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 120_000).toISOString(),
-    rows: [{ ticker: "005930", name: "삼성전자", price: 100_000, sources: ["volume"] }],
+    rows: [{ ticker: "005930", name: "삼성전자", price: 100_000, changePercent: 1, previousClose: 10000, sources: ["volume"] }],
   })),
 }));
 

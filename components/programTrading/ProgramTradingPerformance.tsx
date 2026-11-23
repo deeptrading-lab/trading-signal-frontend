@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useChartTheme } from "@/hooks/utils/useChartTheme";
 import { PROGRAM_MENU_COPY as M, PROGRAM_REVIEW_COPY as C } from "@/lib/copy/programTrading/programTrading";
 import type { PaperPerformancePoint } from "@/lib/types/programTrading/programTrading";
@@ -19,9 +19,6 @@ export function ProgramTradingPerformance({ points, selectedId, paginated }: { p
   const data = points.map(point => ({
     ...point,
     day: shortDate.format(new Date(point.finishedAt)),
-    stroke: point.id === selectedId ? theme.C.tooltipText : undefined,
-    strokeWidth: point.id === selectedId ? 2 : undefined,
-    fill: point.returnPct >= 0 ? theme.C.stroke : theme.C.down,
   }));
   const dateTicks = data.filter((point, index) => point.day !== data[index - 1]?.day).map(point => point.id);
   const pointsById = new Map(data.map(point => [point.id, point]));
@@ -36,7 +33,7 @@ export function ProgramTradingPerformance({ points, selectedId, paginated }: { p
           <p className="text-body-sm text-text-muted">{C.performanceDescription}</p>
           <div className="h-56 min-w-0 md:h-64">
             <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
-              <BarChart data={data} title={C.performanceDescription} margin={{ right: 12 }}>
+              <LineChart data={data} title={C.performanceDescription} margin={{ top: 8, right: 12, left: 8 }}>
                 <CartesianGrid vertical={false} stroke={theme.C.grid} />
                 <XAxis {...theme.axisProps} dataKey="id" ticks={dateTicks} minTickGap={24} tickFormatter={(id: string) => {
                   return pointsById.get(id)?.day ?? "";
@@ -53,8 +50,26 @@ export function ProgramTradingPerformance({ points, selectedId, paginated }: { p
                   }}
                   formatter={value => [formatPct(Number(value), { digits: 2, sign: true }), M.returns]}
                 />
-                <Bar dataKey="returnPct" maxBarSize={36} minPointSize={1} isAnimationActive={false} />
-              </BarChart>
+                <Line
+                  type="linear"
+                  dataKey="returnPct"
+                  stroke={theme.C.stroke}
+                  strokeWidth={2}
+                  dot={({ cx, cy, payload }) => (
+                    <circle
+                      key={payload.id}
+                      cx={cx}
+                      cy={cy}
+                      r={payload.id === selectedId ? 5 : 3}
+                      fill={payload.returnPct >= 0 ? theme.C.stroke : theme.C.down}
+                      stroke={payload.id === selectedId ? theme.C.tooltipText : theme.C.surface}
+                      strokeWidth={2}
+                    />
+                  )}
+                  activeDot={{ r: 6, strokeWidth: 2 }}
+                  isAnimationActive={false}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </>

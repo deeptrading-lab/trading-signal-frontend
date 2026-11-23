@@ -1,4 +1,5 @@
 import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { RULES_VERSION } from "./engine";
 import type { TradingState } from "@/lib/types/programTrading/programTrading";
 import { auditPaperSession, type JournalEvent } from "./reviewAudit";
 import { writePaperReview } from "./sessionStorage";
@@ -38,7 +39,7 @@ export async function openJournal(dir: string) {
     },
     async record(state: TradingState) {
       const mode = state.executionMode === "toss-paper" ? "toss-paper" : "simulation";
-      const base = { at: state.updatedAt, rulesVersion: "program-v3", mode } as const;
+      const base = { at: state.updatedAt, rulesVersion: RULES_VERSION, mode } as const;
       for (const trade of state.trades) await append({ ...base, id: `trade:${trade.id}`, kind: "trade", trade });
       if (state.lifecycle) await append({ ...base, id: `session:${state.lifecycle.startedAt}:${state.lifecycle.status}`, kind: "session", lifecycle: { ...state.lifecycle } });
     },
@@ -52,7 +53,7 @@ export async function openJournal(dir: string) {
       const ledgerNet = exits.reduce((sum, trade) => sum + (trade.net ?? 0), 0);
       const mode = state.executionMode === "toss-paper" ? "toss-paper" : "simulation";
       const source = mode === "toss-paper" ? "토스증권 시세" : "합성 시세";
-      const review = { ledgerNet, balanceChange: (lifecycle.afterBalance ?? lifecycle.beforeBalance) - lifecycle.beforeBalance, rulesVersion: events.at(-1)?.rulesVersion ?? "program-v3", source: "trades.jsonl", mode, lifecycle, closedTrades: exits.length, realized: state.realized, decision: lifecycle.reviewDecision, proposals, autoApply: false };
+      const review = { ledgerNet, balanceChange: (lifecycle.afterBalance ?? lifecycle.beforeBalance) - lifecycle.beforeBalance, rulesVersion: events.at(-1)?.rulesVersion ?? RULES_VERSION, source: "trades.jsonl", mode, lifecycle, closedTrades: exits.length, realized: state.realized, decision: lifecycle.reviewDecision, proposals, autoApply: false };
       const audit = mode === "toss-paper" ? auditPaperSession(review, events, `${review.rulesVersion} · engine.ts / tossPaper.ts`) : undefined;
       const report = { ...review, audit };
       await writePaperReview(dir, report);

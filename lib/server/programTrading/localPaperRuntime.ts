@@ -4,7 +4,7 @@ import { isoToKstDate } from "@/lib/api/toss/kst";
 import type { ProgramTradingAction, TradingState } from "@/lib/types/programTrading/programTrading";
 import { emptyCandidateSnapshot, hasCandidates } from "@/lib/validation/programTrading/candidateGate";
 import { createCandidateRefresh } from "./candidateRefresh";
-import { command, initialState, paperStopDeadline, settleExpiredPaperStop } from "./engine";
+import { command, enforceObservationSafety, initialState, paperStopDeadline, settleExpiredPaperStop } from "./engine";
 import { logPaperMarket, withinMarketBudget } from "./marketBudget";
 import { openJournal } from "./journal";
 import { savePaperResult } from "./reviewHistory";
@@ -130,7 +130,7 @@ async function createRuntime() {
     if (priorDay) state.startBlockReason = "이전 운용을 종료한 뒤 새 모의 세션을 시작해 주세요.";
     else if (session.canStart) delete state.startBlockReason;
     else if (session.holiday) state.startBlockReason = "오늘은 국내 주식시장 휴장일이에요.";
-    else if (Number.isFinite(session.start)) state.startBlockReason = "국내 거래일 09:10~15:00 사이에 시작할 수 있어요.";
+    else if (Number.isFinite(session.start)) state.startBlockReason = "국내 거래일 09:10~14:30 미만에 시작할 수 있어요.";
     else state.startBlockReason = "토스 장 운영 시간을 확인하지 못했어요.";
     return session;
   }
@@ -151,24 +151,35 @@ async function createRuntime() {
     const now = Date.now();
     if (now - lastHeartbeat > 15_000) logPaperMarket("heartbeat-gap", { gapMs: now - lastHeartbeat });
     lastHeartbeat = now;
-    if (tickPending) return;
-    tickPending = true;
-    const observedRevision = revision;
-    const observedCommand = commandVersion;
-    const draft = structuredClone(state);
-    // No remote request holds the command queue. A newer command or candidate
-    // refresh invalidates the draft, including any late virtual fills.
-    void (async () => {
-      const session = await readCalendar();
-      updateSession(draft, session);
-      const changed = await stepTossPaper(draft, session);
-      await serial(async () => {
-        if (revision !== observedRevision || commandVersion !== observedCommand) return;
-        state = draft;
+    // The safety transition commits on live state even while a previous IO tick is
+    // pending or a candidate refresh invalidates its draft. Timer callbacks alone
+    // are not proof that quotes or engine state have advanced.
+    void serial(async () => {
+      if (enforceObservationSafety(state, now)) {
+        revision++;
+        state.updatedAt = new Date(now).toISOString();
+        logPaperMarket("observation-gap-stop", { lastStepAt: state.lastStepAt });
         scheduleStop();
-        if (changed) await persist();
-      });
-    })().catch(() => logPaperMarket("tick-failed")).finally(() => { tickPending = false; });
+        await persist();
+      }
+    }).then(() => {
+      if (tickPending) return;
+      tickPending = true;
+      const observedRevision = revision;
+      const observedCommand = commandVersion;
+      const draft = structuredClone(state);
+      void (async () => {
+        const session = await readCalendar();
+        updateSession(draft, session);
+        const changed = await stepTossPaper(draft, session);
+        await serial(async () => {
+          if (revision !== observedRevision || commandVersion !== observedCommand) return;
+          state = draft;
+          scheduleStop();
+          if (changed) await persist();
+        });
+      })().catch(() => logPaperMarket("tick-failed")).finally(() => { tickPending = false; });
+    }).catch(() => logPaperMarket("safety-check-failed"));
   }
 
   if (settleStop() || (state.lifecycle?.status === "completed" && process.env.PROGRAM_PAPER_RESULT_SYNC === "1")) await persist();
@@ -219,9 +230,9 @@ async function createRuntime() {
           if (state.lifecycle?.status === "completed" || state.lifecycle?.status === "stopping") {
             return { error: "종료했거나 종료 중인 세션은 시작할 수 없어요." };
           }
-          if (state.killed) return { error: "손실 제한에 도달해 이 세션을 다시 시작할 수 없어요." };
+          if (state.killed) return { error: "안전 제한에 도달해 이 세션을 다시 시작할 수 없어요." };
           if (state.startBlockReason) return { error: state.startBlockReason };
-          if (!hasCandidates(state.candidates)) return { error: "AI 단타의 실제 추천 종목을 조회하지 못했어요." };
+          if (!hasCandidates(state.candidates)) return { error: "거래량 상위에서 상승 중인 매매 후보를 확인하지 못했어요." };
         }
         if (action === "flatten") {
           state.quotes = [];
