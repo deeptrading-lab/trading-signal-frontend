@@ -2,260 +2,190 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "자동매매 · 종료와 정산",
+    "output": ".archify/program-rules/settlement.html",
+    "repository": {
+      "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
+      "revision": "8d17df78a5c736fa4360259034f9e234062100e6",
+      "link_mode": "local-only"
+    },
+    "title": "자동매매 · 마감과 원장 정산",
     "locale": "ko",
     "quality_profile": "showcase",
     "legend": {
       "entries": {
         "backend": {
-          "label": "실행·결과"
+          "label": "실행"
         },
         "security": {
           "label": "확인·대기"
-        },
-        "database": {
-          "label": "비용 가정"
         }
       }
-    },
-    "output": ".archify/program-rules/settlement.html",
-    "repository": {
-      "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "204fe237ffd4a94c8bac37130f94cfbe54ee6030",
-      "link_mode": "local-only"
     }
   },
   "lanes": [
     {
-      "id": "clean",
-      "label": "청산"
+      "id": "step1",
+      "label": "종료 요청"
     },
     {
-      "id": "settled",
-      "label": "종료 조건"
+      "id": "step2",
+      "label": "토스 현재가"
     },
     {
-      "id": "balance",
-      "label": "손익 확정"
+      "id": "step3",
+      "label": "가상 정산"
     },
     {
-      "id": "ledger",
-      "label": "기록"
+      "id": "step4",
+      "label": "종료 자산"
     },
     {
-      "id": "target",
-      "label": "목표 판단"
-    },
-    {
-      "id": "proposal",
-      "label": "미달 시 검토"
+      "id": "step5",
+      "label": "원장"
     }
   ],
   "nodes": [
     {
-      "id": "clean",
-      "lane": "clean",
+      "id": "step1",
+      "lane": "step1",
       "col": 0,
-      "label": "잔여 보유 가상 청산",
-      "sublabel": "최신 유효 시세 우선 · 종료 요청 후 30초",
       "type": "backend",
+      "icon": "active",
+      "label": "15:00 또는 사용자 종료",
+      "sublabel": "신규 매수 중단 · 진행 중 후보 응답 폐기",
+      "width": 240,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
-      ],
-      "icon": "active",
-      "width": 240
+      ]
     },
     {
-      "id": "settled",
-      "lane": "settled",
+      "id": "step2",
+      "lane": "step2",
       "col": 0,
-      "label": "모든 종료 조건을 충족했나요?",
-      "sublabel": "가상 보유 0",
       "type": "security",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
       "icon": "decision",
-      "width": 240
-    },
-    {
-      "id": "balance",
-      "lane": "balance",
-      "col": 0,
-      "label": "전·후 자산과 수익률 확정",
-      "sublabel": "실제 매매 성과와 가상 정산 한계 구분",
-      "type": "backend",
+      "label": "보유분 현재가 최종 조회",
+      "sublabel": "호출 가능할 때 1건으로 일괄 조회",
+      "width": 240,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
-      ],
-      "icon": "active",
-      "width": 240
+      ]
     },
     {
-      "id": "ledger",
-      "lane": "ledger",
-      "col": 0,
-      "label": "전체 가상 체결 원장 보존",
-      "sublabel": "진입근거·비용·청산사유·시세공백 기록",
-      "type": "backend",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "icon": "active",
-      "width": 240
-    },
-    {
-      "id": "target",
-      "lane": "target",
-      "col": 0,
-      "label": "목표 1% 이상인가요?",
-      "sublabel": "세션 시작 목표와 종료 결과 비교",
+      "id": "step2-alternate",
+      "lane": "step2",
+      "col": 1,
       "type": "security",
+      "icon": "decision",
+      "label": "실패·누락·제한",
+      "sublabel": "해당 종목의 마지막 유효 가격",
+      "width": 240,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
-      ],
-      "icon": "decision",
-      "width": 240
+      ]
     },
     {
-      "id": "proposal",
-      "lane": "proposal",
+      "id": "step3",
+      "lane": "step3",
       "col": 0,
-      "label": "원인·검증 가이드 생성",
-      "sublabel": "이번 수치는 미검증 가설 · 자동 코드 변경 없음",
       "type": "backend",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
       "icon": "active",
-      "width": 240
-    },
-    {
-      "id": "wait",
-      "lane": "settled",
-      "col": 1,
-      "label": "종료 대기",
-      "sublabel": "시세 없이 과거 가격을 현재 체결로 간주하지 않음",
-      "type": "security",
+      "label": "보유분 전량 가상 청산",
+      "sublabel": "조회 가격 체결과 마지막 기록가 정산을 구분",
+      "width": 240,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
-      ],
-      "tag": "기한 후 마지막 기록가로 정산",
-      "icon": "decision",
-      "width": 241.6
+      ]
     },
     {
-      "id": "costs",
-      "lane": "ledger",
-      "col": 1,
-      "label": "가상 체결 비용 가정",
-      "sublabel": "슬리피지 0.05% · 수수료 0.015% · 매도세 0.2%",
-      "type": "database",
-      "sources": [
-        {
-          "path": "docs/program-trading/rules.template.html",
-          "line": 1
-        }
-      ],
-      "tag": "가상 체결 시 반영",
-      "icon": "active",
-      "width": 240
-    },
-    {
-      "id": "keep",
-      "lane": "target",
-      "col": 1,
-      "label": "규칙 유지",
-      "sublabel": "목표 달성 · 보완 제안 없음",
+      "id": "step4",
+      "lane": "step4",
+      "col": 0,
       "type": "backend",
+      "icon": "active",
+      "label": "현금과 수익률 확정",
+      "sublabel": "원장에 체결 가격·수량·종료 사유 기록",
+      "width": 240,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
           "line": 1
         }
-      ],
+      ]
+    },
+    {
+      "id": "step5",
+      "lane": "step5",
+      "col": 0,
+      "type": "backend",
       "icon": "active",
-      "width": 240
+      "label": "종료한 세션 보관",
+      "sublabel": "새 세션 열기에서 기존 원장과 복기 보관",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
     }
   ],
   "edges": [
     {
-      "from": "clean",
-      "to": "settled",
+      "from": "step1",
+      "to": "step2",
       "fromSide": "bottom",
       "toSide": "top"
     },
     {
-      "from": "settled",
-      "to": "balance",
-      "label": "충족",
-      "fromSide": "bottom",
-      "toSide": "top"
-    },
-    {
-      "from": "balance",
-      "to": "ledger",
-      "fromSide": "bottom",
-      "toSide": "top"
-    },
-    {
-      "from": "ledger",
-      "to": "target",
-      "fromSide": "bottom",
-      "toSide": "top"
-    },
-    {
-      "from": "target",
-      "to": "proposal",
-      "label": "아니오",
-      "fromSide": "bottom",
-      "toSide": "top"
-    },
-    {
-      "from": "settled",
-      "to": "wait",
-      "label": "미충족",
+      "from": "step2",
+      "to": "step2-alternate",
       "role": "branch",
       "variant": "security"
     },
     {
-      "from": "ledger",
-      "to": "costs",
-      "label": "비용"
+      "from": "step2-alternate",
+      "to": "step3",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "right"
     },
     {
-      "from": "target",
-      "to": "keep",
-      "label": "예"
+      "from": "step2",
+      "to": "step3",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step3",
+      "to": "step4",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step4",
+      "to": "step5",
+      "fromSide": "bottom",
+      "toSide": "top"
     }
   ],
   "mainPath": [
-    "clean",
-    "settled",
-    "balance",
-    "ledger",
-    "target",
-    "proposal"
+    "step1",
+    "step2",
+    "step3",
+    "step4",
+    "step5"
   ]
 }

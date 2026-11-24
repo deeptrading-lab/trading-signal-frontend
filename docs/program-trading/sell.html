@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="generator" content="archify 3.2.0">
   <meta name="archify-reader-contract" content="declared-wide-v1">
-  <title>자동매매 · 매도 우선순위 다이어그램</title>
+  <title>자동매매 · 보유 종목 매도와 재탐색 다이어그램</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -5083,6 +5083,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       svg [data-node-id], svg [data-edge-from], svg [data-detail], svg [data-detail-anchor], svg [data-legend-hit], svg { transition: none !important; }
     }
   </style>
+<script type="application/json" id="archify-software-notices">"NOTICE\nArchify\nCopyright (c) 2026 tt-a1i (Archify)\nCopyright (c) 2025 Cocoon AI\n\nArchify is distributed under the Apache License, Version 2.0 (LICENSE),\nexcept where a file, package manifest, or third-party notice specifies otherwise.\nThe separately versioned DeepSeek Harness adapter remains MIT; its bundled\nSkill retains the license of the immutable source selected in release.json.\n\nCode and contributions received under the MIT License through pre-transition\ncommit 25cf37080fc8b1dbe758a4efc3935b55f3327083 remain available under their\noriginal terms. Previously published releases keep their existing licenses. The complete historical MIT\ncopyright and permission notice is preserved in LICENSE-MIT. This transition\ndoes not revoke existing MIT grants or assert a new patent grant on behalf\nof historical contributors.\n\nArchify originated from Cocoon-AI/architecture-diagram-generator:\nhttps://github.com/Cocoon-AI/architecture-diagram-generator\n\nThird-party components retain their own licenses; see THIRD_PARTY_NOTICES.md\nand the license files beside those components. Names and logos do not imply\nofficial endorsement, and the software license grants no general trademark\npermission.\n\nThese software licenses cover Archify's embedded runtime and templates, not\nownership of a user's authored content, business data, or source repository.\n\nLICENSE\n\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n\nLICENSE-MIT\nMIT License\n\nCopyright (c) 2026 tt-a1i (Archify)\nCopyright (c) 2025 Cocoon AI\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\nTHIRD_PARTY_NOTICES.md\n# Third-party notices\n\nArchify includes optional vector data for third-party brand marks. These marks\nare provided only to identify technologies and services in user-authored\ndiagrams. Their inclusion does not imply sponsorship, endorsement, partnership,\nor affiliation with Archify.\n\nArchify's license and historical MIT grants are described in LICENSE, NOTICE,\nand LICENSE-MIT. The software license does not\nreplace the copyright licenses, trademark policies, or brand guidelines that\napply to third-party marks. Users are responsible for confirming that their\nparticular use is permitted.\n\n## Simple Icons\n\nMost of the built-in vector paths and their metadata were generated from\n[Simple Icons 16.28.0](https://github.com/simple-icons/simple-icons/tree/16.28.0).\nSimple Icons makes its collection work available under\n[CC0 1.0 Universal](https://github.com/simple-icons/simple-icons/blob/16.28.0/LICENSE.md).\n\nAs Simple Icons explains in its\n[disclaimer](https://github.com/simple-icons/simple-icons/blob/16.28.0/DISCLAIMER.md),\nCC0 for the collection does not mean that every underlying icon is CC0. License\nand brand-guideline metadata may be incomplete or change over time. The absence\nof an individual license entry is not a grant of permission.\n\nArchify embeds the selected icons as vector-path data and may render them in a\nuser-selected color. The following individual licenses were recorded in the\npinned Simple Icons 16.28.0 metadata:\n\n| Mark | Recorded source | Recorded license | Archify treatment |\n|---|---|---|---|\n| Angular | [Angular press kit](https://angular.dev/press-kit) | [`CC-BY-4.0`](https://creativecommons.org/licenses/by/4.0/) | Embedded as vector-path data; color may be changed by the authored diagram. |\n| Apache Airflow | [Apache logos](https://apache.org/logos) | [`Apache-2.0`](https://www.apache.org/licenses/LICENSE-2.0) | Embedded as vector-path data; Apache trademarks remain subject to the [ASF trademark policy](https://www.apache.org/foundation/marks/). |\n| Apache Kafka | [Apache logos](https://apache.org/logos) | [`Apache-2.0`](https://www.apache.org/licenses/LICENSE-2.0) | Embedded as vector-path data; Apache trademarks remain subject to the [ASF trademark policy](https://www.apache.org/foundation/marks/). |\n| .NET | [.NET brand repository](https://github.com/dotnet/brand/blob/c7d0f51b8ec59531332d05fb27a5b758a7a3d689/logo/dotnet-logo.svg) | [`CC0-1.0`](https://creativecommons.org/publicdomain/zero/1.0/) | Embedded as vector-path data; color may be changed by the authored diagram. |\n| JavaScript | [JS community logo](https://github.com/voodootikigod/logo.js/blob/1544bdeed6d618a6cfe4f0650d04ab8d9cfa76d9/js.svg) | [`MIT`](https://github.com/voodootikigod/logo.js/blob/1544bdeed6d618a6cfe4f0650d04ab8d9cfa76d9/LICENSE) | Embedded as vector-path data; color may be changed by the authored diagram. |\n| Jenkins | [Jenkins artwork source](https://get.jenkins.io/art/) | [`CC-BY-SA-3.0`](https://creativecommons.org/licenses/by-sa/3.0/) | Embedded as vector-path data; color may be changed by the authored diagram. Jenkins retains its trademark rights. |\n| Rust | [Rust project](https://www.rust-lang.org) | [`CC-BY-SA-4.0`](https://creativecommons.org/licenses/by-sa/4.0/) | Embedded as vector-path data; color may be changed by the authored diagram. See the [Rust media guide](https://www.rust-lang.org/policies/media-guide). |\n| Vue.js | [Vue logo source](https://github.com/vuejs/art/blob/a1c78b74569b70a25300925b4eacfefcc143b8f6/logo.svg) | [`CC-BY-NC-SA-4.0`](https://creativecommons.org/licenses/by-nc-sa/4.0/) | Embedded as vector-path data; color may be changed by the authored diagram. The non-commercial and share-alike conditions remain applicable; see the [Vue artwork terms](https://github.com/vuejs/art/blob/a1c78b74569b70a25300925b4eacfefcc143b8f6/README.md). |\n\nThe source, guideline, and known license fields for every packaged mark are\npreserved in `renderers/shared/generated-brand-marks.mjs`.\n\n## OpenAI mark\n\nThe OpenAI vector path is recorded from the\n[OpenAI brand guidelines](https://openai.com/brand/), not from Simple Icons.\nUse remains subject to those current guidelines and any applicable trademark\nrights. Its inclusion does not state or imply endorsement by OpenAI.\n\n## JetBrains Mono\n\nDelivered Archify viewer artifacts embed the JetBrains Mono variable font\nsubsets served by Google Fonts. For characters covered by these subsets, font\nselection does not depend on a network request or a locally installed copy.\nUncovered characters (including CJK) still use the system fallback stack;\nbrowser and operating-system rasterization can differ.\nJetBrains Mono is maintained at\n[github.com/JetBrains/JetBrainsMono](https://github.com/JetBrains/JetBrainsMono)\nand is distributed under the SIL Open Font License 1.1. The complete license\ntext is preserved in `assets/JetBrainsMono-OFL.txt` in the packaged Skill and\nin the font CSS carried by standalone HTML and SVG exports.\n\n## Pele\n\nThe explainer renders Mermaid chart fences with an unmodified subset of\n[Pele 1.3.0](https://github.com/obsidianmd/pele), copyright (c) 2026 kepano,\ndistributed under the MIT License. The subset and its license text are in\n`explainer/vendor/pele/` in the packaged Skill. Charts are rendered to static\nSVG when a page is built; delivered pages contain no Pele code.\n\n## No additional rights granted\n\nBrand names, logos, and trademarks remain the property of their respective\nowners. This notice records provenance and known terms; it does not grant rights\nthat Archify does not hold, and it does not state that every packaged mark has\nbeen cleared for every commercial, promotional, or redistributive use."</script>
 </head>
 <body>
   <!-- Toolbar: theme, live visual style, trace motion, presentation stage, and export.
@@ -5193,17 +5194,17 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
            data-preset-badge-blueprint="블루프린트 / 개정 01"
            data-preset-badge-editorial="에디토리얼 / 현장 노트">
         <div class="pulse-dot"></div>
-        <h1>자동매매 · 매도 우선순위</h1>
+        <h1>자동매매 · 보유 종목 매도와 재탐색</h1>
       </div>
     </div>
 
-    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"git@github.com:deeptrading-lab/trading-signal-frontend","revision":"204fe237ffd4a94c8bac37130f94cfbe54ee6030","shortRevision":"204fe23","label":"deeptrading-lab/trading-signal-frontend","linkMode":"local-only"},"referenceCount":26,"nodes":{"orders":[{"path":"docs/program-trading/rules.template.html","line":1}],"unknown":[{"path":"docs/program-trading/rules.template.html","line":1}],"lock":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell0":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell0yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell1":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell1yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell2":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell2yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell3":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell3yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell4":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell4yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell5":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell5yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell6":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell6yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell7":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell7yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell8":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell8yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell9":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell9yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell10":[{"path":"docs/program-trading/rules.template.html","line":1}],"sell10yes":[{"path":"docs/program-trading/rules.template.html","line":1}],"hold":[{"path":"docs/program-trading/rules.template.html","line":1}]}}</script>
+    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"git@github.com:deeptrading-lab/trading-signal-frontend","revision":"8d17df78a5c736fa4360259034f9e234062100e6","shortRevision":"8d17df7","label":"deeptrading-lab/trading-signal-frontend","linkMode":"local-only"},"referenceCount":9,"nodes":{"step1":[{"path":"docs/program-trading/rules.template.html","line":1}],"step1-alternate":[{"path":"docs/program-trading/rules.template.html","line":1}],"step2":[{"path":"docs/program-trading/rules.template.html","line":1}],"step2-alternate":[{"path":"docs/program-trading/rules.template.html","line":1}],"step3":[{"path":"docs/program-trading/rules.template.html","line":1}],"step4":[{"path":"docs/program-trading/rules.template.html","line":1}],"step4-alternate":[{"path":"docs/program-trading/rules.template.html","line":1}],"step5":[{"path":"docs/program-trading/rules.template.html","line":1}],"step5-alternate":[{"path":"docs/program-trading/rules.template.html","line":1}]}}</script>
     <script id="archify-i18n-data" type="application/json">{"locale":"ko","messages":{"viewer.kind.frontend":"프런트엔드","viewer.kind.backend":"백엔드","viewer.kind.database":"데이터베이스","viewer.kind.cloud":"클라우드","viewer.kind.security":"보안","viewer.kind.messagebus":"메시지 버스","viewer.kind.external":"외부","viewer.kind.neutral":"중립","viewer.kind.node":"노드","viewer.kind.start":"시작","viewer.kind.active":"활성","viewer.kind.waiting":"대기","viewer.kind.decision":"판단","viewer.kind.success":"성공","viewer.kind.failure":"실패","viewer.toolbar.actions":"다이어그램 동작","viewer.theme.toggle.title":"테마 전환 (T)","viewer.theme.toggle":"색상 테마 전환","viewer.theme.dark":"다크","viewer.theme.light":"라이트","viewer.preset.choose.title":"시각 스타일 선택 (S로 순환)","viewer.preset.choose":"시각 스타일 선택","viewer.preset.style":"스타일","viewer.preset.menu":"시각 스타일","viewer.preset.identity":"시각적 정체성","viewer.preset.cycles":"S로 순환","viewer.preset.classic":"클래식","viewer.preset.classic.short":"클래식","viewer.preset.classic.hint":"안정적인 기술 기본 스타일","viewer.preset.flow":"시그널 플로우","viewer.preset.flow.short":"플로우","viewer.preset.flow.hint":"동적 흐름을 강조하는 프레젠테이션","viewer.preset.blueprint":"블루프린트","viewer.preset.blueprint.hint":"엔지니어링 리뷰용","viewer.preset.editorial":"에디토리얼","viewer.preset.editorial.hint":"발행 및 출시 노트에 적합","viewer.preset.badge.signalFlow":"시그널 플로우","viewer.preset.badge.blueprint":"블루프린트 / 개정 01","viewer.preset.badge.editorial":"에디토리얼 / 현장 노트","viewer.preset.badge.editorialPlate":"ARCHIFY / 도판 04","viewer.preset.current":"현재 시각 스타일: {style}. 시각 스타일 선택","viewer.motion.live":"동적","viewer.motion.still":"정적","viewer.motion.pause":"동작 일시정지","viewer.motion.resume":"동작 재개","viewer.motion.reduced":"동작 최소화 설정으로 인해 동작이 일시정지되었습니다","viewer.motion.hidden":"페이지가 보이지 않는 동안 동작이 일시정지되었습니다","viewer.motion.yielding":"동작 일시정지; 현재 {owner}에 양보 중","viewer.motion.yielding.title":"실시간 미리보기 활성화 · {owner}에 양보 중","viewer.owner.route":"경로 탐색","viewer.owner.lens":"시맨틱 렌즈","viewer.owner.relationship":"관계 미리보기","viewer.owner.intent":"의도 추적","viewer.owner.focus":"시맨틱 포커스","viewer.owner.legend":"범례 미리보기","viewer.owner.reader":"읽는 이의 상호작용","viewer.present.enter":"프레젠테이션 모드 진입","viewer.present.enter.title":"프레젠테이션 모드 (F)","viewer.present.exit":"프레젠테이션 모드 종료","viewer.present.exit.title":"프레젠테이션 모드 종료 (F 또는 Escape)","viewer.present.present":"프레젠테이션","viewer.present.exit.label":"종료","viewer.export.button":"내보내기","viewer.export.button.title":"다이어그램 내보내기 (E)","viewer.export.diagram":"다이어그램 내보내기","viewer.export.menu":"내보내기","viewer.export.subtitle":"가볍고 깔끔한 출력물","viewer.export.share":"공유","viewer.export.shareCard":"공유 카드","viewer.export.routeShareCard":"경로 공유 카드","viewer.export.reachShareCard":"도달범위 공유 카드","viewer.export.copyDiagram":"다이어그램 복사","viewer.export.clipboardPng":"PNG를 클립보드로","viewer.export.raster":"래스터 이미지","viewer.export.image":"이미지","viewer.export.lossless":"무손실 이미지","viewer.export.compact":"압축 이미지","viewer.export.modern":"최신 이미지 포맷","viewer.export.vectorMotion":"벡터 및 동작","viewer.export.vectorMotion.heading":"벡터 및 동작","viewer.export.editable":"편집 가능한 벡터","viewer.export.svg.auto":"SVG · 자동","viewer.export.svg.auto.hint":"호스트 테마에 맞춤","viewer.export.svg.light":"SVG · 라이트","viewer.export.svg.light.hint":"항상 라이트 테마","viewer.export.svg.dark":"SVG · 다크","viewer.export.svg.dark.hint":"항상 다크 테마","viewer.export.motion6s":"6초 동작","viewer.export.unsupported":"이 브라우저에서 지원하지 않습니다","viewer.export.clipboardUnsupported":"이 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다","viewer.export.clipboardUnsupported.short":"이 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다.","viewer.export.motionUnavailable":"이 브라우저에서는 동작을 캡처할 수 없습니다","viewer.export.webmUnavailable":"이 브라우저에서는 WebM을 사용할 수 없습니다","viewer.export.failed":"내보내기 실패: {message}","viewer.export.unknownVariant":"알 수 없는 공유 카드 유형: {variant}","viewer.export.routeRequired":"경로 공유 카드를 내보내려면 먼저 경로를 추적하세요","viewer.export.reachRequired":"도달범위 공유 카드를 내보내려면 먼저 편집된 도달범위를 추적하세요","viewer.export.unknown":"알 수 없음","viewer.export.routeFailed":"경로 공유 카드 내보내기 실패: {message}","viewer.export.reachFailed":"도달범위 공유 카드 내보내기 실패: {message}","viewer.export.copyFailed":"복사 실패: {message}","viewer.export.copiedPng":"PNG를 클립보드에 복사했습니다","viewer.export.downloadedRoute":"경로 공유 카드를 다운로드했습니다","viewer.export.downloadedReach":"도달범위 공유 카드를 다운로드했습니다","viewer.export.downloadedWebm":"WebM을 다운로드했습니다","viewer.export.recording":"6초 분량 동작을 녹화 중…","viewer.export.card.routeSummary.one":"경로: {source} → {target} · 방향성 홉 {count}개","viewer.export.card.routeSummary.other":"경로: {source} → {target} · 방향성 홉 {count}개","viewer.export.card.reachSummary":"{origin}에서 시작한 편집된 {direction} · {nodes} · {links} · 최대 {hops}","viewer.export.card.node.one":"노드 {count}개","viewer.export.card.node.other":"노드 {count}개","viewer.export.card.link.one":"연결 {count}개","viewer.export.card.link.other":"연결 {count}개","viewer.export.card.hop.one":"홉 {count}개","viewer.export.card.hop.other":"홉 {count}개","viewer.export.card.routeBadge":"ARCHIFY · 경로 · {hops}","viewer.export.card.reachBadge":"ARCHIFY · {direction} 도달범위","viewer.export.direction.upstream":"업스트림","viewer.export.direction.downstream":"다운스트림","viewer.export.error.canvasUnavailable":"{label}에 캔버스를 사용할 수 없습니다","viewer.export.error.contextUnavailable":"{label}에 2D 캔버스 컨텍스트를 만들 수 없습니다","viewer.export.error.toBlobUnavailable":"{label}에서 canvas.toBlob을 사용할 수 없습니다","viewer.export.error.toBlobNull":"{label}의 canvas.toBlob이 데이터를 반환하지 않았습니다","viewer.export.error.variantsCombined":"공유 카드 유형을 함께 조합할 수 없습니다","viewer.export.error.viewerState":"공유 카드 내보내기가 임시 뷰어 상태를 제거하지 못했습니다","viewer.export.error.routeState":"경로 카드 내보내기가 해석된 경로를 안전하게 보존하지 못했습니다","viewer.export.error.reachState":"도달범위 카드 내보내기가 편집된 도달범위를 안전하게 보존하지 못했습니다","viewer.export.error.webmRequirements":"WebM 동작 내보내기는 추적 애니메이션과 브라우저의 MediaRecorder 지원이 필요합니다","viewer.export.error.mediaRecorder":"MediaRecorder 실패","viewer.export.error.emptyWebm":"MediaRecorder가 빈 WebM을 생성했습니다","viewer.export.error.webmBackground":"WebM 내보내기용 SVG 배경을 불러오지 못했습니다","viewer.guide.title":"이 시스템 살펴보기","viewer.focus.selectedNodes":"선택한 노드 {count}개","viewer.guide.eyebrow":"다이어그램 가이드","viewer.guide.close":"다이어그램 가이드 닫기","viewer.guide.inspecting":"컴파일된 시맨틱 구조 검사 중","viewer.guide.actions":"다이어그램 탐색 동작","viewer.guide.find":"아무 노드나 찾기","viewer.guide.find.hint":"라벨, 역할, 유형, 고정 ID로 검색합니다.","viewer.guide.route":"경로 추적","viewer.guide.route.aria":"방향성 경로 추적","viewer.guide.route.hint":"두 시맨틱 노드가 편집된 방향으로 어떻게 연결되는지 확인합니다.","viewer.guide.map":"전체 시스템 보기","viewer.guide.map.hint":"실시간 뷰포트와 고정 노드가 있는 시맨틱 레이더를 엽니다.","viewer.guide.lens":"시맨틱 유형 비교","viewer.guide.lens.hint":"역할 수를 세고, 트래픽을 표시하고, 직접 편집된 연결을 비교합니다.","viewer.guide.present":"프레젠테이션 모드 진입","viewer.guide.present.hint":"내보내기는 그대로 두고 실시간 다이어그램에 뷰포트 전체를 할애합니다.","viewer.guide.shortcuts":"추가 키보드 단축키","viewer.guide.shortcut.export":"내보내기","viewer.guide.shortcut.theme":"테마","viewer.guide.shortcut.style":"스타일","viewer.guide.shortcut.reset":"초기화","viewer.guide.shortcut.zoomIn":"확대","viewer.guide.shortcut.zoomOut":"축소","viewer.guide.shortcut.close":"닫기","viewer.guide.credit":"Archify가 유용했다면 GitHub에 Star를 남겨 주세요","viewer.guide.star":"Star","viewer.guide.facts":"{nodes} · {relationships}","viewer.guide.fact.node.one":"시맨틱 노드 {count}개","viewer.guide.fact.node.other":"시맨틱 노드 {count}개","viewer.guide.fact.relationship.one":"관계 {count}개","viewer.guide.fact.relationship.other":"관계 {count}개","viewer.guide.open":"다이어그램 가이드 열기","viewer.finder.title":"노드 찾기","viewer.finder.close":"노드 찾기 닫기","viewer.finder.placeholder":"라벨 또는 ID로 검색","viewer.finder.search":"다이어그램 노드 검색","viewer.finder.results":"다이어그램 노드","viewer.finder.empty":"일치하는 노드가 없습니다","viewer.finder.result.focus":"{label} 포커스","viewer.finder.result.routeStart":"{label}을(를) 경로 시작점으로 선택","viewer.finder.result.routeTarget":"{label}을(를) 경로 도착점으로 선택, {links}","viewer.finder.status.empty":"일치하는 노드가 없습니다","viewer.finder.status.count.one":"일치하는 노드 {count}개","viewer.finder.status.count.other":"일치하는 노드 {count}개","viewer.finder.noun.nodes":"노드","viewer.finder.link.one":"연결 {count}개","viewer.finder.link.other":"연결 {count}개","viewer.finder.result.focus.one":"{label} 포커스, 관련 연결 {count}개","viewer.finder.result.focus.other":"{label} 포커스, 관련 연결 {count}개","viewer.finder.status.filtered":"{noun} {available}개 중 {visible}개","viewer.finder.status.all":"{noun} {available}개","viewer.passport.eyebrow":"시맨틱 패스포트","viewer.passport.metadata":"노드 메타데이터","viewer.passport.evidence":"검증된 소스 근거","viewer.passport.verified":"검증된 소스","viewer.passport.verificationScope":"고정된 리비전 기준 로컬 Git으로 검증했습니다. 원격 접근 권한은 확인하지 않았습니다.","viewer.passport.reach":"편집된 도달범위","viewer.passport.reach.trace":"편집된 도달가능성 추적","viewer.passport.upstream":"업스트림","viewer.passport.downstream":"다운스트림","viewer.passport.upstream.trace":"업스트림 편집 도달가능성 추적","viewer.passport.downstream.trace":"다운스트림 편집 도달가능성 추적","viewer.passport.close":"시맨틱 패스포트 닫기","viewer.passport.move":"의미 정보 패널 이동. 드래그하거나 화살표 키를 사용하고, Home 키로 초기화하세요.","viewer.passport.copy":"링크 복사","viewer.passport.copy.focus":"포커스된 노드의 링크 복사","viewer.passport.relations":"관계","viewer.passport.relations.show":"연결된 관계 표시","viewer.passport.relations.hide":"연결된 관계 숨기기","viewer.passport.relations.list":"연결된 관계","viewer.passport.copyRelation":"관계 복사","viewer.passport.copyNode":"노드 복사","viewer.passport.copyPinned":"고정된 관계의 링크 복사","viewer.passport.copySource":"소스 노드의 링크 복사","viewer.passport.copy.focused.success":"포커스된 노드 링크를 복사했습니다","viewer.passport.copy.pinned.success":"고정된 관계 링크를 복사했습니다","viewer.passport.copy.focused.failed":"포커스된 노드 링크를 복사할 수 없습니다","viewer.passport.copy.pinned.failed":"고정된 관계 링크를 복사할 수 없습니다","viewer.passport.relationship.none":"연결된 관계가 없습니다","viewer.passport.relationship.count.one":"관계 {count}개","viewer.passport.relationship.count.other":"관계 {count}개","viewer.passport.relationship.show.one":"연결된 관계 {count}개 표시","viewer.passport.relationship.show.other":"연결된 관계 {count}개 표시","viewer.passport.relationship.summary":"출향 {out}개 · 입향 {in}개{loops}","viewer.passport.relationship.loops":" · 자기순환 {count}개","viewer.passport.relationship.explorer":"직접 관계 탐색기","viewer.passport.relationship.help":"방향키로 관계를 탐색하세요. Enter 또는 Space로 상세정보를 고정하고, Escape로 지웁니다.","viewer.passport.relationship.loopsBack":"되돌아옴","viewer.passport.relationship.connectsTo":"연결 대상","viewer.passport.relationship.connectsFrom":"연결 출처","viewer.passport.relationship.pinned":"고정된 관계 · {from} → {to} · {label}","viewer.passport.relationship.inspect":"{total}개 중 {index}번 관계 검사: {from}에서 {to}로, {label}. Enter로 상세정보 확인.","viewer.passport.relationship.group.out":"출향","viewer.passport.relationship.group.in":"입향","viewer.passport.relationship.group.loop":"자기순환","viewer.passport.relationship.row":"{group}: {relationship}, {neighbor}","viewer.passport.relationship.direction.out":"출 →","viewer.passport.relationship.direction.in":"← 입","viewer.passport.relationship.direction.loop":"순환","viewer.passport.sourceCount.one":"검증된 소스 참조 {count}개","viewer.passport.sourceCount.other":"검증된 소스 참조 {count}개","viewer.passport.repository.open":"검증된 저장소 리비전 {revision} 열기","viewer.passport.source.open":"리비전 {revision}의 검증된 소스 {path} 열기","viewer.passport.source.openLink":"열기 ↗","viewer.passport.reach.upstream.one":"업스트림 편집 노드 {count}개 추적","viewer.passport.reach.upstream.other":"업스트림 편집 노드 {count}개 추적","viewer.passport.reach.downstream.one":"다운스트림 편집 노드 {count}개 추적","viewer.passport.reach.downstream.other":"다운스트림 편집 노드 {count}개 추적","viewer.passport.reach.noUpstream":"업스트림 편집 노드가 없습니다","viewer.passport.reach.noDownstream":"다운스트림 편집 노드가 없습니다","viewer.passport.reach.status":"{direction} · 노드 {nodes}개 · 연결 {links}개 · 최대 {hops}홉","viewer.route.eyebrow":"경로 탐색","viewer.route.start":"시작 노드 선택","viewer.route.start.find":"시작점 찾기","viewer.route.start.find.aria":"경로 시작점 찾기","viewer.route.copy":"링크 복사","viewer.route.copy.aria":"추적된 경로의 링크 복사","viewer.route.clear":"지우기","viewer.route.clear.aria":"경로 탐색 지우기","viewer.route.traced":"추적된 경로","viewer.route.pickTwo":"다이어그램에서 시맨틱 노드 두 개를 선택하세요","viewer.route.pickOne":"다이어그램에서 시맨틱 노드 하나를 선택하세요","viewer.route.controls":"경로 이동 제어","viewer.route.previous":"이전 경로 위치","viewer.route.play":"경로 이동 재생","viewer.route.pause":"경로 이동 일시정지","viewer.route.replay":"경로 이동 다시 재생","viewer.route.next":"다음 경로 위치","viewer.route.journey":"이동 경로","viewer.route.pause.label":"일시정지","viewer.route.replay.label":"다시 재생","viewer.route.overview":"개요","viewer.route.overview.aria":"전체 경로 개요 표시","viewer.route.instructions":"출발지를 먼저 선택한 뒤 도착지를 선택하세요. 방향이 중요합니다.","viewer.route.destination":"{label}에서 출발할 도착지 선택","viewer.route.destination.find":"도착지 찾기","viewer.route.destination.find.aria":"도달 가능한 경로 도착지 찾기","viewer.route.differentDestination":"다른 도착지 선택","viewer.route.distinct":"경로에는 서로 다른 시맨틱 노드 두 개가 필요합니다.","viewer.route.unreachable":"{label}(으)로 가는 방향성 경로가 없습니다","viewer.route.unreachable.detail":"{source}에서 {target}에 도달할 수 없습니다. 강조 표시된 도착지를 선택하세요.","viewer.route.start.instructions":"출발지를 선택하세요. 다음 단계에서는 방향성으로 도달 가능한 도착지만 표시됩니다.","viewer.route.copy.success":"추적된 경로 링크를 복사했습니다","viewer.route.copy.failed":"경로 링크를 복사할 수 없습니다","viewer.route.position":"경로 위치 {total}개 중 {index}번: {label}","viewer.route.step":"{total}단계 중 {index}단계 · {phase} · {label}","viewer.route.motionRequired":"자동 이동에는 동적 모드가 필요합니다","viewer.route.trigger.clear":"추적된 경로 지우기","viewer.route.overview.status":"{nodes} · {hops} · 최단 편집 경로","viewer.route.overview.node.one":"노드 {count}개","viewer.route.overview.node.other":"노드 {count}개","viewer.route.overview.hop.one":"방향성 홉 {count}개","viewer.route.overview.hop.other":"방향성 홉 {count}개","viewer.route.phase.playing":"재생 중","viewer.route.phase.complete":"완료됨","viewer.route.phase.inspecting":"검사 중","viewer.route.destination.count.one":"방향성 도착지 {count}개 사용 가능. 강조 표시된 노드를 선택하세요.","viewer.route.destination.count.other":"방향성 도착지 {count}개 사용 가능. 강조 표시된 노드를 선택하세요.","viewer.route.noOutgoing":"여기서 시작하는 출향 경로가 없습니다. 지우고 다른 출발지를 선택하세요.","viewer.route.result.title":"{source}에서 {target}까지","viewer.route.finder.source.title":"경로 시작점 선택","viewer.route.finder.source.placeholder":"경로 출발지 검색","viewer.route.finder.source.empty":"일치하는 경로 출발지가 없습니다","viewer.route.finder.source.results":"경로를 시작할 수 있는 노드","viewer.route.finder.source.noun":"경로 출발지","viewer.route.finder.source.badge":"시작","viewer.route.finder.target.title":"{label}에서 출발할 도착지","viewer.route.finder.target.placeholder":"도달 가능한 도착지 검색","viewer.route.finder.target.empty":"일치하는 도달 가능한 도착지가 없습니다","viewer.route.finder.target.results":"도달 가능한 경로 도착지","viewer.route.finder.target.noun":"도달 가능한 도착지","viewer.route.hop.one":"홉 {count}개","viewer.route.hop.other":"홉 {count}개","viewer.lens.eyebrow":"시맨틱 렌즈","viewer.lens.title":"시스템 역할 비교","viewer.lens.close":"시맨틱 렌즈 닫기","viewer.lens.instruction":"시맨틱 유형을 최대 두 개까지 선택하세요. 하나를 선택하면 실제 트래픽을 표시하고, 두 개를 선택하면 직접 편집된 관계만 비교합니다.","viewer.lens.kinds":"시맨틱 유형","viewer.lens.choose":"유형을 선택해 해당 노드와 연결된 관계를 확인하세요.","viewer.lens.copy":"시맨틱 렌즈 링크 복사","viewer.lens.clear":"시맨틱 렌즈 지우기","viewer.lens.open":"시맨틱 렌즈 열기","viewer.lens.openActive":"활성 시맨틱 렌즈 열기","viewer.lens.legend":"시맨틱 범례","viewer.lens.legend.inspect.one":"{label} 검사, 노드 {count}개","viewer.lens.legend.inspect.other":"{label} 검사, 노드 {count}개","viewer.lens.kind.count.one":"{label}, 노드 {count}개","viewer.lens.kind.count.other":"{label}, 노드 {count}개","viewer.lens.compare.one":"{first} → {second}: {forward} · {second} → {first}: {reverse} · 직접 관계 {count}개","viewer.lens.compare.other":"{first} → {second}: {forward} · {second} → {first}: {reverse} · 직접 관계 {count}개","viewer.lens.single":"{nodes} · {relationships} · 연결된 주변 노드는 계속 표시됩니다","viewer.lens.node.one":"{label} 노드 {count}개","viewer.lens.node.other":"{label} 노드 {count}개","viewer.lens.relationship.one":"연결된 관계 {count}개","viewer.lens.relationship.other":"연결된 관계 {count}개","viewer.radar.title":"시맨틱 레이더","viewer.radar.building":"개요 구성 중","viewer.radar.openFull":"전체 시맨틱 레이더 열기","viewer.radar.open":"레이더 열기","viewer.radar.close":"시맨틱 레이더 닫기","viewer.radar.surface":"다이어그램 개요입니다. 노드를 클릭해 포커스하거나 방향키로 이동하세요.","viewer.radar.click":"노드 클릭","viewer.radar.drag":"드래그로 이동","viewer.radar.space":"시맨틱 레이더를 표시하려면 지도 공간이 더 필요합니다.","viewer.radar.nodes":"시맨틱 다이어그램 레이더 노드","viewer.radar.focus":"시맨틱 레이더에서 {label} 포커스","viewer.radar.status":"노드 {count}개 · {viewport}","viewer.radar.fullMap":"노드 {count}개 · 전체 지도","viewer.radar.compacted":"시맨틱 패스포트나 지도 컨트롤을 가리지 않도록 레이더를 축소했습니다.","viewer.radar.cancelWaiting":"지도 공간 확보를 기다리는 시맨틱 레이더 취소","viewer.radar.needsSpace":"시맨틱 레이더를 표시하려면 지도 공간이 더 필요합니다","viewer.radar.viewport.full":"전체 지도","viewer.radar.viewport.width":"너비 {percent}%","viewer.radar.viewport.scale":"뷰포트 {percent}%","viewer.nav.controls":"다이어그램 보기 제어","viewer.nav.route":"방향성 경로 추적","viewer.nav.route.title":"경로 추적 (R)","viewer.nav.route.short":"경로","viewer.nav.radar":"시맨틱 레이더 열기","viewer.nav.radar.title":"시맨틱 레이더 (M)","viewer.nav.radar.short":"지도","viewer.nav.lens":"시맨틱 렌즈 열기","viewer.nav.lens.title":"시맨틱 렌즈 (L)","viewer.nav.lens.short":"렌즈","viewer.nav.find":"노드 찾기","viewer.nav.find.title":"노드 찾기 (/)","viewer.outline.title":"노드 목록","viewer.rail.show":"설명 및 목록","viewer.rail.controls":"측면 패널","viewer.rail.collapse":"측면 패널 접기","viewer.rail.bottom":"패널을 다이어그램 아래로 이동","viewer.rail.right":"패널을 다이어그램 옆으로 이동","viewer.nav.guide":"다이어그램 가이드 열기","viewer.nav.guide.title":"다이어그램 가이드 (?)","viewer.nav.zoomOut":"축소","viewer.nav.zoomOut.title":"축소 (-)","viewer.nav.reset":"다이어그램 보기 초기화","viewer.nav.reset.title":"보기 초기화 (0)","viewer.nav.read":"읽기","viewer.nav.zoomIn":"확대","viewer.nav.zoomIn.title":"확대 (+)","viewer.nav.camera":"{hint}. 다이어그램 보기 초기화","viewer.nav.camera.title":"{semantic}{hint} · 보기 초기화 (0)","viewer.nav.camera.semantic":"시맨틱 카메라 활성 · ","viewer.nav.level.map":"개요","viewer.nav.level.read":"읽기","viewer.nav.level.full":"전체","viewer.nav.level.auto":"자동","viewer.nav.detail.map":"확대하면 관계 라벨과 노드 컨텍스트가 표시됩니다","viewer.nav.detail.read":"다시 확대하면 태그와 주석이 표시됩니다","viewer.nav.detail.full":"다이어그램 전체 상세정보","viewer.intent.summary":"{label}. 출향 {out}개, 입향 {in}개{loops}. 연결 총 {total}개. Enter로 상세정보 확인.","viewer.intent.loops":", 자기순환 {count}개","viewer.common.copied":"복사됨","viewer.common.copyFailed":"복사 실패","viewer.common.copyLink":"링크 복사","viewer.common.clear":"지우기","viewer.common.close":"닫기"}}</script>
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / 도판 04">
-      <svg viewBox="0 0 1084 1920" data-reader-fit="width-first" data-layout-contract="readable-v2" role="img" lang="ko" aria-labelledby="archify-diagram-title archify-diagram-description" data-animation="trace" data-preset="classic" data-quality-profile="showcase" data-node-ui="">
-        <title id="archify-diagram-title">자동매매 · 매도 우선순위</title>
+      <svg viewBox="0 0 994 776" data-reader-fit="width-first" data-layout-contract="readable-v2" role="img" lang="ko" aria-labelledby="archify-diagram-title archify-diagram-description" data-animation="trace" data-preset="classic" data-quality-profile="showcase" data-node-ui="">
+        <title id="archify-diagram-title">자동매매 · 보유 종목 매도와 재탐색</title>
         <desc id="archify-diagram-description">Archify로 생성한 워크플로우 다이어그램입니다.</desc>
         <!-- Definitions -->
         <defs>
@@ -5249,47 +5250,20 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Swimlanes -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-0" x="40" y="52" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="74" class="t-muted" font-size="10" font-weight="600">01 / 보유 시세 확인</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-0" x="40" y="52" width="938" height="104" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="74" class="t-muted" font-size="10" font-weight="600">01 / 토스 현재가</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-1" x="40" y="178" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="200" class="t-muted" font-size="10" font-weight="600">02 / 시세 유효성</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-1" x="40" y="176" width="938" height="104" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="198" class="t-muted" font-size="10" font-weight="600">02 / 종목 손익</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="304" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="326" class="t-muted" font-size="10" font-weight="600">03 / 우선순위 1</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="300" width="938" height="104" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="322" class="t-muted" font-size="10" font-weight="600">03 / 가상 매도</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-3" x="40" y="430" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="452" class="t-muted" font-size="10" font-weight="600">04 / 우선순위 2</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-3" x="40" y="424" width="938" height="104" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="446" class="t-muted" font-size="10" font-weight="600">04 / 남은 보유</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-4" x="40" y="556" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="578" class="t-muted" font-size="10" font-weight="600">05 / 우선순위 3</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-5" x="40" y="682" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="704" class="t-muted" font-size="10" font-weight="600">06 / 우선순위 4</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-6" x="40" y="808" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="830" class="t-muted" font-size="10" font-weight="600">07 / 우선순위 5</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-7" x="40" y="934" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="956" class="t-muted" font-size="10" font-weight="600">08 / 우선순위 6</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-8" x="40" y="1060" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="1082" class="t-muted" font-size="10" font-weight="600">09 / 우선순위 7</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-9" x="40" y="1186" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="1208" class="t-muted" font-size="10" font-weight="600">10 / 우선순위 8</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-10" x="40" y="1312" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="1334" class="t-muted" font-size="10" font-weight="600">11 / 우선순위 9</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-11" x="40" y="1438" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="1460" class="t-muted" font-size="10" font-weight="600">12 / 우선순위 10</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-12" x="40" y="1564" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="1586" class="t-muted" font-size="10" font-weight="600">13 / 우선순위 11</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-13" x="40" y="1690" width="1028" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="1712" class="t-muted" font-size="10" font-weight="600">14 / 조건 미해당</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-4" x="40" y="548" width="938" height="104" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="570" class="t-muted" font-size="10" font-weight="600">05 / 세션 손익</text>
 
         <!-- Phase headers -->
 
@@ -5298,440 +5272,135 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 
         <!-- Edge paths -->
-        <path data-edge-from="orders" data-edge-to="unknown" data-edge-key="0" data-edge-role="" data-composition-points="209.6,154;209.6,220" d="M 209.6 154 L 209.6 220" class="a-default" data-animate="edge" style="--step:0" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell0" data-edge-to="sell0yes" data-edge-label="해당" data-edge-key="1" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="329.6,372;409.20000000000005,372" d="M 329.6 372 L 409.20000000000005 372" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell0" data-edge-to="sell1" data-edge-label="해당 없음" data-edge-key="2" data-edge-role="" data-composition-points="209.6,398;209.6,472" d="M 209.6 398 L 209.6 472" class="a-default" data-animate="edge" style="--step:2" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell1" data-edge-to="sell1yes" data-edge-label="해당" data-edge-key="3" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="330.4,498;409.20000000000005,498" d="M 330.4 498 L 409.20000000000005 498" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell1" data-edge-to="sell2" data-edge-label="해당 없음" data-edge-key="4" data-edge-role="" data-composition-points="209.6,524;209.6,598" d="M 209.6 524 L 209.6 598" class="a-default" data-animate="edge" style="--step:3" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell10" data-edge-to="hold" data-edge-label="해당 없음" data-edge-key="5" data-edge-role="" data-composition-points="209.6,1658;209.6,1732" d="M 209.6 1658 L 209.6 1732" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell10" data-edge-to="sell10yes" data-edge-label="해당" data-edge-key="6" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="342.4,1632;409.20000000000005,1632" d="M 342.4 1632 L 409.20000000000005 1632" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell2" data-edge-to="sell2yes" data-edge-label="해당" data-edge-key="7" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="337.6,624;409.20000000000005,624" d="M 337.6 624 L 409.20000000000005 624" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell2" data-edge-to="sell3" data-edge-label="해당 없음" data-edge-key="8" data-edge-role="" data-composition-points="209.6,650;209.6,724" d="M 209.6 650 L 209.6 724" class="a-default" data-animate="edge" style="--step:4" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell3" data-edge-to="sell3yes" data-edge-label="해당" data-edge-key="9" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="364,750;409.20000000000005,750" d="M 364 750 L 409.20000000000005 750" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell3" data-edge-to="sell4" data-edge-label="해당 없음" data-edge-key="10" data-edge-role="" data-composition-points="209.6,776;209.6,850" d="M 209.6 776 L 209.6 850" class="a-default" data-animate="edge" style="--step:5" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell4" data-edge-to="sell4yes" data-edge-label="해당" data-edge-key="11" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="329.6,876;409.20000000000005,876" d="M 329.6 876 L 409.20000000000005 876" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell4" data-edge-to="sell5" data-edge-label="해당 없음" data-edge-key="12" data-edge-role="" data-composition-points="209.6,902;209.6,976" d="M 209.6 902 L 209.6 976" class="a-default" data-animate="edge" style="--step:6" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell5" data-edge-to="sell5yes" data-edge-label="해당" data-edge-key="13" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="361.35,1002;409.20000000000005,1002" d="M 361.35 1002 L 409.20000000000005 1002" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell5" data-edge-to="sell6" data-edge-label="해당 없음" data-edge-key="14" data-edge-role="" data-composition-points="209.6,1028;209.6,1102" d="M 209.6 1028 L 209.6 1102" class="a-default" data-animate="edge" style="--step:7" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell6" data-edge-to="sell6yes" data-edge-label="해당" data-edge-key="15" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="338.6,1128;409.20000000000005,1128" d="M 338.6 1128 L 409.20000000000005 1128" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell6" data-edge-to="sell7" data-edge-label="해당 없음" data-edge-key="16" data-edge-role="" data-composition-points="209.6,1154;209.6,1228" d="M 209.6 1154 L 209.6 1228" class="a-default" data-animate="edge" style="--step:8" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell7" data-edge-to="sell7yes" data-edge-label="해당" data-edge-key="17" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="371.2,1254;409.20000000000005,1254" d="M 371.2 1254 L 409.20000000000005 1254" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell7" data-edge-to="sell8" data-edge-label="해당 없음" data-edge-key="18" data-edge-role="" data-composition-points="209.6,1280;209.6,1354" d="M 209.6 1280 L 209.6 1354" class="a-default" data-animate="edge" style="--step:9" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell8" data-edge-to="sell8yes" data-edge-label="해당" data-edge-key="19" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="329.6,1380;409.20000000000005,1380" d="M 329.6 1380 L 409.20000000000005 1380" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell8" data-edge-to="sell9" data-edge-label="해당 없음" data-edge-key="20" data-edge-role="" data-composition-points="209.6,1406;209.6,1480" d="M 209.6 1406 L 209.6 1480" class="a-default" data-animate="edge" style="--step:10" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell9" data-edge-to="sell10" data-edge-label="해당 없음" data-edge-key="21" data-edge-role="" data-composition-points="209.6,1532;209.6,1606" d="M 209.6 1532 L 209.6 1606" class="a-default" data-animate="edge" style="--step:11" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sell9" data-edge-to="sell9yes" data-edge-label="해당" data-edge-key="22" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="332.1,1506;409.20000000000005,1506" d="M 332.1 1506 L 409.20000000000005 1506" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="unknown" data-edge-to="lock" data-edge-label="미충족" data-edge-key="23" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="329.6,246;409.20000000000005,246" d="M 329.6 246 L 409.20000000000005 246" class="a-security" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="unknown" data-edge-to="sell0" data-edge-label="확인" data-edge-key="24" data-edge-role="" data-composition-points="209.6,272;209.6,346" d="M 209.6 272 L 209.6 346" class="a-default" data-animate="edge" style="--step:1" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="step1" data-edge-to="step1-alternate" data-edge-key="0" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="288,119;320,119" d="M 288 119 L 320 119" class="a-security" data-animate="edge" style="--step:5" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="step1" data-edge-to="step2" data-edge-key="1" data-edge-role="" data-composition-points="168,145;168,217" d="M 168 145 L 168 217" class="a-default" data-animate="edge" style="--step:0" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="step2" data-edge-to="step2-alternate" data-edge-key="2" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="288,243;320,243" d="M 288 243 L 320 243" class="a-security" data-animate="edge" style="--step:7" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="step2" data-edge-to="step3" data-edge-key="3" data-edge-role="" data-composition-points="168,269;168,341" d="M 168 269 L 168 341" class="a-default" data-animate="edge" style="--step:1" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="step3" data-edge-to="step4" data-edge-key="4" data-edge-role="" data-composition-points="168,393;168,465" d="M 168 393 L 168 465" class="a-default" data-animate="edge" style="--step:2" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="step4" data-edge-to="step4-alternate" data-edge-key="5" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="288,491;320,491" d="M 288 491 L 320 491" class="a-security" data-animate="edge" style="--step:10" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="step4" data-edge-to="step5" data-edge-key="6" data-edge-role="" data-composition-points="168,517;168,589" d="M 168 517 L 168 589" class="a-default" data-animate="edge" style="--step:3" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="step5" data-edge-to="step5-alternate" data-edge-key="7" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="288,615;320,615" d="M 288 615 L 320 615" class="a-security" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
 
         <!-- Nodes -->
-        <g id="node-orders" data-node-id="orders" data-node-label="보유 종목부터 시세 점검" tabindex="0" role="button" aria-label="보유 종목부터 시세 점검 포커스, 토스 최근 체결과 호가 확인, 보유 시세 확인" aria-pressed="false" data-node-kind="backend" data-node-sublabel="토스 최근 체결과 호가 확인" data-node-tag="시세 유효 여부 확인" data-node-context="보유 시세 확인">
-          <title>보유 종목부터 시세 점검 · 토스 최근 체결과 호가 확인 · 보유 시세 확인 · 시세 유효 여부 확인</title>
-          <rect x="89.6" y="86" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="89.6" y="86" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:0" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(95.6 92) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="107" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">보유 종목부터 시세 점검</text>
-          <text data-detail="context" x="209.6" y="124" class="t-muted" font-size="8" text-anchor="middle">토스 최근 체결과 호가 확인</text>
-        <text data-detail="fine" x="209.6" y="142" class="t-backend" font-size="7" text-anchor="middle">시세 유효 여부 확인</text>
-        </g>
-
-        <g id="node-unknown" data-node-id="unknown" data-node-label="가상 매도에 유효한 시세인가요?" tabindex="0" role="button" aria-label="가상 매도에 유효한 시세인가요? 포커스, 정규장 · 5초 이내 체결과 호가, 시세 유효성" aria-pressed="false" data-node-kind="security" data-node-sublabel="정규장 · 5초 이내 체결과 호가" data-node-context="시세 유효성">
-          <title>가상 매도에 유효한 시세인가요? · 정규장 · 5초 이내 체결과 호가 · 시세 유효성</title>
-          <rect x="89.6" y="220" width="240" height="52" rx="8" class="c-mask"/>
-          <rect x="89.6" y="220" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:1" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(95.6 226) scale(0.6875)">
+        <g id="node-step1" data-node-id="step1" data-node-label="보유 종목은 5분마다 현재가 확인" tabindex="0" role="button" aria-label="보유 종목은 5분마다 현재가 확인 포커스, 토스 보유 종목 전체를 한 번에 조회, 토스 현재가" aria-pressed="false" data-node-kind="security" data-node-sublabel="토스 보유 종목 전체를 한 번에 조회" data-node-context="토스 현재가">
+          <title>보유 종목은 5분마다 현재가 확인 · 토스 보유 종목 전체를 한 번에 조회 · 토스 현재가</title>
+          <rect x="48" y="93" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="48" y="93" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:0" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(54 99) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="252" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">가상 매도에 유효한 시세인가요?</text>
-          <text data-detail="context" x="209.6" y="264.3" class="t-muted" font-size="8" text-anchor="middle">정규장 · 5초 이내 체결과 호가</text>
+          <text data-node-label="" data-detail-anchor="" x="168" y="125" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">보유 종목은 5분마다 현재가 확인</text>
+          <text data-detail="context" x="168" y="137.3" class="t-muted" font-size="8" text-anchor="middle">토스 보유 종목 전체를 한 번에 조회</text>
         </g>
 
-        <g id="node-lock" data-node-id="lock" data-node-label="가상 청산 대기" tabindex="0" role="button" aria-label="가상 청산 대기 포커스, 공백 안전 종료·30초 정산 기한은 별도로 진행, 시세 유효성" aria-pressed="false" data-node-kind="security" data-node-sublabel="공백 안전 종료·30초 정산 기한은 별도로 진행" data-node-context="시세 유효성">
-          <title>가상 청산 대기 · 공백 안전 종료·30초 정산 기한은 별도로 진행 · 시세 유효성</title>
-          <rect x="409.20000000000005" y="220" width="240" height="52" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="220" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(415.20000000000005 226) scale(0.6875)">
+        <g id="node-step1-alternate" data-node-id="step1-alternate" data-node-label="429·가격 누락" tabindex="0" role="button" aria-label="429·가격 누락 포커스, 해당 종목 보유 · 다음 조회 대기, 토스 현재가" aria-pressed="false" data-node-kind="security" data-node-sublabel="해당 종목 보유 · 다음 조회 대기" data-node-context="토스 현재가">
+          <title>429·가격 누락 · 해당 종목 보유 · 다음 조회 대기 · 토스 현재가</title>
+          <rect x="320" y="93" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="320" y="93" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:6" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(326 99) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="241" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">가상 청산 대기</text>
-          <text data-detail="context" x="529.2" y="258" class="t-muted" font-size="8" text-anchor="middle">공백 안전 종료·30초 정산 기한은 별도로 진행</text>
+          <text data-node-label="" data-detail-anchor="" x="440" y="114" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">429·가격 누락</text>
+          <text data-detail="context" x="440" y="131" class="t-muted" font-size="8" text-anchor="middle">해당 종목 보유 · 다음 조회 대기</text>
         </g>
 
-        <g id="node-sell0" data-node-id="sell0" data-node-label="① 종료 처리 중인가?" tabindex="0" role="button" aria-label="① 종료 처리 중인가? 포커스, 기록된 종료 사유로 청산 · 신규 매수 금지, 우선순위 1" aria-pressed="false" data-node-kind="security" data-node-sublabel="기록된 종료 사유로 청산 · 신규 매수 금지" data-node-context="우선순위 1">
-          <title>① 종료 처리 중인가? · 기록된 종료 사유로 청산 · 신규 매수 금지 · 우선순위 1</title>
-          <rect x="89.6" y="346" width="240" height="52" rx="8" class="c-mask"/>
-          <rect x="89.6" y="346" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:2" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(95.6 352) scale(0.6875)">
+        <g id="node-step2" data-node-id="step2" data-node-label="매수가 대비 손익 확인" tabindex="0" role="button" aria-label="매수가 대비 손익 확인 포커스, +2% 이상 익절 · −1% 이하 손절, 종목 손익" aria-pressed="false" data-node-kind="security" data-node-sublabel="+2% 이상 익절 · −1% 이하 손절" data-node-context="종목 손익">
+          <title>매수가 대비 손익 확인 · +2% 이상 익절 · −1% 이하 손절 · 종목 손익</title>
+          <rect x="48" y="217" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="48" y="217" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:1" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(54 223) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="367" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">① 종료 처리 중인가?</text>
-          <text data-detail="context" x="209.6" y="384" class="t-muted" font-size="8" text-anchor="middle">기록된 종료 사유로 청산 · 신규 매수 금지</text>
+          <text data-node-label="" data-detail-anchor="" x="168" y="238" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">매수가 대비 손익 확인</text>
+          <text data-detail="context" x="168" y="255" class="t-muted" font-size="8" text-anchor="middle">+2% 이상 익절 · −1% 이하 손절</text>
         </g>
 
-        <g id="node-sell0yes" data-node-id="sell0yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 1" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 1">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 1 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="338" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="338" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 344) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="372.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="387.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="399.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell1" data-node-id="sell1" data-node-label="② 시세·엔진 공백 ≥30초인가?" tabindex="0" role="button" aria-label="② 시세·엔진 공백 ≥30초인가? 포커스, data-gap · 세션 종료 · 복구 후 보유 청산 우선, 우선순위 2" aria-pressed="false" data-node-kind="security" data-node-sublabel="data-gap · 세션 종료 · 복구 후 보유 청산 우선" data-node-context="우선순위 2">
-          <title>② 시세·엔진 공백 ≥30초인가? · data-gap · 세션 종료 · 복구 후 보유 청산 우선 · 우선순위 2</title>
-          <rect x="88.8" y="472" width="241.6" height="52" rx="8" class="c-mask"/>
-          <rect x="88.8" y="472" width="241.6" height="52" rx="8" class="c-security" data-animate="node" style="--step:3" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(94.8 478) scale(0.6875)">
+        <g id="node-step2-alternate" data-node-id="step2-alternate" data-node-label="범위 안이면 해당 종목 보유" tabindex="0" role="button" aria-label="범위 안이면 해당 종목 보유 포커스, 다음 조회 대기, 종목 손익" aria-pressed="false" data-node-kind="security" data-node-sublabel="다음 조회 대기" data-node-context="종목 손익">
+          <title>범위 안이면 해당 종목 보유 · 다음 조회 대기 · 종목 손익</title>
+          <rect x="320" y="217" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="320" y="217" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:8" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(326 223) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="199.3" y="493" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">② 시세·엔진 공백 ≥30초인가?</text>
-          <text data-detail="context" x="209.6" y="510" class="t-muted" font-size="8" text-anchor="middle">data-gap · 세션 종료 · 복구 후 보유 청산 우선</text>
+          <text data-node-label="" data-detail-anchor="" x="432.2" y="238" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">범위 안이면 해당 종목 보유</text>
+          <text data-detail="context" x="440" y="255" class="t-muted" font-size="8" text-anchor="middle">다음 조회 대기</text>
         </g>
 
-        <g id="node-sell1yes" data-node-id="sell1yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 2" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 2">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 2 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="464" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="464" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 470) scale(0.6875)">
+        <g id="node-step3" data-node-id="step3" data-node-label="조건을 충족한 종목 전량 매도" tabindex="0" role="button" aria-label="조건을 충족한 종목 전량 매도 포커스, 조회 가격으로 가상 매도 · 수수료와 세금 0, 가상 매도" aria-pressed="false" data-node-kind="backend" data-node-sublabel="조회 가격으로 가상 매도 · 수수료와 세금 0" data-node-context="가상 매도">
+          <title>조건을 충족한 종목 전량 매도 · 조회 가격으로 가상 매도 · 수수료와 세금 0 · 가상 매도</title>
+          <rect x="48" y="341" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="48" y="341" width="240" height="52" rx="8" class="c-backend" data-animate="node" style="--step:2" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(54 347) scale(0.6875)">
             <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="498.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="513.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="525.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
+          <text data-node-label="" data-detail-anchor="" x="168" y="373" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">조건을 충족한 종목 전량 매도</text>
+          <text data-detail="context" x="168" y="385.3" class="t-muted" font-size="8" text-anchor="middle">조회 가격으로 가상 매도 · 수수료와 세금 0</text>
         </g>
 
-        <g id="node-sell2" data-node-id="sell2" data-node-label="③ 세션 손실 −0.6% 이하인가?" tabindex="0" role="button" aria-label="③ 세션 손실 −0.6% 이하인가? 포커스, kill · 세션 시작 자산 기준 · 절대 손실 상한 아님, 우선순위 3" aria-pressed="false" data-node-kind="security" data-node-sublabel="kill · 세션 시작 자산 기준 · 절대 손실 상한 아님" data-node-context="우선순위 3">
-          <title>③ 세션 손실 −0.6% 이하인가? · kill · 세션 시작 자산 기준 · 절대 손실 상한 아님 · 우선순위 3</title>
-          <rect x="81.6" y="598" width="256" height="52" rx="8" class="c-mask"/>
-          <rect x="81.6" y="598" width="256" height="52" rx="8" class="c-security" data-animate="node" style="--step:4" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(87.6 604) scale(0.6875)">
+        <g id="node-step4" data-node-id="step4" data-node-label="보유 종목이 모두 없어졌나요?" tabindex="0" role="button" aria-label="보유 종목이 모두 없어졌나요? 포커스, 보유 0일 때만 세션 수익률 판단, 남은 보유" aria-pressed="false" data-node-kind="security" data-node-sublabel="보유 0일 때만 세션 수익률 판단" data-node-context="남은 보유">
+          <title>보유 종목이 모두 없어졌나요? · 보유 0일 때만 세션 수익률 판단 · 남은 보유</title>
+          <rect x="48" y="465" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="48" y="465" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:3" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(54 471) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="206.5" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">③ 세션 손실 −0.6% 이하인가?</text>
-          <text data-detail="context" x="209.6" y="636" class="t-muted" font-size="8" text-anchor="middle">kill · 세션 시작 자산 기준 · 절대 손실 상한 아님</text>
+          <text data-node-label="" data-detail-anchor="" x="168" y="497" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">보유 종목이 모두 없어졌나요?</text>
+          <text data-detail="context" x="168" y="509.3" class="t-muted" font-size="8" text-anchor="middle">보유 0일 때만 세션 수익률 판단</text>
         </g>
 
-        <g id="node-sell2yes" data-node-id="sell2yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 3" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 3">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 3 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="590" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="590" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 596) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="624.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="639.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="651.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell3" data-node-id="sell3" data-node-label="④ 세션 비용 후 목표 +1% 이상인가?" tabindex="0" role="button" aria-label="④ 세션 비용 후 목표 +1% 이상인가? 포커스, session-target · 전량 청산 후 종료 · 체결 후 목표 미달 가능, 우선순위 4" aria-pressed="false" data-node-kind="security" data-node-sublabel="session-target · 전량 청산 후 종료 · 체결 후 목표 미달 가능" data-node-context="우선순위 4">
-          <title>④ 세션 비용 후 목표 +1% 이상인가? · session-target · 전량 청산 후 종료 · 체결 후 목표 미달 가능 · 우선순위 4</title>
-          <rect x="55.19999999999999" y="724" width="308.8" height="52" rx="8" class="c-mask"/>
-          <rect x="55.19999999999999" y="724" width="308.8" height="52" rx="8" class="c-security" data-animate="node" style="--step:5" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(61.19999999999999 730) scale(0.6875)">
+        <g id="node-step4-alternate" data-node-id="step4-alternate" data-node-label="보유 중이면 다음 5분 점검" tabindex="0" role="button" aria-label="보유 중이면 다음 5분 점검 포커스, 다음 조회 대기, 남은 보유" aria-pressed="false" data-node-kind="security" data-node-sublabel="다음 조회 대기" data-node-context="남은 보유">
+          <title>보유 중이면 다음 5분 점검 · 다음 조회 대기 · 남은 보유</title>
+          <rect x="320" y="465" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="320" y="465" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:11" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(326 471) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="745" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">④ 세션 비용 후 목표 +1% 이상인가?</text>
-          <text data-detail="context" x="209.6" y="762" class="t-muted" font-size="8" text-anchor="middle">session-target · 전량 청산 후 종료 · 체결 후 목표 미달 가능</text>
+          <text data-node-label="" data-detail-anchor="" x="435.5" y="486" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">보유 중이면 다음 5분 점검</text>
+          <text data-detail="context" x="440" y="503" class="t-muted" font-size="8" text-anchor="middle">다음 조회 대기</text>
         </g>
 
-        <g id="node-sell3yes" data-node-id="sell3yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 4" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 4">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 4 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="716" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="716" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 722) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="750.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="765.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="777.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell4" data-node-id="sell4" data-node-label="⑤ 비용 후 손실 2회 연속인가?" tabindex="0" role="button" aria-label="⑤ 비용 후 손실 2회 연속인가? 포커스, loss-streak · 잔량 청산 후 세션 종료, 우선순위 5" aria-pressed="false" data-node-kind="security" data-node-sublabel="loss-streak · 잔량 청산 후 세션 종료" data-node-context="우선순위 5">
-          <title>⑤ 비용 후 손실 2회 연속인가? · loss-streak · 잔량 청산 후 세션 종료 · 우선순위 5</title>
-          <rect x="89.6" y="850" width="240" height="52" rx="8" class="c-mask"/>
-          <rect x="89.6" y="850" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:6" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(95.6 856) scale(0.6875)">
+        <g id="node-step5" data-node-id="step5" data-node-label="세션 시작 자산과 현금 비교" tabindex="0" role="button" aria-label="세션 시작 자산과 현금 비교 포커스, +1% 이상 또는 −2% 이하이면 종료, 세션 손익" aria-pressed="false" data-node-kind="security" data-node-sublabel="+1% 이상 또는 −2% 이하이면 종료" data-node-context="세션 손익">
+          <title>세션 시작 자산과 현금 비교 · +1% 이상 또는 −2% 이하이면 종료 · 세션 손익</title>
+          <rect x="48" y="589" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="48" y="589" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:4" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(54 595) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="882" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑤ 비용 후 손실 2회 연속인가?</text>
-          <text data-detail="context" x="209.6" y="894.3" class="t-muted" font-size="8" text-anchor="middle">loss-streak · 잔량 청산 후 세션 종료</text>
+          <text data-node-label="" data-detail-anchor="" x="160.2" y="610" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">세션 시작 자산과 현금 비교</text>
+          <text data-detail="context" x="168" y="627" class="t-muted" font-size="8" text-anchor="middle">+1% 이상 또는 −2% 이하이면 종료</text>
         </g>
 
-        <g id="node-sell4yes" data-node-id="sell4yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 5" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 5">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 5 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="842" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="842" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 848) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="876.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="891.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="903.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell5" data-node-id="sell5" data-node-label="⑥ 세션 매수 10회 도달·보유 청산 완료인가?" tabindex="0" role="button" aria-label="⑥ 세션 매수 10회 도달·보유 청산 완료인가? 포커스, trade-limit · 추가 매수 없이 세션 종료, 우선순위 6" aria-pressed="false" data-node-kind="security" data-node-sublabel="trade-limit · 추가 매수 없이 세션 종료" data-node-context="우선순위 6">
-          <title>⑥ 세션 매수 10회 도달·보유 청산 완료인가? · trade-limit · 추가 매수 없이 세션 종료 · 우선순위 6</title>
-          <rect x="57.849999999999994" y="976" width="303.5" height="52" rx="8" class="c-mask"/>
-          <rect x="57.849999999999994" y="976" width="303.5" height="52" rx="8" class="c-security" data-animate="node" style="--step:7" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(63.849999999999994 982) scale(0.6875)">
+        <g id="node-step5-alternate" data-node-id="step5-alternate" data-node-label="세션 한도 미도달" tabindex="0" role="button" aria-label="세션 한도 미도달 포커스, 다음 호출 가능 시 후보 조회, 세션 손익" aria-pressed="false" data-node-kind="security" data-node-sublabel="다음 호출 가능 시 후보 조회" data-node-context="세션 손익">
+          <title>세션 한도 미도달 · 다음 호출 가능 시 후보 조회 · 세션 손익</title>
+          <rect x="320" y="589" width="240" height="52" rx="8" class="c-mask"/>
+          <rect x="320" y="589" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:12" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(326 595) scale(0.6875)">
             <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1008" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑥ 세션 매수 10회 도달·보유 청산 완료인가?</text>
-          <text data-detail="context" x="209.6" y="1020.3" class="t-muted" font-size="8" text-anchor="middle">trade-limit · 추가 매수 없이 세션 종료</text>
-        </g>
-
-        <g id="node-sell5yes" data-node-id="sell5yes" data-node-label="추가 매수 없이 세션 종료" tabindex="0" role="button" aria-label="추가 매수 없이 세션 종료 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 6" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 6">
-          <title>추가 매수 없이 세션 종료 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 6 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="968" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="968" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 974) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="528" y="989" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">추가 매수 없이 세션 종료</text>
-          <text data-detail="context" x="529.2" y="1006" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="1024" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell6" data-node-id="sell6" data-node-label="⑦ 15:20 또는 장 종료 기준 도달인가?" tabindex="0" role="button" aria-label="⑦ 15:20 또는 장 종료 기준 도달인가? 포커스, close · 보유 청산 후 운용 종료, 우선순위 7" aria-pressed="false" data-node-kind="security" data-node-sublabel="close · 보유 청산 후 운용 종료" data-node-context="우선순위 7">
-          <title>⑦ 15:20 또는 장 종료 기준 도달인가? · close · 보유 청산 후 운용 종료 · 우선순위 7</title>
-          <rect x="80.6" y="1102" width="258" height="52" rx="8" class="c-mask"/>
-          <rect x="80.6" y="1102" width="258" height="52" rx="8" class="c-security" data-animate="node" style="--step:8" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(86.6 1108) scale(0.6875)">
-            <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1134" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑦ 15:20 또는 장 종료 기준 도달인가?</text>
-          <text data-detail="context" x="209.6" y="1146.3" class="t-muted" font-size="8" text-anchor="middle">close · 보유 청산 후 운용 종료</text>
-        </g>
-
-        <g id="node-sell6yes" data-node-id="sell6yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 7" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 7">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 7 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="1094" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="1094" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 1100) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="1128.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="1143.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="1155.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell7" data-node-id="sell7" data-node-label="⑧ 종목 비용 후 수익률 ≤−0.8%인가?" tabindex="0" role="button" aria-label="⑧ 종목 비용 후 수익률 ≤−0.8%인가? 포커스, stop · 매수·매도 비용과 슬리피지 포함 · 같은 세션 재진입 금지, 우선순위 8" aria-pressed="false" data-node-kind="security" data-node-sublabel="stop · 매수·매도 비용과 슬리피지 포함 · 같은 세션 재진입 금지" data-node-context="우선순위 8">
-          <title>⑧ 종목 비용 후 수익률 ≤−0.8%인가? · stop · 매수·매도 비용과 슬리피지 포함 · 같은 세션 재진입 금지 · 우선순위 8</title>
-          <rect x="48" y="1228" width="323.2" height="52" rx="8" class="c-mask"/>
-          <rect x="48" y="1228" width="323.2" height="52" rx="8" class="c-security" data-animate="node" style="--step:9" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(54 1234) scale(0.6875)">
-            <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1249" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑧ 종목 비용 후 수익률 ≤−0.8%인가?</text>
-          <text data-detail="context" x="209.6" y="1266" class="t-muted" font-size="8" text-anchor="middle">stop · 매수·매도 비용과 슬리피지 포함 · 같은 세션 재진입 금지</text>
-        </g>
-
-        <g id="node-sell7yes" data-node-id="sell7yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 8" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 8">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 8 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="1220" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="1220" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 1226) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="1254.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="1269.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="1281.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell8" data-node-id="sell8" data-node-label="⑨ 종목 비용 후 수익률 ≥+1%인가?" tabindex="0" role="button" aria-label="⑨ 종목 비용 후 수익률 ≥+1%인가? 포커스, target · 개별 종목 순익이며 계좌 목표와 구분, 우선순위 9" aria-pressed="false" data-node-kind="security" data-node-sublabel="target · 개별 종목 순익이며 계좌 목표와 구분" data-node-context="우선순위 9">
-          <title>⑨ 종목 비용 후 수익률 ≥+1%인가? · target · 개별 종목 순익이며 계좌 목표와 구분 · 우선순위 9</title>
-          <rect x="89.6" y="1354" width="240" height="52" rx="8" class="c-mask"/>
-          <rect x="89.6" y="1354" width="240" height="52" rx="8" class="c-security" data-animate="node" style="--step:10" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(95.6 1360) scale(0.6875)">
-            <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1386" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑨ 종목 비용 후 수익률 ≥+1%인가?</text>
-          <text data-detail="context" x="209.6" y="1398.3" class="t-muted" font-size="8" text-anchor="middle">target · 개별 종목 순익이며 계좌 목표와 구분</text>
-        </g>
-
-        <g id="node-sell8yes" data-node-id="sell8yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 9" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 9">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 9 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="1346" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="1346" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 1352) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="1380.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="1395.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="1407.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell9" data-node-id="sell9" data-node-label="⑩ 순익 고점 0.6% 이후 되밀림인가?" tabindex="0" role="button" aria-label="⑩ 순익 고점 0.6% 이후 되밀림인가? 포커스, trail · 고점−0.3%p 또는 최소 +0.1% 기준, 우선순위 10" aria-pressed="false" data-node-kind="security" data-node-sublabel="trail · 고점−0.3%p 또는 최소 +0.1% 기준" data-node-context="우선순위 10">
-          <title>⑩ 순익 고점 0.6% 이후 되밀림인가? · trail · 고점−0.3%p 또는 최소 +0.1% 기준 · 우선순위 10</title>
-          <rect x="87.1" y="1480" width="245" height="52" rx="8" class="c-mask"/>
-          <rect x="87.1" y="1480" width="245" height="52" rx="8" class="c-security" data-animate="node" style="--step:11" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(93.1 1486) scale(0.6875)">
-            <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1512" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑩ 순익 고점 0.6% 이후 되밀림인가?</text>
-          <text data-detail="context" x="209.6" y="1524.3" class="t-muted" font-size="8" text-anchor="middle">trail · 고점−0.3%p 또는 최소 +0.1% 기준</text>
-        </g>
-
-        <g id="node-sell9yes" data-node-id="sell9yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 10" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 10">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 10 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="1472" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="1472" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 1478) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="1506.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="1521.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="1533.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-sell10" data-node-id="sell10" data-node-label="⑪ 실제 보유 경과 ≥5분인가?" tabindex="0" role="button" aria-label="⑪ 실제 보유 경과 ≥5분인가? 포커스, time-exit · 수익 여부와 무관하게 유효 시세에서 청산, 우선순위 11" aria-pressed="false" data-node-kind="security" data-node-sublabel="time-exit · 수익 여부와 무관하게 유효 시세에서 청산" data-node-context="우선순위 11">
-          <title>⑪ 실제 보유 경과 ≥5분인가? · time-exit · 수익 여부와 무관하게 유효 시세에서 청산 · 우선순위 11</title>
-          <rect x="76.79999999999998" y="1606" width="265.6" height="52" rx="8" class="c-mask"/>
-          <rect x="76.79999999999998" y="1606" width="265.6" height="52" rx="8" class="c-security" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="decision" class="semantic-sigil s-security" transform="translate(82.79999999999998 1612) scale(0.6875)">
-            <path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1627" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">⑪ 실제 보유 경과 ≥5분인가?</text>
-          <text data-detail="context" x="209.6" y="1644" class="t-muted" font-size="8" text-anchor="middle">time-exit · 수익 여부와 무관하게 유효 시세에서 청산</text>
-        </g>
-
-        <g id="node-sell10yes" data-node-id="sell10yes" data-node-label="해당 사유로 가상 청산·종료 반영" tabindex="0" role="button" aria-label="해당 사유로 가상 청산·종료 반영 포커스, 가상 매도 후 현금·손익·제한 갱신, 우선순위 11" aria-pressed="false" data-node-kind="backend" data-node-sublabel="가상 매도 후 현금·손익·제한 갱신" data-node-tag="비용 반영 · 종료 사유 보존" data-node-context="우선순위 11">
-          <title>해당 사유로 가상 청산·종료 반영 · 가상 매도 후 현금·손익·제한 갱신 · 우선순위 11 · 비용 반영 · 종료 사유 보존</title>
-          <rect x="409.20000000000005" y="1598" width="240" height="68" rx="8" class="c-mask"/>
-          <rect x="409.20000000000005" y="1598" width="240" height="68" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(415.20000000000005 1604) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="529.2" y="1632.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">해당 사유로 가상 청산·종료 반영</text>
-          <text data-detail="context" x="529.2" y="1647.1" class="t-muted" font-size="8" text-anchor="middle">가상 매도 후 현금·손익·제한 갱신</text>
-        <text data-detail="fine" x="529.2" y="1659.9" class="t-backend" font-size="7" text-anchor="middle">비용 반영 · 종료 사유 보존</text>
-        </g>
-
-        <g id="node-hold" data-node-id="hold" data-node-label="보유 · 다음 점검" tabindex="0" role="button" aria-label="보유 · 다음 점검 포커스, 상위 종료·청산 조건부터 다시 확인, 조건 미해당" aria-pressed="false" data-node-kind="backend" data-node-sublabel="상위 종료·청산 조건부터 다시 확인" data-node-context="조건 미해당">
-          <title>보유 · 다음 점검 · 상위 종료·청산 조건부터 다시 확인 · 조건 미해당</title>
-          <rect x="89.6" y="1732" width="240" height="52" rx="8" class="c-mask"/>
-          <rect x="89.6" y="1732" width="240" height="52" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="active" class="semantic-sigil s-backend" transform="translate(95.6 1738) scale(0.6875)">
-            <path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="209.6" y="1753" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">보유 · 다음 점검</text>
-          <text data-detail="context" x="209.6" y="1770" class="t-muted" font-size="8" text-anchor="middle">상위 종료·청산 조건부터 다시 확인</text>
+          <text data-node-label="" data-detail-anchor="" x="440" y="610" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">세션 한도 미도달</text>
+          <text data-detail="context" x="440" y="627" class="t-muted" font-size="8" text-anchor="middle">다음 호출 가능 시 후보 조회</text>
         </g>
 
         <!-- Edge labels -->
 
-        <g data-detail="context" data-edge-from="sell0" data-edge-to="sell0yes" data-edge-label="해당" data-edge-key="1">
-          <rect x="354.40000000000003" y="352" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="369.40000000000003" y="362" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell0" data-edge-to="sell1" data-edge-label="해당 없음" data-edge-key="2">
-          <rect x="183" y="425" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="435" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell1" data-edge-to="sell1yes" data-edge-label="해당" data-edge-key="3">
-          <rect x="354.8" y="478" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="369.8" y="488" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell1" data-edge-to="sell2" data-edge-label="해당 없음" data-edge-key="4">
-          <rect x="183" y="551" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="561" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell10" data-edge-to="hold" data-edge-label="해당 없음" data-edge-key="5">
-          <rect x="183" y="1685" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="1695" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell10" data-edge-to="sell10yes" data-edge-label="해당" data-edge-key="6">
-          <rect x="360.8" y="1612" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="375.8" y="1622" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell2" data-edge-to="sell2yes" data-edge-label="해당" data-edge-key="7">
-          <rect x="358.40000000000003" y="604" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="373.40000000000003" y="614" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell2" data-edge-to="sell3" data-edge-label="해당 없음" data-edge-key="8">
-          <rect x="183" y="677" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="687" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell3" data-edge-to="sell3yes" data-edge-label="해당" data-edge-key="9">
-          <rect x="371.6" y="730" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="386.6" y="740" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell3" data-edge-to="sell4" data-edge-label="해당 없음" data-edge-key="10">
-          <rect x="183" y="803" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="813" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell4" data-edge-to="sell4yes" data-edge-label="해당" data-edge-key="11">
-          <rect x="354.40000000000003" y="856" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="369.40000000000003" y="866" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell4" data-edge-to="sell5" data-edge-label="해당 없음" data-edge-key="12">
-          <rect x="183" y="929" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="939" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell5" data-edge-to="sell5yes" data-edge-label="해당" data-edge-key="13">
-          <rect x="370.27500000000003" y="982" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="385.27500000000003" y="992" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell5" data-edge-to="sell6" data-edge-label="해당 없음" data-edge-key="14">
-          <rect x="183" y="1055" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="1065" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell6" data-edge-to="sell6yes" data-edge-label="해당" data-edge-key="15">
-          <rect x="358.90000000000003" y="1108" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="373.90000000000003" y="1118" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell6" data-edge-to="sell7" data-edge-label="해당 없음" data-edge-key="16">
-          <rect x="183" y="1181" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="1191" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell7" data-edge-to="sell7yes" data-edge-label="해당" data-edge-key="17">
-          <rect x="375.20000000000005" y="1234" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="390.20000000000005" y="1244" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell7" data-edge-to="sell8" data-edge-label="해당 없음" data-edge-key="18">
-          <rect x="183" y="1307" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="1317" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell8" data-edge-to="sell8yes" data-edge-label="해당" data-edge-key="19">
-          <rect x="354.40000000000003" y="1360" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="369.40000000000003" y="1370" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell8" data-edge-to="sell9" data-edge-label="해당 없음" data-edge-key="20">
-          <rect x="183" y="1433" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="1443" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell9" data-edge-to="sell10" data-edge-label="해당 없음" data-edge-key="21">
-          <rect x="183" y="1559" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="1569" class="t-muted" font-size="8" text-anchor="middle">해당 없음</text>
-        </g>
-        <g data-detail="context" data-edge-from="sell9" data-edge-to="sell9yes" data-edge-label="해당" data-edge-key="22">
-          <rect x="355.65000000000003" y="1486" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="370.65000000000003" y="1496" class="t-muted" font-size="8" text-anchor="middle">해당</text>
-        </g>
-        <g data-detail="context" data-edge-from="unknown" data-edge-to="lock" data-edge-label="미충족" data-edge-key="23">
-          <rect x="350.00000000000006" y="226" width="38.8" height="14" rx="3" class="c-mask"/>
-          <text x="369.40000000000003" y="236" class="t-edge-security" font-size="8" text-anchor="middle">미충족</text>
-        </g>
-        <g data-detail="context" data-edge-from="unknown" data-edge-to="sell0" data-edge-label="확인" data-edge-key="24">
-          <rect x="194.6" y="299" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="209.6" y="309" class="t-muted" font-size="8" text-anchor="middle">확인</text>
-        </g>
+
+
+
+
+
+
+
 
         <!-- Legend -->
         <g data-legend="" data-legend-bridge="">
-          <text x="20" y="1820" class="t-primary" font-size="12" font-weight="650">범례</text>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="실행·결과" data-legend-x="20" data-legend-baseline="1840" data-legend-width="85">
-            <rect x="20" y="1832" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
-            <text x="42" y="1840" class="t-muted" font-size="7.5" font-weight="500">실행·결과</text>
+          <text x="20" y="676" class="t-primary" font-size="12" font-weight="650">범례</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="실행" data-legend-x="20" data-legend-baseline="696" data-legend-width="62">
+            <rect x="20" y="688" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
+            <text x="42" y="696" class="t-muted" font-size="7.5" font-weight="500">실행</text>
           </g>
-          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="확인·대기" data-legend-x="112" data-legend-baseline="1840" data-legend-width="85">
-            <rect x="112" y="1832" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
-            <text x="134" y="1840" class="t-muted" font-size="7.5" font-weight="500">확인·대기</text>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="확인·대기" data-legend-x="89" data-legend-baseline="696" data-legend-width="85">
+            <rect x="89" y="688" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
+            <text x="111" y="696" class="t-muted" font-size="7.5" font-weight="500">확인·대기</text>
           </g>
         </g>
       </svg>
@@ -6610,6 +6279,13 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         var autoTheme = requestedTheme === 'auto';
         var svg = document.querySelector('.diagram-container svg');
         var clone = svg.cloneNode(true);
+        var softwareNotices = document.getElementById('archify-software-notices');
+        if (softwareNotices) {
+          var softwareMetadata = document.createElementNS('http://www.w3.org/2000/svg', 'metadata');
+          softwareMetadata.setAttribute('id', 'archify-software-notices');
+          softwareMetadata.textContent = JSON.parse(softwareNotices.textContent);
+          clone.insertBefore(softwareMetadata, clone.firstChild);
+        }
 
         var canonicalStateClean = cleanExportClone(clone);
 
