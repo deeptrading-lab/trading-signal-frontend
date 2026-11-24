@@ -121,9 +121,9 @@ function setCache(symbol: string, value: Orderbook | null): void {
   cache.set(symbol, { value, cachedAt: Date.now() });
 }
 
-async function load(symbol: string): Promise<Orderbook> {
+async function load(symbol: string, source?: string): Promise<Orderbook> {
   try {
-    const raw = await tossGet<TossOrderbook>("/api/v1/orderbook", { symbol });
+    const raw = await tossGet<TossOrderbook>("/api/v1/orderbook", { symbol }, source);
     const orderbook = normalizeOrderbook(raw);
     setCache(symbol, orderbook);
     return orderbook;
@@ -140,7 +140,7 @@ async function load(symbol: string): Promise<Orderbook> {
  * 호가 조회 — **never-throw**.
  * 키 미설정·형식 밖 심볼·조회 실패 = 빈 호가(부가 정보 fail-soft).
  */
-export async function fetchOrderbook(symbol: string): Promise<Orderbook> {
+export async function fetchOrderbook(symbol: string, source?: string): Promise<Orderbook> {
   const normalized = symbol.trim().toUpperCase();
   if (!isTossConfigured()) return EMPTY_ORDERBOOK;
   if (!isValidOrderbookSymbol(normalized)) return EMPTY_ORDERBOOK;
@@ -153,7 +153,7 @@ export async function fetchOrderbook(symbol: string): Promise<Orderbook> {
 
   let pending = inflight.get(normalized);
   if (!pending) {
-    pending = load(normalized);
+    pending = load(normalized, source);
     inflight.set(normalized, pending);
   }
   return pending;

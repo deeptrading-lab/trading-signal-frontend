@@ -9,8 +9,7 @@ import type { PaperReviewEvent } from "@/lib/types/programTrading/programTrading
 
 const exec = promisify(execFile);
 const engineFiles = new Set([
-  "engine.ts", "tossPaper.ts", "journal.ts", "reviewAudit.ts", "candidateRefresh.ts",
-  "recommendationCandidates.ts", "marketBudget.ts",
+  "engine.ts", "tossPaper.ts", "journal.ts", "reviewAudit.ts", "localPaperRuntime.ts", "marketBudget.ts",
 ].map(name => `lib/server/programTrading/${name}`));
 const template = "docs/program-trading/rules.template.html";
 const generated = /^(?:docs\/program-trading\/rules\.html|docs\/program-trading\/(?:summary|detail|buy|sell|settlement)\.(?:html|workflow\.json))$/;

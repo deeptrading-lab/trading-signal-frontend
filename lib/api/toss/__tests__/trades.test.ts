@@ -175,11 +175,11 @@ describe("fetchTrades", () => {
     mockTossGet.mockResolvedValue([
       { price: "101", volume: "2", timestamp: "2026-07-03T14:00:01+09:00" },
     ]);
-    const trades = await fetchTrades("005930", 30);
+    const trades = await fetchTrades("005930", 30, "program-paper");
     expect(mockTossGet).toHaveBeenCalledWith("/api/v1/trades", {
       symbol: "005930",
       count: 30,
-    });
+    }, "program-paper");
     expect(trades).toHaveLength(1);
     expect(trades[0].price).toBe(101);
   });
@@ -187,6 +187,22 @@ describe("fetchTrades", () => {
   it("조회 실패는 빈 배열로 수렴하고 throw 하지 않는다 (fail-soft)", async () => {
     mockTossGet.mockRejectedValue(new Error("404"));
     await expect(fetchTrades("005930")).resolves.toEqual([]);
+  });
+
+  it("실패 후 10초 동안 같은 종목과 건수의 재요청을 억제한다", async () => {
+    vi.useFakeTimers();
+    try {
+      mockTossGet.mockRejectedValue(new Error("429"));
+      await fetchTrades("005930", 1);
+      vi.advanceTimersByTime(5_000);
+      await fetchTrades("005930", 1);
+      expect(mockTossGet).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(5_000);
+      await fetchTrades("005930", 1);
+      expect(mockTossGet).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("성공 캐시 + single-flight — 3s 내 동시 요청은 토스 1콜 (AC-11)", async () => {

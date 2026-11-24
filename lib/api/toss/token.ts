@@ -21,6 +21,7 @@ import axios from "axios";
 import { getKisStore, hashAppKey } from "@/lib/api/kis/store";
 import { makeTossTokenError } from "./errors";
 import { delay } from "@/lib/server/bffUtils";
+import { logTossRateLimit, recordTossDispatch, recordTossResult } from "./requestMetrics";
 
 const TOKEN_URL = "https://openapi.tossinvest.com/oauth2/token";
 const TOKEN_TIMEOUT_MS = 5_000;
@@ -117,6 +118,7 @@ async function acquireToken(creds: { id: string; secret: string }): Promise<stri
 
 async function issueToken(creds: { id: string; secret: string }): Promise<CacheEntry> {
   let response;
+  const attempt = recordTossDispatch("/oauth2/token", Date.now(), "token");
   try {
     response = await axios.post(
       TOKEN_URL,
@@ -133,6 +135,7 @@ async function issueToken(creds: { id: string; secret: string }): Promise<CacheE
       },
     );
   } catch (error) {
+    recordTossResult(attempt, axios.isAxiosError(error) ? error.response?.status : undefined);
     throw makeTossTokenError({
       message:
         error instanceof Error
@@ -140,6 +143,7 @@ async function issueToken(creds: { id: string; secret: string }): Promise<CacheE
           : undefined,
     });
   }
+  recordTossResult(attempt, response.status);
 
   const data = response.data as {
     access_token?: string;
@@ -147,6 +151,7 @@ async function issueToken(creds: { id: string; secret: string }): Promise<CacheE
     error?: string;
     error_description?: string;
   };
+  if (response.status === 429) logTossRateLimit(attempt, response, { code: data?.error });
   if (response.status !== 200 || !data?.access_token) {
     throw makeTossTokenError({
       status: response.status,

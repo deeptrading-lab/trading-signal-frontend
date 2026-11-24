@@ -23,6 +23,7 @@
     "design:sync": "npx --yes @google/design.md export --format tailwind docs/design/finsight-redesign.md > tailwind.theme.json && node scripts/inject-breakpoints.mjs && node scripts/inject-color-themes.mjs && node scripts/inject-shadows.mjs && node scripts/inject-motion.mjs",
     "program:rules": "node --import tsx scripts/renderProgramTradingRules.ts",
     "program:rules:check": "node --import tsx scripts/renderProgramTradingRules.ts --check",
+    "program:rules:browser": "node --import tsx scripts/renderProgramTradingRules.ts --browser-check",
     "program:dev": "npm run dev -- --hostname 127.0.0.1",
     "program:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programTradingReadOnlyCheck.ts",
     "program:review": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/programPaperReview.ts"

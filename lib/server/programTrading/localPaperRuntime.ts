@@ -1,24 +1,24 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { withTimeout } from "@/lib/server/bffUtils";
 import { isoToKstDate } from "@/lib/api/toss/kst";
+import { nextPaperMarketRequestAt, PAPER_MARKET_INTERVAL_MS } from "@/lib/api/toss/paperMarketLimit";
+import { PROGRAM_PAPER_COPY as P } from "@/lib/copy/programTrading/programTrading";
 import type { ProgramTradingAction, TradingState } from "@/lib/types/programTrading/programTrading";
-import { emptyCandidateSnapshot, hasCandidates } from "@/lib/validation/programTrading/candidateGate";
-import { createCandidateRefresh } from "./candidateRefresh";
-import { command, enforceObservationSafety, initialState, paperStopDeadline, settleExpiredPaperStop } from "./engine";
-import { logPaperMarket, withinMarketBudget } from "./marketBudget";
+import { buyCandidates, closeSession, initialState, observePrices, RULES_VERSION, startSession } from "./engine";
+import { logPaperMarket } from "./marketBudget";
 import { openJournal } from "./journal";
 import { savePaperResult } from "./reviewHistory";
-import { loadRecommendationCandidates } from "./recommendationCandidates";
 import { paperArchiveDirectory as archiveDirectory, paperSessionDirectory as directory, trimPaperReviews } from "./sessionStorage";
-import { minuteInKorea, requireTossPaperConfig, stepTossPaper, tossPaperSession } from "./tossPaper";
+import { emptyPaperCandidates, fetchPaperCandidates, fetchPaperPrices, paperSession, requireTossPaperConfig } from "./tossPaper";
 
-const checkingSession = "토스 시세와 장 운영 시간을 확인하고 있어요.";
+const MARKET_TIMEOUT_MS = 5_000;
+
 const registry = globalThis as typeof globalThis & {
   localTossPaperRuntime?: ReturnType<typeof createRuntime>;
 };
 
 export function getLocalPaperRuntime() {
-  // Route bundles and development reloads share one queue and timer in the Next process.
   return registry.localTossPaperRuntime ??= createRuntime().catch(error => {
     delete registry.localTossPaperRuntime;
     throw error;
@@ -28,62 +28,46 @@ export function getLocalPaperRuntime() {
 async function createRuntime() {
   requireTossPaperConfig();
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  let state: TradingState = { ...initialState(), executionMode: "toss-paper" };
+  let state = initialState();
   try {
     const saved: TradingState = JSON.parse(await readFile(`${directory}/state.json`, "utf8"));
     if (saved.version !== 1 || saved.executionMode !== "toss-paper") throw new Error("invalid state");
-    state = { ...saved, running: false, quotes: [], candidates: emptyCandidateSnapshot() };
+    state = { ...saved, running: false };
+    if (!state.lifecycle) state = initialState();
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
   let journal: Awaited<ReturnType<typeof openJournal>> | undefined = await openJournal(directory);
   journal.reconcile(state);
-  state.startBlockReason = checkingSession;
+  if (state.lifecycle) await journal.record(state);
 
   let queue = Promise.resolve();
-  let commandVersion = 0;
-  let revision = 0;
+  let pending: AbortController | undefined;
+  let closing: Promise<void> | undefined;
   let requiresRestart = false;
-  let stopTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastSyncedSession: string | null = null;
 
-  function settleStop() {
-    const now = Date.now();
-    if (!settleExpiredPaperStop(state, minuteInKorea(now), now)) return false;
-    revision++;
-    return true;
-  }
-
-  function scheduleStop() {
-    clearTimeout(stopTimer);
-    const deadline = paperStopDeadline(state.lifecycle);
-    if (state.lifecycle?.status !== "stopping" || !Number.isFinite(deadline)) return;
-    stopTimer = setTimeout(() => {
-      void serial(async () => {
-        if (settleStop()) await persist();
-        else scheduleStop();
-      }).catch(() => undefined);
-    }, Math.max(0, deadline - Date.now())).unref();
-  }
-  function serial<T>(fn: () => Promise<T>) {
+  function serial<T>(fn: () => T | Promise<T>) {
     const next = queue.then(fn);
     queue = next.then(() => undefined, () => {
-      revision++;
+      pending?.abort();
       state.running = false;
-      state.lastError = "모의투자 상태를 저장하지 못했어요. 로컬 원장을 확인해 주세요.";
+      state.lastError = P.storageError;
     });
     return next;
   }
 
-  let lastSyncedSession: string | null = null;
   async function persist() {
     if (!journal) {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       journal = await openJournal(directory);
     }
-    await journal.record(state);
+    // The snapshot contains the full ledger and can replay any journal writes interrupted by a restart.
     await writeFile(`${directory}/state.tmp`, JSON.stringify(state, null, 2), { mode: 0o600 });
     await rename(`${directory}/state.tmp`, `${directory}/state.json`);
+    await journal.record(state);
+    if (state.lifecycle?.status !== "completed") return;
     const report = await journal.report(state);
     if (report && process.env.PROGRAM_PAPER_RESULT_SYNC === "1" && lastSyncedSession !== report.lifecycle.startedAt) {
       const session = report.lifecycle.startedAt;
@@ -93,110 +77,116 @@ async function createRuntime() {
         logPaperMarket("result-sync-failed", { reason: error instanceof Error ? error.message : undefined });
       });
     }
-    if (state.lifecycle?.status === "completed") await trimPaperReviews(true);
+    await trimPaperReviews(true);
   }
 
-  async function openNewSession() {
-    if (state.lifecycle?.status !== "completed" || state.positions.length) {
-      return { error: "보유 종목의 청산과 거래 종료를 확인한 뒤 새 세션을 열어 주세요." };
+  function snapshot(now = Date.now()) {
+    const session = paperSession(now);
+    let startBlockReason: string | undefined;
+    if (requiresRestart) startBlockReason = P.restartRequired;
+    else if (state.lifecycle && state.policyVersion !== RULES_VERSION) startBlockReason = P.legacySession;
+    else if (session.weekend) startBlockReason = P.weekend;
+    else if (now < session.openAt || now >= session.closeAt) startBlockReason = P.outsideHours;
+    return structuredClone({ ...state, minute: session.minute, startBlockReason });
+  }
+
+  function markTime(now: number) {
+    state.minute = paperSession(now).minute;
+    state.updatedAt = new Date(now).toISOString();
+    state.lastStepAt = now;
+  }
+
+  function priorDate(now: number) {
+    return state.lifecycle && isoToKstDate(state.lifecycle.startedAt ?? undefined) !== paperSession(now).date;
+  }
+
+  async function readMarket<T>(request: AbortController, promise: Promise<T>, fallback: () => T, budget = MARKET_TIMEOUT_MS) {
+    try {
+      return await withTimeout(promise, budget);
+    } catch {
+      return fallback();
+    } finally {
+      request.abort();
     }
+  }
 
+  async function beginClose(cause: "manual" | "close", now: number, allowLookup: boolean) {
+    if (!state.lifecycle || state.lifecycle.status === "completed" || closing || state.lastError) return;
+    pending?.abort();
+    pending = undefined;
+    state.running = false;
+    state.lifecycle.status = "stopping";
+    state.lifecycle.stopCause ??= cause;
+    state.lifecycle.stopRequestedAt ??= new Date(now).toISOString();
+    markTime(now);
     await persist();
-    await mkdir(archiveDirectory, { recursive: true, mode: 0o700 });
-    const archiveName = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
-    // Move the entire session at once. If the process stops after the move, startup sees a fresh session.
-    await rename(directory, `${archiveDirectory}/${archiveName}`);
-    state = {
-      ...initialState(),
-      executionMode: "toss-paper",
-      candidates: state.candidates,
-      startBlockReason: checkingSession,
-    };
-    journal = undefined;
-    return { state: structuredClone(state) };
+
+    const tickers = state.positions.map(position => position.ticker);
+    const request = new AbortController();
+    const result = allowLookup && tickers.length && Date.now() >= nextPaperMarketRequestAt()
+      ? readMarket(request, fetchPaperPrices(tickers, request.signal), () => new Map())
+      : Promise.resolve(new Map());
+    closing = result.then(prices => serial(async () => {
+      const at = Date.now();
+      markTime(at);
+      closeSession(state, prices, cause, at);
+      await persist();
+    })).catch(() => undefined).finally(() => { closing = undefined; });
   }
 
-  let lastCalendar: Awaited<ReturnType<typeof tossPaperSession>> | undefined;
-  async function readCalendar() {
-    const session = await tossPaperSession(lastCalendar);
-    if (Number.isFinite(session.start) && Number.isFinite(session.end)) lastCalendar = session;
-    else if (session.holiday) lastCalendar = undefined;
-    return session;
-  }
-
-  function updateSession(state: TradingState, session: Awaited<ReturnType<typeof tossPaperSession>>) {
-    state.minute = session.minute;
-    const priorDay = state.lifecycle && isoToKstDate(state.lifecycle.startedAt ?? undefined) !== session.date;
-    if (priorDay) state.startBlockReason = "이전 운용을 종료한 뒤 새 모의 세션을 시작해 주세요.";
-    else if (session.canStart) delete state.startBlockReason;
-    else if (session.holiday) state.startBlockReason = "오늘은 국내 주식시장 휴장일이에요.";
-    else if (Number.isFinite(session.start)) state.startBlockReason = "국내 거래일 09:10~14:30 미만에 시작할 수 있어요.";
-    else state.startBlockReason = "토스 장 운영 시간을 확인하지 못했어요.";
-    return session;
-  }
-
-  let lastCandidateAttempt = 0;
-  const refreshCandidates = createCandidateRefresh(() => {
-    lastCandidateAttempt = Date.now();
-    return loadRecommendationCandidates();
-  }, snapshot => serial(async () => {
-    state.candidates = snapshot;
-    revision++;
-    if (!hasCandidates(snapshot)) logPaperMarket("candidates-unavailable", { status: snapshot.status });
-  }));
-
-  let tickPending = false;
-  let lastHeartbeat = Date.now();
   function tick() {
-    const now = Date.now();
-    if (now - lastHeartbeat > 15_000) logPaperMarket("heartbeat-gap", { gapMs: now - lastHeartbeat });
-    lastHeartbeat = now;
-    // The safety transition commits on live state even while a previous IO tick is
-    // pending or a candidate refresh invalidates its draft. Timer callbacks alone
-    // are not proof that quotes or engine state have advanced.
     void serial(async () => {
-      if (enforceObservationSafety(state, now)) {
-        revision++;
-        state.updatedAt = new Date(now).toISOString();
-        logPaperMarket("observation-gap-stop", { lastStepAt: state.lastStepAt });
-        scheduleStop();
-        await persist();
+      const now = Date.now();
+      const session = paperSession(now);
+      if (!state.lifecycle || state.lifecycle.status === "completed" || closing || state.lastError) return;
+      const expiredDate = priorDate(now);
+      if (state.lifecycle.status === "stopping" || expiredDate || now >= session.closeAt) {
+        const cause = state.lifecycle.stopCause === "manual" ? "manual" : "close";
+        await beginClose(cause, now, state.lifecycle.status !== "stopping" && !expiredDate && !session.weekend
+          && now < session.closeAt + MARKET_TIMEOUT_MS && state.policyVersion === RULES_VERSION);
+        return;
       }
-    }).then(() => {
-      if (tickPending) return;
-      tickPending = true;
-      const observedRevision = revision;
-      const observedCommand = commandVersion;
-      const draft = structuredClone(state);
-      void (async () => {
-        const session = await readCalendar();
-        updateSession(draft, session);
-        const changed = await stepTossPaper(draft, session);
-        await serial(async () => {
-          if (revision !== observedRevision || commandVersion !== observedCommand) return;
-          state = draft;
-          scheduleStop();
-          if (changed) await persist();
-        });
-      })().catch(() => logPaperMarket("tick-failed")).finally(() => { tickPending = false; });
-    }).catch(() => logPaperMarket("safety-check-failed"));
+      if (!state.running || pending || now < session.scanAt || state.policyVersion !== RULES_VERSION) return;
+
+      const tickers = state.positions.map(position => position.ticker);
+      const dueAt = tickers.length ? state.nextPriceAt ?? now : Math.max(state.nextCandidateAt ?? now, nextPaperMarketRequestAt());
+      if (now < dueAt) return;
+      // Leave the final slot available for the 15:00 liquidation request.
+      if (tickers.length && now >= session.closeAt - PAPER_MARKET_INTERVAL_MS) return;
+      const request = new AbortController();
+      const budget = Math.min(MARKET_TIMEOUT_MS, session.closeAt - now);
+      pending = request;
+      const response = tickers.length
+        ? readMarket(request, fetchPaperPrices(tickers, request.signal), () => new Map(), budget).then(prices => ({ prices }))
+        : readMarket(request, fetchPaperCandidates(request.signal), emptyPaperCandidates, budget).then(candidates => ({ candidates }));
+
+      void response.then(result => serial(async () => {
+        if (pending !== request) return;
+        pending = undefined;
+        const at = Date.now();
+        if (!state.running || at >= session.closeAt || priorDate(at)) return;
+        markTime(at);
+        if ("prices" in result) observePrices(state, result.prices, at);
+        else buyCandidates(state, result.candidates, at);
+        await persist();
+      })).catch(() => undefined);
+    }).catch(() => undefined);
   }
 
-  if (settleStop() || (state.lifecycle?.status === "completed" && process.env.PROGRAM_PAPER_RESULT_SYNC === "1")) await persist();
-  scheduleStop();
+  if (state.lifecycle?.status === "completed") {
+    // Recover a completed snapshot if the process exited before the review was written.
+    try {
+      await readFile(`${directory}/review.json`, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await journal.report(state);
+    }
+  }
+  setInterval(tick, 1_000).unref();
   tick();
-  setInterval(() => { void refreshCandidates().catch(() => undefined); }, 60_000).unref();
-  setInterval(tick, 5_000).unref();
 
   return {
-    async snapshot() {
-      // Await the first lookup in the request that opens the screen. Retry a failed
-      // lookup while the screen is open instead of waiting for the next full refresh.
-      if (!hasCandidates(state.candidates) && Date.now() - lastCandidateAttempt >= 15_000) {
-        await withinMarketBudget(refreshCandidates().catch(() => undefined), undefined, 2_000);
-      }
-      return structuredClone(state);
-    },
+    async snapshot() { return snapshot(); },
     async withIdleForImprovement(apply?: () => Promise<void>) {
       const result = await serial(async () => {
         if (state.running || state.positions.length || state.lifecycle?.status === "running" || state.lifecycle?.status === "stopping") return { idle: false };
@@ -214,36 +204,37 @@ async function createRuntime() {
       return result.idle;
     },
     async run(action: ProgramTradingAction) {
-      const version = ++commandVersion;
-      const startChecks = action === "start"
-        ? await Promise.all([readCalendar(), withinMarketBudget(refreshCandidates(), undefined, 3_000)])
-        : undefined;
-
-      return serial(async () => {
-        revision++;
-        if (action === "new-session") return openNewSession();
-        if (startChecks) {
-          if (requiresRestart) return { error: "반영한 개선을 사용하려면 로컬 개발 서버를 다시 시작해 주세요." };
-          if (version !== commandVersion) return { error: "더 최근 운용 명령이 있어 시작을 취소했어요." };
-          updateSession(state, startChecks[0]);
-          if (state.lastError) return { error: state.lastError };
-          if (state.lifecycle?.status === "completed" || state.lifecycle?.status === "stopping") {
-            return { error: "종료했거나 종료 중인 세션은 시작할 수 없어요." };
-          }
-          if (state.killed) return { error: "안전 제한에 도달해 이 세션을 다시 시작할 수 없어요." };
-          if (state.startBlockReason) return { error: state.startBlockReason };
-          if (!hasCandidates(state.candidates)) return { error: "거래량 상위에서 상승 중인 매매 후보를 확인하지 못했어요." };
+      const result = await serial(async () => {
+        const now = Date.now();
+        const session = paperSession(now);
+        if (state.lastError) return { error: state.lastError };
+        if (action === "new-session") {
+          if (state.lifecycle?.status !== "completed" || state.positions.length) return { error: P.finishBeforeNew };
+          await mkdir(archiveDirectory, { recursive: true, mode: 0o700 });
+          const archiveName = `${new Date(now).toISOString().replaceAll(":", "-")}-${randomUUID()}`;
+          await rename(directory, `${archiveDirectory}/${archiveName}`);
+          state = initialState(now);
+          journal = undefined;
+        } else if (action === "start") {
+          const reason = snapshot(now).startBlockReason;
+          if (reason) return { error: reason };
+          if (state.lifecycle && (state.lifecycle.status !== "running" || priorDate(now))) return { error: P.finishBeforeNew };
+          startSession(state, session.scanAt, now);
+          markTime(now);
+          await persist();
+        } else if (action === "pause" && state.lifecycle?.status === "running") {
+          pending?.abort();
+          pending = undefined;
+          state.running = false;
+          markTime(now);
+          await persist();
+        } else if (action === "flatten") {
+          await beginClose("manual", now, !priorDate(now) && now < session.closeAt && state.policyVersion === RULES_VERSION);
         }
-        if (action === "flatten") {
-          state.quotes = [];
-          state.minute = minuteInKorea(Date.now());
-        }
-        command(state, action);
-        settleStop();
-        scheduleStop();
-        await persist();
-        return { state: structuredClone(state) };
+        return { state: snapshot(now) };
       });
+      if (action === "start" && !result.error) tick();
+      return result;
     },
     download: (kind: "logs" | "review") => readFile(`${directory}/${kind === "logs" ? "trades.jsonl" : "review.json"}`, "utf8"),
   };

@@ -1,6 +1,6 @@
-import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { ProgramTradingImproveButton } from "./ProgramTradingImproveButton";
+import { ProgramTradingInfo } from "./ProgramTradingInfo";
 import { PROGRAM_REVIEW_COPY as C } from "@/lib/copy/programTrading/programTrading";
 import { listPaperReviewEvents, paperResultId } from "@/lib/server/programTrading/reviewHistory";
 
@@ -10,11 +10,11 @@ const reviewTime = new Intl.DateTimeFormat("ko-KR", {
 
 function EvaluationSection({ children }: { children: ReactNode }) {
   return (
-    <section aria-labelledby="session-evaluation" className="min-w-0 space-y-md rounded-lg border border-border-line bg-surface p-md md:p-lg">
-      <h2 id="session-evaluation" className="flex items-center gap-sm text-h2 font-bold text-text-strong">
-        <Sparkles aria-hidden="true" className="size-5 shrink-0 text-primary" />
-        {C.evaluation}
-      </h2>
+    <section aria-labelledby="session-evaluation" className="min-w-0 space-y-sm border-t border-border-line pt-sm">
+      <div className="relative flex items-center">
+        <h2 id="session-evaluation" className="text-h2 font-bold text-text-strong">{C.evaluation}</h2>
+        <ProgramTradingInfo label={C.evaluation} description={C.evaluationHint} />
+      </div>
       {children}
     </section>
   );
@@ -53,7 +53,7 @@ export async function ProgramTradingEvaluation({ startedAt, canApply }: { starte
                 <EventTime value={latest.created_at} />
               </div>
             </div>
-            <div className="min-w-0 space-y-sm rounded-lg bg-surface-muted p-md">
+            <div className="min-w-0 space-y-sm border-t border-border-line pt-md md:border-t-0 md:border-l md:pt-0 md:pl-md">
               <h3 className="text-body-md font-semibold text-text-strong">{latestApplied ? C.improveApplied : C.evaluationPlan}</h3>
               {latestApplied ? (
                 <>
@@ -105,9 +105,9 @@ export async function ProgramTradingEvaluation({ startedAt, canApply }: { starte
       {previous.length > 0 && (
         <details className="space-y-sm border-t border-border-line pt-sm text-body-sm">
           <summary className="min-h-hit-area-min cursor-pointer rounded-md py-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary font-semibold text-text-strong">{C.evaluationHistory} · {previous.length}{C.countUnit}</summary>
-          <ul className="space-y-sm">
+          <ul className="divide-y divide-border-line">
             {previous.map(({ id, score, created_at, details }) => (
-              <li key={id} className="wrap-anywhere space-y-xs rounded-lg bg-surface-muted p-md text-text-strong">
+              <li key={id} className="wrap-anywhere space-y-xs py-sm text-text-strong">
                 <EventTime value={created_at} />
                 <p className="font-semibold">{C.evaluationScore(score)}</p>
                 <p>{details.summary}</p>

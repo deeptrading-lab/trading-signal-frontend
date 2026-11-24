@@ -71,7 +71,7 @@ export default async function ProgramTradingReviewPage({
   );
 
   return (
-    <div className="mx-auto flex min-w-0 w-full max-w-main-max-w flex-col gap-xl font-(family-name:--font-pretendard)">
+    <div className="mx-auto flex w-full min-w-0 max-w-main-max-w flex-col gap-lg font-(family-name:--font-pretendard) sm:gap-xl">
       <header className="flex flex-wrap items-center justify-between gap-sm">
         <div className="space-y-xs">
           <h1 className="text-h1 font-bold text-text-strong">{C.title}</h1>
@@ -96,7 +96,7 @@ export default async function ProgramTradingReviewPage({
       {result ? (
         <div className="grid min-w-0 gap-lg lg:grid-cols-[minmax(0,1fr)_14rem]">
           {(result.sessions.length > 1 || (result.sessions.length > 0 && !result.review) || pagination) && (
-            <details className="rounded-lg border border-border-line bg-surface p-md lg:hidden">
+            <details className="border-y border-border-line lg:hidden">
               <summary className="min-h-hit-area-min cursor-pointer rounded-md py-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-body-sm font-semibold text-text-strong">{C.changeSession}</summary>
               <nav aria-label={C.sessions} className="mt-sm">{sessionLinks}</nav>
             </details>
@@ -109,14 +109,14 @@ export default async function ProgramTradingReviewPage({
                 </Suspense>
                 <ProgramTradingReviewTable review={result.review} />
               </>
-            ) : <p className="rounded-lg border border-border-line bg-surface p-lg text-body-sm text-text-muted">
+            ) : <p className="border-t border-border-line pt-md text-body-sm text-text-muted">
               {sessionId || result.sessions.length ? (shared ? C.sharedUnavailable : C.unavailable) : C.empty}
             </p>}
             <ProgramTradingPerformance points={result.performance} selectedId={result.selectedId} paginated={shared} />
           </div>
           {(result.sessions.length > 0 || pagination) && (
-            <nav aria-label={C.sessions} className="hidden h-fit min-w-0 space-y-sm rounded-lg border border-border-line bg-surface p-md lg:sticky lg:top-lg lg:col-start-2 lg:row-start-1 lg:block">
-              <h2 className="text-body-md font-semibold text-text-strong">{C.sessions}</h2>
+            <nav aria-label={C.sessions} className="hidden h-fit min-w-0 space-y-sm border-l border-border-line pl-md lg:sticky lg:top-lg lg:col-start-2 lg:row-start-1 lg:block">
+              <h2 className="text-h2 font-bold text-text-strong">{C.sessions}</h2>
               {sessionLinks}
             </nav>
           )}

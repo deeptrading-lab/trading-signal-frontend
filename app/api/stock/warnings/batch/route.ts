@@ -6,7 +6,7 @@
  * 빈 맵 + `X-Data-Source: none`(동료 로컬 무영향).
  *
  * `?tickers=a,b,c` (쉼표 구분). 최대 `MAX_TICKERS` 캡(초과분은 로그 후 절단 — 무음 절단 금지).
- * `fetchActiveWarningsBatch` 가 동시성 제한(5/s 준수) + 60s 캐시 + never-throw 를 담당.
+ * `fetchActiveWarningsBatch` 가 동시성 제한 + 60s 캐시 + never-throw 를 담당.
  */
 
 import { NextRequest } from "next/server";
@@ -26,7 +26,8 @@ import { withTimeout, jsonWithDataSource } from "@/lib/server/bffUtils";
  * 콜드 캐시 첫 로드는 동시성 5 로 나눠 fan-out(60s 캐시가 이후 흡수, fail-soft·백그라운드).
  */
 const MAX_TICKERS = 50;
-const BFF_TIMEOUT_MS = 6_000;
+// A cold 50-symbol batch takes at least 12 seconds at the shared STOCK pace.
+const BFF_TIMEOUT_MS = 18_000;
 
 export async function GET(request: NextRequest) {
   const raw = (request.nextUrl.searchParams.get("tickers") ?? "").trim();

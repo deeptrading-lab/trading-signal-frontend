@@ -102,8 +102,8 @@ describe("fetchOrderbook", () => {
       asks: [{ price: "101", volume: "2" }],
       bids: [{ price: "100", volume: "3" }],
     });
-    const ob = await fetchOrderbook("005930");
-    expect(mockTossGet).toHaveBeenCalledWith("/api/v1/orderbook", { symbol: "005930" });
+    const ob = await fetchOrderbook("005930", "program-paper");
+    expect(mockTossGet).toHaveBeenCalledWith("/api/v1/orderbook", { symbol: "005930" }, "program-paper");
     expect(ob.spread).toBe(1);
   });
 

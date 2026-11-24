@@ -1,76 +1,122 @@
 "use client";
 
-import { ArrowDown, BriefcaseBusiness, ClipboardList, Play, RefreshCw, Square } from "lucide-react";
+import { ClipboardList, Play, RefreshCw, Square } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ProgramTradingDiagramModal } from "@/components/programTrading/ProgramTradingDiagramModal";
+import { ProgramTradingInfo } from "@/components/programTrading/ProgramTradingInfo";
 import { useProgramTrading } from "@/hooks/programTrading/useProgramTrading";
 import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_PAPER_COPY as P, PROGRAM_REVIEW_COPY as R } from "@/lib/copy/programTrading/programTrading";
+import type { Trade } from "@/lib/types/programTrading/programTrading";
 import { cn } from "@/lib/utils/cn";
 
 const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
-const time = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, "0")}:${(minute % 60).toString().padStart(2, "0")}`;
+const kstTime = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+const tradeColumns = [P.time, C.ticker, C.quantity, C.price, C.reason, C.net];
+const numericTradeColumns = [C.quantity, C.price, C.net] as readonly string[];
+const ledgerCell = "px-sm py-sm first:pl-0 last:pr-0 sm:px-md";
+const ledgerNumber = "text-right tabular-nums";
+
+function tradeTime(trade: Trade) {
+  if (trade.evidence && Number.isFinite(trade.evidence.observedAt)) {
+    return kstTime.format(trade.evidence.observedAt);
+  }
+  const hours = Math.floor(trade.minute / 60).toString().padStart(2, "0");
+  return `${hours}:${(trade.minute % 60).toString().padStart(2, "0")}`;
+}
 
 export function ProgramTradingPanel() {
   const [diagramOpen, setDiagramOpen] = useState(false);
-  const { state, loading, pending, error, connected, canStart, candidatesReady, send } = useProgramTrading();
+  const { state, loading, pending, error, connected, canStart, send } = useProgramTrading();
   const positions = state?.positions ?? [];
   const finished = state?.lifecycle?.status === "completed";
   const stopping = state?.lifecycle?.status === "stopping";
   const before = state?.lifecycle?.beforeBalance;
   const after = finished ? state?.lifecycle?.afterBalance : state?.equity;
-  const returns = before && after != null ? (after / before - 1) * 100 : null;
+  const profit = before == null || after == null ? null : after - before;
+  const returns = before && profit != null ? (profit / before) * 100 : null;
+  const trades = state?.trades ?? [];
+  const latestTrade = trades.at(-1);
+  const candidates = state?.candidates.rows ?? [];
   const metrics = [
-    [M.initial, before == null ? M.noBalance : money(before)],
-    [finished ? M.final : M.current, before == null || after == null ? M.noBalance : money(after)],
-    [M.profit, before == null || after == null ? M.noBalance : money(after - before)],
-    [M.returns, returns == null ? M.noBalance : `${returns > 0 ? "+" : ""}${returns.toFixed(2)}%`],
+    { label: M.initial, value: before == null ? M.noBalance : money(before) },
+    { label: finished ? M.final : M.current, value: before == null || after == null ? M.noBalance : money(after) },
+    { label: M.profit, value: profit == null ? M.noBalance : money(profit), direction: profit },
+    { label: M.returns, value: returns == null ? M.noBalance : `${returns > 0 ? "+" : ""}${returns.toFixed(2)}%`, direction: returns },
   ];
 
-  return <div className="mx-auto flex min-w-0 w-full max-w-main-max-w flex-col gap-xl font-(family-name:--font-pretendard)">
-    <header className="flex flex-wrap items-center justify-between gap-md">
-      <div>
+  return <div className="mx-auto flex w-full min-w-0 max-w-main-max-w flex-col gap-lg font-(family-name:--font-pretendard) sm:gap-xl">
+    <header className="flex flex-wrap items-center justify-between gap-x-lg gap-y-sm">
+      <div className="relative w-full min-w-0 sm:w-64">
         <h1 className="text-h1 font-bold text-text-strong">{M.title}</h1>
-        <p className="mt-xs text-body-sm text-text-muted">{P.subtitle}</p>
+        <div className="flex w-fit min-w-0 items-center">
+          <span className="text-body-sm font-medium text-text-muted">{P.mode}</span>
+          <ProgramTradingInfo label={P.mode} description={P.hint} />
+        </div>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-sm">
-        <span className="badge-info">{P.mode}</span>
-        <button type="button" className="button-secondary program-trading-action whitespace-nowrap" aria-haspopup="dialog" onClick={() => setDiagramOpen(true)}>
+      <div className="grid w-full min-w-0 grid-cols-2 gap-sm sm:flex sm:w-auto">
+        <button type="button" className="button-secondary program-trading-action" aria-haspopup="dialog" onClick={() => setDiagramOpen(true)}>
           {M.showDiagram}
         </button>
-        <Link href="/program-trading/review" className="button-secondary program-trading-action whitespace-nowrap no-underline" prefetch={false}>
+        <Link href="/program-trading/review" className="button-secondary program-trading-action no-underline" prefetch={false}>
           <ClipboardList className="size-4 shrink-0" aria-hidden="true" />
           {R.open}
         </Link>
       </div>
     </header>
 
-    <section className="rounded-lg border border-border-line p-lg" aria-label={P.mode}>
-      <p className="text-body-sm font-semibold text-text-strong">{P.hint}</p>
-      <h2 className="mt-md text-body-sm font-semibold text-text-strong">{P.candidates} · {state?.candidates.rows.length ?? 0}</h2>
-      {state?.candidates.rows.length ? (
-        <ul className="mt-sm flex flex-wrap gap-xs">
-          {state.candidates.rows.map(row => <li key={row.ticker} className="badge-info max-w-full whitespace-normal break-words">
-            {row.name} · {row.sources.map(source => P.candidateSources[source]).join("·")}
-          </li>)}
+    <section className="border-t border-border-line pt-sm" aria-labelledby="program-candidates">
+      <div className="relative flex flex-wrap items-center justify-between gap-x-sm">
+        <div className="flex min-w-0 items-center">
+          <h2 id="program-candidates" className="text-h2 font-bold text-text-strong">{P.candidates}</h2>
+          <ProgramTradingInfo label={P.candidates} description={P.candidateHint} />
+        </div>
+        <span className="text-body-sm tabular-nums text-text-muted">{state ? `${candidates.length}${P.candidateUnit}` : M.noBalance}</span>
+      </div>
+      {candidates.length > 0 && (
+        <ul className="mt-xs flex flex-wrap gap-x-lg gap-y-xs text-body-sm text-text-strong">
+          {candidates.map(row => (
+            <li key={row.ticker} className="min-w-0 wrap-anywhere">
+              {row.name}
+              {row.sources.some(source => source !== "volume") && (
+                <span className="ml-xs text-text-muted">{row.sources.map(source => P.candidateSources[source]).join(" · ")}</span>
+              )}
+            </li>
+          ))}
         </ul>
-      ) : <p className="mt-xs text-caption text-text-muted">{M.noBalance}</p>}
-      <p className="mt-xs break-keep text-caption text-text-muted">{P.limits}</p>
+      )}
     </section>
 
-    <section aria-label={M.returns} className="space-y-md">
-      <div className="grid grid-cols-2 gap-md lg:grid-cols-4">
-        {metrics.map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-muted p-md sm:p-lg">
-          <p className="text-caption text-text-muted">{label}</p>
-          <p className="mt-sm break-all text-body-md font-bold tabular-nums text-text-strong sm:text-h2">{value}</p>
-        </div>)}
+    <section className="space-y-sm" aria-labelledby="program-results">
+      <div className="relative flex flex-wrap items-center justify-between gap-x-sm">
+        <div className="flex min-w-0 items-center">
+          <h2 id="program-results" className="text-h2 font-bold text-text-strong">{M.results}</h2>
+          <ProgramTradingInfo label={M.results} description={`${M.targetPolicy}. ${P.limits}.`} />
+        </div>
+        <p className="text-body-sm text-text-muted">{M.target} <span className="font-semibold tabular-nums text-text-strong">{state?.lifecycle?.targetReturnPct ?? 1}%</span></p>
       </div>
-      <p className="text-caption text-text-muted">{M.target} {state?.lifecycle?.targetReturnPct ?? 1}% · {M.targetPolicy}</p>
-      <div className="flex flex-wrap items-center justify-between gap-md">
+      <dl className="grid grid-cols-2 gap-px border-y border-border-line bg-border-line lg:grid-cols-4">
+        {metrics.map(({ label, value, direction }) => (
+          <div key={label} className="min-w-0 bg-surface p-sm sm:p-md">
+            <dt className="text-body-sm text-text-muted">{label}</dt>
+            <dd className={cn("mt-xs wrap-anywhere text-body-md font-bold tabular-nums text-text-strong sm:text-h2",
+              direction != null && direction > 0 && "text-signal-up",
+              direction != null && direction < 0 && "text-signal-down",
+            )}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap items-center justify-between gap-sm">
         <p role="status" className={cn("inline-flex items-center gap-xs text-body-sm font-semibold", connected ? "text-primary" : "text-signal-down")}>
           {loading ? C.loading : !connected ? M.stale : stopping ? M.stopping : finished ? M.finished : state?.killed ? C.killed : state?.running ? (
             <>
-              {candidatesReady ? M.running : M.candidateRetry}
+              {positions.length ? M.running : (state.minute < 545 ? P.waitForOpenRanks : M.candidateRetry)}
               <RefreshCw className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
             </>
           ) : M.stopped}
@@ -93,60 +139,62 @@ export function ProgramTradingPanel() {
           </button>
         </div>}
       </div>
-      {finished && <p className="text-caption text-text-muted">{state?.lifecycle?.forcedAt ? M.forcedSettlement : M.completedHint}</p>}
-      {error && <p role="alert" className="rounded-lg bg-surface-muted p-md text-body-sm">{error}</p>}
-      {!loading && connected && !canStart && !finished && !stopping && <p className="text-caption text-text-muted">{state?.startBlockReason ?? P.noCandidates}</p>}
+      {finished && <p className="text-body-sm text-text-muted">{state?.lifecycle?.forcedAt ? M.forcedSettlement : M.completedHint}</p>}
+      {error && <p role="alert" className="text-body-sm text-signal-down">{error}</p>}
+      {!loading && connected && !canStart && !finished && !stopping && <p className="text-body-sm text-text-muted">{state?.startBlockReason ?? P.noCandidates}</p>}
     </section>
 
-    <section className="space-y-md rounded-lg border border-border-line bg-surface p-md sm:p-lg" aria-labelledby="program-holdings">
+    <section className="space-y-sm border-t border-border-line pt-md" aria-labelledby="program-holdings">
       <div className="flex flex-wrap items-center justify-between gap-sm">
-        <h2 id="program-holdings" className="flex items-center gap-sm text-h2 font-bold text-text-strong">
-          <BriefcaseBusiness className="size-5 shrink-0 text-primary" aria-hidden="true" />
-          {P.holdings}
-        </h2>
-        {state && <span className="badge-info shrink-0 tabular-nums">{positions.length}{P.positionUnit}</span>}
+        <h2 id="program-holdings" className="text-h2 font-bold text-text-strong">{P.holdings}</h2>
+        {state && <span className="text-body-sm tabular-nums text-text-muted">{positions.length}{P.positionUnit}</span>}
       </div>
       {positions.length ? (
-        <ul className={cn("grid gap-sm", positions.length > 1 && "md:grid-cols-2")}>
+        <ul className="divide-y divide-border-line">
           {positions.map(position => (
-            <li key={position.ticker} className="flex min-w-0 items-center justify-between gap-md rounded-md bg-surface-muted px-md py-sm">
-              <span className="min-w-0 wrap-anywhere text-body-md font-semibold text-text-strong">{position.name ?? position.ticker}</span>
-              <span className="shrink-0 whitespace-nowrap text-body-md font-semibold tabular-nums text-text-strong">
+            <li key={position.ticker} className="flex min-w-0 items-center justify-between gap-md py-xs text-body-sm text-text-strong">
+              <span className="min-w-0 wrap-anywhere font-semibold">{position.name ?? position.ticker}</span>
+              <span className="shrink-0 whitespace-nowrap tabular-nums">
                 {position.quantity.toLocaleString("ko-KR")}{P.shareUnit}
               </span>
             </li>
           ))}
         </ul>
-      ) : <p className="rounded-md bg-surface-muted px-md py-sm text-body-sm text-text-muted">{P.positionEmpty}</p>}
+      ) : <p className="text-body-sm text-text-muted">{P.positionEmpty}</p>}
     </section>
 
-    <section className="space-y-md" aria-label={M.logs}>
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <h2 className="text-h2 font-bold text-text-strong">{M.logs}</h2>
-        <span className="flex items-center gap-xs text-caption text-text-muted"><ArrowDown className="h-4 w-4 shrink-0" aria-hidden="true" />{M.realtime}</span>
+    <section className="space-y-sm border-t border-border-line pt-sm" aria-labelledby="program-logs">
+      <div className="relative flex flex-wrap items-center justify-between gap-x-sm">
+        <div className="flex min-w-0 items-center">
+          <h2 id="program-logs" className="text-h2 font-bold text-text-strong">{M.logs}</h2>
+          <ProgramTradingInfo label={M.logs} description={M.logHint} />
+        </div>
+        {latestTrade && <p className="text-body-sm tabular-nums text-text-muted">{M.lastTrade} {tradeTime(latestTrade)}</p>}
       </div>
-      <p className="text-caption text-text-muted">
-        {state?.updatedAt ? `${M.logUpdated} · ${new Date(state.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul" })}` : M.empty}
-      </p>
-      {!state?.trades.length ? <p className="rounded-lg bg-surface-muted p-lg text-body-sm text-text-muted">{M.empty}</p> :
-        <div className="max-h-96 max-w-full overflow-auto rounded-lg border border-border-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      {!latestTrade ? <p className="text-body-sm text-text-muted">{M.empty}</p> :
+        <div className="max-h-96 max-w-full overflow-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           tabIndex={0} role="region" aria-label={M.logs}>
           <table className="w-full whitespace-nowrap text-left text-body-sm">
             <caption className="sr-only">{M.logs}</caption>
-            <thead className="sticky top-0 bg-surface-muted"><tr>
-              {[P.time, C.ticker, C.quantity, C.price, C.reason, C.net].map(label => <th key={label} scope="col" className="p-md font-medium text-text-muted">{label}</th>)}
+            <thead className="sticky top-0 bg-surface"><tr>
+              {tradeColumns.map(label => (
+                <th key={label} scope="col" className={cn(ledgerCell, "font-medium text-text-muted", numericTradeColumns.includes(label) && "text-right")}>{label}</th>
+              ))}
             </tr></thead>
-            <tbody>{state.trades.slice().reverse().map(trade => <tr key={trade.id} className="border-t border-border-line">
-              <td className="p-md tabular-nums">{time(trade.minute)}</td>
-              <td className="p-md font-semibold">{trade.name ?? trade.ticker} · {trade.side === "buy" ? C.buy : C.sell}</td>
-              <td className="p-md tabular-nums">{trade.quantity}</td>
-              <td className="p-md tabular-nums">{money(trade.price)}</td>
-              <td className="p-md">{C.reasons[trade.reason]}</td>
-              <td className="p-md tabular-nums">{trade.net == null ? M.noBalance : money(trade.net)}</td>
+            <tbody>{trades.slice().reverse().map(trade => <tr key={trade.id} className="border-t border-border-line">
+              <td className={cn(ledgerCell, "tabular-nums")}>{tradeTime(trade)}</td>
+              <td className={ledgerCell}>
+                <span className="font-semibold text-text-strong">{trade.name ?? trade.ticker}</span>
+                <span className="ml-xs text-text-muted">{trade.side === "buy" ? C.buy : C.sell}</span>
+              </td>
+              <td className={cn(ledgerCell, ledgerNumber)}>{trade.quantity.toLocaleString("ko-KR")}</td>
+              <td className={cn(ledgerCell, ledgerNumber)}>{money(trade.price)}</td>
+              <td className={ledgerCell}>{C.reasons[trade.reason]}</td>
+              <td className={cn(ledgerCell, ledgerNumber)}>{trade.net == null ? M.noBalance : money(trade.net)}</td>
             </tr>)}</tbody>
           </table>
         </div>}
-      <p className="text-caption text-text-muted">{M.logHint} <a href="/api/program-trading/logs" target="_blank" rel="noreferrer" className="text-link">{M.downloadLogs}</a></p>
+      <a href="/api/program-trading/logs" target="_blank" rel="noreferrer" className="inline-flex min-h-hit-area-min items-center text-body-sm text-link">{M.downloadLogs}</a>
     </section>
     {diagramOpen && <ProgramTradingDiagramModal onClose={() => setDiagramOpen(false)} />}
   </div>;

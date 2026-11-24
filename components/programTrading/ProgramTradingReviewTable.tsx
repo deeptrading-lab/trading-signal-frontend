@@ -21,12 +21,12 @@ function formatWon(value: number | null) {
 
 function ReviewDetails({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <details className="group rounded-lg border border-border-line bg-surface">
-      <summary className="flex min-h-hit-area-min cursor-pointer list-none items-center justify-between gap-sm rounded-lg px-md py-sm text-body-sm font-semibold text-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+    <details className="group border-t border-border-line">
+      <summary className="flex min-h-hit-area-min cursor-pointer list-none items-center justify-between gap-sm py-sm text-body-sm font-semibold text-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
         {title}
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-text-muted group-open:rotate-180" />
       </summary>
-      <div className="space-y-sm border-t border-border-line p-md">{children}</div>
+      <div className="space-y-sm pb-sm">{children}</div>
     </details>
   );
 }
@@ -56,15 +56,15 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
   ] as const;
 
   return (
-    <section className="min-w-0 space-y-md" aria-labelledby="session-summary">
-      <h2 id="session-summary" className="text-body-md font-semibold text-text-strong">{C.summary}</h2>
-      <dl className="grid grid-cols-2 gap-sm sm:grid-cols-3">
+    <section className="min-w-0 space-y-sm border-t border-border-line pt-md" aria-labelledby="session-summary">
+      <h2 id="session-summary" className="text-h2 font-bold text-text-strong">{C.summary}</h2>
+      <dl className="grid grid-cols-2 gap-px border-y border-border-line bg-border-line sm:grid-cols-3">
         {metrics.map(([label, value, direction]) => (
-          <div key={label} className="min-w-0 rounded-lg border border-border-line bg-surface p-md last:col-span-2 sm:last:col-span-1">
+          <div key={label} className="min-w-0 bg-surface p-sm last:col-span-2 sm:p-md sm:last:col-span-1">
             <dt className="text-body-sm text-text-muted">{label}</dt>
-            <dd className={cn("mt-xs wrap-anywhere text-lg font-bold md:text-h2 tabular-nums text-text-strong",
+            <dd className={cn("mt-xs wrap-anywhere text-body-md font-bold tabular-nums text-text-strong sm:text-h2",
               direction != null && direction > 0 && "text-signal-up",
-              direction != null && direction < 0 && "text-chart-down")}>{value}</dd>
+              direction != null && direction < 0 && "text-signal-down")}>{value}</dd>
           </div>
         ))}
       </dl>
@@ -87,7 +87,7 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
         </table>
       </ReviewDetails>
       {!audit && proposals.length > 0 && (
-        <div className="rounded-lg border border-border-line bg-surface p-md">
+        <div className="border-t border-border-line pt-sm">
           <h3 className="text-body-sm font-semibold text-text-strong">{C.proposals}</h3>
           <ul className="mt-xs list-disc space-y-xs break-keep pl-lg text-body-sm text-text-muted">
             {proposals.map(proposal => <li key={proposal}>{proposal}</li>)}
@@ -99,7 +99,7 @@ export function ProgramTradingReviewTable({ review }: { review: PaperSessionRevi
           <>
             <p className="break-keep text-caption text-text-muted">{C.auditCode} · {audit.codeReference}</p>
             {auditGroups.filter(([, findings]) => findings.length > 0).map(([label, findings]) => (
-              <section key={label} className="space-y-sm rounded-lg border border-border-line bg-surface p-md">
+              <section key={label} className="space-y-sm border-t border-border-line py-sm">
                 <h4 className="text-body-sm font-semibold text-text-strong">{label}</h4>
                 <ul className="space-y-sm break-keep text-body-sm">
                   {findings.map(({ title, evidence }) => (

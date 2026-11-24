@@ -10,7 +10,7 @@
  *   - 성공 응답 `{ result }` 언래핑.
  *   - 401 invalid-token/expired-token → 단일 활성 토큰 정책상 외부 재발급으로 내 토큰이 죽은
  *     케이스 → 토큰 폐기 후 1회 재발급·재시도 (`token.ts` 주석 참조).
- *   - 429 → Retry-After를 공유. 캔들은 이후 호출부터 재개하고, 다른 경로는 3초 이내 최대 2회 재시도.
+ *   - 429 → 캔들·종목·시세 그룹에서 Retry-After를 공유. 짧은 종목 조회 제한은 1회 재시도.
  */
 
 import axios, { type AxiosInstance } from "axios";
@@ -25,6 +25,10 @@ import {
   resetCandleRateLimitForTest,
   waitForCandleSlot,
 } from "./candleRateLimit";
+import { getPacedTossGroup, observeTossGroupResponse, resetRestRateLimitsForTest, waitForTossGroupSlot } from "./restRateLimit";
+import { logTossRateLimit, recordTossDispatch, recordTossResult, resetTossRequestMetricsForTest } from "./requestMetrics";
+
+import { assertPaperMarketRequestAllowed, observePaperMarket429, PAPER_MARKET_SOURCE, reservePaperMarketRequest, resetPaperMarketLimitForTest } from "./paperMarketLimit";
 
 export const TOSS_BASE_URL = "https://openapi.tossinvest.com";
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -71,6 +75,9 @@ export function resetTossClientForTest(): void {
   cooldowns.clear();
   nextDiagnostics.clear();
   resetCandleRateLimitForTest();
+  resetRestRateLimitsForTest();
+  resetTossRequestMetricsForTest();
+  resetPaperMarketLimitForTest();
 }
 
 /**
@@ -93,21 +100,27 @@ export async function tossGet<T>(
   path: string,
   params?: Record<string, string | number>,
   source?: string,
+  signal?: AbortSignal,
 ): Promise<T> {
+  const paperMarket = source === PAPER_MARKET_SOURCE && ["/api/v1/rankings", "/api/v1/prices"].includes(path);
   const candle = path === "/api/v1/candles";
+  const group = getPacedTossGroup(path);
   const startedAt = Date.now();
   const admissionDeadline = startedAt + (source === "program-paper"
     ? PAPER_CANDLE_ADMISSION_BUDGET_MS
     : STOCK_CANDLE_ADMISSION_BUDGET_MS);
+  const groupDeadline = startedAt + (source === "program-paper" ? 2_000 : DEFAULT_TIMEOUT_MS);
   let retried401 = false;
   let retries429 = 0;
   let retriedTransient = false;
 
   for (;;) {
-    const waitMs = (cooldowns.get(path) ?? 0) - Date.now();
+    signal?.throwIfAborted();
+    const waitMs = paperMarket ? 0 : (cooldowns.get(path) ?? 0) - Date.now();
     if (waitMs > RETRY_AFTER_CAP_SEC * 1_000) throw makeTossBusinessError(429, undefined);
     if (waitMs > 0) await delay(waitMs);
 
+    if (paperMarket) assertPaperMarketRequestAllowed(Date.now());
     let token: string;
     try {
       token = await getTossAccessToken();
@@ -125,24 +138,32 @@ export async function tossGet<T>(
         throw error;
       }
     }
+    if (group && !paperMarket) await waitForTossGroupSlot(group, groupDeadline);
+    signal?.throwIfAborted();
     const sentAt = Date.now();
+    if (paperMarket) reservePaperMarketRequest(sentAt);
+    const attempt = recordTossDispatch(path, sentAt, source);
     let response;
     let candleRate: ReturnType<typeof observeCandleResponse> | undefined;
+    let groupRate: ReturnType<typeof observeTossGroupResponse> | undefined;
     try {
       try {
         response = await getTossClient().get(path, {
           params,
-          signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(DEFAULT_TIMEOUT_MS)]) : AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
           headers: { Authorization: `Bearer ${token}` },
         });
+        recordTossResult(attempt, response.status);
         if (candle) candleRate = observeCandleResponse(response, sentAt);
+        if (group) groupRate = observeTossGroupResponse(group, response, sentAt);
       } finally {
         releaseCandleSlot?.();
       }
     } catch (error) {
-      diagnose(path, "transport", axios.isAxiosError(error) ? error.response?.status : undefined,
-        axios.isAxiosError(error) ? error.code : undefined);
-      if (!retriedTransient) {
+      const transportStatus = axios.isAxiosError(error) ? error.response?.status : undefined;
+      recordTossResult(attempt, transportStatus);
+      diagnose(path, "transport", transportStatus, axios.isAxiosError(error) ? error.code : undefined);
+      if (!retriedTransient && source !== "program-paper") {
         retriedTransient = true;
         await delay(TRANSIENT_RETRY_BACKOFF_MS);
         continue;
@@ -184,6 +205,12 @@ export async function tossGet<T>(
 
     const errBody = response.data as TossErrorBody;
     const code = errBody?.error?.code;
+    const errorDiagnostics = {
+      code,
+      requestId: errBody?.error?.requestId,
+      referenceId: response.headers?.["referenceid"],
+      cloudFrontId: response.headers?.["x-amz-cf-id"],
+    };
 
     if (
       response.status === 401 &&
@@ -193,20 +220,27 @@ export async function tossGet<T>(
       diagnose(path, "token-refresh", 401, code);
       retried401 = true;
       await invalidateTossToken(token);
+      if (paperMarket) throw makeTossBusinessError(response.status, errBody);
       continue;
     }
 
-    if (response.status === 429 && candleRate) {
-      diagnose(path, "rate-limit", 429, code, candleRate.retryMs, {
-        ...candleDiagnostics,
-        requestId: errBody?.error?.requestId,
-        referenceId: response.headers?.["referenceid"],
-        cloudFrontId: response.headers?.["x-amz-cf-id"],
+    if (response.status === 429 && paperMarket) {
+      observePaperMarket429(response.headers?.["retry-after"], Date.now());
+      logTossRateLimit(attempt, response, { ...errorDiagnostics, queuedMs: sentAt - startedAt });
+    } else if (response.status === 429 && candleRate) {
+      logTossRateLimit(attempt, response, {
+        ...candleDiagnostics, ...errorDiagnostics, retryMs: candleRate.retryMs,
       });
+    } else if (response.status === 429 && groupRate) {
+      logTossRateLimit(attempt, response, { ...groupRate, ...errorDiagnostics, queuedMs: sentAt - startedAt });
+      if (group === "STOCK" && retries429 === 0 && Date.now() + groupRate.retryMs < groupDeadline) {
+        retries429 += 1;
+        continue;
+      }
     } else if (response.status === 429) {
       const waitMs = retryAfterMs(response.headers?.["retry-after"]);
       cooldowns.set(path, Math.max(Date.now() + waitMs, cooldowns.get(path) ?? 0));
-      diagnose(path, "rate-limit", 429, code, waitMs);
+      logTossRateLimit(attempt, response, { ...errorDiagnostics, retryMs: waitMs, queuedMs: sentAt - startedAt });
       if (retries429 < MAX_429_RETRIES && waitMs <= RETRY_AFTER_CAP_SEC * 1_000) {
         retries429 += 1;
         continue;

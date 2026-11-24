@@ -24,8 +24,8 @@ export function ProgramTradingPerformance({ points, selectedId, paginated }: { p
   const pointsById = new Map(data.map(point => [point.id, point]));
 
   return (
-    <section aria-labelledby="program-performance" className="min-w-0 space-y-sm rounded-lg border border-border-line bg-surface p-md">
-      <h2 id="program-performance" className="text-body-md font-semibold text-text-strong">{paginated ? C.sharedPerformance : C.performance}</h2>
+    <section aria-labelledby="program-performance" className="min-w-0 space-y-sm border-t border-border-line pt-md">
+      <h2 id="program-performance" className="text-h2 font-bold text-text-strong">{paginated ? C.sharedPerformance : C.performance}</h2>
       {data.length === 0 ? (
         <p className="text-body-sm text-text-muted">{C.performanceEmpty}</p>
       ) : (

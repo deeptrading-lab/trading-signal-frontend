@@ -1,117 +1,66 @@
-import { RULES } from '../lib/server/programTrading/engine';
+type View = "summary" | "detail" | "buy" | "sell" | "settlement";
+type Node = {
+  id: string;
+  lane: string;
+  col: number;
+  type: string;
+  icon: string;
+  label: string;
+  sublabel: string;
+  width: number;
+  sources: { path: string; line: number }[];
+};
+type Edge = { from: string; to: string; label?: string; role?: string; variant?: string; fromSide?: string; toSide?: string };
 
-type WorkflowNode = { id: string; lane: string; col: number; type: string; label: string; sublabel: string; tag?: string; icon?: string; width?: number; sources: { path: string; line: number }[] };
-type WorkflowEdge = { from: string; to: string; label?: string; role?: string; variant?: string; fromSide?: string; toSide?: string; route?: string };
-type Step = { label: string; note: string; branch: string };
-type View = 'summary' | 'detail' | 'buy' | 'sell' | 'settlement';
-
-// Keep every source condition in rules.template.html; only presentation is reorganized here.
-export function createProgramTradingWorkflow(html: string, view: View, revision: string) {
-  const article = html.match(new RegExp(`<article class="${view === 'summary' ? 'summary' : 'detail'}">([\\s\\S]*?)</article>`))?.[1];
-  if (!article) throw new Error(`다이어그램 원본이 없어요: ${view}`);
-  const sections = [...article.matchAll(/<section>([\s\S]*?)<\/section>/g)].map(section => {
-    const steps: Step[] = [];
-    for (const [, kind, body] of section[1].matchAll(/<div class="(node[^"]*|branch)">([\s\S]*?)<\/div>/g)) {
-      if (kind === 'branch') { steps.at(-1)!.branch = body.replace('↳ ', ''); continue; }
-      steps.push({ label: body.replace(/<small>[\s\S]*?<\/small>/, '').trim(), note: (body.match(/<small>([\s\S]*?)<\/small>/)?.[1] ?? '').replaceAll('&gt;', '>'), branch: '' });
-    }
-    return steps;
-  });
-  const lanes: { id: string; label: string }[] = [];
-  const nodes: WorkflowNode[] = [];
-  const edges: WorkflowEdge[] = [];
-  const sources = [{ path: 'docs/program-trading/rules.template.html', line: 1 }];
-  const row = (id: string, label: string) => lanes.push({ id, label: label.replace(/^\d+\s*[.·]\s*/, '') });
-  const node = (id: string, lane: string, col: number, label: string, sublabel: string, type = 'backend', tag?: string) => {
-    nodes.push({ id, lane, col, label, sublabel, type, sources, ...(tag ? { tag } : {}), icon: type === 'security' ? 'decision' : 'active' });
-    return id;
-  };
-  const edge = (from: string, to: string, label?: string, exception = false) => edges.push({ from, to, ...(label ? { label } : {}), ...(exception ? { role: 'branch', variant: 'security' } : {}) });
-  const chain = (ids: string[]) => ids.slice(1).forEach((id, index) => edge(ids[index], id));
-  const pct = (value: number) => Number((value * 100).toFixed(4));
-  let mainPath: string[] = [];
-  const titles: Record<View, string> = { summary: '자동매매 · 전체 흐름', detail: '자동매매 · 매수 조건', buy: '자동매매 · 매수 조건', sell: '자동매매 · 매도 우선순위', settlement: '자동매매 · 종료와 정산' };
-
-  if (view === 'summary') {
-    const [start, finish] = sections;
-    const steps = [
-      ['connect', '01 · 시세 준비', '토스 시세 연결', start[0].note],
-      ['ready', '02 · 시작 전 확인', '시작 준비 확인', '거래량 상위 14개 중 전일 대비 +종목'],
-      ['run', '03 · 운용', '사용자가 시작 → 자동매매', '매도 위험 관리 우선 · 조건 충족 매수'],
-      ['stop', '04 · 종료', '종료 요청', `목표 +${pct(RULES.sessionTarget)}% · 손실 −${pct(RULES.dailyLoss)}% · 연패/횟수/공백/마감`],
-      ['confirm', '05 · 완료 확인', '종료 조건을 모두 충족했나요?', '가상 보유 0'],
-      ['review', '06 · 결과 판단', `수익률이 목표 ${pct(RULES.sessionTarget)}% 이상인가요?`, '전체 가상 체결 원장으로 종료 복기'],
-    ];
-    for (const [id, lane, label, note] of steps) { row(id, lane); node(id, id, 0, label, note, ['ready', 'confirm', 'review'].includes(id) ? 'security' : 'backend', id === 'run' ? '가상 체결·보유 반영' : undefined); }
-    chain(['connect', 'ready', 'run', 'stop', 'confirm']);
-    edge('confirm', 'review', '충족');
-    node('pending', 'confirm', 1, '종료·정산 대기', finish[1].note, 'security', '기한 후 마지막 기록가로 정산'); edge('confirm', 'pending', '미충족', true);
-    node('keep', 'review', 1, '규칙 유지', '목표 달성 · 보완 제안 없음'); edge('review', 'keep', '예');
-    row('improve', '07 · 미달 시 검토'); node('improve', 'improve', 0, '검토 가이드 생성', finish[4].note, 'backend', '실행 중 규칙 자동 변경 없음'); edge('review', 'improve', '아니오');
-    mainPath = ['connect', 'ready', 'run', 'stop', 'confirm', 'review', 'improve'];
-  } else if (view === 'buy' || view === 'detail') {
-    const steps = sections[0];
-    const labels = steps.map(step => step.label);
-    const names = ['시세 준비', '거래 시간', '후보 유효성', '보유·재진입', '시세 확인', '진입 신호', '수량·예산', '가상 체결'];
-    const failures = ['시작 차단', '신규 매수 대기', '신규 매수 중지', '해당 후보 대기', '해당 후보 보류', '해당 후보 제외', '주문하지 않음'];
-    const failNotes = ['토스 시세 키와 거래량 상위 상승 후보 확인', '보유분 위험 관리 유지', '유효 후보 복구 시 자동 재개', '보유 한도·재진입 대기 재확인', '유효한 최신 시세에서 다시 확인', '다음 후보를 점검', '계산 수량이 1주 미만'];
-    for (let index = 0; index < steps.length; index++) {
-      const step = steps[index]; const id = `buy${index}`; row(id, `${index + 1}. ${names[index]}`);
-      let note = step.note;
-      let tag: string | undefined;
-      if (index === 0) tag = '사용자 시작 요청';
-      if (index === 1) tag = 'KST · 세션 종료 제한이 없을 때만 진입';
-      if (index === 3) tag = '손실 종목은 같은 세션 재진입 금지';
-      if (index === 4) tag = '유효한 시세 · 양방향 호가 · 비용 게이트';
-      if (index === 5) tag = '최근 완료 양봉과 그 이전 완료봉 3개 · 현재가 ≥신호 종가';
-      if (index === 6) { note = `최소(자산 ${pct(RULES.allocation)}%, 위험 ${pct(RULES.risk)}%, 현금)`; tag = step.note; }
-      if (index === 7) { note = '가상 매수 후 원장 기록'; tag = step.note; }
-      node(id, id, 0, labels[index], note, index < 6 ? 'security' : 'backend', tag);
-      if (index < 7) { node(`${id}no`, id, 1, failures[index], failNotes[index], 'security'); edge(id, `${id}no`, index === 6 ? '1주 미만' : '미충족', true); edge(id, `buy${index + 1}`, index === 6 ? '1주 이상' : '충족'); }
-    }
-    mainPath = steps.map((_, index) => `buy${index}`);
-  } else if (view === 'sell') {
-    const steps = sections[1];
-    row('orders', '01 · 보유 시세 확인'); node('orders', 'orders', 0, '보유 종목부터 시세 점검', '토스 최근 체결과 호가 확인', 'backend', '시세 유효 여부 확인');
-    row('unknown', '02 · 시세 유효성'); node('unknown', 'unknown', 0, '가상 매도에 유효한 시세인가요?', '정규장 · 5초 이내 체결과 호가', 'security');
-    node('lock', 'unknown', 1, '가상 청산 대기', '공백 안전 종료·30초 정산 기한은 별도로 진행', 'security'); edge('orders', 'unknown'); edge('unknown', 'lock', '미충족', true);
-    // Every priority is read from the template; adding a rule cannot silently hide it.
-    const priorities = steps.slice(2, -1);
-    for (const [index, step] of priorities.entries()) {
-      const id = `sell${index}`; row(id, `우선순위 ${index + 1}`);
-      node(id, id, 0, step.label, step.note, 'security');
-      const action = step.note.startsWith('trade-limit') ? '추가 매수 없이 세션 종료' : '해당 사유로 가상 청산·종료 반영';
-      node(`${id}yes`, id, 1, action, '가상 매도 후 현금·손익·제한 갱신', 'backend', '비용 반영 · 종료 사유 보존');
-      edge(id, `${id}yes`, '해당');
-      edge(index === 0 ? 'unknown' : `sell${index - 1}`, id, index === 0 ? '확인' : '해당 없음');
-    }
-    row('hold', '조건 미해당'); node('hold', 'hold', 0, '보유 · 다음 점검', '상위 종료·청산 조건부터 다시 확인');
-    edge(`sell${priorities.length - 1}`, 'hold', '해당 없음');
-    mainPath = ['orders', 'unknown', ...priorities.map((_, index) => `sell${index}`), 'hold'];
-  } else {
-    const steps = sections[2];
-    const data = [
-      ['clean', '01 · 청산', '잔여 보유 가상 청산', steps[0].note],
-      ['settled', '02 · 종료 조건', '모든 종료 조건을 충족했나요?', '가상 보유 0'],
-      ['balance', '03 · 손익 확정', '전·후 자산과 수익률 확정', steps[2].note],
-      ['ledger', '04 · 기록', '전체 가상 체결 원장 보존', steps[3].note],
-      ['target', '05 · 목표 판단', `목표 ${pct(RULES.sessionTarget)}% 이상인가요?`, '세션 시작 목표와 종료 결과 비교'],
-      ['proposal', '06 · 미달 시 검토', '원인·검증 가이드 생성', steps[5].note],
-    ];
-    for (const [id, lane, label, note] of data) { row(id, lane); node(id, id, 0, label, note, ['settled', 'target'].includes(id) ? 'security' : 'backend'); }
-    edge('clean', 'settled'); edge('settled', 'balance', '충족'); edge('balance', 'ledger'); edge('ledger', 'target'); edge('target', 'proposal', '아니오');
-    node('wait', 'settled', 1, '종료 대기', steps[1].note, 'security', '기한 후 마지막 기록가로 정산'); edge('settled', 'wait', '미충족', true);
-    node('costs', 'ledger', 1, '가상 체결 비용 가정', `슬리피지 ${pct(RULES.slippage)}% · 수수료 ${pct(RULES.fee)}% · 매도세 ${pct(RULES.sellTax)}%`, 'database', '가상 체결 시 반영'); edge('ledger', 'costs', '비용');
-    node('keep', 'target', 1, '규칙 유지', '목표 달성 · 보완 제안 없음'); edge('target', 'keep', '예');
-    mainPath = data.map(([id]) => id);
-  }
-  for (const relation of edges) {
-    const from = nodes.find(item => item.id === relation.from)!;
-    const to = nodes.find(item => item.id === relation.to)!;
-    if (from.col === to.col && from.lane !== to.lane) Object.assign(relation, { fromSide: 'bottom', toSide: 'top' });
-  }
-  const units = (value: string) => [...value].reduce((sum, character) => sum + (character.codePointAt(0)! > 127 ? 2 : 1), 0);
-  for (const item of nodes) item.width = Math.max(240, units(item.label) * 6.5 + 24, units(item.sublabel) * 4.8 + 16, units(item.tag ?? '') * 4.8 + 24);
-  return { schema_version: 2, diagram_type: 'workflow', meta: { title: titles[view], locale: 'ko', quality_profile: 'showcase', legend: { entries: { backend: { label: '실행·결과' }, security: { label: '확인·대기' }, database: { label: '비용 가정' } } }, output: `.archify/program-rules/${view}.html`, repository: { url: 'git@github.com:deeptrading-lab/trading-signal-frontend.git', revision, link_mode: 'local-only' } }, lanes, nodes, edges, mainPath };
+function width(label: string, note: string) {
+  const units = (value: string) => [...value].reduce((sum, char) => sum + (char.codePointAt(0)! > 127 ? 2 : 1), 0);
+  return Math.max(240, units(label) * 6.5 + 24, units(note) * 4.8 + 16);
 }
 
+export function createProgramTradingWorkflow(html: string, view: View, revision: string) {
+  const section = html.match(new RegExp(`<section data-view="${view === "detail" ? "buy" : view}"><h2>([^<]+)</h2>([\\s\\S]*?)</section>`));
+  if (!section) throw new Error(`다이어그램 원본이 없어요: ${view}`);
+
+  const laneLabels: Record<View, string[]> = {
+    summary: ["브라우저", "로컬 서버", "토스 랭킹", "가상 체결", "토스 현재가", "매도 판단", "종료"],
+    detail: ["운용 시간", "후보 조회", "후보 조건", "순위", "예산", "가상 체결"],
+    buy: ["운용 시간", "후보 조회", "후보 조건", "순위", "예산", "가상 체결"],
+    sell: ["토스 현재가", "종목 손익", "가상 매도", "남은 보유", "세션 손익"],
+    settlement: ["종료 요청", "토스 현재가", "가상 정산", "종료 자산", "원장"],
+  };
+  const sources = [{ path: "docs/program-trading/rules.template.html", line: 1 }];
+  const lanes: { id: string; label: string }[] = [];
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+  const mainPath: string[] = [];
+  const steps = section[2].matchAll(/<div class="node (gate|action)">([^<]+)<small>([^<]+)<\/small><\/div>(?:\s*<div class="branch"( data-continue="true")?>↳ ([^<]+)<\/div>)?/g);
+  for (const [index, [, kind, label, note, continueBranch, exception]] of [...steps].entries()) {
+    const id = `step${index + 1}`;
+    const previous = mainPath.at(-1);
+    lanes.push({ id, label: laneLabels[view][index] ?? label });
+    nodes.push({
+      id, lane: id, col: 0, type: kind === "gate" ? "security" : "backend",
+      icon: kind === "gate" ? "decision" : "active", label, sublabel: note, width: width(label, note), sources,
+    });
+    if (previous) edges.push({ from: previous, to: id, fromSide: "bottom", toSide: "top" });
+    if (exception) {
+      const branch = `${id}-alternate`;
+      const [heading, description] = exception.split(" → ");
+      nodes.push({
+        id: branch, lane: id, col: 1, type: "security", icon: "decision",
+        label: heading, sublabel: description ?? "다음 조회 대기", width: width(heading, description ?? ""), sources,
+      });
+      edges.push({ from: id, to: branch, role: "branch", variant: "security" });
+      if (continueBranch) edges.push({ from: branch, to: `step${index + 2}`, role: "branch", fromSide: "bottom", toSide: "right" });
+    }
+    mainPath.push(id);
+  }
+  return {
+    schema_version: 2, diagram_type: "workflow",
+    meta: {
+      output: `.archify/program-rules/${view}.html`,
+      repository: { url: "git@github.com:deeptrading-lab/trading-signal-frontend.git", revision, link_mode: "local-only" },
+      title: `자동매매 · ${section[1]}`, locale: "ko", quality_profile: "showcase", legend: { entries: { backend: { label: "실행" }, security: { label: "확인·대기" } } } },
+    lanes, nodes, edges, mainPath,
+  };
+}

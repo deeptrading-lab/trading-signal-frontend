@@ -1,41 +1,43 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-import { createProgramTradingWorkflow } from '../programTradingWorkflow';
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { createProgramTradingWorkflow } from "../programTradingWorkflow";
 
-const template = readFileSync('docs/program-trading/rules.template.html', 'utf8');
-const revision = 'b'.repeat(40);
-const make = (view: Parameters<typeof createProgramTradingWorkflow>[1]) => createProgramTradingWorkflow(template, view, revision);
+const template = readFileSync("docs/program-trading/rules.template.html", "utf8");
+const make = (view: Parameters<typeof createProgramTradingWorkflow>[1]) => createProgramTradingWorkflow(template, view, "b".repeat(40));
 
-describe('자동매매 도식의 판단 경로', () => {
-  it('완료 조건 미충족은 복기로 넘어가지 않고 정산을 기다린다', () => {
-    const diagram = make('summary');
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'confirm', to: 'pending', label: '미충족' }));
-    expect(diagram.edges.filter(edge => edge.from === 'pending')).toHaveLength(0);
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'confirm', to: 'review', label: '충족' }));
+describe("거래량 기준 자동매매 도식", () => {
+  it("브라우저의 상태 조회와 두 토스 호출을 구별한다", () => {
+    const diagram = make("summary");
+    const steps = diagram.mainPath.map(id => diagram.nodes.find(node => node.id === id)?.sublabel);
+    expect(steps).toEqual(expect.arrayContaining([
+      expect.stringContaining("GET은 로컬 상태 조회"),
+      expect.stringContaining("GET /api/v1/rankings"),
+      expect.stringContaining("GET /api/v1/prices"),
+    ]));
+    expect(diagram.nodes.find(node => node.label === "429")?.sublabel).toContain("요청 폐기");
   });
-  it('각 매수 조건의 충족 경로만 다음 조건으로 이어진다', () => {
-    const diagram = make('buy');
-    for (let index = 0; index < 6; index++) {
-      expect(diagram.edges).toContainEqual(expect.objectContaining({ from: `buy${index}`, to: `buy${index + 1}`, label: '충족' }));
-      expect(diagram.edges).toContainEqual(expect.objectContaining({ from: `buy${index}`, to: `buy${index}no`, label: '미충족' }));
-      expect(diagram.edges.filter(edge => edge.from === `buy${index}no`)).toHaveLength(0);
+
+  it("후보 미충족 경로가 가상 체결에 이어지지 않는다", () => {
+    const diagram = make("buy");
+    for (const id of ["step1", "step2", "step3"]) {
+      expect(diagram.edges).toContainEqual(expect.objectContaining({ from: id, to: `${id}-alternate`, role: "branch" }));
+      expect(diagram.edges.find(edge => edge.from === `${id}-alternate`)).toBeUndefined();
     }
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'buy6', to: 'buy6no', label: '1주 미만' }));
+    expect(diagram.nodes.at(-1)?.label).toBe("정수 주를 순위대로 가상 체결");
   });
-  it('매도는 먼저 해당하는 한 조건만 실행하고 미해당일 때 다음 우선순위를 본다', () => {
-    const diagram = make('sell');
-    for (let index = 0; index < 11; index++) {
-      expect(diagram.edges).toContainEqual(expect.objectContaining({ from: `sell${index}`, to: `sell${index}yes`, label: '해당' }));
-      expect(diagram.edges.filter(edge => edge.from === `sell${index}yes`)).toHaveLength(0);
-    }
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'sell10', to: 'hold', label: '해당 없음' }));
-    expect(diagram.edges.filter(edge => edge.from === 'lock')).toHaveLength(0);
+
+  it("보유가 모두 해소된 다음 세션 손익을 판단한다", () => {
+    const diagram = make("sell");
+    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: "step4", to: "step5" }));
+    expect(diagram.nodes.find(node => node.id === "step4-alternate")?.label).toBe("보유 중이면 다음 {{priceIntervalMs}}분 점검");
+    expect(diagram.nodes.find(node => node.id === "step5-alternate")?.sublabel).toBe("다음 호출 가능 시 후보 조회");
   });
-  it('정산 대기·목표 달성·미달을 서로 다른 결과로 표시한다', () => {
-    const diagram = make('settlement');
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'settled', to: 'wait', label: '미충족' }));
-    expect(diagram.edges.filter(edge => edge.from === 'wait')).toHaveLength(0);
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'target', to: 'keep', label: '예' }));
-    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: 'target', to: 'proposal', label: '아니오' }));
+
+  it("최종 조회 실패도 마지막 가격으로 가상 청산과 원장 기록에 이어진다", () => {
+    const diagram = make("settlement");
+    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: "step2", to: "step2-alternate" }));
+    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: "step2-alternate", to: "step3" }));
+    expect(diagram.nodes.find(node => node.id === "step2-alternate")?.sublabel).toContain("마지막 유효 가격");
+    expect(diagram.edges).toContainEqual(expect.objectContaining({ from: "step3", to: "step4" }));
   });
 });

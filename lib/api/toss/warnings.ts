@@ -119,9 +119,8 @@ export async function fetchActiveWarnings(
 /**
  * 여러 심볼의 활성 유의사항을 동시성 제한 fan-out 으로 조회 — PRD `intraday-warnings` §3-1.
  * 각 심볼은 `fetchActiveWarnings`(never-throw·60s 캐시·single-flight)를 지나므로 중복 심볼·
- * 최근 조회분은 캐시로 흡수된다. `concurrency` 는 동시 in-flight 수를 제한할 뿐 엄밀한 초당
- * 요청수는 아니다(리뷰 F-3) — 실제 `STOCK` 5/s 준수는 `tossGet` 의 429 Retry-After 백오프 +
- * 60s 캐시가 담당하고, 여기선 버스트 폭만 좁힌다.
+ * 최근 조회분은 캐시로 흡수된다. `concurrency` 는 동시 in-flight 수를 제한한다.
+ * `tossGet` 은 종목 기본정보와 공유하는 `STOCK` 그룹의 호출 간격과 재개 시각을 관리한다.
  *
  * @returns 심볼(**정규화 대문자**) → 유의사항 배열. 실패 심볼은 빈 배열(fail-soft).
  *   ⚠️ 출력 키는 대문자다. 현재 소비 지면은 전부 KR 6자리 숫자 티커(대문자 no-op)라 원본 조회가

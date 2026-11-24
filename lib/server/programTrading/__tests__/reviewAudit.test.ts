@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PaperSessionReview, Trade } from "@/lib/types/programTrading/programTrading";
-import { RULES, RULES_VERSION } from "../engine";
+const RULES_VERSION = "program-v5-short-exposure";
+const RULES = { fee: .00015, sellTax: .002, stop: .008, target: .01, maxPositions: 1, entryStart: 550, entryEnd: 870, cooldown: 10, slippage: .0005 };
 import { auditPaperSession, type JournalEvent } from "../reviewAudit";
 
 const legacyVersion = "program-v4-volume-positive";

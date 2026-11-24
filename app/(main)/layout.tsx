@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils/cn";
  *   - `/profile`     마이페이지(profile-reskin) — 카드리스 플랫(자산 히어로만 라이트 카드)
  *   - `/intraday*`   단타 워치(intraday-reskin) — 목록(`/intraday`) + 세션 상세(`/intraday/[sessionId]`),
  *                    카드리스 플랫(요약 KPI·자산곡선·포지션·체결·타임라인 모두 플랫).
+ *   - `/program-trading`, `/program-trading/review` 자동매매 운용·세션 결과.
  *   - `/dashboard/scorecard`  판정 적중률(scorecard-reskin) — 카드리스 플랫 표(단일 라우트, exact match).
  * `startsWith("/stock")` 는 `/stockfoo` 같은 유령 경로가 없어(라우트 트리상 `/stock` 세그먼트뿐) 새지 않고,
  * `/watchlist`·`/analyze`·`/profile`·`/dashboard/scorecard` 은 하위 라우트가 없어 exact match 로 좁힌다.
@@ -64,6 +65,7 @@ function isWhiteSurfaceRoute(pathname: string): boolean {
     pathname === "/profile" ||
     pathname.startsWith("/intraday") ||
     pathname === "/program-trading" ||
+    pathname === "/program-trading/review" ||
     pathname === "/dashboard/scorecard"
   );
 }

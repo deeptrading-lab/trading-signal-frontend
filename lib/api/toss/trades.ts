@@ -80,15 +80,15 @@ function setCache(key: string, value: Trade[] | null): void {
   cache.set(key, { value, cachedAt: Date.now() });
 }
 
-async function load(key: string, symbol: string, count: number): Promise<Trade[]> {
+async function load(key: string, symbol: string, count: number, source?: string): Promise<Trade[]> {
   try {
-    const raw = await tossGet<TossTrade[]>("/api/v1/trades", { symbol, count });
+    const raw = await tossGet<TossTrade[]>("/api/v1/trades", { symbol, count }, source);
     const trades = normalizeTrades(raw);
     setCache(key, trades);
     return trades;
   } catch {
     // 404(종목 없음)·5xx·네트워크 전부 빈 배열 수렴 + 실패 캐시로 재시도 억제.
-    setCache(key, []);
+    setCache(key, null);
     return [];
   } finally {
     inflight.delete(key);
@@ -102,6 +102,7 @@ async function load(key: string, symbol: string, count: number): Promise<Trade[]
 export async function fetchTrades(
   symbol: string,
   count: number = DEFAULT_TRADES_COUNT,
+  source?: string,
 ): Promise<Trade[]> {
   const normalized = symbol.trim().toUpperCase();
   if (!isTossConfigured()) return [];
@@ -116,7 +117,7 @@ export async function fetchTrades(
 
   let pending = inflight.get(key);
   if (!pending) {
-    pending = load(key, normalized, count);
+    pending = load(key, normalized, count, source);
     inflight.set(key, pending);
   }
   return pending;

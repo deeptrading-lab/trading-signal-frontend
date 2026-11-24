@@ -1,88 +1,153 @@
+import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { TradingState } from "@/lib/types/programTrading/programTrading";
+import { nextPaperMarketRequestAt } from "@/lib/api/toss/paperMarketLimit";
 import { initialState } from "../engine";
+import { getLocalPaperRuntime } from "../localPaperRuntime";
+import { emptyPaperCandidates, fetchPaperCandidates, fetchPaperPrices } from "../tossPaper";
 
-const mocks = vi.hoisted(() => ({
-  saved: "", record: vi.fn(), report: vi.fn(), reconcile: vi.fn(), writeFile: vi.fn(),
-  loadCandidates: vi.fn(), step: vi.fn(), calendar: vi.fn(),
-}));
 vi.mock("node:fs/promises", () => ({
-  mkdir: vi.fn().mockResolvedValue(undefined),
-  rename: vi.fn().mockResolvedValue(undefined),
-  writeFile: mocks.writeFile,
-  readFile: vi.fn().mockImplementation(() => Promise.resolve(mocks.saved)),
+  mkdir: vi.fn(), readdir: vi.fn(async () => []), readFile: vi.fn(),
+  appendFile: vi.fn(), rename: vi.fn(), writeFile: vi.fn(),
 }));
-vi.mock("../journal", () => ({ openJournal: vi.fn().mockImplementation(async () => ({ record: mocks.record, report: mocks.report, reconcile: mocks.reconcile })) }));
-vi.mock("../reviewHistory", () => ({ savePaperResult: vi.fn() }));
-vi.mock("../sessionStorage", () => ({ paperArchiveDirectory: "mock-archive", paperSessionDirectory: "mock-paper", trimPaperReviews: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("../recommendationCandidates", () => ({ loadRecommendationCandidates: mocks.loadCandidates }));
-vi.mock("../tossPaper", () => ({
-  requireTossPaperConfig: vi.fn(), stepTossPaper: mocks.step, tossPaperSession: mocks.calendar,
-  minuteInKorea: () => 600,
+vi.mock("../tossPaper", async importOriginal => ({
+  ...await importOriginal<typeof import("../tossPaper")>(),
+  requireTossPaperConfig: vi.fn(),
+  fetchPaperCandidates: vi.fn(),
+  fetchPaperPrices: vi.fn(),
+}));
+vi.mock("@/lib/api/toss/paperMarketLimit", () => ({
+  nextPaperMarketRequestAt: vi.fn(() => 0), PAPER_MARKET_INTERVAL_MS: 60_000,
 }));
 
-const registry = globalThis as typeof globalThis & { localTossPaperRuntime?: unknown };
-const now = Date.parse("2026-11-19T01:00:00Z");
+const date = "2026-11-09";
+const clock = (time: string) => Date.parse(`${date}T${time}+09:00`);
+const candidates = () => ({
+  ...emptyPaperCandidates(), status: "ready" as const,
+  rows: [{ ticker: "005930", name: "삼성전자", price: 100_000, rank: 1, volume: 1_000_000, changePercent: 1, previousClose: 99_000, sources: ["volume" as const] }],
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.setSystemTime(now);
-  delete registry.localTossPaperRuntime;
-  vi.clearAllMocks();
-  const state = initialState();
-  state.executionMode = "toss-paper";
-  state.running = true;
-  state.updatedAt = new Date(now).toISOString();
-  state.lastStepAt = now;
-  state.lifecycle = { status: "running", startedAt: state.updatedAt, finishedAt: null, beforeBalance: state.initial, afterBalance: null, returnPct: null, targetReturnPct: 1, reviewDecision: "pending" };
-  state.positions = [{ ticker: "005930", quantity: 10, entry: 10_000, mark: 10_000, bidMark: 10_000, enteredAt: now, lastFreshAt: now }];
-  state.cash -= 100_015;
-  mocks.saved = JSON.stringify(state);
-  mocks.writeFile.mockResolvedValue(undefined);
-  mocks.record.mockResolvedValue(undefined);
-  mocks.report.mockResolvedValue(undefined);
-  mocks.loadCandidates.mockImplementation(async () => ({ status: "ready", rows: [{ ticker: "005930", name: "삼성전자", price: 10_000, changePercent: 1, previousClose: 9_900, sources: ["volume"] }], checkedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 120_000).toISOString() }));
-  mocks.calendar.mockResolvedValue({ date: "2026-11-19", start: now - 3_600_000, end: now + 20_000_000, close: now + 19_000_000, minute: 600, canStart: true, open: true, holiday: false });
+  vi.setSystemTime(clock("09:00:00"));
+  vi.stubEnv("PROGRAM_PAPER_RESULT_SYNC", undefined);
+  vi.mocked(readFile).mockRejectedValue(Object.assign(new Error("missing"), { code: "ENOENT" }));
+  vi.mocked(fetchPaperCandidates).mockImplementation(async () => candidates());
+  vi.mocked(fetchPaperPrices).mockResolvedValue(new Map());
 });
+
 afterEach(() => {
+  Reflect.deleteProperty(globalThis, "localTossPaperRuntime");
   vi.clearAllTimers();
   vi.useRealTimers();
-  delete registry.localTossPaperRuntime;
+  vi.unstubAllEnvs();
+  vi.resetAllMocks();
 });
 
-it("외부 시세 IO가 멈추고 후보가 갱신돼도 live 공백 종료를 보존한다", async () => {
-  let resolveDraft!: (changed: boolean) => void;
-  mocks.step.mockImplementationOnce((draft: TradingState) => {
-    // A late result attempts to restore the running state; its revision is obsolete.
-    draft.running = true;
-    if (draft.lifecycle) draft.lifecycle.status = "running";
-    return new Promise<boolean>(resolve => { resolveDraft = resolve; });
-  });
-  mocks.step.mockResolvedValue(false);
-  const { getLocalPaperRuntime } = await import("../localPaperRuntime");
+it("waits until 09:05, buys and then reads all holdings every five minutes", async () => {
   const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(299_999);
+  expect(fetchPaperCandidates).not.toHaveBeenCalled();
+  expect(fetchPaperPrices).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(1);
-  expect(mocks.step).toHaveBeenCalledTimes(1);
-
-  await vi.advanceTimersByTimeAsync(29_998);
-  let snapshot = await runtime.snapshot();
-  expect(snapshot.lifecycle?.status).toBe("running");
-
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(1);
+  expect((await runtime.snapshot()).positions).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(299_999);
+  expect(fetchPaperPrices).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(1);
-  snapshot = await runtime.snapshot();
-  expect(snapshot).toMatchObject({ running: false, killed: true, lifecycle: { status: "stopping", stopCause: "data-gap" } });
-  expect(snapshot.positions).toHaveLength(1);
-  expect(mocks.record).toHaveBeenCalled();
+  expect(fetchPaperPrices).toHaveBeenCalledExactlyOnceWith(["005930"], expect.any(AbortSignal));
+  await vi.advanceTimersByTimeAsync(300_000);
+  expect(fetchPaperPrices).toHaveBeenCalledTimes(2);
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(1);
+});
 
-  // The real 60-second ranking refresh/apply path mutates the revision too.
-  await vi.advanceTimersByTimeAsync(30_000);
-  expect(mocks.loadCandidates).toHaveBeenCalled();
-  resolveDraft(true);
+it("replaces a failed ranking request at the next ten-minute interval", async () => {
+  vi.setSystemTime(clock("10:13:00"));
+  vi.mocked(fetchPaperCandidates).mockRejectedValueOnce(Object.assign(new Error("rate limit"), { status: 429 }));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(599_999);
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(1);
+  expect((await runtime.snapshot()).positions).toHaveLength(0);
   await vi.advanceTimersByTimeAsync(1);
-  snapshot = await runtime.snapshot();
-  expect(snapshot.lifecycle?.status).toBe("completed");
-  expect(snapshot.lifecycle?.stopCause).toBe("data-gap");
-  expect(snapshot.positions).toHaveLength(0);
-  expect(snapshot.trades.at(-1)?.reason).toBe("timeout");
-  expect(snapshot.running).toBe(false);
-  expect(snapshot.lifecycle?.forcedAt).toBeDefined();
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(2);
+  expect((await runtime.snapshot()).positions).toHaveLength(1);
+});
+
+it("does not buy after pause when a ranking returns late", async () => {
+  vi.setSystemTime(clock("10:13:00"));
+  let resolve!: (response: ReturnType<typeof candidates>) => void;
+  vi.mocked(fetchPaperCandidates).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(1);
+  await runtime.run("pause");
+  resolve(candidates());
+  await vi.advanceTimersByTimeAsync(1000);
+  expect((await runtime.snapshot()).trades).toEqual([]);
+  expect(vi.mocked(fetchPaperCandidates).mock.calls[0][0].aborted).toBe(true);
+});
+
+it("closes at 15:00 even if the final price request never returns", async () => {
+  vi.setSystemTime(clock("14:57:00"));
+  vi.mocked(fetchPaperPrices).mockImplementation(() => new Promise(() => undefined));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(180_000);
+  expect(fetchPaperPrices).toHaveBeenCalledTimes(1);
+  expect((await runtime.snapshot()).lifecycle?.status).toBe("stopping");
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(await runtime.snapshot()).toMatchObject({
+    running: false, positions: [],
+    trades: [{ side: "buy" }, { side: "sell", price: 100_000, reason: "last-mark" }],
+    lifecycle: { status: "completed", stopCause: "close" },
+  });
+});
+
+it("blocks a weekend start and leaves browser snapshots free of market requests", async () => {
+  vi.setSystemTime(Date.parse("2026-11-08T09:10:00+09:00"));
+  const runtime = await getLocalPaperRuntime();
+  expect(await runtime.run("start")).toHaveProperty("error");
+  await runtime.snapshot();
+  expect(fetchPaperCandidates).not.toHaveBeenCalled();
+  expect(fetchPaperPrices).not.toHaveBeenCalled();
+});
+
+it("settles at the stored mark at close when the shared limit blocks a new request", async () => {
+  vi.setSystemTime(clock("14:57:00"));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(1);
+  vi.mocked(nextPaperMarketRequestAt).mockReturnValue(clock("15:01:00"));
+  await vi.advanceTimersByTimeAsync(180_000);
+  expect(fetchPaperPrices).not.toHaveBeenCalled();
+  expect((await runtime.snapshot()).trades.at(-1)?.reason).toBe("last-mark");
+});
+
+it("keeps an older session from entering under the new rules", async () => {
+  vi.setSystemTime(clock("10:00:00"));
+  vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify({
+    ...initialState(), policyVersion: "program-v5-short-exposure",
+    lifecycle: { status: "running", startedAt: new Date().toISOString(), beforeBalance: 10_000_000, targetReturnPct: 1 },
+  }));
+  const runtime = await getLocalPaperRuntime();
+  expect(await runtime.run("start")).toHaveProperty("error");
+  expect(fetchPaperCandidates).not.toHaveBeenCalled();
+});
+
+it("waits for the common dispatch slot before scanning again after the last position sells", async () => {
+  vi.setSystemTime(clock("10:00:00"));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(0);
+  vi.mocked(fetchPaperPrices).mockImplementationOnce(async () => {
+    vi.mocked(nextPaperMarketRequestAt).mockReturnValue(Date.now() + 60_000);
+    return new Map([["005930", { price: 99_000, at: Date.now() }]]);
+  });
+  await vi.advanceTimersByTimeAsync(300_000);
+  expect((await runtime.snapshot()).positions).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(2);
 });
