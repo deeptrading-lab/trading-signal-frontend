@@ -1,11 +1,16 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { tossGet } from "@/lib/api/toss/client";
+import { getTossStockMasters } from "@/lib/api/toss/stockMaster";
 import { fetchPaperCandidates, fetchPaperPrices, paperSession } from "../tossPaper";
 
 vi.mock("@/lib/api/toss/client", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/api/toss/client")>(),
   tossGet: vi.fn(),
 }));
+vi.mock("@/lib/api/toss/stockMaster", () => ({ getTossStockMasters: vi.fn() }));
+beforeEach(() => {
+  vi.mocked(getTossStockMasters).mockImplementation(async symbols => new Map(symbols.map(symbol => [symbol, { symbol, securityType: "STOCK" }])));
+});
 
 const liveTime = "2026-11-09T09:05:00+09:00";
 const signal = new AbortController().signal;
@@ -43,6 +48,32 @@ it("waits on a prior-date or empty ranking even on a weekday", async () => {
   for (let request = 0; request < 2; request++) expect(await fetchPaperCandidates(signal)).toMatchObject({ status: "empty", rows: [] });
 });
 
+it("excludes ETFs, ETNs, derivatives and unclassified symbols from company candidates", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(liveTime));
+  const symbols = ["005930", "252670", "530107", "100001", "100002", "100003"];
+  vi.mocked(tossGet).mockResolvedValue({ rankedAt: liveTime, rankings: symbols.map(symbol => row(symbol, 2_000_000, "0.01")) });
+  vi.mocked(getTossStockMasters).mockResolvedValue(new Map([
+    ["005930", { symbol: "005930", securityType: "STOCK", name: "삼성전자" }],
+    ["252670", { symbol: "252670", securityType: "ETF" }],
+    ["530107", { symbol: "530107", securityType: "ETN" }],
+    ["100001", { symbol: "100001", securityType: "FUTURE" }],
+    ["100002", { symbol: "100002" }],
+  ]));
+  const result = await fetchPaperCandidates(signal);
+  expect(result.rows).toHaveLength(1);
+  expect(result.rows[0]).toMatchObject({ ticker: "005930", name: "삼성전자", rank: 1 });
+  expect(getTossStockMasters).toHaveBeenCalledTimes(1);
+});
+
+it("does not buy from an unverified ranking when stock classification fails", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(liveTime));
+  vi.mocked(tossGet).mockResolvedValue({ rankedAt: liveTime, rankings: [row("005930", 2_000_000, "0.01")] });
+  vi.mocked(getTossStockMasters).mockRejectedValueOnce(new Error("unavailable"));
+  expect(await fetchPaperCandidates(signal)).toMatchObject({ status: "unavailable", rows: [] });
+});
+
 it("fetches every held symbol in one request and rejects stale or unrequested quotes", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(liveTime));
@@ -59,6 +90,6 @@ it("fetches every held symbol in one request and rejects stale or unrequested qu
 it("uses the KST session and identifies weekends independent of machine timezone", () => {
   expect(paperSession(Date.parse("2026-11-08T00:05:00Z")).weekend).toBe(true);
   expect(paperSession(Date.parse("2026-11-09T00:05:00Z"))).toMatchObject({
-    weekend: false, minute: 545, openAt: Date.parse("2026-11-09T00:00:00Z"), closeAt: Date.parse("2026-11-09T06:00:00Z"),
+    weekend: false, minute: 545, openAt: Date.parse("2026-11-09T00:00:00Z"), closeAt: Date.parse("2026-11-09T06:30:00Z"),
   });
 });

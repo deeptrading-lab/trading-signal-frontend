@@ -119,9 +119,9 @@
       "col": 0,
       "type": "security",
       "icon": "decision",
-      "label": "거래량과 등락률 확인",
-      "sublabel": "거래량 1,000,000주 이상 · 전일 대비 상승",
-      "width": 240,
+      "label": "기업 주식·거래량·등락률 확인",
+      "sublabel": "유형 STOCK · 거래량 1,000,000주 이상 · 전일 대비 상승",
+      "width": 280,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -135,9 +135,9 @@
       "col": 1,
       "type": "security",
       "icon": "decision",
-      "label": "조건에 맞는 후보 없음",
+      "label": "ETF·ETN·파생상품·유형 미확인 제외 · 조회 실패/후보 없음",
       "sublabel": "10분 대기",
-      "width": 240,
+      "width": 407.5,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",

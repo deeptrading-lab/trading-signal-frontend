@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowsLocalProgram } from "./localRequest";
 import { getLocalPaperRuntime } from "./localPaperRuntime";
+import { readProgramAccount } from "./accountIdentity";
+import { PROGRAM_ASSETS_COPY as A } from "@/lib/copy/programTrading/assets";
 
 export async function downloadProgramFile(request: NextRequest, kind: "logs" | "review") {
   const fail = (status: number, error: string) => NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
   if (!allowsLocalProgram(request)) return fail(403, "로컬 주소에서 자동매매 화면을 열어 주세요.");
+  const ownerSub = await readProgramAccount(request);
+  if (!ownerSub) return fail(428, A.login);
   try {
-    const body = await (await getLocalPaperRuntime()).download(kind);
+    const body = await (await getLocalPaperRuntime(ownerSub)).download(kind);
     return new NextResponse(body, { headers: {
       "Content-Type": kind === "logs" ? "application/x-ndjson; charset=utf-8" : "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="program-trading-${kind}.${kind === "logs" ? "jsonl" : "json"}"`,

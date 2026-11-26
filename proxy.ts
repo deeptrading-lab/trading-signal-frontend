@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth/session";
 import { allowsLocalProgram } from "@/lib/server/programTrading/localRequest";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
+import { programBrowserResponse } from "@/lib/auth/programBrowserResponse";
 
 /**
  * 알려진 소셜/검색 크롤러 User-Agent 화이트리스트 (소문자, 부분일치).
@@ -136,17 +137,15 @@ function isGateActive(): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const localPaperRoute = ["/program-trading", "/program-trading/review", "/program-trading/assets", "/api/program-trading", "/api/program-trading/logs", "/api/program-trading/review", "/api/program-trading/assets", "/api/program-trading/diagram", "/api/program-trading/improvement"].includes(pathname);
+  if (localPaperRoute && allowsLocalProgram(request, !["GET", "HEAD"].includes(request.method))) {
+    return pathname.startsWith("/api/") ? NextResponse.next() : programBrowserResponse(request);
+  }
   // 게이트 비활성(OAuth 미설정) → 즉시 통과(앱 공개). 로컬/CI 마찰 0.
   if (!isGateActive()) {
     return NextResponse.next();
   }
-
-  const { pathname, search } = request.nextUrl;
-  const localPaperRoute = ["/program-trading", "/program-trading/review", "/api/program-trading", "/api/program-trading/logs", "/api/program-trading/review", "/api/program-trading/improvement"].includes(pathname);
-  if (localPaperRoute && allowsLocalProgram(request, request.method === "POST")) {
-    return NextResponse.next();
-  }
-
 
   // 예외 화이트리스트 — 항상 통과(루프 가드 포함: /login·/api/auth/* 는 여기서 통과).
   if (isPublicPath(pathname)) {

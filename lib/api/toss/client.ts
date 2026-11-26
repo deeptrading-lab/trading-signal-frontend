@@ -8,7 +8,7 @@
  *
  * `tossGet()` 이 흡수하는 토스 특유 규약:
  *   - 성공 응답 `{ result }` 언래핑.
- *   - 401 invalid-token/expired-token → 단일 활성 토큰 정책상 외부 재발급으로 내 토큰이 죽은
+ *   - 401 invalid-token/expired-token/token-revoked → 외부 재발급 등으로 내 토큰이 죽은
  *     케이스 → 토큰 폐기 후 1회 재발급·재시도 (`token.ts` 주석 참조).
  *   - 429 → 캔들·종목·시세 그룹에서 Retry-After를 공유. 짧은 종목 조회 제한은 1회 재시도.
  */
@@ -214,7 +214,7 @@ export async function tossGet<T>(
 
     if (
       response.status === 401 &&
-      (code === "invalid-token" || code === "expired-token") &&
+      (code === "invalid-token" || code === "expired-token" || code === "token-revoked") &&
       !retried401
     ) {
       diagnose(path, "token-refresh", 401, code);

@@ -1,9 +1,11 @@
 import { ArrowLeft } from "lucide-react";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ProgramTradingEvaluation, ProgramTradingEvaluationStatus } from "@/components/programTrading/ProgramTradingEvaluation";
 import { hasServerRole } from "@/lib/auth/serverGuard";
+import { PROGRAM_BROWSER_COOKIE } from "@/lib/auth/programBrowser";
+import { programBrowserAccount } from "@/lib/server/programTrading/accountIdentity";
 import { AccessDeniedView } from "@/components/layout/AccessDeniedView";
 import { ProgramTradingPerformance } from "@/components/programTrading/ProgramTradingPerformance";
 import { ProgramTradingReviewTable } from "@/components/programTrading/ProgramTradingReviewTable";
@@ -11,7 +13,7 @@ import { PROGRAM_REVIEW_COPY as C } from "@/lib/copy/programTrading/programTradi
 import { allowsLocalProgramHost } from "@/lib/server/programTrading/localRequest";
 import { paperResultPageSize } from "@/lib/server/programTrading/reviewHistory";
 import { loadSharedPaperReviews } from "@/lib/server/programTrading/sharedReviews";
-import { loadPaperReviews } from "@/lib/server/programTrading/sessionStorage";
+import { accountPaperDirectories, loadPaperReviews } from "@/lib/server/programTrading/sessionStorage";
 import { cn } from "@/lib/utils/cn";
 
 const reviewPath = "/program-trading/review";
@@ -27,15 +29,20 @@ export default async function ProgramTradingReviewPage({
 }) {
   const local = allowsLocalProgramHost((await headers()).get("host"));
   if (!local && !(await hasServerRole("admin"))) return <AccessDeniedView />;
+  const owner = local ? programBrowserAccount((await cookies()).get(PROGRAM_BROWSER_COOKIE)?.value) : null;
+  if (local && !owner) return <AccessDeniedView />;
+  const accountDirectories = owner ? accountPaperDirectories(owner) : {};
 
   const { session, source, offset: requestedOffset } = await searchParams;
   const sessionId = typeof session === "string" ? session : undefined;
   const offset = typeof requestedOffset === "string" && /^\d{1,8}$/.test(requestedOffset)
     ? Number(requestedOffset) : 0;
   const localResult = local && source !== "shared"
-    ? await loadPaperReviews(sessionId, { includePerformance: true }).catch(() => null)
+    ? await loadPaperReviews(sessionId, { includePerformance: true, ...accountDirectories }).catch(() => null)
     : null;
-  const shared = !local || source === "shared" || (source !== "local" && !sessionId && !localResult?.sessions.length);
+  const canReadShared = await hasServerRole("admin");
+  if (source === "shared" && !canReadShared) return <AccessDeniedView />;
+  const shared = !local || source === "shared" || (canReadShared && source !== "local" && !sessionId && !localResult?.sessions.length);
   const sharedResult = shared ? await loadSharedPaperReviews(sessionId, offset).catch(() => null) : null;
   const result = shared ? sharedResult : localResult;
   const pagination = shared && (offset > 0 || sharedResult?.hasNext) && (
@@ -85,7 +92,7 @@ export default async function ProgramTradingReviewPage({
         </Link>
       </header>
 
-      {local && (
+      {local && canReadShared && (
         <nav aria-label={C.source} className="grid w-fit max-w-full grid-cols-2 gap-sm">
           <Link href={{ pathname: reviewPath, query: { source: "local" } }} aria-current={!shared ? "page" : undefined}
             prefetch={false} className={cn("button-secondary flex items-center justify-center text-center no-underline", !shared && "border-primary")}>{C.localResults}</Link>

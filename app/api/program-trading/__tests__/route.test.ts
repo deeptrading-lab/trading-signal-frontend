@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
 import { rename, writeFile } from "node:fs/promises";
 import { afterEach, expect, it, vi } from "vitest";
+import { accountPaperDirectories } from "@/lib/server/programTrading/sessionStorage";
 import { GET, POST } from "../route";
+
+vi.mock("@/lib/server/programTrading/accountIdentity", () => ({ readProgramAccount: () => "fixture-owner" }));
+vi.mock("@/lib/server/programTrading/assetsStore", () => ({ readProgramAssets: async () => ({ amount: 10_000_000, source: "default", updatedAt: null }), saveProgramAssets: vi.fn() }));
 
 vi.mock("@/lib/server/programTrading/tossPaper", async importOriginal => {
   const actual = await importOriginal<typeof import("@/lib/server/programTrading/tossPaper")>();
@@ -19,6 +23,7 @@ vi.mock("node:fs/promises", () => ({
 
 afterEach(() => {
   Reflect.deleteProperty(globalThis, "localTossPaperRuntime");
+  Reflect.deleteProperty(globalThis, "localAccountPaperRuntimes");
   vi.clearAllMocks();
   vi.unstubAllEnvs();
   vi.useRealTimers();
@@ -66,8 +71,9 @@ it("archives a completed local session and opens a fresh session ready to start 
   expect(freshState).toMatchObject({ running: false, cash: 10_000_000, positions: [], trades: [] });
   expect(freshState.lifecycle).toBeUndefined();
   expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/toss-paper\/review\.json\.tmp$/), expect.stringContaining('"audit"'), { mode: 0o600 });
-  const archiveMoves = vi.mocked(rename).mock.calls.filter(([from]) => from === ".local/program-trading/toss-paper");
-  expect(archiveMoves).toEqual([[".local/program-trading/toss-paper", expect.stringMatching(/^\.local\/program-trading\/toss-paper-archive\//)]]);
+  const paths = accountPaperDirectories("fixture-owner");
+  const archiveMoves = vi.mocked(rename).mock.calls.filter(([from]) => from === paths.directory);
+  expect(archiveMoves).toEqual([[paths.directory, expect.stringContaining(paths.archiveDirectory)]]);
 
   expect((await send("new-session")).status).toBe(409);
   const restart = await send("start");

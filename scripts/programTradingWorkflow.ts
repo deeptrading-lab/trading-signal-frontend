@@ -22,11 +22,11 @@ export function createProgramTradingWorkflow(html: string, view: View, revision:
   if (!section) throw new Error(`다이어그램 원본이 없어요: ${view}`);
 
   const laneLabels: Record<View, string[]> = {
-    summary: ["브라우저", "로컬 서버", "토스 랭킹", "가상 체결", "토스 현재가", "매도 판단", "종료"],
+    summary: ["브라우저", "브라우저 자산", "로컬 서버", "토스 랭킹", "가상 체결", "토스 현재가", "오후 수익 확인", "매도 판단", "종료"],
     detail: ["운용 시간", "후보 조회", "후보 조건", "순위", "예산", "가상 체결"],
     buy: ["운용 시간", "후보 조회", "후보 조건", "순위", "예산", "가상 체결"],
-    sell: ["토스 현재가", "종목 손익", "가상 매도", "남은 보유", "세션 손익"],
-    settlement: ["종료 요청", "토스 현재가", "가상 정산", "종료 자산", "원장"],
+    sell: ["토스 현재가", "오후 수익 확인", "종목 손익", "가상 매도", "남은 보유", "세션 손익"],
+    settlement: ["종료 요청", "토스 현재가", "가상 정산", "종료 자산", "DB 저장", "원장"],
   };
   const sources = [{ path: "docs/program-trading/rules.template.html", line: 1 }];
   const lanes: { id: string; label: string }[] = [];

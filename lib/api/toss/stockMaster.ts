@@ -20,6 +20,26 @@ const cache = new Map<string, CacheEntry>();
  * 콜드 캐시에서 같은 심볼 /stocks 를 2번 부르게 되므로 pending promise 를 공유한다. */
 const inflight = new Map<string, Promise<TossStockRow | null>>();
 
+/** 후보 유형 확인용 일괄 조회. 캐시 누락분만 한 번에 요청하고 응답 심볼을 검증한다. */
+export async function getTossStockMasters(symbols: string[], source?: string, signal?: AbortSignal): Promise<Map<string, TossStockRow>> {
+  const result = new Map<string, TossStockRow>();
+  const missing: string[] = [];
+  for (const symbol of new Set(symbols)) {
+    const hit = cache.get(symbol);
+    if (hit && Date.now() - hit.cachedAt < MASTER_TTL_MS) result.set(symbol, hit.row);
+    else missing.push(symbol);
+  }
+  if (!missing.length) return result;
+  const response = await tossGet<unknown>("/api/v1/stocks", { symbols: missing.join(",") }, source, signal);
+  const requested = new Set(missing);
+  for (const row of pickTossArray<TossStockRow>(response, "stocks")) {
+    if (!row.symbol || !requested.has(row.symbol)) continue;
+    cache.set(row.symbol, { row, cachedAt: Date.now() });
+    result.set(row.symbol, row);
+  }
+  return result;
+}
+
 /**
  * 종목 마스터 1건 — 캐시 우선 + 인스턴스 내 single-flight. 응답에 심볼이 없으면 null (미상장 등).
  */

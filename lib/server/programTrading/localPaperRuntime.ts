@@ -4,28 +4,43 @@ import { withTimeout } from "@/lib/server/bffUtils";
 import { isoToKstDate } from "@/lib/api/toss/kst";
 import { nextPaperMarketRequestAt, PAPER_MARKET_INTERVAL_MS } from "@/lib/api/toss/paperMarketLimit";
 import { PROGRAM_PAPER_COPY as P } from "@/lib/copy/programTrading/programTrading";
+import { PROGRAM_ASSETS_COPY as A } from "@/lib/copy/programTrading/assets";
 import type { ProgramTradingAction, TradingState } from "@/lib/types/programTrading/programTrading";
-import { buyCandidates, closeSession, initialState, observePrices, RULES_VERSION, startSession } from "./engine";
+import { buyCandidates, closeSession, initialState, observePrices, RULES, RULES_VERSION, startSession } from "./engine";
 import { logPaperMarket } from "./marketBudget";
 import { openJournal } from "./journal";
 import { savePaperResult } from "./reviewHistory";
-import { paperArchiveDirectory as archiveDirectory, paperSessionDirectory as directory, trimPaperReviews } from "./sessionStorage";
+import { accountPaperDirectories, paperArchiveDirectory, paperSessionDirectory, trimPaperReviews } from "./sessionStorage";
+import { readProgramAssets, saveProgramAssets } from "./assetsStore";
 import { emptyPaperCandidates, fetchPaperCandidates, fetchPaperPrices, paperSession, requireTossPaperConfig } from "./tossPaper";
 
 const MARKET_TIMEOUT_MS = 5_000;
 
 const registry = globalThis as typeof globalThis & {
   localTossPaperRuntime?: ReturnType<typeof createRuntime>;
+  localAccountPaperRuntimes?: Map<string, ReturnType<typeof createRuntime>>;
 };
 
-export function getLocalPaperRuntime() {
+export function getLocalPaperRuntime(ownerSub?: string) {
+  if (ownerSub) {
+    const accounts = registry.localAccountPaperRuntimes ??= new Map();
+    const key = accountPaperDirectories(ownerSub).directory;
+    let runtime = accounts.get(key);
+    if (!runtime) {
+      runtime = createRuntime(ownerSub).catch(error => { accounts.delete(key); throw error; });
+      accounts.set(key, runtime);
+    }
+    return runtime;
+  }
   return registry.localTossPaperRuntime ??= createRuntime().catch(error => {
     delete registry.localTossPaperRuntime;
     throw error;
   });
 }
 
-async function createRuntime() {
+async function createRuntime(ownerSub?: string) {
+  const { directory, archiveDirectory } = ownerSub ? accountPaperDirectories(ownerSub)
+    : { directory: paperSessionDirectory, archiveDirectory: paperArchiveDirectory };
   requireTossPaperConfig();
   await mkdir(directory, { recursive: true, mode: 0o700 });
   let state = initialState();
@@ -47,6 +62,7 @@ async function createRuntime() {
   let closing: Promise<void> | undefined;
   let requiresRestart = false;
   let lastSyncedSession: string | null = null;
+  let lastAssetSyncAt = 0;
 
   function serial<T>(fn: () => T | Promise<T>) {
     const next = queue.then(fn);
@@ -69,6 +85,11 @@ async function createRuntime() {
     await journal.record(state);
     if (state.lifecycle?.status !== "completed") return;
     const report = await journal.report(state);
+    if (ownerSub && state.assetSyncStatus !== "saved") {
+      await syncAssets();
+      await writeFile(`${directory}/state.tmp`, JSON.stringify(state, null, 2), { mode: 0o600 });
+      await rename(`${directory}/state.tmp`, `${directory}/state.json`);
+    }
     if (report && process.env.PROGRAM_PAPER_RESULT_SYNC === "1" && lastSyncedSession !== report.lifecycle.startedAt) {
       const session = report.lifecycle.startedAt;
       lastSyncedSession = session;
@@ -77,7 +98,22 @@ async function createRuntime() {
         logPaperMarket("result-sync-failed", { reason: error instanceof Error ? error.message : undefined });
       });
     }
-    await trimPaperReviews(true);
+    await trimPaperReviews(true, archiveDirectory);
+  }
+
+  async function syncAssets() {
+    const lifecycle = state.lifecycle;
+    if (!ownerSub || lifecycle?.status !== "completed" || !lifecycle.startedAt || !lifecycle.finishedAt || lifecycle.afterBalance === null) return;
+    lastAssetSyncAt = Date.now();
+    state.assetSyncStatus = "pending";
+    try {
+      await saveProgramAssets(ownerSub, lifecycle.afterBalance, { startedAt: lifecycle.startedAt, finishedAt: lifecycle.finishedAt });
+      state.assetSyncStatus = "saved";
+      delete state.assetSyncError;
+    } catch {
+      state.assetSyncStatus = "error";
+      state.assetSyncError = A.syncError;
+    }
   }
 
   function snapshot(now = Date.now()) {
@@ -86,7 +122,7 @@ async function createRuntime() {
     if (requiresRestart) startBlockReason = P.restartRequired;
     else if (state.lifecycle && state.policyVersion !== RULES_VERSION) startBlockReason = P.legacySession;
     else if (session.weekend) startBlockReason = P.weekend;
-    else if (now < session.openAt || now >= session.closeAt) startBlockReason = P.outsideHours;
+    else if (now < session.openAt || session.minute >= RULES.profitCloseMinute) startBlockReason = P.outsideHours;
     return structuredClone({ ...state, minute: session.minute, startBlockReason });
   }
 
@@ -138,6 +174,10 @@ async function createRuntime() {
     void serial(async () => {
       const now = Date.now();
       const session = paperSession(now);
+      if (state.lifecycle?.status === "completed" && ownerSub && state.assetSyncStatus !== "saved" && now - lastAssetSyncAt >= 30_000) {
+        await persist();
+        return;
+      }
       if (!state.lifecycle || state.lifecycle.status === "completed" || closing || state.lastError) return;
       const expiredDate = priorDate(now);
       if (state.lifecycle.status === "stopping" || expiredDate || now >= session.closeAt) {
@@ -149,9 +189,17 @@ async function createRuntime() {
       if (!state.running || pending || now < session.scanAt || state.policyVersion !== RULES_VERSION) return;
 
       const tickers = state.positions.map(position => position.ticker);
+      if (!tickers.length && session.minute >= RULES.profitCloseMinute) {
+        if (state.cash > state.lifecycle.beforeBalance) {
+          markTime(now);
+          closeSession(state, new Map(), "afternoon-profit", now);
+          await persist();
+        }
+        return;
+      }
       const dueAt = tickers.length ? state.nextPriceAt ?? now : Math.max(state.nextCandidateAt ?? now, nextPaperMarketRequestAt());
       if (now < dueAt) return;
-      // Leave the final slot available for the 15:00 liquidation request.
+      // Leave the final slot available for the market-close liquidation request.
       if (tickers.length && now >= session.closeAt - PAPER_MARKET_INTERVAL_MS) return;
       const request = new AbortController();
       const budget = Math.min(MARKET_TIMEOUT_MS, session.closeAt - now);
@@ -165,6 +213,7 @@ async function createRuntime() {
         pending = undefined;
         const at = Date.now();
         if (!state.running || at >= session.closeAt || priorDate(at)) return;
+        if ("candidates" in result && paperSession(at).minute >= RULES.profitCloseMinute) return;
         markTime(at);
         if ("prices" in result) observePrices(state, result.prices, at);
         else buyCandidates(state, result.candidates, at);
@@ -187,9 +236,25 @@ async function createRuntime() {
 
   return {
     async snapshot() { return snapshot(); },
+    async saveAssets(amount: number) {
+      const result = await serial(async () => {
+        if (!ownerSub) return { error: A.accountOnly };
+        if (state.running || state.positions.length || state.lifecycle?.status === "running" || state.lifecycle?.status === "stopping") return { error: A.locked };
+        try {
+          await saveProgramAssets(ownerSub, amount);
+          return { assets: await readProgramAssets(ownerSub) };
+        } catch { return { error: A.database }; }
+      });
+      if (result.error) throw new Error(result.error);
+      return result.assets!;
+    },
     async withIdleForImprovement(apply?: () => Promise<void>) {
       const result = await serial(async () => {
         if (state.running || state.positions.length || state.lifecycle?.status === "running" || state.lifecycle?.status === "stopping") return { idle: false };
+        for (const runtime of registry.localAccountPaperRuntimes?.values() ?? []) {
+          const other = await (await runtime).snapshot();
+          if (other.running || other.positions.length || other.lifecycle?.status === "running" || other.lifecycle?.status === "stopping") return { idle: false };
+        }
         try {
           if (apply) {
             await apply();
@@ -207,9 +272,15 @@ async function createRuntime() {
       const result = await serial(async () => {
         const now = Date.now();
         const session = paperSession(now);
+        if (action === "sync-assets") {
+          if (state.lifecycle?.status !== "completed") return { error: A.syncBeforeNew };
+          await persist();
+          return { state: snapshot(now) };
+        }
         if (state.lastError) return { error: state.lastError };
         if (action === "new-session") {
           if (state.lifecycle?.status !== "completed" || state.positions.length) return { error: P.finishBeforeNew };
+          if (ownerSub && state.assetSyncStatus !== "saved") return { error: A.syncBeforeNew };
           await mkdir(archiveDirectory, { recursive: true, mode: 0o700 });
           const archiveName = `${new Date(now).toISOString().replaceAll(":", "-")}-${randomUUID()}`;
           await rename(directory, `${archiveDirectory}/${archiveName}`);
@@ -219,6 +290,13 @@ async function createRuntime() {
           const reason = snapshot(now).startBlockReason;
           if (reason) return { error: reason };
           if (state.lifecycle && (state.lifecycle.status !== "running" || priorDate(now))) return { error: P.finishBeforeNew };
+          if (ownerSub && !state.lifecycle) {
+            let assets;
+            try { assets = await readProgramAssets(ownerSub); }
+            catch { return { error: A.database }; }
+            if (assets.amount === 0) return { error: A.noCapital };
+            state = initialState(now, assets.amount);
+          }
           startSession(state, session.scanAt, now);
           markTime(now);
           await persist();

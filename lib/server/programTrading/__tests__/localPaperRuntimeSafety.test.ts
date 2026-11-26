@@ -88,13 +88,13 @@ it("does not buy after pause when a ranking returns late", async () => {
   expect(vi.mocked(fetchPaperCandidates).mock.calls[0][0].aborted).toBe(true);
 });
 
-it("closes at 15:00 even if the final price request never returns", async () => {
+it("closes at 15:30 even if the final price request never returns", async () => {
   vi.setSystemTime(clock("14:57:00"));
   vi.mocked(fetchPaperPrices).mockImplementation(() => new Promise(() => undefined));
   const runtime = await getLocalPaperRuntime();
   await runtime.run("start");
-  await vi.advanceTimersByTimeAsync(180_000);
-  expect(fetchPaperPrices).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1_980_000);
+  expect(fetchPaperPrices).toHaveBeenCalled();
   expect((await runtime.snapshot()).lifecycle?.status).toBe("stopping");
   await vi.advanceTimersByTimeAsync(5000);
   expect(await runtime.snapshot()).toMatchObject({
@@ -118,10 +118,54 @@ it("settles at the stored mark at close when the shared limit blocks a new reque
   const runtime = await getLocalPaperRuntime();
   await runtime.run("start");
   await vi.advanceTimersByTimeAsync(1);
-  vi.mocked(nextPaperMarketRequestAt).mockReturnValue(clock("15:01:00"));
-  await vi.advanceTimersByTimeAsync(180_000);
+  vi.mocked(nextPaperMarketRequestAt).mockReturnValue(clock("15:31:00"));
+  vi.setSystemTime(clock("15:29:59"));
+  await vi.advanceTimersByTimeAsync(2000);
   expect(fetchPaperPrices).not.toHaveBeenCalled();
   expect((await runtime.snapshot()).trades.at(-1)?.reason).toBe("last-mark");
+});
+
+it("closes all holdings on positive total return after 15:00 and records the reason", async () => {
+  vi.setSystemTime(clock("14:59:00"));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(1);
+  vi.mocked(fetchPaperPrices).mockImplementation(async () => new Map([["005930", { price: 100_100, at: Date.now() }]]));
+  await vi.advanceTimersByTimeAsync(300_000);
+  expect(await runtime.snapshot()).toMatchObject({
+    positions: [], running: false,
+    lifecycle: { status: "completed", stopCause: "afternoon-profit" },
+  });
+  expect((await runtime.snapshot()).trades.at(-1)?.reason).toBe("afternoon-profit");
+  expect(fetchPaperCandidates).toHaveBeenCalledTimes(1);
+});
+
+it("discards a candidate response crossing 15:00 and does not enter again", async () => {
+  vi.setSystemTime(clock("14:59:59"));
+  let resolve!: (response: ReturnType<typeof candidates>) => void;
+  vi.mocked(fetchPaperCandidates).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(1000);
+  resolve(candidates());
+  await vi.advanceTimersByTimeAsync(1000);
+  expect((await runtime.snapshot()).trades).toEqual([]);
+  expect(await runtime.run("start")).toHaveProperty("error");
+});
+
+it("settles paused holdings at 15:30 even at a loss", async () => {
+  vi.setSystemTime(clock("14:59:00"));
+  const runtime = await getLocalPaperRuntime();
+  await runtime.run("start");
+  await vi.advanceTimersByTimeAsync(1);
+  await runtime.run("pause");
+  vi.mocked(fetchPaperPrices).mockImplementation(async () => new Map([["005930", { price: 99_500, at: Date.now() }]]));
+  vi.setSystemTime(clock("15:29:59"));
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(await runtime.snapshot()).toMatchObject({
+    positions: [], running: false, lifecycle: { status: "completed", stopCause: "close" },
+  });
+  expect((await runtime.snapshot()).trades.at(-1)).toMatchObject({ price: 99_500, reason: "close" });
 });
 
 it("keeps an older session from entering under the new rules", async () => {

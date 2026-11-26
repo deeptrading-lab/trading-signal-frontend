@@ -41,6 +41,10 @@
     },
     {
       "id": "step5",
+      "label": "DB 저장"
+    },
+    {
+      "id": "step6",
       "label": "원장"
     }
   ],
@@ -51,7 +55,7 @@
       "col": 0,
       "type": "backend",
       "icon": "active",
-      "label": "15:00 또는 사용자 종료",
+      "label": "15:30 또는 사용자 종료",
       "sublabel": "신규 매수 중단 · 진행 중 후보 응답 폐기",
       "width": 240,
       "sources": [
@@ -131,8 +135,40 @@
       "col": 0,
       "type": "backend",
       "icon": "active",
+      "label": "브라우저별 종료 자산을 DB에 저장",
+      "sublabel": "동일 종료 중복 방지 · 다음 시작 자산으로 사용",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step5-alternate",
+      "lane": "step5",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "저장 실패",
+      "sublabel": "오류 표시 · 30초 재시도 · 새 세션 차단",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step6",
+      "lane": "step6",
+      "col": 0,
+      "type": "backend",
+      "icon": "active",
       "label": "종료한 세션 보관",
-      "sublabel": "새 세션 열기에서 기존 원장과 복기 보관",
+      "sublabel": "새 세션 열기에서 계정별 기존 원장과 복기 보관",
       "width": 240,
       "sources": [
         {
@@ -179,6 +215,18 @@
       "to": "step5",
       "fromSide": "bottom",
       "toSide": "top"
+    },
+    {
+      "from": "step5",
+      "to": "step5-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step5",
+      "to": "step6",
+      "fromSide": "bottom",
+      "toSide": "top"
     }
   ],
   "mainPath": [
@@ -186,6 +234,7 @@
     "step2",
     "step3",
     "step4",
-    "step5"
+    "step5",
+    "step6"
   ]
 }

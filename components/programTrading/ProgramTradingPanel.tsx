@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, Play, RefreshCw, Square } from "lucide-react";
+import { ClipboardList, Play, RefreshCw, Settings2, Square } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ProgramTradingDiagramModal } from "@/components/programTrading/ProgramTradingDiagramModal";
@@ -9,6 +9,7 @@ import { useProgramTrading } from "@/hooks/programTrading/useProgramTrading";
 import { PROGRAM_COPY as C, PROGRAM_MENU_COPY as M, PROGRAM_PAPER_COPY as P, PROGRAM_REVIEW_COPY as R } from "@/lib/copy/programTrading/programTrading";
 import type { Trade } from "@/lib/types/programTrading/programTrading";
 import { cn } from "@/lib/utils/cn";
+import { PROGRAM_ASSETS_COPY as A } from "@/lib/copy/programTrading/assets";
 
 const money = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
 const kstTime = new Intl.DateTimeFormat("ko-KR", {
@@ -60,7 +61,7 @@ export function ProgramTradingPanel() {
           <ProgramTradingInfo label={P.mode} description={P.hint} />
         </div>
       </div>
-      <div className="grid w-full min-w-0 grid-cols-2 gap-sm sm:flex sm:w-auto">
+      <div className="grid w-full min-w-0 grid-cols-2 gap-sm sm:flex sm:w-auto sm:flex-wrap">
         <button type="button" className="button-secondary program-trading-action" aria-haspopup="dialog" onClick={() => setDiagramOpen(true)}>
           {M.showDiagram}
         </button>
@@ -71,6 +72,10 @@ export function ProgramTradingPanel() {
       </div>
     </header>
 
+    {state?.assetSyncStatus && <div className="flex flex-wrap items-center gap-sm" role={state.assetSyncStatus === "error" ? "alert" : "status"}>
+      <p className="text-body-sm text-text-muted">{state.assetSyncStatus === "error" ? A.syncError : state.assetSyncStatus === "saved" ? A.syncSaved : A.syncPending}</p>
+      {state.assetSyncStatus === "error" && <button type="button" disabled={pending} className="button-secondary" onClick={() => send("sync-assets")}>{A.retry}</button>}
+    </div>}
     <section className="border-t border-border-line pt-sm" aria-labelledby="program-candidates">
       <div className="relative flex flex-wrap items-center justify-between gap-x-sm">
         <div className="flex min-w-0 items-center">
@@ -99,7 +104,13 @@ export function ProgramTradingPanel() {
           <h2 id="program-results" className="text-h2 font-bold text-text-strong">{M.results}</h2>
           <ProgramTradingInfo label={M.results} description={`${M.targetPolicy}. ${P.limits}.`} />
         </div>
-        <p className="text-body-sm text-text-muted">{M.target} <span className="font-semibold tabular-nums text-text-strong">{state?.lifecycle?.targetReturnPct ?? 1}%</span></p>
+        <div className="flex items-center gap-sm">
+          <p className="text-body-sm text-text-muted">{M.target} <span className="font-semibold tabular-nums text-text-strong">{state?.lifecycle?.targetReturnPct ?? 1}%</span></p>
+          <Link href="/program-trading/assets" title={A.title}
+            className="inline-flex min-h-hit-area-min shrink-0 items-center gap-xs rounded-md px-xs text-body-sm font-medium text-text-muted no-underline hover:bg-surface-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            <Settings2 className="size-4" aria-hidden="true" />{A.link}
+          </Link>
+        </div>
       </div>
       <dl className="grid grid-cols-2 gap-px border-y border-border-line bg-border-line lg:grid-cols-4">
         {metrics.map(({ label, value, direction }) => (

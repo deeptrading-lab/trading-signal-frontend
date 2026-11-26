@@ -1,9 +1,16 @@
 import { readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import type { PaperPerformancePoint, PaperSessionReview } from "@/lib/types/programTrading/programTrading";
 
 export const paperSessionDirectory = ".local/program-trading/toss-paper";
 export const paperArchiveDirectory = ".local/program-trading/toss-paper-archive";
+
+export function accountPaperDirectories(ownerSub: string) {
+  const key = createHash("sha256").update(ownerSub).digest("hex");
+  const root = join(".local/program-trading/accounts", key);
+  return { directory: join(root, "toss-paper"), archiveDirectory: join(root, "toss-paper-archive") };
+}
 
 const archiveName = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})(\.\d{3}Z)-[\da-f-]{36}$/;
 const reviewLimit = 100;
@@ -52,8 +59,8 @@ export async function trimPaperReviews(hasCurrentReview: boolean, directory = pa
   }
 }
 
-export async function loadPaperReviews(requestedId?: string, { includePerformance = false } = {}) {
-  const [currentReview, archives] = await Promise.all([readReview(paperSessionDirectory), listPaperReviewArchives()]);
+export async function loadPaperReviews(requestedId?: string, { includePerformance = false, directory = paperSessionDirectory, archiveDirectory = paperArchiveDirectory } = {}) {
+  const [currentReview, archives] = await Promise.all([readReview(directory), listPaperReviewArchives(archiveDirectory)]);
   const sessions: { id: string; archivedAt: string | null }[] = archives.flatMap(id => {
     const parts = archiveName.exec(id);
     if (!parts) return [];
@@ -66,12 +73,12 @@ export async function loadPaperReviews(requestedId?: string, { includePerformanc
   const selected = requestedId === undefined ? sessions[0] : sessions.find(session => session.id === requestedId);
   let json: string | null = null;
   if (selected) {
-    json = selected.id === "current" ? currentReview : await readReview(join(paperArchiveDirectory, selected.id));
+    json = selected.id === "current" ? currentReview : await readReview(join(archiveDirectory, selected.id));
   }
   const review: PaperSessionReview | null = json === null ? null : JSON.parse(json);
   const performance = includePerformance ? (await Promise.all(sessions.map(async ({ id }) => {
     const report = id === selected?.id ? review : await (async () => {
-      const saved = id === "current" ? currentReview : await readReview(join(paperArchiveDirectory, id));
+      const saved = id === "current" ? currentReview : await readReview(join(archiveDirectory, id));
       return saved === null ? null : JSON.parse(saved) as PaperSessionReview;
     })().catch(() => null);
     const { finishedAt, returnPct } = report?.lifecycle ?? {};

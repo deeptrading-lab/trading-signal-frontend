@@ -29,26 +29,34 @@
     },
     {
       "id": "step2",
-      "label": "로컬 서버"
+      "label": "브라우저 자산"
     },
     {
       "id": "step3",
-      "label": "토스 랭킹"
+      "label": "로컬 서버"
     },
     {
       "id": "step4",
-      "label": "가상 체결"
+      "label": "토스 랭킹"
     },
     {
       "id": "step5",
-      "label": "토스 현재가"
+      "label": "가상 체결"
     },
     {
       "id": "step6",
-      "label": "매도 판단"
+      "label": "토스 현재가"
     },
     {
       "id": "step7",
+      "label": "오후 수익 확인"
+    },
+    {
+      "id": "step8",
+      "label": "매도 판단"
+    },
+    {
+      "id": "step9",
       "label": "종료"
     }
   ],
@@ -73,6 +81,38 @@
       "id": "step2",
       "lane": "step2",
       "col": 0,
+      "type": "security",
+      "icon": "decision",
+      "label": "브라우저 키의 시작 자산을 DB에서 조회",
+      "sublabel": "최근 종료·수동 저장값 · 저장 이력 없을 때만 1,000만 원",
+      "width": 284.8,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step2-alternate",
+      "lane": "step2",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "브라우저 키 없음·DB 실패·0원",
+      "sublabel": "시작 차단",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step3",
+      "lane": "step3",
+      "col": 0,
       "type": "backend",
       "icon": "active",
       "label": "서버에서 후보 조회 준비",
@@ -86,8 +126,8 @@
       ]
     },
     {
-      "id": "step3",
-      "lane": "step3",
+      "id": "step4",
+      "lane": "step4",
       "col": 0,
       "type": "security",
       "icon": "decision",
@@ -102,8 +142,8 @@
       ]
     },
     {
-      "id": "step3-alternate",
-      "lane": "step3",
+      "id": "step4-alternate",
+      "lane": "step4",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -118,14 +158,14 @@
       ]
     },
     {
-      "id": "step4",
-      "lane": "step4",
+      "id": "step5",
+      "lane": "step5",
       "col": 0,
       "type": "backend",
       "icon": "active",
       "label": "랭킹 가격으로 순차 가상 매수",
-      "sublabel": "거래량 조건을 통과한 N종목에 현금 1/N 배정",
-      "width": 240,
+      "sublabel": "기업 주식·거래량 조건을 통과한 N종목에 현금 1/N 배정",
+      "width": 270.4,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -134,8 +174,8 @@
       ]
     },
     {
-      "id": "step5",
-      "lane": "step5",
+      "id": "step6",
+      "lane": "step6",
       "col": 0,
       "type": "security",
       "icon": "decision",
@@ -150,8 +190,8 @@
       ]
     },
     {
-      "id": "step5-alternate",
-      "lane": "step5",
+      "id": "step6-alternate",
+      "lane": "step6",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -166,8 +206,40 @@
       ]
     },
     {
-      "id": "step6",
-      "lane": "step6",
+      "id": "step7",
+      "lane": "step7",
+      "col": 0,
+      "type": "security",
+      "icon": "decision",
+      "label": "15:00 이후 전체 수익률이 0% 초과인가요?",
+      "sublabel": "모든 보유 가격 확보 · 현금 + 보유 평가액 &gt; 시작 자산",
+      "width": 284.8,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step7-alternate",
+      "lane": "step7",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "예",
+      "sublabel": "전량 가상 매도 후 종료 · 아니오/가격 누락",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step8",
+      "lane": "step8",
       "col": 0,
       "type": "backend",
       "icon": "active",
@@ -182,12 +254,12 @@
       ]
     },
     {
-      "id": "step7",
-      "lane": "step7",
+      "id": "step9",
+      "lane": "step9",
       "col": 0,
       "type": "backend",
       "icon": "active",
-      "label": "15:00 마감 청산 → 원장",
+      "label": "15:30 마감 청산 → 원장",
       "sublabel": "가상 체결과 마지막 기록가 정산을 원장에 기록",
       "width": 240,
       "sources": [
@@ -207,15 +279,15 @@
     },
     {
       "from": "step2",
+      "to": "step2-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step2",
       "to": "step3",
       "fromSide": "bottom",
       "toSide": "top"
-    },
-    {
-      "from": "step3",
-      "to": "step3-alternate",
-      "role": "branch",
-      "variant": "security"
     },
     {
       "from": "step3",
@@ -225,15 +297,15 @@
     },
     {
       "from": "step4",
+      "to": "step4-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step4",
       "to": "step5",
       "fromSide": "bottom",
       "toSide": "top"
-    },
-    {
-      "from": "step5",
-      "to": "step5-alternate",
-      "role": "branch",
-      "variant": "security"
     },
     {
       "from": "step5",
@@ -243,7 +315,31 @@
     },
     {
       "from": "step6",
+      "to": "step6-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step6",
       "to": "step7",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step7",
+      "to": "step7-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step7",
+      "to": "step8",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step8",
+      "to": "step9",
       "fromSide": "bottom",
       "toSide": "top"
     }
@@ -255,6 +351,8 @@
     "step4",
     "step5",
     "step6",
-    "step7"
+    "step7",
+    "step8",
+    "step9"
   ]
 }

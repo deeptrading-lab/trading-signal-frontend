@@ -167,7 +167,7 @@ async function issueToken(creds: { id: string; secret: string }): Promise<CacheE
 }
 
 /**
- * 401(invalid-token/expired-token) 수신 시 죽은 토큰 폐기 — 외부 주체 재발급으로 무효화된 케이스.
+ * 401(invalid-token/expired-token/token-revoked) 수신 시 죽은 토큰 폐기.
  *
  * @param deadToken 401 을 받은 그 토큰. L1/store 가 이미 다른(새) 토큰이면 건드리지 않는다
  *                  (직후 다른 주체가 발급한 fresh 토큰을 지우는 역효과 방지).

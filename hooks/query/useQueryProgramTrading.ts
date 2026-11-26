@@ -10,7 +10,7 @@ export function useQueryProgramTrading() {
     queryKey: queryKeys.programTrading,
     queryFn: ({ signal }) => getProgramState(signal),
     refetchInterval: ({ state: { data } }) =>
-      data && (data.running || data.positions.length || data.lifecycle?.status === "stopping")
+      data && (data.running || data.positions.length || data.lifecycle?.status === "stopping" || data.assetSyncStatus === "error")
         ? ACTIVE_REFRESH_MS
         : IDLE_REFRESH_MS,
     retry: false,

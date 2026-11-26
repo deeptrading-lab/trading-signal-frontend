@@ -50,6 +50,8 @@ async function main() {
   const sources = [
     "lib/server/programTrading/engine.ts", "lib/server/programTrading/localPaperRuntime.ts",
     "lib/server/programTrading/tossPaper.ts", "lib/server/programTrading/journal.ts",
+    "lib/server/programTrading/assetsStore.ts", "lib/server/programTrading/accountIdentity.ts",
+    "lib/auth/programBrowser.ts", "lib/auth/programBrowserResponse.ts",
     "lib/api/toss/paperMarketLimit.ts", "lib/api/toss/client.ts",
   ];
   const sourceText = await Promise.all(sources.map(path => readFile(path, 'utf8')));
@@ -62,7 +64,7 @@ async function main() {
     .replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
       if (!(key in values)) throw new Error(`알 수 없는 규칙: ${key}`);
       const value = values[key as keyof typeof values];
-      if (["entryStart", "candidateStart", "closeMinute"].includes(key)) {
+      if (["entryStart", "candidateStart", "profitCloseMinute", "closeMinute"].includes(key)) {
         return `${Math.floor(value / 60).toString().padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
       }
       if (key.endsWith("IntervalMs")) return String(value / 60_000);

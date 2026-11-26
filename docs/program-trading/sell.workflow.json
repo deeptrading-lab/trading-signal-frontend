@@ -29,18 +29,22 @@
     },
     {
       "id": "step2",
-      "label": "종목 손익"
+      "label": "오후 수익 확인"
     },
     {
       "id": "step3",
-      "label": "가상 매도"
+      "label": "종목 손익"
     },
     {
       "id": "step4",
-      "label": "남은 보유"
+      "label": "가상 매도"
     },
     {
       "id": "step5",
+      "label": "남은 보유"
+    },
+    {
+      "id": "step6",
       "label": "세션 손익"
     }
   ],
@@ -83,6 +87,38 @@
       "col": 0,
       "type": "security",
       "icon": "decision",
+      "label": "15:00 이후 전체 평가자산 &gt; 시작 자산인가요?",
+      "sublabel": "전 종목 유효 가격 확보 시 판단 · 0%는 미충족",
+      "width": 323,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step2-alternate",
+      "lane": "step2",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "예",
+      "sublabel": "전량 매도 후 종료 · 아니오/가격 누락",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step3",
+      "lane": "step3",
+      "col": 0,
+      "type": "security",
+      "icon": "decision",
       "label": "매수가 대비 손익 확인",
       "sublabel": "+2% 이상 익절 · −1% 이하 손절",
       "width": 240,
@@ -94,8 +130,8 @@
       ]
     },
     {
-      "id": "step2-alternate",
-      "lane": "step2",
+      "id": "step3-alternate",
+      "lane": "step3",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -110,8 +146,8 @@
       ]
     },
     {
-      "id": "step3",
-      "lane": "step3",
+      "id": "step4",
+      "lane": "step4",
       "col": 0,
       "type": "backend",
       "icon": "active",
@@ -126,8 +162,8 @@
       ]
     },
     {
-      "id": "step4",
-      "lane": "step4",
+      "id": "step5",
+      "lane": "step5",
       "col": 0,
       "type": "security",
       "icon": "decision",
@@ -142,8 +178,8 @@
       ]
     },
     {
-      "id": "step4-alternate",
-      "lane": "step4",
+      "id": "step5-alternate",
+      "lane": "step5",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -158,8 +194,8 @@
       ]
     },
     {
-      "id": "step5",
-      "lane": "step5",
+      "id": "step6",
+      "lane": "step6",
       "col": 0,
       "type": "security",
       "icon": "decision",
@@ -174,14 +210,14 @@
       ]
     },
     {
-      "id": "step5-alternate",
-      "lane": "step5",
+      "id": "step6-alternate",
+      "lane": "step6",
       "col": 1,
       "type": "security",
       "icon": "decision",
       "label": "세션 한도 미도달",
-      "sublabel": "다음 호출 가능 시 후보 조회",
-      "width": 240,
+      "sublabel": "15:00 전만 후보 조회 · 이후 수익이면 종료/그 외 마감 대기",
+      "width": 294.4,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -217,15 +253,15 @@
     },
     {
       "from": "step3",
+      "to": "step3-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step3",
       "to": "step4",
       "fromSide": "bottom",
       "toSide": "top"
-    },
-    {
-      "from": "step4",
-      "to": "step4-alternate",
-      "role": "branch",
-      "variant": "security"
     },
     {
       "from": "step4",
@@ -238,6 +274,18 @@
       "to": "step5-alternate",
       "role": "branch",
       "variant": "security"
+    },
+    {
+      "from": "step5",
+      "to": "step6",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step6",
+      "to": "step6-alternate",
+      "role": "branch",
+      "variant": "security"
     }
   ],
   "mainPath": [
@@ -245,6 +293,7 @@
     "step2",
     "step3",
     "step4",
-    "step5"
+    "step5",
+    "step6"
   ]
 }

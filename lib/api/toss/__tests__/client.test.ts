@@ -2,13 +2,41 @@ import { AxiosHeaders, type AxiosResponse } from "axios";
 import { afterEach, expect, it, vi } from "vitest";
 import { fetchCandlesPage } from "../candles";
 import { getTossClient, resetTossClientForTest, tossGet } from "../client";
+import { invalidateTossToken } from "../token";
 
 vi.mock("../token", () => ({ getTossAccessToken: vi.fn(async () => "fixture"), invalidateTossToken: vi.fn() }));
 
 afterEach(() => {
   resetTossClientForTest();
   vi.restoreAllMocks();
+  vi.clearAllMocks();
   vi.useRealTimers();
+});
+
+it("replaces a revoked token and retries an ordinary GET only once", async () => {
+  const revoked = { ...reply(401), data: { error: { code: "token-revoked" } } };
+  const get = vi.spyOn(getTossClient(), "get").mockResolvedValueOnce(revoked).mockResolvedValue(reply(200));
+  await expect(tossGet("/api/v1/prices")).resolves.toEqual({ candles: [] });
+  expect(invalidateTossToken).toHaveBeenCalledExactlyOnceWith("fixture");
+  expect(get).toHaveBeenCalledTimes(2);
+
+  get.mockResolvedValue(revoked);
+  await expect(tossGet("/api/v1/prices")).rejects.toMatchObject({ status: 401 });
+  expect(get).toHaveBeenCalledTimes(4);
+});
+
+it("invalidates a revoked paper token but preserves the 60 second request limit", async () => {
+  vi.useFakeTimers();
+  const get = vi.spyOn(getTossClient(), "get")
+    .mockResolvedValueOnce({ ...reply(401), data: { error: { code: "token-revoked" } } })
+    .mockResolvedValue(reply(200));
+  await expect(tossGet("/api/v1/prices", {}, "program-paper")).rejects.toMatchObject({ status: 401 });
+  expect(invalidateTossToken).toHaveBeenCalledExactlyOnceWith("fixture");
+  await expect(tossGet("/api/v1/prices", {}, "program-paper")).rejects.toMatchObject({ status: 503 });
+  expect(get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(60_000);
+  await expect(tossGet("/api/v1/prices", {}, "program-paper")).resolves.toEqual({ candles: [] });
+  expect(get).toHaveBeenCalledTimes(2);
 });
 
 it("shares Retry-After across trade and orderbook requests while stock lookups stay available", async () => {

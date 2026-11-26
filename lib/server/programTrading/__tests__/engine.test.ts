@@ -61,3 +61,33 @@ it("closes with a fresh price when available and marks the remaining settlement 
   expect(state.trades.slice(-2).map(({ price, reason }) => [price, reason])).toEqual([[101, "close"], [100, "last-mark"]]);
   expect(state.lifecycle).toMatchObject({ stopCause: "close", status: "completed", forcedAt: new Date(at).toISOString() });
 });
+
+it.each([899, 900, 910])("closes positive total equity only from 15:00 (minute %i)", minute => {
+  const state = opened([ranked("005930", 1000, 1), ranked("000660", 1000, 2)], 10_000);
+  state.minute = minute;
+  const observedAt = Date.parse("2026-11-09T00:00:00+09:00") + minute * 60_000;
+  // One losing position is included in the account-wide liquidation.
+  observePrices(state, new Map([["005930", { price: 1005, at: observedAt }], ["000660", { price: 999, at: observedAt }]]), observedAt);
+  expect(state.lifecycle?.status).toBe(minute >= 900 ? "completed" : "running");
+  if (minute >= 900) {
+    expect(state.positions).toEqual([]);
+    expect(state.trades.slice(-2).map(t => t.reason)).toEqual(["afternoon-profit", "afternoon-profit"]);
+    expect(state.lifecycle?.returnPct).toBeCloseTo(0.2);
+  }
+});
+
+it.each([1000, 999])("does not close flat or negative total returns after 15:00 (price %i)", price => {
+  const state = opened([ranked("005930", 1000, 1)], 10_000);
+  state.minute = 900;
+  observePrices(state, new Map([["005930", { price, at: now + 3600000 }]]), now + 3600000);
+  expect(state.running).toBe(true);
+  expect(state.positions).toHaveLength(1);
+});
+
+it("does not use a partial price response to trigger account-wide profit closure", () => {
+  const state = opened([ranked("005930", 1000, 1), ranked("000660", 1000, 2)], 10_000);
+  state.minute = 900;
+  observePrices(state, new Map([["005930", { price: 1005, at: now + 3600000 }]]), now + 3600000);
+  expect(state.running).toBe(true);
+  expect(state.positions).toHaveLength(2);
+});

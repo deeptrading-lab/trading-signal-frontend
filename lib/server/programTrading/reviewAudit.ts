@@ -32,10 +32,10 @@ export function auditPaperSession(review: PaperSessionReview, events: JournalEve
   for (const event of events) {
     const trade = event.trade;
     if (!trade) continue;
-    const current = event.rulesVersion === RULES_VERSION;
+    const current = event.rulesVersion === RULES_VERSION || event.rulesVersion === "program-v6-volume-basket";
     const modern = event.rulesVersion === LEGACY_NET_VERSION;
     // Historical sessions must retain their original gross-price policy.
-    const rules = current ? { ...LEGACY_RULES, fee: 0, sellTax: 0, entryStart: RULES.candidateStart, entryEnd: RULES.closeMinute }
+    const rules = current ? { ...LEGACY_RULES, fee: 0, sellTax: 0, entryStart: RULES.candidateStart, entryEnd: RULES.profitCloseMinute }
       : modern ? trade.evidence?.rules ?? LEGACY_RULES : { ...LEGACY_RULES, stop: .01, target: .02, maxPositions: 2, entryEnd: 900 };
 
     const gross = trade.price * trade.quantity;
@@ -87,7 +87,7 @@ export function auditPaperSession(review: PaperSessionReview, events: JournalEve
     returnPct === null || !(Math.abs(expectedReturn - returnPct) < 0.000001)) {
     mismatches.push(`원장 재계산 잔액 ${won(cash)} · 순손익 ${won(net)} · 매도 ${sells}건 · 미결 ${positions.size}종목`);
   }
-  const currentSession = events.some(event => event.rulesVersion === RULES_VERSION);
+  const currentSession = events.some(event => event.rulesVersion === RULES_VERSION || event.rulesVersion === "program-v6-volume-basket");
   if (mismatches.length) {
     audit.issues.push({ title: `원장 대조 불일치 ${mismatches.length}건`, evidence: mismatches.slice(0, 5).join(" / ") });
   } else {

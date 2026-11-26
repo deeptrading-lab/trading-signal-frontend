@@ -1,11 +1,13 @@
 import type { CandidateSnapshot, Position, Reason, TradingState } from "@/lib/types/programTrading/programTrading";
 import type { PaperPrice } from "./tossPaper";
+import { DEFAULT_PROGRAM_ASSETS } from "@/lib/validation/programTrading/assets";
 
-export const RULES_VERSION = "program-v6-volume-basket";
+export const RULES_VERSION = "program-v7-afternoon-close";
 export const RULES = {
   entryStart: 9 * 60,
   candidateStart: 9 * 60 + 5,
-  closeMinute: 15 * 60,
+  profitCloseMinute: 15 * 60,
+  closeMinute: 15 * 60 + 30,
   rankingCount: 100,
   minVolume: 1_000_000,
   candidateIntervalMs: 10 * 60_000,
@@ -16,13 +18,13 @@ export const RULES = {
   sessionLossPercent: 2,
 } as const;
 
-export function initialState(now = Date.now()): TradingState {
+export function initialState(now = Date.now(), assets = DEFAULT_PROGRAM_ASSETS): TradingState {
   const at = new Date(now).toISOString();
   return {
     policyVersion: RULES_VERSION, version: 1, executionMode: "toss-paper",
     candidates: { status: "unavailable", rows: [], checkedAt: at, expiresAt: at },
     running: false, killed: false, tick: 0, minute: RULES.entryStart,
-    cash: 10_000_000, initial: 10_000_000, equity: 10_000_000, realized: 0,
+    cash: assets, initial: assets, equity: assets, realized: 0,
     positions: [], trades: [], quotes: [], updatedAt: at, lastError: null,
   };
 }
@@ -77,6 +79,20 @@ function sell(state: TradingState, position: Position, price: number, reason: Re
 }
 
 export function observePrices(state: TradingState, prices: Map<string, PaperPrice>, now: number) {
+  // 계좌 전체 수익은 이번 응답에 모든 보유 종목의 유효 가격이 있을 때만 판단한다.
+  const complete = state.positions.every(position => {
+    const price = prices.get(position.ticker);
+    return price && price.at >= (position.lastFreshAt ?? 0);
+  });
+  for (const position of state.positions) {
+    const observation = prices.get(position.ticker);
+    if (observation && observation.at >= (position.lastFreshAt ?? 0)) position.mark = observation.price;
+  }
+  updateEquity(state);
+  if (state.minute >= RULES.profitCloseMinute && complete && state.equity > state.lifecycle!.beforeBalance) {
+    closeSession(state, prices, "afternoon-profit", now);
+    return;
+  }
   for (const position of state.positions) {
     const observation = prices.get(position.ticker);
     if (!observation || observation.at < (position.lastFreshAt ?? 0)) continue;
@@ -115,7 +131,7 @@ function finishSession(state: TradingState, cause: NonNullable<NonNullable<Tradi
   };
 }
 
-export function closeSession(state: TradingState, prices: Map<string, PaperPrice>, cause: "manual" | "close", now: number) {
+export function closeSession(state: TradingState, prices: Map<string, PaperPrice>, cause: "manual" | "close" | "afternoon-profit", now: number) {
   for (const position of state.positions) {
     if (state.policyVersion !== RULES_VERSION) {
       // Retire legacy positions at their historical paper valuation without entering another trade.

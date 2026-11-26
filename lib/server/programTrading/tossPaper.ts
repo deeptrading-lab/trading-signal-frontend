@@ -2,6 +2,7 @@ import { isTossConfigured, pickTossArray, tossGet } from "@/lib/api/toss/client"
 import { isoToKstDate, isoToKstHm, kstWeekdayKo } from "@/lib/api/toss/kst";
 import { PAPER_MARKET_SOURCE } from "@/lib/api/toss/paperMarketLimit";
 import { getSymbolName } from "@/lib/api/kis/search";
+import { getTossStockMasters } from "@/lib/api/toss/stockMaster";
 import type { CandidateSnapshot, ProgramCandidate } from "@/lib/types/programTrading/programTrading";
 import { RULES } from "./engine";
 
@@ -63,9 +64,20 @@ export async function fetchPaperCandidates(signal: AbortSignal): Promise<Candida
     });
   }
   candidates.sort((a, b) => b.volume! - a.volume! || a.ticker.localeCompare(b.ticker));
+  let masters: Awaited<ReturnType<typeof getTossStockMasters>>;
+  try {
+    masters = await getTossStockMasters(candidates.map(row => row.ticker), PAPER_MARKET_SOURCE, signal);
+  } catch {
+    // 기업 주식인지 확인할 수 없으면 추정으로 매수하지 않는다.
+    return emptyPaperCandidates(Date.now());
+  }
   const unique = new Map<string, ProgramCandidate>();
   for (const row of candidates) {
-    if (!unique.has(row.ticker)) unique.set(row.ticker, { ...row, rank: unique.size + 1 });
+    const master = masters.get(row.ticker);
+    if (master?.securityType?.toUpperCase() !== "STOCK") continue;
+    if (!unique.has(row.ticker)) unique.set(row.ticker, {
+      ...row, name: master.name?.trim() || master.englishName?.trim() || row.name, rank: unique.size + 1,
+    });
   }
   return { ...snapshot, status: unique.size ? "ready" : "empty", rankedAt: result.rankedAt, rows: [...unique.values()] };
 }
