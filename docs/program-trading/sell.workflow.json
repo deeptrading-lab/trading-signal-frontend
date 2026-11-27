@@ -5,7 +5,7 @@
     "output": ".archify/program-rules/sell.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "8d17df78a5c736fa4360259034f9e234062100e6",
+      "revision": "3d5482899d7521d6e541c1b258c993e7e7f872ad",
       "link_mode": "local-only"
     },
     "title": "자동매매 · 보유 종목 매도와 재탐색",
@@ -183,9 +183,9 @@
       "col": 1,
       "type": "security",
       "icon": "decision",
-      "label": "보유 중이면 다음 5분 점검",
-      "sublabel": "다음 조회 대기",
-      "width": 240,
+      "label": "보유 중",
+      "sublabel": "5분 매도 점검 유지 · 15:00 전 현금이 있으면 별도 후보 조회",
+      "width": 299.2,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",

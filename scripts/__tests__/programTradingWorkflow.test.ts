@@ -19,7 +19,7 @@ describe("거래량 기준 자동매매 도식", () => {
 
   it("후보 미충족 경로가 가상 체결에 이어지지 않는다", () => {
     const diagram = make("buy");
-    for (const id of ["step1", "step2", "step3"]) {
+    for (const id of ["step1", "step2", "step3", "step4", "step6"]) {
       expect(diagram.edges).toContainEqual(expect.objectContaining({ from: id, to: `${id}-alternate`, role: "branch" }));
       expect(diagram.edges.find(edge => edge.from === `${id}-alternate`)).toBeUndefined();
     }
@@ -29,8 +29,9 @@ describe("거래량 기준 자동매매 도식", () => {
   it("보유가 모두 해소된 다음 세션 손익을 판단한다", () => {
     const diagram = make("sell");
     expect(diagram.edges).toContainEqual(expect.objectContaining({ from: "step4", to: "step5" }));
-    expect(diagram.nodes.find(node => node.id === "step4-alternate")?.label).toBe("보유 중이면 다음 {{priceIntervalMs}}분 점검");
-    expect(diagram.nodes.find(node => node.id === "step5-alternate")?.sublabel).toBe("다음 호출 가능 시 후보 조회");
+    expect(diagram.nodes.find(node => node.id === "step5-alternate")?.label).toContain("보유 중");
+    expect(diagram.nodes.find(node => node.id === "step5-alternate")?.sublabel).toContain("별도 후보 조회");
+    expect(diagram.nodes.find(node => node.id === "step6-alternate")?.label).toBe("세션 한도 미도달");
   });
 
   it("최종 조회 실패도 마지막 가격으로 가상 청산과 원장 기록에 이어진다", () => {

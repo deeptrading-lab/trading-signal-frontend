@@ -197,14 +197,20 @@ async function createRuntime(ownerSub?: string) {
         }
         return;
       }
-      const dueAt = tickers.length ? state.nextPriceAt ?? now : Math.max(state.nextCandidateAt ?? now, nextPaperMarketRequestAt());
-      if (now < dueAt) return;
+      if (now < nextPaperMarketRequestAt()) return;
+      const priceDueAt = state.nextPriceAt ?? now;
+      const checkPrices = tickers.length > 0 && now >= priceDueAt;
+      const checkCandidates = session.minute < RULES.profitCloseMinute && state.cash > 0
+        && now >= (state.nextCandidateAt ?? now);
+      if (!checkPrices && !checkCandidates) return;
+      // 매도부터 판단하고, 추가 매수 요청이 다음 매도 점검의 공통 호출 슬롯을 차지하지 않게 한다.
+      if (!checkPrices && tickers.length && now + PAPER_MARKET_INTERVAL_MS + MARKET_TIMEOUT_MS >= priceDueAt) return;
       // Leave the final slot available for the market-close liquidation request.
       if (tickers.length && now >= session.closeAt - PAPER_MARKET_INTERVAL_MS) return;
       const request = new AbortController();
       const budget = Math.min(MARKET_TIMEOUT_MS, session.closeAt - now);
       pending = request;
-      const response = tickers.length
+      const response = checkPrices
         ? readMarket(request, fetchPaperPrices(tickers, request.signal), () => new Map(), budget).then(prices => ({ prices }))
         : readMarket(request, fetchPaperCandidates(request.signal), emptyPaperCandidates, budget).then(candidates => ({ candidates }));
 

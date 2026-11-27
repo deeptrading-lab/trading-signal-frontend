@@ -26,7 +26,7 @@ function fixture(exitPrice: number, reason: "stop" | "target", version = RULES_V
 const audit = (input: ReturnType<typeof fixture>) => auditPaperSession(input.review, input.events, "fixture");
 
 describe("규칙 버전별 종료 감사", () => {
-  it.each(["program-v6-volume-basket", "program-v7-afternoon-close"])("%s 원장은 비용 0과 거래량 매수 기준을 보존한다", version => {
+  it.each(["program-v6-volume-basket", "program-v7-afternoon-close", "program-v8-cash-reinvestment"])("%s 원장은 비용 0과 거래량 매수 기준을 보존한다", version => {
     const input = fixture(10_200, "target", version, 600, { fee: 0, sellTax: 0 });
     input.events[0].trade!.reason = "volume-rank";
     expect(audit(input).issues).toEqual([]);

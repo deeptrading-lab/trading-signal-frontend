@@ -48,6 +48,26 @@ it("waits on a prior-date or empty ranking even on a weekday", async () => {
   for (let request = 0; request < 2; request++) expect(await fetchPaperCandidates(signal)).toMatchObject({ status: "empty", rows: [] });
 });
 
+it("전일 대비 20%까지 허용하고 20% 초과와 유효하지 않은 등락률은 후보에서 제외한다", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(liveTime));
+  vi.mocked(tossGet).mockResolvedValue({ rankedAt: liveTime, rankings: [
+    row("005930", 2_000_000, "0.1999"), row("000660", 2_000_000, "0.20"),
+    row("035720", 2_000_000, "0.2001"), row("068270", 2_000_000, "0.30"),
+    row("051910", 2_000_000, "NaN"), row("003550", 2_000_000, "Infinity"),
+  ] });
+  const result = await fetchPaperCandidates(signal);
+  expect(result.rows.map(candidate => candidate.ticker)).toEqual(["000660", "005930"]);
+  expect(getTossStockMasters).toHaveBeenCalledExactlyOnceWith(["000660", "005930"], "program-paper", signal);
+});
+
+it("모든 종목이 20% 초과이면 매수 후보가 없다", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(liveTime));
+  vi.mocked(tossGet).mockResolvedValue({ rankedAt: liveTime, rankings: [row("005930", 2_000_000, "0.2001")] });
+  expect(await fetchPaperCandidates(signal)).toMatchObject({ status: "empty", rows: [] });
+});
+
 it("excludes ETFs, ETNs, derivatives and unclassified symbols from company candidates", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(liveTime));

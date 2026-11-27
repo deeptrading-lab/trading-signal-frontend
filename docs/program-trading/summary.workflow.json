@@ -5,7 +5,7 @@
     "output": ".archify/program-rules/summary.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "8d17df78a5c736fa4360259034f9e234062100e6",
+      "revision": "3d5482899d7521d6e541c1b258c993e7e7f872ad",
       "link_mode": "local-only"
     },
     "title": "자동매매 · 전체 호출 흐름",
@@ -37,26 +37,30 @@
     },
     {
       "id": "step4",
-      "label": "토스 랭킹"
+      "label": "조회 우선순위"
     },
     {
       "id": "step5",
-      "label": "가상 체결"
+      "label": "토스 랭킹"
     },
     {
       "id": "step6",
-      "label": "토스 현재가"
+      "label": "가상 체결"
     },
     {
       "id": "step7",
-      "label": "오후 수익 확인"
+      "label": "토스 현재가"
     },
     {
       "id": "step8",
-      "label": "매도 판단"
+      "label": "오후 수익 확인"
     },
     {
       "id": "step9",
+      "label": "매도 판단"
+    },
+    {
+      "id": "step10",
       "label": "종료"
     }
   ],
@@ -131,9 +135,9 @@
       "col": 0,
       "type": "security",
       "icon": "decision",
-      "label": "토스 거래량 순위 요청",
-      "sublabel": "GET /api/v1/rankings · 시세 요청 간격 60초",
-      "width": 240,
+      "label": "보유 점검과 신규 매수 일정을 독립 확인",
+      "sublabel": "보유 가격 5분 · 현금이 있으면 보유 중에도 후보 10분",
+      "width": 271,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -144,6 +148,38 @@
     {
       "id": "step4-alternate",
       "lane": "step4",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "일정 겹침",
+      "sublabel": "매도 먼저 · 다음 매도 점검이 가까우면 후보 조회 대기",
+      "width": 270.4,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step5",
+      "lane": "step5",
+      "col": 0,
+      "type": "security",
+      "icon": "decision",
+      "label": "토스 거래량 순위 요청",
+      "sublabel": "GET /api/v1/rankings · 15:00 전 · 시세 요청 간격 60초",
+      "width": 280,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step5-alternate",
+      "lane": "step5",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -158,14 +194,14 @@
       ]
     },
     {
-      "id": "step5",
-      "lane": "step5",
+      "id": "step6",
+      "lane": "step6",
       "col": 0,
       "type": "backend",
       "icon": "active",
       "label": "랭킹 가격으로 순차 가상 매수",
-      "sublabel": "기업 주식·거래량 조건을 통과한 N종목에 현금 1/N 배정",
-      "width": 270.4,
+      "sublabel": "기업 주식·거래량·상승률 20% 이하 통과 · 보유 종목 제외 · 신규 N종목에 남은 현금 1/N 배정",
+      "width": 457.59999999999997,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -174,8 +210,8 @@
       ]
     },
     {
-      "id": "step6",
-      "lane": "step6",
+      "id": "step7",
+      "lane": "step7",
       "col": 0,
       "type": "security",
       "icon": "decision",
@@ -190,8 +226,8 @@
       ]
     },
     {
-      "id": "step6-alternate",
-      "lane": "step6",
+      "id": "step7-alternate",
+      "lane": "step7",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -206,8 +242,8 @@
       ]
     },
     {
-      "id": "step7",
-      "lane": "step7",
+      "id": "step8",
+      "lane": "step8",
       "col": 0,
       "type": "security",
       "icon": "decision",
@@ -222,8 +258,8 @@
       ]
     },
     {
-      "id": "step7-alternate",
-      "lane": "step7",
+      "id": "step8-alternate",
+      "lane": "step8",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -238,14 +274,14 @@
       ]
     },
     {
-      "id": "step8",
-      "lane": "step8",
+      "id": "step9",
+      "lane": "step9",
       "col": 0,
       "type": "backend",
       "icon": "active",
       "label": "종목별 매도와 세션 판단",
-      "sublabel": "보유 0 → 세션 손익 확인 · 범위 안이면 후보 조회",
-      "width": 251.2,
+      "sublabel": "보유 0 → 세션 손익 확인 · 보유 중에도 별도 후보 일정 유지",
+      "width": 299.2,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -254,8 +290,8 @@
       ]
     },
     {
-      "id": "step9",
-      "lane": "step9",
+      "id": "step10",
+      "lane": "step10",
       "col": 0,
       "type": "backend",
       "icon": "active",
@@ -309,15 +345,15 @@
     },
     {
       "from": "step5",
+      "to": "step5-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step5",
       "to": "step6",
       "fromSide": "bottom",
       "toSide": "top"
-    },
-    {
-      "from": "step6",
-      "to": "step6-alternate",
-      "role": "branch",
-      "variant": "security"
     },
     {
       "from": "step6",
@@ -339,7 +375,19 @@
     },
     {
       "from": "step8",
+      "to": "step8-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step8",
       "to": "step9",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step9",
+      "to": "step10",
       "fromSide": "bottom",
       "toSide": "top"
     }
@@ -353,6 +401,7 @@
     "step6",
     "step7",
     "step8",
-    "step9"
+    "step9",
+    "step10"
   ]
 }

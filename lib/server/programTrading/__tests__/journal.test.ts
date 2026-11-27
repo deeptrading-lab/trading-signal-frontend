@@ -16,7 +16,7 @@ describe("persistent trading journal", () => {
    s.lifecycle={status:"completed",startedAt:"2026-11-01T00:00:00Z",finishedAt:"2026-11-01T01:00:00Z",beforeBalance:100,afterBalance:102,returnPct:2,targetReturnPct:1,reviewDecision:"keep"};
    await restarted.record(s); await restarted.report(s);
    const review=JSON.parse(await readFile(join(dir,"review.json"),"utf8"));
-   expect(review.rulesVersion).toBe("program-v7-afternoon-close");
+   expect(review.rulesVersion).toBe("program-v8-cash-reinvestment");
    expect(review.closedTrades).toBe(1); expect(review.proposals).toEqual([]); expect(review.autoApply).toBe(false);
    expect((await readFile(join(dir,"trades.jsonl"),"utf8")).trim().split("\n")).toHaveLength(2);
    s.lifecycle.reviewDecision="review"; await restarted.report(s);

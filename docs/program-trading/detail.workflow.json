@@ -5,7 +5,7 @@
     "output": ".archify/program-rules/detail.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "8d17df78a5c736fa4360259034f9e234062100e6",
+      "revision": "3d5482899d7521d6e541c1b258c993e7e7f872ad",
       "link_mode": "local-only"
     },
     "title": "자동매매 · 후보 선정과 가상 매수",
@@ -29,22 +29,30 @@
     },
     {
       "id": "step2",
-      "label": "후보 조회"
+      "label": "조회 일정"
     },
     {
       "id": "step3",
-      "label": "후보 조건"
+      "label": "후보 조회"
     },
     {
       "id": "step4",
-      "label": "순위"
+      "label": "후보 조건"
     },
     {
       "id": "step5",
-      "label": "예산"
+      "label": "순위"
     },
     {
       "id": "step6",
+      "label": "보유 제외"
+    },
+    {
+      "id": "step7",
+      "label": "예산"
+    },
+    {
+      "id": "step8",
       "label": "가상 체결"
     }
   ],
@@ -87,9 +95,9 @@
       "col": 0,
       "type": "security",
       "icon": "decision",
-      "label": "09:05 후보 조회",
-      "sublabel": "토스 국내 시장 실시간 거래량 상위 100개",
-      "width": 240,
+      "label": "잔여 현금과 후보 조회 일정 확인",
+      "sublabel": "보유 여부와 무관하게 10분마다 · 매도 점검 우선",
+      "width": 241.6,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -100,6 +108,38 @@
     {
       "id": "step2-alternate",
       "lane": "step2",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "현금 없음·호출 제한·다음 매도 점검 임박",
+      "sublabel": "후보 조회 대기",
+      "width": 290.5,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step3",
+      "lane": "step3",
+      "col": 0,
+      "type": "security",
+      "icon": "decision",
+      "label": "09:05부터 후보 조회",
+      "sublabel": "토스 국내 시장 실시간 거래량 상위 100개",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step3-alternate",
+      "lane": "step3",
       "col": 1,
       "type": "security",
       "icon": "decision",
@@ -114,14 +154,14 @@
       ]
     },
     {
-      "id": "step3",
-      "lane": "step3",
+      "id": "step4",
+      "lane": "step4",
       "col": 0,
       "type": "security",
       "icon": "decision",
       "label": "기업 주식·거래량·등락률 확인",
-      "sublabel": "유형 STOCK · 거래량 1,000,000주 이상 · 전일 대비 상승",
-      "width": 280,
+      "sublabel": "유형 STOCK · 거래량 1,000,000주 이상 · 전일 대비 0% 초과·20% 이하 상승",
+      "width": 366.4,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -130,14 +170,14 @@
       ]
     },
     {
-      "id": "step3-alternate",
-      "lane": "step3",
+      "id": "step4-alternate",
+      "lane": "step4",
       "col": 1,
       "type": "security",
       "icon": "decision",
-      "label": "ETF·ETN·파생상품·유형 미확인 제외 · 조회 실패/후보 없음",
-      "sublabel": "10분 대기",
-      "width": 407.5,
+      "label": "20% 초과·등락률 미확인·STOCK 아님",
+      "sublabel": "제외 · 조회 실패/후보 없음은 10분 대기",
+      "width": 251.5,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -146,8 +186,8 @@
       ]
     },
     {
-      "id": "step4",
-      "lane": "step4",
+      "id": "step5",
+      "lane": "step5",
       "col": 0,
       "type": "backend",
       "icon": "active",
@@ -162,14 +202,14 @@
       ]
     },
     {
-      "id": "step5",
-      "lane": "step5",
+      "id": "step6",
+      "lane": "step6",
       "col": 0,
-      "type": "backend",
-      "icon": "active",
-      "label": "가용 현금을 후보 수로 균등 배정",
-      "sublabel": "현금 ÷ 후보 수가 종목별 예산 · 예산 ÷ 랭킹 가격",
-      "width": 256,
+      "type": "security",
+      "icon": "decision",
+      "label": "기존 보유 종목 제외",
+      "sublabel": "보유 종목 추가 매수 금지 · 중복 후보 재검사",
+      "width": 240,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -178,14 +218,46 @@
       ]
     },
     {
-      "id": "step6",
+      "id": "step6-alternate",
       "lane": "step6",
+      "col": 1,
+      "type": "security",
+      "icon": "decision",
+      "label": "신규 후보 없음",
+      "sublabel": "현금 유지 · 10분 뒤 재조회",
+      "width": 240,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step7",
+      "lane": "step7",
+      "col": 0,
+      "type": "backend",
+      "icon": "active",
+      "label": "남은 현금을 신규 후보 수로 균등 배정",
+      "sublabel": "매도 후 확정 현금 ÷ 신규 후보 수 · 예산 ÷ 랭킹 가격",
+      "width": 275.2,
+      "sources": [
+        {
+          "path": "docs/program-trading/rules.template.html",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "step8",
+      "lane": "step8",
       "col": 0,
       "type": "backend",
       "icon": "active",
       "label": "정수 주를 순위대로 가상 체결",
-      "sublabel": "1주 미만과 절사 잔액은 현금 · 거래 비용 0",
-      "width": 240,
+      "sublabel": "1주 미만·절사 잔액은 현금 · 거래 비용 0 · 기존 매도 점검 시각 유지",
+      "width": 347.2,
       "sources": [
         {
           "path": "docs/program-trading/rules.template.html",
@@ -233,6 +305,12 @@
     },
     {
       "from": "step4",
+      "to": "step4-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step4",
       "to": "step5",
       "fromSide": "bottom",
       "toSide": "top"
@@ -240,6 +318,24 @@
     {
       "from": "step5",
       "to": "step6",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step6",
+      "to": "step6-alternate",
+      "role": "branch",
+      "variant": "security"
+    },
+    {
+      "from": "step6",
+      "to": "step7",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "step7",
+      "to": "step8",
       "fromSide": "bottom",
       "toSide": "top"
     }
@@ -250,6 +346,8 @@
     "step3",
     "step4",
     "step5",
-    "step6"
+    "step6",
+    "step7",
+    "step8"
   ]
 }

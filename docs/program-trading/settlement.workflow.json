@@ -5,7 +5,7 @@
     "output": ".archify/program-rules/settlement.html",
     "repository": {
       "url": "git@github.com:deeptrading-lab/trading-signal-frontend.git",
-      "revision": "8d17df78a5c736fa4360259034f9e234062100e6",
+      "revision": "3d5482899d7521d6e541c1b258c993e7e7f872ad",
       "link_mode": "local-only"
     },
     "title": "자동매매 · 마감과 원장 정산",

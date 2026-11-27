@@ -2,7 +2,10 @@ import type { CandidateSnapshot, Position, Reason, TradingState } from "@/lib/ty
 import type { PaperPrice } from "./tossPaper";
 import { DEFAULT_PROGRAM_ASSETS } from "@/lib/validation/programTrading/assets";
 
-export const RULES_VERSION = "program-v7-afternoon-close";
+export const RULES_VERSION = "program-v8-cash-reinvestment";
+export function isVolumeBasketPolicy(version: string | undefined) {
+  return version === RULES_VERSION || version === "program-v7-afternoon-close" || version === "program-v6-volume-basket";
+}
 export const RULES = {
   entryStart: 9 * 60,
   candidateStart: 9 * 60 + 5,
@@ -10,6 +13,7 @@ export const RULES = {
   closeMinute: 15 * 60 + 30,
   rankingCount: 100,
   minVolume: 1_000_000,
+  maxEntryChangePercent: 20,
   candidateIntervalMs: 10 * 60_000,
   priceIntervalMs: 5 * 60_000,
   targetPercent: 2,
@@ -43,13 +47,25 @@ function updateEquity(state: TradingState) {
   state.equity = state.cash + state.positions.reduce((total, position) => total + position.mark * position.quantity, 0);
 }
 
-export function buyCandidates(state: TradingState, snapshot: CandidateSnapshot, now: number) {
-  state.candidates = snapshot;
-  state.nextCandidateAt = now + RULES.candidateIntervalMs;
-  if (!snapshot.rows.length) return;
+export function isEntryChangeAllowed(changePercent: number) {
+  return Number.isFinite(changePercent) && changePercent > 0 && changePercent <= RULES.maxEntryChangePercent;
+}
 
-  const budget = Math.floor(state.cash / snapshot.rows.length);
-  for (const candidate of snapshot.rows) {
+export function buyCandidates(state: TradingState, snapshot: CandidateSnapshot, now: number) {
+  if (!state.running || state.lifecycle?.status !== "running"
+    || state.minute < RULES.candidateStart || state.minute >= RULES.profitCloseMinute) return;
+  const excluded = new Set(state.positions.map(position => position.ticker));
+  const rows = snapshot.rows.filter(candidate => {
+    if (excluded.has(candidate.ticker) || !isEntryChangeAllowed(candidate.changePercent)) return false;
+    excluded.add(candidate.ticker);
+    return true;
+  });
+  state.candidates = { ...snapshot, rows, status: rows.length ? snapshot.status : snapshot.status === "ready" ? "empty" : snapshot.status };
+  state.nextCandidateAt = now + RULES.candidateIntervalMs;
+  if (!rows.length) return;
+
+  const budget = Math.floor(state.cash / rows.length);
+  for (const candidate of rows) {
     const { ticker, name, price } = candidate;
     const quantity = Math.floor(budget / price);
     if (quantity < 1) continue;
@@ -61,7 +77,8 @@ export function buyCandidates(state: TradingState, snapshot: CandidateSnapshot, 
       evidence: { candidate, candidateCheckedAt: snapshot.rankedAt ?? snapshot.checkedAt, rules: { ...RULES }, observedAt: now },
     });
   }
-  if (state.positions.length) state.nextPriceAt = now + RULES.priceIntervalMs;
+  // 신규 편입이 기존 보유분의 매도 점검 시각을 뒤로 미루지 않도록 한다.
+  if (state.positions.length) state.nextPriceAt ??= now + RULES.priceIntervalMs;
   updateEquity(state);
 }
 
@@ -133,7 +150,7 @@ function finishSession(state: TradingState, cause: NonNullable<NonNullable<Tradi
 
 export function closeSession(state: TradingState, prices: Map<string, PaperPrice>, cause: "manual" | "close" | "afternoon-profit", now: number) {
   for (const position of state.positions) {
-    if (state.policyVersion !== RULES_VERSION) {
+    if (!isVolumeBasketPolicy(state.policyVersion)) {
       // Retire legacy positions at their historical paper valuation without entering another trade.
       const price = Math.floor((position.bidMark ?? position.mark) * (1 - .0005));
       sell(state, position, price, "timeout", now, Math.ceil(price * position.quantity * (.00015 + .002)), Math.ceil(position.entry * position.quantity * .00015));

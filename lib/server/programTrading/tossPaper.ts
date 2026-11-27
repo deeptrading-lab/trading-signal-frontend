@@ -4,7 +4,7 @@ import { PAPER_MARKET_SOURCE } from "@/lib/api/toss/paperMarketLimit";
 import { getSymbolName } from "@/lib/api/kis/search";
 import { getTossStockMasters } from "@/lib/api/toss/stockMaster";
 import type { CandidateSnapshot, ProgramCandidate } from "@/lib/types/programTrading/programTrading";
-import { RULES } from "./engine";
+import { isEntryChangeAllowed, RULES } from "./engine";
 
 type RankingRow = {
   symbol?: string;
@@ -57,7 +57,7 @@ export async function fetchPaperCandidates(signal: AbortSignal): Promise<Candida
     const changePercent = Number(row?.price?.changeRate) * 100;
     if (!/^[0-9][A-Z0-9]{5}$/.test(ticker) || row?.currency !== "KRW"
       || !Number.isSafeInteger(volume) || volume < RULES.minVolume
-      || !Number.isSafeInteger(price) || price <= 0 || !Number.isFinite(changePercent) || changePercent <= 0) continue;
+      || !Number.isSafeInteger(price) || price <= 0 || !isEntryChangeAllowed(changePercent)) continue;
     candidates.push({
       ticker, name: getSymbolName(ticker) || ticker, price, changePercent, previousClose: previousClose > 0 ? previousClose : 0,
       sources: ["volume"], volume,
